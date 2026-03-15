@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from ...serializers import ContentConfirmSerializer, ContentTopicSerializer
 from .core import (
+    ContentCandidate,
     build_content_plan,
     count_new_items,
     create_phrase_if_missing,
@@ -16,6 +17,8 @@ from .core import (
     is_word_selected,
     save_excluded_words,
     serialize_candidate,
+    item_exists,
+    word_selection_id,
 )
 from .topics import save_topic
 
@@ -29,9 +32,21 @@ class ContentPreviewView(APIView):
 
         topic = serializer.validated_data["topic"].strip()
         context = serializer.validated_data.get("context", "").strip()
-        save_topic(topic, context)
+        source_language = serializer.validated_data.get("source_language", "spanish")
+        target_language = serializer.validated_data.get("target_language", "german")
+        save_topic(
+            topic,
+            context,
+            source_language=source_language,
+            target_language=target_language,
+        )
         logger.info("content.preview.started topic=%s", topic)
-        plan = build_content_plan(topic, context=context)
+        plan = build_content_plan(
+            topic,
+            context=context,
+            source_language=source_language,
+            target_language=target_language,
+        )
         logger.info(
             "content.preview.completed topic=%s phrases_total=%d phrases_new=%d words_total=%d words_new=%d",
             topic,
@@ -44,6 +59,8 @@ class ContentPreviewView(APIView):
             {
                 "topic": topic,
                 "context": context,
+                "source_language": source_language,
+                "target_language": target_language,
                 "phrases": [serialize_candidate(phrase) for phrase in plan.phrases],
                 "words": [serialize_candidate(word) for word in plan.words],
                 "new_items_count": count_new_items(plan),
@@ -58,9 +75,18 @@ class ContentConfirmView(APIView):
 
         topic = serializer.validated_data["topic"].strip()
         context = serializer.validated_data.get("context", "").strip()
-        save_topic(topic, context)
+        source_language = serializer.validated_data.get("source_language", "spanish")
+        target_language = serializer.validated_data.get("target_language", "german")
+        save_topic(
+            topic,
+            context,
+            source_language=source_language,
+            target_language=target_language,
+        )
         selected_phrases = serializer.validated_data.get("selected_phrases")
         selected_words = serializer.validated_data.get("selected_words", [])
+        preview_phrases = serializer.validated_data.get("preview_phrases", [])
+        preview_words = serializer.validated_data.get("preview_words", [])
         logger.info(
             "content.confirm.started topic=%s selected_phrases=%s selected_words=%d",
             topic,
@@ -77,23 +103,59 @@ class ContentConfirmView(APIView):
             for word in selected_words
             if word.strip()
         }
-        plan = build_content_plan(topic, context=context)
+        plan = build_content_plan(
+            topic,
+            context=context,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        selected_word_candidates = (
+            _selected_preview_word_candidates(
+                preview_words=preview_words,
+                source_language=source_language,
+                target_language=target_language,
+            )
+            if preview_words
+            else plan.words
+        )
         words_to_exclude = [
             word
-            for word in plan.words
+            for word in selected_word_candidates
             if (not word.exists) and (not is_word_selected(word, selected_words_normalized))
         ]
         save_excluded_words(words_to_exclude)
 
         created_phrases = [
-            create_phrase_if_missing(phrase, topic)
-            for phrase in plan.phrases
-            if selected_phrases_normalized is None or is_candidate_selected(phrase, selected_phrases_normalized)
+            create_phrase_if_missing(
+                phrase,
+                topic,
+                source_language=source_language,
+                target_language=target_language,
+            )
+            for phrase in (
+                _selected_preview_phrase_candidates(
+                    preview_phrases=preview_phrases,
+                    selected_phrases_normalized=selected_phrases_normalized,
+                    source_language=source_language,
+                    target_language=target_language,
+                )
+                if selected_phrases_normalized is not None and preview_phrases
+                else [
+                    phrase
+                    for phrase in plan.phrases
+                    if selected_phrases_normalized is None or is_candidate_selected(phrase, selected_phrases_normalized)
+                ]
+            )
         ]
         created_phrase_items = [phrase for phrase in created_phrases if phrase is not None]
         created_words = [
-            create_word_if_missing(word, topic)
-            for word in plan.words
+            create_word_if_missing(
+                word,
+                topic,
+                source_language=source_language,
+                target_language=target_language,
+            )
+            for word in selected_word_candidates
             if is_word_selected(word, selected_words_normalized)
         ]
         created_word_items = [word for word in created_words if word is not None]
@@ -108,9 +170,89 @@ class ContentConfirmView(APIView):
         return Response(
             {
                 "topic": topic,
+                "source_language": source_language,
+                "target_language": target_language,
                 "created_phrase": bool(created_phrase_items),
                 "created_phrases_count": len(created_phrase_items),
                 "created_words_count": len(created_word_items),
                 "created_words": [item.spanish_text for item in created_word_items],
             }
         )
+
+
+def _selected_preview_phrase_candidates(
+    *,
+    preview_phrases: list[dict],
+    selected_phrases_normalized: set[str] | None,
+    source_language: str,
+    target_language: str,
+) -> list[ContentCandidate]:
+    if selected_phrases_normalized is None:
+        return []
+
+    candidates: list[ContentCandidate] = []
+    seen_keys: set[str] = set()
+    for phrase in preview_phrases:
+        if not isinstance(phrase, dict):
+            continue
+        spanish_text = str(phrase.get("spanish_text", "")).strip()
+        german_text = str(phrase.get("german_text", "")).strip()
+        notes = str(phrase.get("notes", "")).strip()
+        if not spanish_text or not german_text:
+            continue
+        candidate = ContentCandidate(
+            spanish_text=spanish_text,
+            german_text=german_text,
+            exists=item_exists(
+                "phrase",
+                spanish_text,
+                german_text,
+                source_language=source_language,
+                target_language=target_language,
+            ),
+            notes=notes,
+        )
+        selection_key = word_selection_id(candidate)
+        if selection_key in seen_keys:
+            continue
+        if not is_candidate_selected(candidate, selected_phrases_normalized):
+            continue
+        seen_keys.add(selection_key)
+        candidates.append(candidate)
+    return candidates
+
+
+def _selected_preview_word_candidates(
+    *,
+    preview_words: list[dict],
+    source_language: str,
+    target_language: str,
+) -> list[ContentCandidate]:
+    candidates: list[ContentCandidate] = []
+    seen_keys: set[str] = set()
+    for word in preview_words:
+        if not isinstance(word, dict):
+            continue
+        spanish_text = str(word.get("spanish_text", "")).strip()
+        german_text = str(word.get("german_text", "")).strip()
+        notes = str(word.get("notes", "")).strip()
+        if not spanish_text or not german_text:
+            continue
+        candidate = ContentCandidate(
+            spanish_text=spanish_text,
+            german_text=german_text,
+            exists=item_exists(
+                "word",
+                spanish_text,
+                german_text,
+                source_language=source_language,
+                target_language=target_language,
+            ),
+            notes=notes,
+        )
+        selection_key = word_selection_id(candidate)
+        if selection_key in seen_keys:
+            continue
+        seen_keys.add(selection_key)
+        candidates.append(candidate)
+    return candidates

@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item
+from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item, SavedTopic
 
 
 @pytest.mark.django_db
@@ -422,6 +422,108 @@ def test_content_topic_contexts_endpoint_returns_contexts_for_topic(monkeypatch)
 
 
 @pytest.mark.django_db
+def test_content_topics_endpoint_isolated_by_language_pair(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(content_views, "generate_conversation_with_chatgpt", lambda topic, context="": None)
+    monkeypatch.setattr(
+        content_views,
+        "generate_content_with_chatgpt",
+        lambda topic, context="": (
+            f"Topic {topic}",
+            f"Thema {topic}",
+            "",
+            [],
+        ),
+    )
+
+    client = APIClient()
+    response_es_de = client.post(
+        "/api/content/preview",
+        {"topic": "travel", "source_language": "spanish", "target_language": "german"},
+        format="json",
+    )
+    response_en_fr = client.post(
+        "/api/content/preview",
+        {"topic": "meeting", "source_language": "english", "target_language": "french"},
+        format="json",
+    )
+    assert response_es_de.status_code == 200
+    assert response_en_fr.status_code == 200
+
+    es_de_topics = client.get(
+        "/api/content/topics",
+        {"source_language": "spanish", "target_language": "german"},
+    )
+    en_fr_topics = client.get(
+        "/api/content/topics",
+        {"source_language": "english", "target_language": "french"},
+    )
+    assert es_de_topics.status_code == 200
+    assert en_fr_topics.status_code == 200
+    assert "travel" in es_de_topics.json()["topics"]
+    assert "meeting" not in es_de_topics.json()["topics"]
+    assert "meeting" in en_fr_topics.json()["topics"]
+    assert "travel" not in en_fr_topics.json()["topics"]
+
+
+@pytest.mark.django_db
+def test_content_topic_contexts_endpoint_isolated_by_language_pair(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(content_views, "generate_conversation_with_chatgpt", lambda topic, context="": None)
+    monkeypatch.setattr(
+        content_views,
+        "generate_content_with_chatgpt",
+        lambda topic, context="": (
+            f"Topic {topic}",
+            f"Thema {topic}",
+            "",
+            [],
+        ),
+    )
+
+    client = APIClient()
+    response_es_de = client.post(
+        "/api/content/preview",
+        {
+            "topic": "travel",
+            "context": "at the airport",
+            "source_language": "spanish",
+            "target_language": "german",
+        },
+        format="json",
+    )
+    response_en_fr = client.post(
+        "/api/content/preview",
+        {
+            "topic": "travel",
+            "context": "at the office",
+            "source_language": "english",
+            "target_language": "french",
+        },
+        format="json",
+    )
+    assert response_es_de.status_code == 200
+    assert response_en_fr.status_code == 200
+
+    contexts_es_de = client.get(
+        "/api/content/topic-contexts",
+        {"topic": "travel", "source_language": "spanish", "target_language": "german"},
+    )
+    contexts_en_fr = client.get(
+        "/api/content/topic-contexts",
+        {"topic": "travel", "source_language": "english", "target_language": "french"},
+    )
+    assert contexts_es_de.status_code == 200
+    assert contexts_en_fr.status_code == 200
+    assert "at the airport" in contexts_es_de.json()["contexts"]
+    assert "at the office" not in contexts_es_de.json()["contexts"]
+    assert "at the office" in contexts_en_fr.json()["contexts"]
+    assert "at the airport" not in contexts_en_fr.json()["contexts"]
+
+
+@pytest.mark.django_db
 def test_content_confirm_creates_only_selected_phrases(monkeypatch):
     from learning.views import content as content_views
 
@@ -580,3 +682,177 @@ def test_generate_conversation_prompt_includes_context_and_situation_when_missin
     assert "Context: not provided" in captured["user_input"]
     assert "Situation detail: not provided" in captured["user_input"]
     assert "Style seed: small-talk" in captured["user_input"]
+
+
+@pytest.mark.django_db
+def test_content_confirm_uses_preview_phrases_when_regeneration_differs(monkeypatch):
+    from learning.views import content as content_views
+
+    call_count = {"value": 0}
+
+    def fake_generate_conversation(topic, context="", **kwargs):
+        call_count["value"] += 1
+        if call_count["value"] == 1:
+            return [
+                {"spanish_text": "Quiero reservar una mesa.", "german_text": "Ich moechte einen Tisch reservieren.", "notes": ""}
+            ]
+        return [
+            {"spanish_text": "Necesito un taxi.", "german_text": "Ich brauche ein Taxi.", "notes": ""}
+        ]
+
+    monkeypatch.setattr(content_views, "generate_conversation_with_chatgpt", fake_generate_conversation)
+    monkeypatch.setattr(content_views, "generate_keywords_for_phrase_with_chatgpt", lambda s, g, **kwargs: [])
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    preview = client.post("/api/content/preview", {"topic": "restaurant"}, format="json")
+    assert preview.status_code == 200
+    preview_payload = preview.json()
+    selected_key = preview_payload["phrases"][0]["selection_key"]
+
+    confirm = client.post(
+        "/api/content/confirm",
+        {
+            "topic": "restaurant",
+            "selected_phrases": [selected_key],
+            "selected_words": [],
+            "preview_phrases": preview_payload["phrases"],
+        },
+        format="json",
+    )
+    assert confirm.status_code == 200
+    assert confirm.json()["created_phrases_count"] == 1
+    assert Item.objects.filter(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Quiero reservar una mesa.",
+        german_text="Ich moechte einen Tisch reservieren.",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_content_confirm_uses_preview_words_when_regeneration_differs(monkeypatch):
+    from learning.views import content as content_views
+
+    call_count = {"value": 0}
+
+    def fake_generate_conversation(topic, context="", **kwargs):
+        return [
+            {"spanish_text": "Necesito ayuda.", "german_text": "Ich brauche Hilfe.", "notes": ""},
+        ]
+
+    def fake_generate_keywords(spanish_phrase, german_phrase, **kwargs):
+        call_count["value"] += 1
+        if call_count["value"] == 1:
+            return [
+                {"spanish_text": "ayuda", "german_text": "die Hilfe", "notes": "", "plural_german": ""},
+            ]
+        return [
+            {"spanish_text": "taxi", "german_text": "das Taxi", "notes": "", "plural_german": ""},
+        ]
+
+    monkeypatch.setattr(content_views, "generate_conversation_with_chatgpt", fake_generate_conversation)
+    monkeypatch.setattr(content_views, "generate_keywords_for_phrase_with_chatgpt", fake_generate_keywords)
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    preview = client.post("/api/content/preview", {"topic": "help"}, format="json")
+    assert preview.status_code == 200
+    preview_payload = preview.json()
+    selected_word_key = preview_payload["words"][0]["selection_key"]
+
+    confirm = client.post(
+        "/api/content/confirm",
+        {
+            "topic": "help",
+            "selected_words": [selected_word_key],
+            "preview_words": preview_payload["words"],
+        },
+        format="json",
+    )
+    assert confirm.status_code == 200
+    assert confirm.json()["created_words_count"] == 1
+    assert Item.objects.filter(
+        item_type=Item.ItemType.WORD,
+        spanish_text="ayuda",
+        german_text="die Hilfe",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_content_items_endpoint_lists_items_for_language_pair():
+    first = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        source_language="spanish",
+        target_language="german",
+    )
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hello",
+        german_text="bonjour",
+        source_language="english",
+        target_language="french",
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/content/items",
+        {"source_language": "spanish", "target_language": "german"},
+    )
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()["items"]]
+    assert first.id in ids
+    assert len(ids) == 1
+
+
+@pytest.mark.django_db
+def test_content_item_delete_endpoint_removes_item_for_language_pair():
+    removable = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="hola",
+        german_text="hallo",
+        source_language="spanish",
+        target_language="german",
+    )
+    other_pair = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="hola",
+        german_text="salut",
+        source_language="spanish",
+        target_language="french",
+    )
+
+    client = APIClient()
+    response = client.delete(
+        f"/api/content/items/{removable.id}",
+        {"source_language": "spanish", "target_language": "german"},
+        format="json",
+    )
+    assert response.status_code == 204
+    assert Item.objects.filter(id=removable.id).exists() is False
+    assert Item.objects.filter(id=other_pair.id).exists() is True
+
+
+@pytest.mark.django_db
+def test_content_topic_delete_endpoint_removes_topic_for_language_pair():
+    SavedTopic.objects.create(topic="travel", source_language="spanish", target_language="german")
+    SavedTopic.objects.create(topic="travel", source_language="english", target_language="french")
+
+    client = APIClient()
+    response = client.delete(
+        "/api/content/topics/delete",
+        {"topic": "travel", "source_language": "spanish", "target_language": "german"},
+        format="json",
+    )
+    assert response.status_code == 204
+    assert SavedTopic.objects.filter(topic="travel", source_language="spanish", target_language="german").exists() is False
+    assert SavedTopic.objects.filter(topic="travel", source_language="english", target_language="french").exists() is True

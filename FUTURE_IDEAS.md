@@ -24,6 +24,7 @@
 - Track answer quality score, latency, and streak.
 - Add adaptive hint penalties and confidence scoring.
 - Start the session asking for a time commitment and adjust session size dynamically. 
+- Add article handling (e.g. for gendered languages) and more complex item types (e.g. sentences, audio).
 
 ## Frontend
 

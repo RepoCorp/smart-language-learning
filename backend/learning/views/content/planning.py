@@ -17,18 +17,61 @@ logger = logging.getLogger(__name__)
 GERMAN_ARTICLES = {"der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines"}
 
 
-def _generate_conversation(topic: str, context: str) -> list[dict[str, str]] | None:
+def _generate_conversation(
+    topic: str,
+    context: str,
+    source_language: str,
+    target_language: str,
+) -> list[dict[str, str]] | None:
     try:
-        return generate_conversation_with_chatgpt(topic, context=context)
+        return generate_conversation_with_chatgpt(
+            topic,
+            context=context,
+            source_language=source_language,
+            target_language=target_language,
+        )
     except TypeError:
-        return generate_conversation_with_chatgpt(topic)
+        try:
+            return generate_conversation_with_chatgpt(topic, context=context)
+        except TypeError:
+            return generate_conversation_with_chatgpt(topic)
 
 
-def _generate_content(topic: str, context: str) -> tuple[str, str, str, list[dict[str, str]]] | None:
+def _generate_content(
+    topic: str,
+    context: str,
+    source_language: str,
+    target_language: str,
+) -> tuple[str, str, str, list[dict[str, str]]] | None:
     try:
-        return generate_content_with_chatgpt(topic, context=context)
+        return generate_content_with_chatgpt(
+            topic,
+            context=context,
+            source_language=source_language,
+            target_language=target_language,
+        )
     except TypeError:
-        return generate_content_with_chatgpt(topic)
+        try:
+            return generate_content_with_chatgpt(topic, context=context)
+        except TypeError:
+            return generate_content_with_chatgpt(topic)
+
+
+def _generate_keywords(
+    spanish_text: str,
+    german_text: str,
+    source_language: str,
+    target_language: str,
+) -> list[dict[str, str]] | None:
+    try:
+        return generate_keywords_for_phrase_with_chatgpt(
+            spanish_text,
+            german_text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+    except TypeError:
+        return generate_keywords_for_phrase_with_chatgpt(spanish_text, german_text)
 
 
 def _normalize_for_phrase_match(value: str) -> str:
@@ -68,10 +111,20 @@ def _append_non_literal_note(notes: str, spanish_word: str, german_word: str) ->
     return f"{base}{suffix}"
 
 
-def build_content_plan(topic: str, context: str = "") -> ContentPlan:
+def build_content_plan(
+    topic: str,
+    context: str = "",
+    source_language: str = "spanish",
+    target_language: str = "german",
+) -> ContentPlan:
     normalized_topic = normalize_topic(topic)
     normalized_context = " ".join(context.split()).strip()
-    generated_conversation = _generate_conversation(normalized_topic, normalized_context)
+    generated_conversation = _generate_conversation(
+        normalized_topic,
+        normalized_context,
+        source_language=source_language,
+        target_language=target_language,
+    )
     phrase_sources: list[tuple[str, str, str, list[dict[str, str]]]] = []
 
     if generated_conversation is not None:
@@ -79,10 +132,20 @@ def build_content_plan(topic: str, context: str = "") -> ContentPlan:
             spanish_text = phrase["spanish_text"].strip()
             german_text = phrase["german_text"].strip()
             notes = str(phrase.get("notes", "")).strip()
-            keyword_result = generate_keywords_for_phrase_with_chatgpt(spanish_text, german_text) or []
+            keyword_result = _generate_keywords(
+                spanish_text,
+                german_text,
+                source_language=source_language,
+                target_language=target_language,
+            ) or []
             phrase_sources.append((spanish_text, german_text, notes, keyword_result))
     else:
-        generated = _generate_content(normalized_topic, normalized_context)
+        generated = _generate_content(
+            normalized_topic,
+            normalized_context,
+            source_language=source_language,
+            target_language=target_language,
+        )
         if generated is None:
             logger.warning("content.generate.fallback topic=%s reason=chatgpt_unavailable_or_invalid", normalized_topic)
             phrase_sources = [(f"Hoy estudio {normalized_topic}.", f"Heute lerne ich {normalized_topic}.", "", [])]
@@ -95,7 +158,13 @@ def build_content_plan(topic: str, context: str = "") -> ContentPlan:
 
     phrases: list[ContentCandidate] = []
     for phrase_es, phrase_de, phrase_notes, _ in phrase_sources:
-        phrase_exists = item_exists(Item.ItemType.PHRASE, phrase_es, phrase_de)
+        phrase_exists = item_exists(
+            Item.ItemType.PHRASE,
+            phrase_es,
+            phrase_de,
+            source_language=source_language,
+            target_language=target_language,
+        )
         phrases.append(
             ContentCandidate(
                 spanish_text=phrase_es,
@@ -122,7 +191,7 @@ def build_content_plan(topic: str, context: str = "") -> ContentPlan:
             if not spanish_word or not german_word:
                 skipped_missing_fields += 1
                 continue
-            if not german_word_has_article(german_word):
+            if target_language == "german" and not german_word_has_article(german_word):
                 skipped_without_article += 1
                 continue
             key = normalize_word_pair(spanish_word, german_word)
@@ -141,7 +210,13 @@ def build_content_plan(topic: str, context: str = "") -> ContentPlan:
                 keyword_notes = _append_non_literal_note(keyword_notes, spanish_word, german_word)
             plural_german = str(keyword.get("plural_german", "")).strip()
             keyword_notes = enrich_notes_with_plural(keyword_notes, plural_german)
-            exists = item_exists(Item.ItemType.WORD, spanish_word, german_word)
+            exists = item_exists(
+                Item.ItemType.WORD,
+                spanish_word,
+                german_word,
+                source_language=source_language,
+                target_language=target_language,
+            )
             words.append(
                 ContentCandidate(
                     spanish_text=spanish_word,

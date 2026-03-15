@@ -148,3 +148,36 @@ def test_phrase_directions_have_independent_session_status():
     directions = [item["direction"] for item in upcoming_response.json()["items"] if item["id"] == phrase.id]
     assert Item.ReviewDirection.SPANISH_TO_GERMAN in directions
     assert Item.ReviewDirection.GERMAN_TO_SPANISH in directions
+
+
+@pytest.mark.django_db
+def test_session_filters_items_by_language_pair():
+    now = timezone.now()
+    es_de_due = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        source_language="spanish",
+        target_language="german",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hello",
+        german_text="bonjour",
+        source_language="english",
+        target_language="french",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/session",
+        {"size": 5, "source_language": "spanish", "target_language": "german"},
+    )
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()["items"]]
+    assert es_de_due.id in ids
+    assert len(ids) == 1

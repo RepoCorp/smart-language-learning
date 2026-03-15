@@ -63,6 +63,14 @@ COMMON_WORDS = {
     "yo",
 }
 GREETING_HINTS = {"greeting", "greetings", "saludo", "saludos", "hello", "hola", "reunion", "reunión"}
+STUDY_LANGUAGE_LABELS = {
+    "spanish": "Spanish",
+    "english": "English",
+    "german": "German",
+    "french": "French",
+    "italian": "Italian",
+    "portuguese": "Portuguese",
+}
 
 
 def call_openai_json(
@@ -124,6 +132,10 @@ def _normalize_text(value: str) -> str:
     lowered = value.lower()
     cleaned = re.sub(r"[^\w\s]", " ", lowered, flags=re.UNICODE)
     return " ".join(cleaned.split())
+
+
+def _language_label(code: str) -> str:
+    return STUDY_LANGUAGE_LABELS.get(code, code.capitalize())
 
 
 def _extract_keywords(text: str) -> list[str]:
@@ -262,6 +274,8 @@ def _validate_conversation(
 def _build_conversation_prompt(
     topic: str,
     context: str,
+    source_language: str,
+    target_language: str,
     style_seed: str,
     recent_patterns: list[dict[str, object]],
     retry_hint: str = "",
@@ -273,6 +287,10 @@ def _build_conversation_prompt(
         f"Topic: {topic}",
         f"Context: {context_value}",
         f"Situation detail: {situation_detail}",
+        (
+            "Language mapping: use 'source_text' for "
+            f"{_language_label(source_language)} and 'target_text' for {_language_label(target_language)}."
+        ),
         f"Style seed: {style_seed}",
         "Variety constraints: avoid overused templates and avoid reusing the same key verb/noun in consecutive turns unless necessary.",
         "Recent conversation fingerprints to avoid:",
@@ -283,7 +301,12 @@ def _build_conversation_prompt(
     return "\n".join(parts)
 
 
-def generate_conversation_with_chatgpt(topic: str, context: str = "") -> list[dict[str, str]] | None:
+def generate_conversation_with_chatgpt(
+    topic: str,
+    context: str = "",
+    source_language: str = "spanish",
+    target_language: str = "german",
+) -> list[dict[str, str]] | None:
     style_seed = choice(STYLE_SEEDS)
     recent_patterns = _load_recent_fingerprints()
     retry_hint = "more variation, same topic and level"
@@ -294,6 +317,8 @@ def generate_conversation_with_chatgpt(topic: str, context: str = "") -> list[di
             _build_conversation_prompt(
                 topic=topic,
                 context=context,
+                source_language=source_language,
+                target_language=target_language,
                 style_seed=style_seed,
                 recent_patterns=recent_patterns,
                 retry_hint=retry_hint if attempt == 1 else "",
@@ -315,15 +340,15 @@ def generate_conversation_with_chatgpt(topic: str, context: str = "") -> list[di
         for phrase in conversation:
             if not isinstance(phrase, dict):
                 continue
-            spanish_text = str(phrase.get("spanish_text", "")).strip()
-            german_text = str(phrase.get("german_text", "")).strip()
+            source_text = str(phrase.get("source_text", phrase.get("spanish_text", ""))).strip()
+            target_text = str(phrase.get("target_text", phrase.get("german_text", ""))).strip()
             notes = str(phrase.get("notes", "")).strip()
-            if not spanish_text or not german_text:
+            if not source_text or not target_text:
                 continue
             phrases.append(
                 {
-                    "spanish_text": spanish_text,
-                    "german_text": german_text,
+                    "spanish_text": source_text,
+                    "german_text": target_text,
                     "notes": notes,
                 }
             )
@@ -357,10 +382,24 @@ def generate_conversation_with_chatgpt(topic: str, context: str = "") -> list[di
     return None
 
 
-def generate_keywords_for_phrase_with_chatgpt(spanish_phrase: str, german_phrase: str) -> list[dict[str, str]] | None:
+def generate_keywords_for_phrase_with_chatgpt(
+    spanish_phrase: str,
+    german_phrase: str,
+    source_language: str = "spanish",
+    target_language: str = "german",
+) -> list[dict[str, str]] | None:
+    article_requirement = (
+        "For german_text, include article and singular form (e.g., 'der Park')."
+        if target_language == "german"
+        else "Do not force articles in german_text unless natural for the selected target language."
+    )
     parsed = call_openai_json(
         PHRASE_KEYWORDS_PROMPT,
-        f"Spanish phrase: {spanish_phrase}\nGerman phrase: {german_phrase}",
+        (
+            f"Source language ({_language_label(source_language)}) phrase in source_text: {spanish_phrase}\n"
+            f"Target language ({_language_label(target_language)}) phrase in target_text: {german_phrase}\n"
+            f"{article_requirement}"
+        ),
     )
     if parsed is None:
         return None
@@ -374,10 +413,10 @@ def generate_keywords_for_phrase_with_chatgpt(spanish_phrase: str, german_phrase
     for keyword in keywords:
         if not isinstance(keyword, dict):
             continue
-        spanish_word = str(keyword.get("spanish_text", "")).strip()
-        german_word = str(keyword.get("german_text", "")).strip()
+        spanish_word = str(keyword.get("source_text", keyword.get("spanish_text", ""))).strip()
+        german_word = str(keyword.get("target_text", keyword.get("german_text", ""))).strip()
         keyword_notes = str(keyword.get("notes", "")).strip()
-        plural_german = str(keyword.get("plural_german", "")).strip()
+        plural_german = str(keyword.get("plural_target", keyword.get("plural_german", ""))).strip()
         if not spanish_word or not german_word:
             continue
         cleaned_keywords.append(
@@ -397,15 +436,33 @@ def generate_keywords_for_phrase_with_chatgpt(spanish_phrase: str, german_phrase
     return cleaned_keywords
 
 
-def generate_content_with_chatgpt(topic: str, context: str = "") -> tuple[str, str, str, list[dict[str, str]]] | None:
-    conversation = generate_conversation_with_chatgpt(topic, context=context)
+def generate_content_with_chatgpt(
+    topic: str,
+    context: str = "",
+    source_language: str = "spanish",
+    target_language: str = "german",
+) -> tuple[str, str, str, list[dict[str, str]]] | None:
+    conversation = generate_conversation_with_chatgpt(
+        topic,
+        context=context,
+        source_language=source_language,
+        target_language=target_language,
+    )
     if not conversation:
         return None
     first = conversation[0]
     spanish_text = first["spanish_text"]
     german_text = first["german_text"]
     notes = first.get("notes", "")
-    keywords = generate_keywords_for_phrase_with_chatgpt(spanish_text, german_text) or []
+    keywords = (
+        generate_keywords_for_phrase_with_chatgpt(
+            spanish_text,
+            german_text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        or []
+    )
     return spanish_text, german_text, notes, keywords
 
 

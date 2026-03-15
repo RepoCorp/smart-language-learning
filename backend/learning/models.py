@@ -1,5 +1,14 @@
 from django.db import models
 
+STUDY_LANGUAGE_CHOICES = (
+    ("spanish", "Spanish"),
+    ("english", "English"),
+    ("german", "German"),
+    ("french", "French"),
+    ("italian", "Italian"),
+    ("portuguese", "Portuguese"),
+)
+
 
 class Item(models.Model):
     class ItemType(models.TextChoices):
@@ -13,6 +22,8 @@ class Item(models.Model):
     item_type = models.CharField(max_length=10, choices=ItemType.choices)
     spanish_text = models.CharField(max_length=255)
     german_text = models.CharField(max_length=255)
+    source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
+    target_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="german")
     example_sentence = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     audio_url = models.URLField(blank=True)
@@ -57,13 +68,23 @@ class ExcludedWordSuggestion(models.Model):
 
 
 class SavedTopic(models.Model):
-    topic = models.CharField(max_length=120, unique=True)
+    topic = models.CharField(max_length=120)
+    source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
+    target_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="german")
     used_count = models.PositiveIntegerField(default=1)
     last_used_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("topic", "source_language", "target_language"),
+                name="learning_savedtopic_topic_langpair_uniq",
+            )
+        ]
+
     def __str__(self) -> str:
-        return self.topic
+        return f"{self.topic} ({self.source_language}->{self.target_language})"
 
 
 class SavedTopicContext(models.Model):

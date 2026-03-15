@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { fetchSession, markSeen, submitReview } from "../api";
 import { useI18n } from "../i18n";
+import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
@@ -10,6 +11,7 @@ import WordReview from "./WordReview";
 
 export default function SessionPage(): JSX.Element {
   const { t } = useI18n();
+  const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const [items, setItems] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -22,7 +24,7 @@ export default function SessionPage(): JSX.Element {
     setError("");
     setShowIncorrectReviewItem(false);
     try {
-      const data = await fetchSession(5);
+      const data = await fetchSession(5, sourceLanguage, targetLanguage);
       setItems(data.items || []);
       setIndex(0);
     } catch {
@@ -30,7 +32,7 @@ export default function SessionPage(): JSX.Element {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, sourceLanguage, targetLanguage]);
 
   useEffect(() => {
     void loadSession();
@@ -98,7 +100,15 @@ export default function SessionPage(): JSX.Element {
   }
 
   if (!items.length) {
-    return <main className="container">{t("session.empty")}</main>;
+    return (
+      <main className="container">
+        <p>{t("session.empty")}</p>
+        <p>
+          <Link to="/content/create">{t("session.createContent")}</Link> |{" "}
+          <Link to="/content/manage">{t("content.manageLink")}</Link>
+        </p>
+      </main>
+    );
   }
 
   if (!current) {
@@ -109,7 +119,8 @@ export default function SessionPage(): JSX.Element {
     <main className="container" data-testid="session-page">
       <h1>{t("session.title")}</h1>
       <p>
-        <Link to="/content/create">{t("session.createContent")}</Link>
+        <Link to="/content/create">{t("session.createContent")}</Link> |{" "}
+        <Link to="/content/manage">{t("content.manageLink")}</Link>
       </p>
       <p>
         {t("session.itemProgress", { current: index + 1, total: items.length })}

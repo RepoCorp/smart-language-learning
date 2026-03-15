@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from .models import Item
+from .models import STUDY_LANGUAGE_CHOICES, Item
 
 
 class SessionItemSerializer(serializers.Serializer):
@@ -39,6 +39,21 @@ class ContentTopicSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
     )
+    source_language = serializers.ChoiceField(
+        choices=STUDY_LANGUAGE_CHOICES,
+        required=False,
+        default="spanish",
+    )
+    target_language = serializers.ChoiceField(
+        choices=STUDY_LANGUAGE_CHOICES,
+        required=False,
+        default="german",
+    )
+
+    def validate(self, attrs):
+        if attrs.get("source_language") == attrs.get("target_language"):
+            raise serializers.ValidationError("source_language and target_language must be different.")
+        return attrs
 
 
 class ContentConfirmSerializer(ContentTopicSerializer):
@@ -49,6 +64,16 @@ class ContentConfirmSerializer(ContentTopicSerializer):
     )
     selected_words = serializers.ListField(
         child=serializers.CharField(max_length=600),
+        required=False,
+        allow_empty=True,
+    )
+    preview_phrases = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_empty=True,
+    )
+    preview_words = serializers.ListField(
+        child=serializers.DictField(),
         required=False,
         allow_empty=True,
     )

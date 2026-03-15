@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useI18n } from "../i18n";
+import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 
 function normalize(value: string): string {
@@ -16,12 +17,23 @@ const FEEDBACK_DELAY_MS = 2000;
 
 export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
+  const { sourceLanguage, targetLanguage } = useStudyLanguages();
+  const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
+    spanish: "study.language.spanish",
+    english: "study.language.english",
+    german: "study.language.german",
+    french: "study.language.french",
+    italian: "study.language.italian",
+    portuguese: "study.language.portuguese",
+  };
   const [feedback, setFeedback] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const isSpanishToGerman = item.direction !== "de_to_es";
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
-  const languageLabel = isSpanishToGerman ? t("review.language.german") : t("review.language.spanish");
+  const languageLabel = isSpanishToGerman
+    ? t(languageKeyByCode[targetLanguage])
+    : t(languageKeyByCode[sourceLanguage]);
 
   const choose = async (choice: string): Promise<void> => {
     if (isSubmitting) {

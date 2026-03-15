@@ -1,6 +1,7 @@
 export type ItemType = "word" | "phrase";
 export type SessionMode = "new" | "review";
 export type ReviewDirection = "es_to_de" | "de_to_es";
+export type StudyLanguageCode = "spanish" | "english" | "german" | "french" | "italian" | "portuguese";
 
 export interface SessionItem {
   id: number;
@@ -30,6 +31,8 @@ export interface ContentCandidate {
 export interface ContentPreviewResponse {
   topic: string;
   context?: string;
+  source_language?: StudyLanguageCode;
+  target_language?: StudyLanguageCode;
   phrases: ContentCandidate[];
   words: ContentCandidate[];
   new_items_count: number;
@@ -37,6 +40,8 @@ export interface ContentPreviewResponse {
 
 export interface ContentConfirmResponse {
   topic: string;
+  source_language?: StudyLanguageCode;
+  target_language?: StudyLanguageCode;
   created_phrase: boolean;
   created_phrases_count?: number;
   created_words_count: number;
@@ -45,6 +50,18 @@ export interface ContentConfirmResponse {
 
 export interface ContentTopicsResponse {
   topics: string[];
+}
+
+export interface ContentItemRecord {
+  id: number;
+  item_type: ItemType;
+  spanish_text: string;
+  german_text: string;
+  created_at: string;
+}
+
+export interface ContentItemsResponse {
+  items: ContentItemRecord[];
 }
 
 export interface ContentTopicContextsResponse {

@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 
 import { confirmContent, fetchContentTopicContexts, fetchContentTopics, previewContent } from "../api";
 import { useI18n } from "../i18n";
+import { useStudyLanguages } from "../studyLanguages";
 import type { ContentPreviewResponse } from "../types";
 
 const CREATE_NEW_OPTION = "__create_new__";
 
 export default function ContentCreatePage(): JSX.Element {
   const { t } = useI18n();
+  const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const [selectedTopic, setSelectedTopic] = useState<string>("");
   const [customTopic, setCustomTopic] = useState<string>("");
   const [selectedContext, setSelectedContext] = useState<string>("");
@@ -28,14 +30,34 @@ export default function ContentCreatePage(): JSX.Element {
 
     const loadTopics = async (): Promise<void> => {
       try {
-        const response = await fetchContentTopics();
+        const response = await fetchContentTopics(sourceLanguage, targetLanguage);
         if (!active) {
           return;
         }
         setPreviousTopics(response.topics || []);
+        setSelectedTopic("");
+        setCustomTopic("");
+        setPreviousContexts([]);
+        setSelectedContext("");
+        setCustomContext("");
+        setPreview(null);
+        setSelectedPhrases({});
+        setSelectedWords({});
+        setResult("");
+        setError("");
       } catch {
         if (active) {
           setPreviousTopics([]);
+          setSelectedTopic("");
+          setCustomTopic("");
+          setPreviousContexts([]);
+          setSelectedContext("");
+          setCustomContext("");
+          setPreview(null);
+          setSelectedPhrases({});
+          setSelectedWords({});
+          setResult("");
+          setError("");
         }
       }
     };
@@ -44,7 +66,7 @@ export default function ContentCreatePage(): JSX.Element {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sourceLanguage, targetLanguage]);
 
   useEffect(() => {
     let active = true;
@@ -55,7 +77,7 @@ export default function ContentCreatePage(): JSX.Element {
         return;
       }
       try {
-        const response = await fetchContentTopicContexts(selectedTopic.trim());
+        const response = await fetchContentTopicContexts(selectedTopic.trim(), sourceLanguage, targetLanguage);
         if (!active) {
           return;
         }
@@ -75,10 +97,10 @@ export default function ContentCreatePage(): JSX.Element {
     return () => {
       active = false;
     };
-  }, [selectedTopic]);
+  }, [selectedTopic, sourceLanguage, targetLanguage]);
 
-  const shouldCreateNewTopic = previousTopics.length === 0 || selectedTopic === CREATE_NEW_OPTION;
-  const shouldCreateNewContext = previousContexts.length === 0 || selectedContext === CREATE_NEW_OPTION;
+  const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
+  const shouldCreateNewContext = selectedContext === CREATE_NEW_OPTION;
 
   const onGeneratePreview = async (): Promise<void> => {
     setError("");
@@ -97,9 +119,9 @@ export default function ContentCreatePage(): JSX.Element {
 
     setLoading(true);
     try {
-      const data = await previewContent(topicFromInput, contextFromInput);
+      const data = await previewContent(topicFromInput, contextFromInput, sourceLanguage, targetLanguage);
       setPreview(data);
-      const topicsResponse = await fetchContentTopics();
+      const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
       const initialPhraseSelection: Record<string, boolean> = {};
       for (const phrase of data.phrases) {
@@ -140,7 +162,24 @@ export default function ContentCreatePage(): JSX.Element {
           return !word.exists && selectedWords[key];
         })
         .map((word) => word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`);
-      const response = await confirmContent(preview.topic, phrasesToSave, wordsToSave, preview.context || "");
+      const response = await confirmContent(
+        preview.topic,
+        phrasesToSave,
+        wordsToSave,
+        preview.context || "",
+        preview.source_language || sourceLanguage,
+        preview.target_language || targetLanguage,
+        preview.phrases.map((phrase) => ({
+          spanish_text: phrase.spanish_text,
+          german_text: phrase.german_text,
+          notes: phrase.notes || "",
+        })),
+        preview.words.map((word) => ({
+          spanish_text: word.spanish_text,
+          german_text: word.german_text,
+          notes: word.notes || "",
+        })),
+      );
       const phraseMessage = response.created_phrases_count
         ? t("content.result.phrasesCreated", { count: response.created_phrases_count })
         : t("content.result.phrasesExisted");
@@ -157,7 +196,7 @@ export default function ContentCreatePage(): JSX.Element {
       setPreview(null);
       setSelectedPhrases({});
       setSelectedWords({});
-      const topicsResponse = await fetchContentTopics();
+      const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
       setError(t("content.error.saveContent"));
@@ -185,7 +224,8 @@ export default function ContentCreatePage(): JSX.Element {
       <h1>{t("content.title")}</h1>
       <p>{t("content.description")}</p>
       <p>
-        <Link to="/session">{t("content.backToSession")}</Link>
+        <Link to="/session">{t("content.backToSession")}</Link> |{" "}
+        <Link to="/content/manage">{t("content.manageLink")}</Link>
       </p>
 
       <section className="card">
@@ -342,6 +382,14 @@ export default function ContentCreatePage(): JSX.Element {
             </button>
           </div>
         </section>
+      )}
+
+      {saving && (
+        <div className="blocking-modal-overlay" role="alert" aria-live="assertive" aria-busy="true">
+          <div className="blocking-modal">
+            <p>{t("content.saving")}</p>
+          </div>
+        </div>
       )}
     </main>
   );

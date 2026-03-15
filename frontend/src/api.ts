@@ -1,11 +1,13 @@
 import type {
   ContentConfirmResponse,
+  ContentItemsResponse,
   ContentPreviewResponse,
   ContentTopicContextsResponse,
   ContentTopicsResponse,
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
+  StudyLanguageCode,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
@@ -19,8 +21,17 @@ export function getOverviewStatsUpdatedEventName(): string {
   return OVERVIEW_STATS_UPDATED_EVENT;
 }
 
-export async function fetchSession(size = 5): Promise<SessionResponse> {
-  const response = await fetch(`${API_BASE}/session?size=${size}`);
+export async function fetchSession(
+  size = 5,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<SessionResponse> {
+  const params = new URLSearchParams({
+    size: String(size),
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/session?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load session");
   }
@@ -58,11 +69,21 @@ export async function markSeen(itemId: number): Promise<void> {
   notifyOverviewStatsUpdated();
 }
 
-export async function previewContent(topic: string, context = ""): Promise<ContentPreviewResponse> {
+export async function previewContent(
+  topic: string,
+  context = "",
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentPreviewResponse> {
   const response = await fetch(`${API_BASE}/content/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, context }),
+    body: JSON.stringify({
+      topic,
+      context,
+      source_language: sourceLanguage,
+      target_language: targetLanguage,
+    }),
   });
   if (!response.ok) {
     throw new Error("Failed to generate content preview");
@@ -75,6 +96,10 @@ export async function confirmContent(
   selectedPhrases: string[],
   selectedWords: string[],
   context = "",
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+  previewPhrases: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
+  previewWords: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
 ): Promise<ContentConfirmResponse> {
   const response = await fetch(`${API_BASE}/content/confirm`, {
     method: "POST",
@@ -82,8 +107,12 @@ export async function confirmContent(
     body: JSON.stringify({
       topic,
       context,
+      source_language: sourceLanguage,
+      target_language: targetLanguage,
       selected_phrases: selectedPhrases,
       selected_words: selectedWords,
+      preview_phrases: previewPhrases,
+      preview_words: previewWords,
     }),
   });
   if (!response.ok) {
@@ -93,16 +122,46 @@ export async function confirmContent(
   return (await response.json()) as ContentConfirmResponse;
 }
 
-export async function fetchContentTopics(): Promise<ContentTopicsResponse> {
-  const response = await fetch(`${API_BASE}/content/topics`);
+export async function fetchContentTopics(
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentTopicsResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/topics?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load previous topics");
   }
   return (await response.json()) as ContentTopicsResponse;
 }
 
-export async function fetchContentTopicContexts(topic: string): Promise<ContentTopicContextsResponse> {
-  const params = new URLSearchParams({ topic });
+export async function fetchContentItems(
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemsResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/items?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to load saved items");
+  }
+  return (await response.json()) as ContentItemsResponse;
+}
+
+export async function fetchContentTopicContexts(
+  topic: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentTopicContextsResponse> {
+  const params = new URLSearchParams({
+    topic,
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
   const response = await fetch(`${API_BASE}/content/topic-contexts?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load topic contexts");
@@ -110,8 +169,52 @@ export async function fetchContentTopicContexts(topic: string): Promise<ContentT
   return (await response.json()) as ContentTopicContextsResponse;
 }
 
-export async function fetchOverviewStats(): Promise<OverviewStatsResponse> {
-  const response = await fetch(`${API_BASE}/overview-stats`);
+export async function deleteContentItem(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<void> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete item");
+  }
+  notifyOverviewStatsUpdated();
+}
+
+export async function deleteContentTopic(
+  topic: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/content/topics/delete`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      topic,
+      source_language: sourceLanguage,
+      target_language: targetLanguage,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete topic");
+  }
+}
+
+export async function fetchOverviewStats(
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<OverviewStatsResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/overview-stats?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load overview stats");
   }

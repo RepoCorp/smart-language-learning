@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useI18n } from "../i18n";
+import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 
 interface NewItemProps {
@@ -10,6 +11,17 @@ interface NewItemProps {
 
 export default function NewItem({ item, onContinue }: NewItemProps): JSX.Element {
   const { t } = useI18n();
+  const { sourceLanguage, targetLanguage } = useStudyLanguages();
+  const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
+    spanish: "study.language.spanish",
+    english: "study.language.english",
+    german: "study.language.german",
+    french: "study.language.french",
+    italian: "study.language.italian",
+    portuguese: "study.language.portuguese",
+  };
+  const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
+  const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
   const [saving, setSaving] = useState<boolean>(false);
 
   const markAsSeen = async (): Promise<void> => {
@@ -43,10 +55,10 @@ export default function NewItem({ item, onContinue }: NewItemProps): JSX.Element
     <div>
       <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
       <p>
-        <strong>{t("newItem.spanish")}</strong> {item.spanish_text}
+        <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {item.spanish_text}
       </p>
       <p>
-        <strong>{t("newItem.german")}</strong> {item.german_text}
+        <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {item.german_text}
       </p>
       <p>
         <strong>{t("newItem.example")}</strong> {item.example_sentence || "-"}
