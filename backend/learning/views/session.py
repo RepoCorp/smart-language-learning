@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from collections import defaultdict
 
 from django.utils import timezone
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Item
+from ..models import Item, ItemDialogOccurrence
 from ..serializers import SessionItemSerializer
 
 
@@ -209,6 +210,7 @@ def entry_key(entry: SessionEntry) -> tuple[int, str | None]:
 
 def serialize_entries(entries: list[SessionEntry]) -> list[dict]:
     options_map = build_phrase_options(entries)
+    related_dialogs_map = build_related_dialogs_map(entries)
     payload: list[dict] = []
 
     for entry in entries:
@@ -224,6 +226,7 @@ def serialize_entries(entries: list[SessionEntry]) -> list[dict]:
                 "mode": entry.mode,
                 "direction": entry.direction,
                 "options": options_map.get(entry_key(entry), []),
+                "related_dialogs": related_dialogs_map.get(entry.item.id, []),
             }
         )
 
@@ -274,3 +277,48 @@ def build_phrase_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
         options_map[entry_key(entry)] = choices
 
     return options_map
+
+
+def build_related_dialogs_map(entries: list[SessionEntry], per_item_limit: int = 4) -> dict[int, list[dict]]:
+    item_ids = {entry.item.id for entry in entries}
+    if not item_ids:
+        return {}
+
+    occurrences = (
+        ItemDialogOccurrence.objects.filter(item_id__in=item_ids)
+        .select_related("dialog", "turn")
+        .order_by("-created_at", "-match_score", "-dialog__created_at", "-id")
+    )
+
+    by_item_dialog: dict[int, dict[int, dict]] = defaultdict(dict)
+    for occurrence in occurrences:
+        dialogs_for_item = by_item_dialog[occurrence.item_id]
+        dialog_payload = dialogs_for_item.get(occurrence.dialog_id)
+        if dialog_payload is None:
+            if len(dialogs_for_item) >= per_item_limit:
+                continue
+            dialog_payload = {
+                "dialog_id": occurrence.dialog_id,
+                "topic": occurrence.dialog.topic,
+                "context": occurrence.dialog.context,
+                "audio_url": occurrence.dialog.audio_url,
+                "created_at": occurrence.dialog.created_at.isoformat(),
+                "turns": occurrence.dialog.turns if isinstance(occurrence.dialog.turns, list) else [],
+                "matched_turns": [],
+            }
+            dialogs_for_item[occurrence.dialog_id] = dialog_payload
+
+        matched_turn = {
+            "turn_index": occurrence.turn_index,
+            "side": occurrence.side,
+            "match_score": occurrence.match_score,
+            "source_text": occurrence.turn.source_text,
+            "target_text": occurrence.turn.target_text,
+        }
+        if matched_turn not in dialog_payload["matched_turns"]:
+            dialog_payload["matched_turns"].append(matched_turn)
+
+    return {
+        item_id: list(dialogs.values())
+        for item_id, dialogs in by_item_dialog.items()
+    }

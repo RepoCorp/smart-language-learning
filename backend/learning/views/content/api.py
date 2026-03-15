@@ -17,6 +17,9 @@ from .core import (
     is_candidate_selected,
     is_word_selected,
     save_dialog,
+    save_dialog_turns,
+    save_phrase_dialog_occurrences,
+    save_word_dialog_occurrences,
     save_excluded_words,
     serialize_candidate,
     item_exists,
@@ -176,13 +179,30 @@ class ContentConfirmView(APIView):
             turns=dialog_turns,
             audio_url=dialog_audio_url,
         )
+        created_turns = save_dialog_turns(saved_dialog, dialog_turns)
+        phrase_occurrences = save_phrase_dialog_occurrences(
+            dialog=saved_dialog,
+            turns=created_turns,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        word_occurrences = save_word_dialog_occurrences(
+            dialog=saved_dialog,
+            turns=created_turns,
+            word_candidates=selected_word_candidates,
+            source_language=source_language,
+            target_language=target_language,
+        )
         logger.info(
-            "content.confirm.completed topic=%s created_phrases=%d created_words=%d excluded_words=%d dialog_id=%s dialog_audio=%s",
+            "content.confirm.completed topic=%s created_phrases=%d created_words=%d excluded_words=%d dialog_id=%s turns=%d phrase_occ=%d word_occ=%d dialog_audio=%s",
             topic,
             len(created_phrase_items),
             len(created_word_items),
             len(words_to_exclude),
             saved_dialog.id,
+            len(created_turns),
+            phrase_occurrences,
+            word_occurrences,
             bool(dialog_audio_url),
         )
 

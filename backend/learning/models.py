@@ -133,3 +133,51 @@ class SavedDialog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.topic} ({self.source_language}->{self.target_language})"
+
+
+class DialogTurn(models.Model):
+    dialog = models.ForeignKey(SavedDialog, on_delete=models.CASCADE, related_name="dialog_turns")
+    turn_index = models.PositiveIntegerField()
+    source_text = models.TextField(blank=True)
+    target_text = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("turn_index", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("dialog", "turn_index"),
+                name="lrn_dturn_dialog_turn_uniq",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Dialog {self.dialog_id} turn {self.turn_index}"
+
+
+class ItemDialogOccurrence(models.Model):
+    class Side(models.TextChoices):
+        SOURCE = "source", "Source"
+        TARGET = "target", "Target"
+
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="dialog_occurrences")
+    dialog = models.ForeignKey(SavedDialog, on_delete=models.CASCADE, related_name="item_occurrences")
+    turn = models.ForeignKey(DialogTurn, on_delete=models.CASCADE, related_name="item_occurrences")
+    turn_index = models.PositiveIntegerField()
+    side = models.CharField(max_length=10, choices=Side.choices)
+    match_score = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("item", "dialog", "turn_index", "side"),
+                name="lrn_iocc_item_dlg_turn_side_uq",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("item", "created_at"), name="lrn_iocc_item_created_idx"),
+            models.Index(fields=("dialog",), name="lrn_iocc_dialog_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Item {self.item_id} in dialog {self.dialog_id} turn {self.turn_index}"

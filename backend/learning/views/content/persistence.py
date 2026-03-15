@@ -13,7 +13,7 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
-from ...models import ExcludedWordSuggestion, Item, SavedDialog
+from ...models import DialogTurn, ExcludedWordSuggestion, Item, ItemDialogOccurrence, SavedDialog
 from .selection import normalize_word_pair, word_selection_id
 from .types import ContentCandidate, ContentPlan
 
@@ -320,3 +320,111 @@ def save_dialog(
         turns=turns,
         audio_url=audio_url,
     )
+
+
+def save_dialog_turns(dialog: SavedDialog, turns: list[dict[str, str]]) -> list[DialogTurn]:
+    created_turns: list[DialogTurn] = []
+    for index, turn in enumerate(turns):
+        source_text = str(turn.get("source_text", "")).strip()
+        target_text = str(turn.get("target_text", "")).strip()
+        created_turns.append(
+            DialogTurn.objects.create(
+                dialog=dialog,
+                turn_index=index,
+                source_text=source_text,
+                target_text=target_text,
+            )
+        )
+    return created_turns
+
+
+def save_phrase_dialog_occurrences(
+    *,
+    dialog: SavedDialog,
+    turns: list[DialogTurn],
+    source_language: str,
+    target_language: str,
+) -> int:
+    created = 0
+    for turn in turns:
+        phrase_item = Item.objects.filter(
+            item_type=Item.ItemType.PHRASE,
+            source_language=source_language,
+            target_language=target_language,
+            spanish_text__iexact=turn.source_text,
+            german_text__iexact=turn.target_text,
+        ).first()
+        if not phrase_item:
+            continue
+        _, was_created = ItemDialogOccurrence.objects.get_or_create(
+            item=phrase_item,
+            dialog=dialog,
+            turn=turn,
+            turn_index=turn.turn_index,
+            side=ItemDialogOccurrence.Side.TARGET,
+            defaults={"match_score": 1.0},
+        )
+        if was_created:
+            created += 1
+    return created
+
+
+def save_word_dialog_occurrences(
+    *,
+    dialog: SavedDialog,
+    turns: list[DialogTurn],
+    word_candidates: list[ContentCandidate],
+    source_language: str,
+    target_language: str,
+) -> int:
+    created = 0
+    for candidate in word_candidates:
+        matching_word_items = Item.objects.filter(
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+            spanish_text__iexact=candidate.spanish_text,
+            german_text__iexact=candidate.german_text,
+        )
+        if not matching_word_items.exists():
+            continue
+
+        source_pattern = _compile_word_pattern(candidate.spanish_text)
+        target_pattern = _compile_word_pattern(candidate.german_text)
+        for turn in turns:
+            source_hit = bool(source_pattern.search(turn.source_text)) if source_pattern else False
+            target_hit = bool(target_pattern.search(turn.target_text)) if target_pattern else False
+            if not source_hit and not target_hit:
+                continue
+            for item in matching_word_items:
+                if source_hit:
+                    _, was_created = ItemDialogOccurrence.objects.get_or_create(
+                        item=item,
+                        dialog=dialog,
+                        turn=turn,
+                        turn_index=turn.turn_index,
+                        side=ItemDialogOccurrence.Side.SOURCE,
+                        defaults={"match_score": 0.75},
+                    )
+                    if was_created:
+                        created += 1
+                if target_hit:
+                    _, was_created = ItemDialogOccurrence.objects.get_or_create(
+                        item=item,
+                        dialog=dialog,
+                        turn=turn,
+                        turn_index=turn.turn_index,
+                        side=ItemDialogOccurrence.Side.TARGET,
+                        defaults={"match_score": 0.8},
+                    )
+                    if was_created:
+                        created += 1
+    return created
+
+
+def _compile_word_pattern(text: str):
+    normalized = text.strip()
+    if not normalized:
+        return None
+    escaped = re.escape(normalized)
+    return re.compile(rf"\b{escaped}\b", re.IGNORECASE)

@@ -202,6 +202,12 @@ select {
   border: 1px solid #bcccdc;
 }
 
+.conversation-turn.turn-highlight {
+  border: 2px solid #0b4fc4 !important;
+  background: #dbeafe !important;
+  box-shadow: 0 0 0 3px rgba(11, 79, 196, 0.22), 0 6px 14px rgba(11, 79, 196, 0.18);
+}
+
 .conversation-speaker {
   margin: 0 0 4px 0;
   font-size: 12px;
@@ -252,6 +258,31 @@ select {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #334e68;
+}
+
+.related-dialogs {
+  margin-top: 12px;
+}
+
+.related-dialog-card {
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #f8fafc;
+}
+
+.related-dialogs-modal {
+  width: min(900px, 95vw);
+  max-height: 85vh;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+.related-dialogs-scroll {
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .manage-list {

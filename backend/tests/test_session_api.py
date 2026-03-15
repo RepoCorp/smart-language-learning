@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from learning.models import Item
+from learning.models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
 
 
 @pytest.mark.django_db
@@ -181,3 +181,53 @@ def test_session_filters_items_by_language_pair():
     ids = [item["id"] for item in response.json()["items"]]
     assert es_de_due.id in ids
     assert len(ids) == 1
+
+
+@pytest.mark.django_db
+def test_session_includes_related_dialogs_for_item():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="taxi",
+        german_text="das Taxi",
+        source_language="spanish",
+        target_language="german",
+    )
+    dialog = SavedDialog.objects.create(
+        topic="transport",
+        context="at the airport",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {"source_text": "Necesito un taxi.", "target_text": "Ich brauche ein Taxi."},
+            {"source_text": "Esta afuera.", "target_text": "Es steht draussen."},
+        ],
+        audio_url="http://localhost:8000/media/audio/dialog-mock.wav",
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Necesito un taxi.",
+        target_text="Ich brauche ein Taxi.",
+    )
+    ItemDialogOccurrence.objects.create(
+        item=item,
+        dialog=dialog,
+        turn=turn,
+        turn_index=0,
+        side=ItemDialogOccurrence.Side.SOURCE,
+        match_score=0.75,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/session",
+        {"size": 1, "source_language": "spanish", "target_language": "german"},
+    )
+    assert response.status_code == 200
+    payload_item = response.json()["items"][0]
+    assert payload_item["id"] == item.id
+    assert len(payload_item["related_dialogs"]) == 1
+    assert payload_item["related_dialogs"][0]["dialog_id"] == dialog.id
+    assert payload_item["related_dialogs"][0]["audio_url"] == "http://localhost:8000/media/audio/dialog-mock.wav"
+    assert len(payload_item["related_dialogs"][0]["turns"]) == 2
+    assert payload_item["related_dialogs"][0]["matched_turns"][0]["turn_index"] == 0

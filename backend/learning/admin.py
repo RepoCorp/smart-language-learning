@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ExcludedWordSuggestion, Item, SavedDialog, SavedTopic, SavedTopicContext
+from .models import DialogTurn, ExcludedWordSuggestion, Item, ItemDialogOccurrence, SavedDialog, SavedTopic, SavedTopicContext
 
 
 @admin.register(Item)
@@ -32,3 +32,15 @@ class SavedTopicContextAdmin(admin.ModelAdmin):
 class SavedDialogAdmin(admin.ModelAdmin):
     list_display = ("id", "topic", "source_language", "target_language", "created_at")
     search_fields = ("topic", "context")
+
+
+@admin.register(DialogTurn)
+class DialogTurnAdmin(admin.ModelAdmin):
+    list_display = ("id", "dialog", "turn_index")
+    search_fields = ("dialog__topic", "source_text", "target_text")
+
+
+@admin.register(ItemDialogOccurrence)
+class ItemDialogOccurrenceAdmin(admin.ModelAdmin):
+    list_display = ("id", "item", "dialog", "turn_index", "side", "match_score", "created_at")
+    list_filter = ("side",)

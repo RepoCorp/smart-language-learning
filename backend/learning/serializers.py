@@ -20,6 +20,7 @@ class SessionItemSerializer(serializers.Serializer):
         required=False,
     )
     options = serializers.ListField(child=serializers.CharField(), required=False)
+    related_dialogs = serializers.ListField(child=serializers.DictField(), required=False)
 
 
 class SubmitReviewSerializer(serializers.Serializer):

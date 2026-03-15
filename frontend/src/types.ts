@@ -14,6 +14,24 @@ export interface SessionItem {
   mode: SessionMode;
   direction?: ReviewDirection | null;
   options: string[];
+  related_dialogs?: Array<{
+    dialog_id: number;
+    topic: string;
+    context: string;
+    audio_url: string;
+    created_at: string;
+    turns: Array<{
+      source_text: string;
+      target_text: string;
+    }>;
+    matched_turns: Array<{
+      turn_index: number;
+      side: "source" | "target";
+      match_score: number;
+      source_text: string;
+      target_text: string;
+    }>;
+  }>;
 }
 
 export interface SessionResponse {
