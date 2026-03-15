@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { confirmContent, fetchContentTopicContexts, fetchContentTopics, previewContent } from "../api";
+import { useI18n } from "../i18n";
 import type { ContentPreviewResponse } from "../types";
 
 const CREATE_NEW_OPTION = "__create_new__";
 
 export default function ContentCreatePage(): JSX.Element {
+  const { t } = useI18n();
   const [selectedTopic, setSelectedTopic] = useState<string>("");
   const [customTopic, setCustomTopic] = useState<string>("");
   const [selectedContext, setSelectedContext] = useState<string>("");
@@ -87,7 +89,7 @@ export default function ContentCreatePage(): JSX.Element {
 
     const topicFromInput = shouldCreateNewTopic ? customTopic.trim() : selectedTopic.trim();
     if (!topicFromInput) {
-      setError(previousTopics.length ? "Please select or enter a topic." : "Please enter a topic.");
+      setError(previousTopics.length ? t("content.error.selectOrEnterTopic") : t("content.error.enterTopic"));
       return;
     }
 
@@ -111,8 +113,8 @@ export default function ContentCreatePage(): JSX.Element {
         initialWordSelection[key] = !word.exists;
       }
       setSelectedWords(initialWordSelection);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate preview");
+    } catch {
+      setError(t("content.error.generatePreview"));
     } finally {
       setLoading(false);
     }
@@ -140,12 +142,12 @@ export default function ContentCreatePage(): JSX.Element {
         .map((word) => word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`);
       const response = await confirmContent(preview.topic, phrasesToSave, wordsToSave, preview.context || "");
       const phraseMessage = response.created_phrases_count
-        ? `${response.created_phrases_count} phrase(s) created`
-        : "all phrases already existed";
+        ? t("content.result.phrasesCreated", { count: response.created_phrases_count })
+        : t("content.result.phrasesExisted");
       if (!wordsToSave.length) {
-        setResult(`Saved: no new words selected, ${phraseMessage}.`);
+        setResult(t("content.result.savedNoWords", { phraseMessage }));
       } else {
-        setResult(`Saved: ${response.created_words_count} word(s), ${phraseMessage}.`);
+        setResult(t("content.result.savedWithWords", { count: response.created_words_count, phraseMessage }));
       }
       setSelectedTopic("");
       setCustomTopic("");
@@ -157,8 +159,8 @@ export default function ContentCreatePage(): JSX.Element {
       setSelectedWords({});
       const topicsResponse = await fetchContentTopics();
       setPreviousTopics(topicsResponse.topics || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save content");
+    } catch {
+      setError(t("content.error.saveContent"));
     } finally {
       setSaving(false);
     }
@@ -180,73 +182,71 @@ export default function ContentCreatePage(): JSX.Element {
 
   return (
     <main className="container" data-testid="content-create-page">
-      <h1>Create content</h1>
-      <p>Enter a topic and the app will generate a short simple conversation and candidate vocabulary.</p>
+      <h1>{t("content.title")}</h1>
+      <p>{t("content.description")}</p>
       <p>
-        <Link to="/session">Back to session</Link>
+        <Link to="/session">{t("content.backToSession")}</Link>
       </p>
 
       <section className="card">
         <div className="content-form-section">
-          <p className="content-form-section-title">Topic</p>
-          <label htmlFor="topic-select" className="prompt">Topic</label>
+          <label htmlFor="topic-select" className="prompt">{t("content.topic.label")}</label>
           <select
             id="topic-select"
             value={selectedTopic}
             onChange={(e) => setSelectedTopic(e.target.value)}
             disabled={loading || saving}
           >
-            <option value="">{previousTopics.length ? "Select a topic..." : "No saved topics yet"}</option>
+            <option value="">{previousTopics.length ? t("content.topic.select") : t("content.topic.none")}</option>
             {previousTopics.map((savedTopic) => (
               <option key={savedTopic} value={savedTopic}>
                 {savedTopic}
               </option>
             ))}
-            <option value={CREATE_NEW_OPTION}>Create new topic...</option>
+            <option value={CREATE_NEW_OPTION}>{t("content.topic.createNew")}</option>
           </select>
           {shouldCreateNewTopic && (
             <>
-              <label htmlFor="topic-input" className="prompt">New topic</label>
+              <label htmlFor="topic-input" className="prompt">{t("content.topic.newLabel")}</label>
               <input
                 id="topic-input"
                 value={customTopic}
                 onChange={(e) => setCustomTopic(e.target.value)}
-                placeholder="e.g. travel, cooking, machine learning"
+                placeholder={t("content.topic.placeholder")}
                 disabled={loading || saving}
               />
             </>
           )}
         </div>
         <div className="content-form-section">
-          <p className="content-form-section-title">Context</p>
-          <label htmlFor="topic-context-select" className="prompt">Context</label>
+          <label htmlFor="topic-context-select" className="prompt">{t("content.context.label")}</label>
           <select
             id="topic-context-select"
             value={selectedContext}
             onChange={(e) => setSelectedContext(e.target.value)}
             disabled={loading || saving}
           >
-            <option value="">No context</option>
+            <option value="">{t("content.context.none")}</option>
             {previousContexts.map((savedContext) => (
               <option key={savedContext} value={savedContext}>
                 {savedContext}
               </option>
             ))}
-            <option value={CREATE_NEW_OPTION}>Create new context...</option>
+            <option value={CREATE_NEW_OPTION}>{t("content.context.createNew")}</option>
           </select>
           {shouldCreateNewContext && (
             <input
               id="topic-context-input"
               value={customContext}
               onChange={(e) => setCustomContext(e.target.value)}
-              placeholder="e.g. in a restaurant, at the airport, formal tone"
+              placeholder={t("content.context.placeholder")}
               disabled={loading || saving}
             />
           )}
         </div>
         <div className="actions">
           <button onClick={() => void onGeneratePreview()} disabled={loading || saving}>
-            {loading ? "Generating..." : "Generate preview"}
+            {loading ? t("content.generating") : t("content.generate")}
           </button>
         </div>
       </section>
@@ -256,8 +256,8 @@ export default function ContentCreatePage(): JSX.Element {
 
       {preview && (
         <section className="card">
-          <h2>Preview</h2>
-          <p><strong>Conversation phrases:</strong></p>
+          <h2>{t("content.preview.title")}</h2>
+          <p><strong>{t("content.preview.phrases")}</strong></p>
           <ul className="conversation-preview-list">
             {preview.phrases.map((phrase, index) => {
               const phraseKey = phrase.selection_key || `${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}`;
@@ -266,11 +266,11 @@ export default function ContentCreatePage(): JSX.Element {
                   key={`${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}|||${index}`}
                   className={`conversation-turn ${index % 2 === 0 ? "speaker-a" : "speaker-b"}`}
                 >
-                  <p className="conversation-speaker">{index % 2 === 0 ? "Person A" : "Person B"}</p>
+                  <p className="conversation-speaker">{index % 2 === 0 ? t("content.preview.personA") : t("content.preview.personB")}</p>
                   <p className="conversation-line">{phrase.spanish_text}</p>
                   <p className="conversation-line conversation-line-translation">{phrase.german_text}</p>
                   {phrase.exists ? (
-                    <p className="conversation-status">already exists</p>
+                    <p className="conversation-status">{t("content.preview.exists")}</p>
                   ) : (
                     <label className="conversation-status">
                       <input
@@ -279,7 +279,7 @@ export default function ContentCreatePage(): JSX.Element {
                         onChange={() => togglePhraseSelection(phraseKey)}
                         disabled={saving}
                       />{" "}
-                      new
+                      {t("content.preview.new")}
                     </label>
                   )}
                 </li>
@@ -300,11 +300,11 @@ export default function ContentCreatePage(): JSX.Element {
             }).length;
             const newItemsToSave = selectedNewPhrasesCount + selectedNewWordsCount;
             return (
-              <p><strong>New items to save:</strong> {newItemsToSave}</p>
+              <p><strong>{t("content.preview.newItems")}</strong> {newItemsToSave}</p>
             );
           })()}
 
-          <p><strong>Candidate words:</strong></p>
+          <p><strong>{t("content.preview.words")}</strong></p>
           <ul className="word-preview-list">
             {preview.words.map((word) => (
               <li
@@ -313,7 +313,7 @@ export default function ContentCreatePage(): JSX.Element {
               >
                 {word.exists ? (
                   <>
-                    {word.spanish_text} - {word.german_text} (already exists)
+                    {word.spanish_text} - {word.german_text} ({t("content.preview.exists")})
                   </>
                 ) : (
                   <label className="word-preview-label">
@@ -327,7 +327,7 @@ export default function ContentCreatePage(): JSX.Element {
                       }
                       disabled={saving}
                     />
-                    {word.spanish_text} - {word.german_text} (new)
+                    {word.spanish_text} - {word.german_text} ({t("content.preview.new")})
                   </label>
                 )}
               </li>
@@ -335,10 +335,10 @@ export default function ContentCreatePage(): JSX.Element {
           </ul>
           <div className="actions">
             <button onClick={() => void onConfirmSave()} disabled={saving}>
-              {saving ? "Saving..." : "Confirm and save"}
+              {saving ? t("content.saving") : t("content.save")}
             </button>
             <button onClick={() => setPreview(null)} disabled={saving}>
-              Cancel
+              {t("content.cancel")}
             </button>
           </div>
         </section>

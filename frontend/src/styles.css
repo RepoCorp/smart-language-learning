@@ -33,6 +33,20 @@ body {
   font-size: 14px;
 }
 
+.language-switcher {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.language-switcher select {
+  width: auto;
+  min-width: 110px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
 .container {
   max-width: 760px;
   margin: 0 auto;
@@ -202,6 +216,10 @@ select {
     padding: 10px 16px;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .language-switcher {
+    margin-left: 0;
   }
 
   .container {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { useI18n } from "../i18n";
 import type { SessionItem } from "../types";
 
 function normalize(value: string): string {
@@ -14,12 +15,13 @@ interface PhraseReviewProps {
 const FEEDBACK_DELAY_MS = 2000;
 
 export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
+  const { t } = useI18n();
   const [feedback, setFeedback] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const isSpanishToGerman = item.direction !== "de_to_es";
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
-  const languageLabel = isSpanishToGerman ? "German" : "Spanish";
+  const languageLabel = isSpanishToGerman ? t("review.language.german") : t("review.language.spanish");
 
   const choose = async (choice: string): Promise<void> => {
     if (isSubmitting) {
@@ -28,7 +30,7 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
 
     const correct = normalize(choice) === normalize(expectedAnswer);
     setIsSubmitting(true);
-    setFeedback(correct ? "Correct" : `Incorrect. Answer: ${expectedAnswer}`);
+    setFeedback(correct ? t("phrase.feedback.correct") : t("phrase.feedback.incorrect", { answer: expectedAnswer }));
     try {
       await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
       await onAnswered(correct);
@@ -65,7 +67,7 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
       return;
     }
     setIsSubmitting(true);
-    setFeedback(`Marked as incorrect by choice. Answer: ${expectedAnswer}`);
+    setFeedback(t("phrase.feedback.markedWrong", { answer: expectedAnswer }));
     try {
       await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
       await onAnswered(false);
@@ -76,7 +78,7 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
 
   return (
     <div>
-      <p className="prompt">Select the correct {languageLabel} translation: {promptText}</p>
+      <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
       <div className="options">
         {item.options.map((option, idx) => (
           <button key={option} onClick={() => choose(option)} disabled={isSubmitting}>
@@ -86,7 +88,7 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
       </div>
       <div className="actions">
         <button onClick={() => void markAsWrongByChoice()} disabled={isSubmitting}>
-          I recognized it but mark failed
+          {t("phrase.markFailed")}
         </button>
       </div>
       {feedback && <p>{feedback}</p>}

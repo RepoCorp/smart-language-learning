@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { useI18n } from "../i18n";
 import type { SessionItem } from "../types";
 
 interface NewItemProps {
@@ -8,6 +9,7 @@ interface NewItemProps {
 }
 
 export default function NewItem({ item, onContinue }: NewItemProps): JSX.Element {
+  const { t } = useI18n();
   const [saving, setSaving] = useState<boolean>(false);
 
   const markAsSeen = async (): Promise<void> => {
@@ -39,28 +41,28 @@ export default function NewItem({ item, onContinue }: NewItemProps): JSX.Element
 
   return (
     <div>
-      <p className="prompt">New {item.item_type === "word" ? "word" : "phrase"}</p>
+      <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
       <p>
-        <strong>Spanish:</strong> {item.spanish_text}
+        <strong>{t("newItem.spanish")}</strong> {item.spanish_text}
       </p>
       <p>
-        <strong>German:</strong> {item.german_text}
+        <strong>{t("newItem.german")}</strong> {item.german_text}
       </p>
       <p>
-        <strong>Example:</strong> {item.example_sentence || "-"}
+        <strong>{t("newItem.example")}</strong> {item.example_sentence || "-"}
       </p>
       <p>
-        <strong>Notes:</strong> {item.notes || "-"}
+        <strong>{t("newItem.notes")}</strong> {item.notes || "-"}
       </p>
       {item.audio_url && (
         <>
           <audio controls src={item.audio_url}>
-            Your browser does not support audio.
+            {t("newItem.noAudioSupport")}
           </audio>
           {item.item_type === "word" && (
             <p>
               <a href={item.audio_url} target="_blank" rel="noreferrer">
-                Audio link
+                {t("newItem.audioLink")}
               </a>
             </p>
           )}
@@ -68,7 +70,7 @@ export default function NewItem({ item, onContinue }: NewItemProps): JSX.Element
       )}
       <div className="actions">
         <button onClick={markAsSeen} disabled={saving}>
-          {saving ? "Saving..." : "Got it"}
+          {saving ? t("newItem.saving") : t("newItem.gotIt")}
         </button>
       </div>
     </div>

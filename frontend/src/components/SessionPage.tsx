@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { fetchSession, markSeen, submitReview } from "../api";
+import { useI18n } from "../i18n";
 import type { SessionItem } from "../types";
 import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
 import WordReview from "./WordReview";
 
 export default function SessionPage(): JSX.Element {
+  const { t } = useI18n();
   const [items, setItems] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -23,12 +25,12 @@ export default function SessionPage(): JSX.Element {
       const data = await fetchSession(5);
       setItems(data.items || []);
       setIndex(0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load session");
+    } catch {
+      setError(t("session.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadSession();
@@ -88,29 +90,29 @@ export default function SessionPage(): JSX.Element {
   };
 
   if (loading) {
-    return <main className="container">Loading session...</main>;
+    return <main className="container">{t("session.loading")}</main>;
   }
 
   if (error) {
-    return <main className="container error">Error: {error}</main>;
+    return <main className="container error">{t("session.error", { message: error })}</main>;
   }
 
   if (!items.length) {
-    return <main className="container">No content available.</main>;
+    return <main className="container">{t("session.empty")}</main>;
   }
 
   if (!current) {
-    return <main className="container">Loading session...</main>;
+    return <main className="container">{t("session.loading")}</main>;
   }
 
   return (
     <main className="container" data-testid="session-page">
-      <h1>Learning session</h1>
+      <h1>{t("session.title")}</h1>
       <p>
-        <Link to="/content/create">Create content</Link>
+        <Link to="/content/create">{t("session.createContent")}</Link>
       </p>
       <p>
-        Item {index + 1} of {items.length}
+        {t("session.itemProgress", { current: index + 1, total: items.length })}
       </p>
       <section className="card">
         {showIncorrectReviewItem ? (
@@ -127,7 +129,7 @@ export default function SessionPage(): JSX.Element {
           <PhraseReview key={current.id} item={current} onAnswered={register} />
         )}
       </section>
-      {waitingNext && <p>Moving to the next item...</p>}
+      {waitingNext && <p>{t("session.movingNext")}</p>}
     </main>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useI18n } from "../i18n";
 import type { SessionItem } from "../types";
 
 function normalize(value: string): string {
@@ -14,6 +15,7 @@ interface WordReviewProps {
 const FEEDBACK_DELAY_MS = 1000;
 
 export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.Element {
+  const { t } = useI18n();
   const [answer, setAnswer] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
   const [hintLetter, setHintLetter] = useState<string>("");
@@ -26,7 +28,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const isSpanishToGerman = item.direction !== "de_to_es";
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
-  const languageLabel = isSpanishToGerman ? "German" : "Spanish";
+  const languageLabel = isSpanishToGerman ? t("review.language.german") : t("review.language.spanish");
 
   const hint = useMemo(() => hintLetter, [hintLetter]);
 
@@ -91,7 +93,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
         setClearedByHint(false);
         return;
       }
-      setFeedback("Please enter an answer.");
+      setFeedback(t("word.feedback.empty"));
       return;
     }
 
@@ -99,15 +101,15 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     const exceededHintLimit = hasExceededHintLimit(expectedAnswer);
     if (inputMatches && exceededHintLimit) {
       requireWrongAccept(
-        `Correct answer entered, but too many hints were used. It will be treated as incorrect: ${expectedAnswer}`,
+        t("word.feedback.tooManyHints", { answer: expectedAnswer }),
       );
       return;
     }
     if (inputMatches) {
-      await submitWithFeedback(true, "Correct");
+      await submitWithFeedback(true, t("word.feedback.correct"));
       return;
     }
-    requireWrongAccept(`Incorrect. Answer: ${expectedAnswer}`);
+    requireWrongAccept(t("word.feedback.incorrect", { answer: expectedAnswer }));
   };
 
   const handleAnswerChange = (value: string): void => {
@@ -127,11 +129,11 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     const exceededHintLimit = hasExceededHintLimit(expectedAnswer);
     if (exceededHintLimit) {
       requireWrongAccept(
-        `Correct answer entered, but too many hints were used. It will be treated as incorrect: ${expectedAnswer}`,
+        t("word.feedback.tooManyHints", { answer: expectedAnswer }),
       );
       return;
     }
-    void submitWithFeedback(true, "Correct");
+    void submitWithFeedback(true, t("word.feedback.correct"));
   };
 
   const acceptWrongAnswer = async (): Promise<void> => {
@@ -172,7 +174,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
 
   return (
     <div>
-      <p className="prompt">Write in {languageLabel}: {promptText}</p>
+      <p className="prompt">{t("word.prompt", { language: languageLabel, text: promptText })}</p>
       <input
         ref={inputRef}
         value={answer}
@@ -192,22 +194,22 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
           }
           void check();
         }}
-        placeholder="Your answer"
+        placeholder={t("word.input.placeholder")}
         data-testid="word-input"
         disabled={isSubmitting || awaitingWrongAccept}
         autoFocus
       />
-      <p className="hint">{hint ? `Hint: ${hint}` : "\u00a0"}</p>
+      <p className="hint">{hint ? t("word.hint", { letter: hint }) : "\u00a0"}</p>
       <div className="actions">
         {!awaitingWrongAccept && (
           <>
-            <button onClick={showInputAwareHint} disabled={isSubmitting}>Hint</button>
-            <button onClick={check} disabled={isSubmitting || !answer.trim()}>Check</button>
+            <button onClick={showInputAwareHint} disabled={isSubmitting}>{t("word.hintButton")}</button>
+            <button onClick={check} disabled={isSubmitting || !answer.trim()}>{t("word.checkButton")}</button>
           </>
         )}
         {awaitingWrongAccept && (
           <button onClick={() => void acceptWrongAnswer()} disabled={isSubmitting}>
-            Accept
+            {t("word.acceptButton")}
           </button>
         )}
       </div>
