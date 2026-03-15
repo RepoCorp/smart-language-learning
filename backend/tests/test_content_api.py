@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import ExcludedWordSuggestion, Item
+from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item
 
 
 @pytest.mark.django_db
@@ -494,3 +494,89 @@ def test_content_preview_skips_keywords_not_present_in_phrase(monkeypatch):
     words = response.json()["words"]
     german_words = [word["german_text"] for word in words]
     assert "der Gesamtbetrag" not in german_words
+
+
+@pytest.mark.django_db
+def test_generate_conversation_retries_after_validation_failure(monkeypatch):
+    from learning.views.content import generation
+
+    ConversationFingerprint.objects.create(
+        first_line="hola como estas",
+        keywords="hola,estas",
+        fingerprint="hola como estas || hola estas",
+    )
+
+    calls = []
+
+    def fake_call_openai_json(system_prompt, user_input, timeout_seconds=10, **kwargs):
+        calls.append((user_input, kwargs))
+        if len(calls) == 1:
+            return {
+                "conversation": [
+                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
+                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
+                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
+                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
+                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
+                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
+                ]
+            }
+        return {
+            "conversation": [
+                {"spanish_text": "Buenas, necesito pan.", "german_text": "Guten Tag, ich brauche Brot.", "notes": ""},
+                {"spanish_text": "Claro, aqui tiene uno.", "german_text": "Klar, hier haben Sie eins.", "notes": ""},
+                {"spanish_text": "Tambien quiero leche.", "german_text": "Ich moechte auch Milch.", "notes": ""},
+                {"spanish_text": "Perfecto, algo mas?", "german_text": "Perfekt, noch etwas?", "notes": ""},
+                {"spanish_text": "No, cuanto pago?", "german_text": "Nein, wie viel zahle ich?", "notes": ""},
+                {"spanish_text": "Son cinco euros.", "german_text": "Das sind fuenf Euro.", "notes": ""},
+            ]
+        }
+
+    monkeypatch.setattr(generation, "call_openai_json", fake_call_openai_json)
+    monkeypatch.setattr(generation, "choice", lambda values: values[0])
+
+    phrases = generation.generate_conversation_with_chatgpt("shopping", context="at a bakery")
+
+    assert phrases is not None
+    assert len(calls) == 2
+    assert calls[0][1]["temperature"] == 0.9
+    assert calls[0][1]["top_p"] == 0.9
+    assert calls[0][1]["presence_penalty"] == 0.6
+    assert "Style seed: casual" in calls[0][0]
+    assert "Topic: shopping" in calls[0][0]
+    assert "Context: at a bakery" in calls[0][0]
+    assert "Situation detail: at a bakery" in calls[0][0]
+    assert "hola como estas | hola estas" in calls[0][0]
+    assert "Retry instruction: more variation, same topic and level" in calls[1][0]
+    assert ConversationFingerprint.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_generate_conversation_prompt_includes_context_and_situation_when_missing(monkeypatch):
+    from learning.views.content import generation
+
+    captured = {}
+
+    def fake_call_openai_json(system_prompt, user_input, timeout_seconds=10, **kwargs):
+        captured["user_input"] = user_input
+        return {
+            "conversation": [
+                {"spanish_text": "Busco un taxi.", "german_text": "Ich suche ein Taxi.", "notes": ""},
+                {"spanish_text": "Hay uno afuera.", "german_text": "Draußen ist eins.", "notes": ""},
+                {"spanish_text": "Gracias por la ayuda.", "german_text": "Danke fuer die Hilfe.", "notes": ""},
+                {"spanish_text": "Con gusto.", "german_text": "Gern geschehen.", "notes": ""},
+                {"spanish_text": "Hasta luego.", "german_text": "Bis spaeter.", "notes": ""},
+                {"spanish_text": "Buen viaje.", "german_text": "Gute Reise.", "notes": ""},
+            ]
+        }
+
+    monkeypatch.setattr(generation, "call_openai_json", fake_call_openai_json)
+    monkeypatch.setattr(generation, "choice", lambda values: values[-1])
+
+    phrases = generation.generate_conversation_with_chatgpt("transport", context="")
+
+    assert phrases is not None
+    assert "Topic: transport" in captured["user_input"]
+    assert "Context: not provided" in captured["user_input"]
+    assert "Situation detail: not provided" in captured["user_input"]
+    assert "Style seed: small-talk" in captured["user_input"]
