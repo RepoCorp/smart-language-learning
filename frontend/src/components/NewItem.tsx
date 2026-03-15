@@ -62,9 +62,11 @@ export default function NewItem({ item, onContinue }: NewItemProps): JSX.Element
       <p>
         <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {item.german_text}
       </p>
-      <p>
-        <strong>{t("newItem.example")}</strong> {item.example_sentence || "-"}
-      </p>
+      {item.item_type === "word" && (
+        <p>
+          <strong>{t("newItem.example")}</strong> {item.example_sentence || "-"}
+        </p>
+      )}
       <p>
         <strong>{t("newItem.notes")}</strong> {item.notes || "-"}
       </p>

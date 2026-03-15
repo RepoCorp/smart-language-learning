@@ -170,7 +170,8 @@ export default function ContentManagePage(): JSX.Element {
       <h1>{t("manage.title")}</h1>
       <p>
         <Link to="/session">{t("manage.backToSession")}</Link> |{" "}
-        <Link to="/content/create">{t("manage.backToCreate")}</Link>
+        <Link to="/content/create">{t("manage.backToCreate")}</Link> |{" "}
+        <Link to="/words">{t("session.wordsLibrary")}</Link>
       </p>
       {loading && <p>{t("session.loading")}</p>}
       {error && <p className="error">{error}</p>}

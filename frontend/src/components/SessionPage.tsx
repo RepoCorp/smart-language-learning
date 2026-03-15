@@ -120,7 +120,8 @@ export default function SessionPage(): JSX.Element {
       <h1>{t("session.title")}</h1>
       <p>
         <Link to="/content/create">{t("session.createContent")}</Link> |{" "}
-        <Link to="/content/manage">{t("content.manageLink")}</Link>
+        <Link to="/content/manage">{t("content.manageLink")}</Link> |{" "}
+        <Link to="/words">{t("session.wordsLibrary")}</Link>
       </p>
       <p>
         {t("session.itemProgress", { current: index + 1, total: items.length })}

@@ -4,6 +4,7 @@ import type {
   ContentPreviewResponse,
   ContentTopicContextsResponse,
   ContentTopicsResponse,
+  ContentWordsResponse,
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
@@ -152,6 +153,25 @@ export async function fetchContentItems(
     throw new Error("Failed to load saved items");
   }
   return (await response.json()) as ContentItemsResponse;
+}
+
+export async function fetchContentWords(
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+  query = "",
+): Promise<ContentWordsResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  if (query.trim()) {
+    params.set("q", query.trim());
+  }
+  const response = await fetch(`${API_BASE}/content/words?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to load words");
+  }
+  return (await response.json()) as ContentWordsResponse;
 }
 
 export async function fetchContentTopicContexts(

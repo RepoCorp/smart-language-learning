@@ -309,6 +309,16 @@ select {
   text-align: left;
 }
 
+.word-link-button {
+  background: none;
+  border: none;
+  color: #0b4fc4;
+  padding: 0;
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+
 .manage-actions-row {
   display: flex;
   gap: 10px;

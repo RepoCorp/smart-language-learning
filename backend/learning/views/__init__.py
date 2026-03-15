@@ -6,6 +6,7 @@ from .content import (
     ContentTopicContextsView,
     ContentTopicDeleteView,
     ContentTopicsView,
+    ContentWordsView,
 )
 from .health import HealthView
 from .overview_stats import OverviewStatsView
@@ -21,6 +22,7 @@ __all__ = [
     "ContentTopicDeleteView",
     "ContentTopicContextsView",
     "ContentTopicsView",
+    "ContentWordsView",
     "HealthView",
     "OverviewStatsView",
     "SubmitReviewView",

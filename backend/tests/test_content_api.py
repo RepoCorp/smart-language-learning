@@ -937,3 +937,53 @@ def test_content_confirm_generates_dialog_audio_when_requested(monkeypatch):
 
     saved_dialog = SavedDialog.objects.get(id=payload["saved_dialog_id"])
     assert saved_dialog.audio_url == "http://localhost:8000/media/audio/dialog-mock.wav"
+
+
+@pytest.mark.django_db
+def test_content_words_endpoint_filters_and_returns_related_dialogs():
+    word = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="taxi",
+        german_text="das Taxi",
+        source_language="spanish",
+        target_language="german",
+        example_sentence="Necesito un taxi.",
+        notes="Transport word",
+        audio_url="http://localhost:8000/media/audio/word-mock.mp3",
+    )
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="pan",
+        german_text="das Brot",
+        source_language="spanish",
+        target_language="german",
+    )
+    dialog = SavedDialog.objects.create(
+        topic="transport",
+        context="airport",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Necesito un taxi.", "target_text": "Ich brauche ein Taxi."}],
+        audio_url="http://localhost:8000/media/audio/dialog-mock.wav",
+    )
+    from learning.models import DialogTurn, ItemDialogOccurrence
+    turn = DialogTurn.objects.create(dialog=dialog, turn_index=0, source_text="Necesito un taxi.", target_text="Ich brauche ein Taxi.")
+    ItemDialogOccurrence.objects.create(
+        item=word,
+        dialog=dialog,
+        turn=turn,
+        turn_index=0,
+        side=ItemDialogOccurrence.Side.SOURCE,
+        match_score=0.75,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/content/words",
+        {"source_language": "spanish", "target_language": "german", "q": "tax"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["words"]
+    assert len(payload) == 1
+    assert payload[0]["id"] == word.id
+    assert payload[0]["related_dialogs"][0]["dialog_id"] == dialog.id
