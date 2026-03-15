@@ -46,6 +46,9 @@ export interface ContentConfirmResponse {
   created_phrases_count?: number;
   created_words_count: number;
   created_words: string[];
+  saved_dialog_id?: number;
+  saved_dialog_turns?: Array<{ source_text: string; target_text: string }>;
+  dialog_audio_url?: string;
 }
 
 export interface ContentTopicsResponse {

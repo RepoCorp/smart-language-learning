@@ -21,7 +21,10 @@ export default function ContentCreatePage(): JSX.Element {
   const [preview, setPreview] = useState<ContentPreviewResponse | null>(null);
   const [selectedPhrases, setSelectedPhrases] = useState<Record<string, boolean>>({});
   const [selectedWords, setSelectedWords] = useState<Record<string, boolean>>({});
+  const [createDialogAudio, setCreateDialogAudio] = useState<boolean>(false);
   const [result, setResult] = useState<string>("");
+  const [dialogAudioUrl, setDialogAudioUrl] = useState<string>("");
+  const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string }>>([]);
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [previousContexts, setPreviousContexts] = useState<string[]>([]);
 
@@ -43,7 +46,10 @@ export default function ContentCreatePage(): JSX.Element {
         setPreview(null);
         setSelectedPhrases({});
         setSelectedWords({});
+        setCreateDialogAudio(false);
         setResult("");
+        setDialogAudioUrl("");
+        setSavedDialogTurns([]);
         setError("");
       } catch {
         if (active) {
@@ -56,7 +62,10 @@ export default function ContentCreatePage(): JSX.Element {
           setPreview(null);
           setSelectedPhrases({});
           setSelectedWords({});
+          setCreateDialogAudio(false);
           setResult("");
+          setDialogAudioUrl("");
+          setSavedDialogTurns([]);
           setError("");
         }
       }
@@ -105,9 +114,12 @@ export default function ContentCreatePage(): JSX.Element {
   const onGeneratePreview = async (): Promise<void> => {
     setError("");
     setResult("");
+    setDialogAudioUrl("");
+    setSavedDialogTurns([]);
     setPreview(null);
     setSelectedPhrases({});
     setSelectedWords({});
+    setCreateDialogAudio(false);
 
     const topicFromInput = shouldCreateNewTopic ? customTopic.trim() : selectedTopic.trim();
     if (!topicFromInput) {
@@ -169,6 +181,7 @@ export default function ContentCreatePage(): JSX.Element {
         preview.context || "",
         preview.source_language || sourceLanguage,
         preview.target_language || targetLanguage,
+        createDialogAudio,
         preview.phrases.map((phrase) => ({
           spanish_text: phrase.spanish_text,
           german_text: phrase.german_text,
@@ -188,6 +201,8 @@ export default function ContentCreatePage(): JSX.Element {
       } else {
         setResult(t("content.result.savedWithWords", { count: response.created_words_count, phraseMessage }));
       }
+      setDialogAudioUrl(response.dialog_audio_url || "");
+      setSavedDialogTurns(response.saved_dialog_turns || []);
       setSelectedTopic("");
       setCustomTopic("");
       setSelectedContext("");
@@ -196,6 +211,7 @@ export default function ContentCreatePage(): JSX.Element {
       setPreview(null);
       setSelectedPhrases({});
       setSelectedWords({});
+      setCreateDialogAudio(false);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
@@ -333,6 +349,36 @@ export default function ContentCreatePage(): JSX.Element {
 
       {error && <p className="error">{error}</p>}
       {result && <p>{result}</p>}
+      {(savedDialogTurns.length > 0 || dialogAudioUrl) && (
+        <section className="card">
+          <p><strong>{t("content.result.dialogTitle")}</strong></p>
+          {savedDialogTurns.length > 0 && (
+            <ul className="conversation-preview-list">
+              {savedDialogTurns.map((turn, index) => (
+                <li
+                  key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
+                  className={`conversation-turn ${index % 2 === 0 ? "speaker-a" : "speaker-b"}`}
+                >
+                  <p className="conversation-speaker">{index % 2 === 0 ? t("content.preview.personA") : t("content.preview.personB")}</p>
+                  <p className="conversation-line">{turn.source_text}</p>
+                  <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {dialogAudioUrl && (
+            <>
+              <p><strong>{t("content.result.dialogAudio")}</strong></p>
+              <audio controls src={dialogAudioUrl} preload="none" />
+              <p>
+                <a href={dialogAudioUrl} target="_blank" rel="noreferrer">
+                  {dialogAudioUrl}
+                </a>
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
       {preview && (
         <section className="card">
@@ -429,6 +475,17 @@ export default function ContentCreatePage(): JSX.Element {
               </li>
             ))}
           </ul>
+          <div className="actions">
+            <label>
+              <input
+                type="checkbox"
+                checked={createDialogAudio}
+                onChange={(e) => setCreateDialogAudio(e.target.checked)}
+                disabled={saving}
+              />{" "}
+              {t("content.createDialogAudio")}
+            </label>
+          </div>
           <div className="actions">
             <button onClick={() => void onConfirmSave()} disabled={saving}>
               {saving ? t("content.saving") : t("content.save")}

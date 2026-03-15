@@ -57,6 +57,10 @@ class ContentTopicSerializer(serializers.Serializer):
 
 
 class ContentConfirmSerializer(ContentTopicSerializer):
+    create_dialog_audio = serializers.BooleanField(
+        required=False,
+        default=False,
+    )
     selected_phrases = serializers.ListField(
         child=serializers.CharField(max_length=600),
         required=False,

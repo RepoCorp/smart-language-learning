@@ -2,6 +2,7 @@
 
 Arreglar todos los usos de español y aleman en el codigo.
 Añadir manejo del casing para todos los idiomas usando el modelo 
+escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
 
 # Future Ideas
 
@@ -30,6 +31,7 @@ Añadir manejo del casing para todos los idiomas usando el modelo
 - Add adaptive hint penalties and confidence scoring.
 - Start the session asking for a time commitment and adjust session size dynamically. 
 - Add article handling (e.g. for gendered languages) and more complex item types (e.g. sentences, audio).
+- Añadir imagen de dancing apple ... 
 
 ## Frontend
 

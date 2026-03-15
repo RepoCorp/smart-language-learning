@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ExcludedWordSuggestion, Item, SavedTopic, SavedTopicContext
+from .models import ExcludedWordSuggestion, Item, SavedDialog, SavedTopic, SavedTopicContext
 
 
 @admin.register(Item)
@@ -26,3 +26,9 @@ class SavedTopicAdmin(admin.ModelAdmin):
 class SavedTopicContextAdmin(admin.ModelAdmin):
     list_display = ("id", "topic", "context", "used_count", "last_used_at", "created_at")
     search_fields = ("topic__topic", "context")
+
+
+@admin.register(SavedDialog)
+class SavedDialogAdmin(admin.ModelAdmin):
+    list_display = ("id", "topic", "source_language", "target_language", "created_at")
+    search_fields = ("topic", "context")

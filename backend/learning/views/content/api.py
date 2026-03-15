@@ -11,10 +11,12 @@ from .core import (
     ContentCandidate,
     build_content_plan,
     count_new_items,
+    create_dialog_audio_file,
     create_phrase_if_missing,
     create_word_if_missing,
     is_candidate_selected,
     is_word_selected,
+    save_dialog,
     save_excluded_words,
     serialize_candidate,
     item_exists,
@@ -87,11 +89,13 @@ class ContentConfirmView(APIView):
         selected_words = serializer.validated_data.get("selected_words", [])
         preview_phrases = serializer.validated_data.get("preview_phrases", [])
         preview_words = serializer.validated_data.get("preview_words", [])
+        create_dialog_audio = serializer.validated_data.get("create_dialog_audio", False)
         logger.info(
-            "content.confirm.started topic=%s selected_phrases=%s selected_words=%d",
+            "content.confirm.started topic=%s selected_phrases=%s selected_words=%d create_dialog_audio=%s",
             topic,
             "all" if selected_phrases is None else len(selected_phrases),
             len(selected_words),
+            create_dialog_audio,
         )
         selected_phrases_normalized = (
             None
@@ -159,12 +163,27 @@ class ContentConfirmView(APIView):
             if is_word_selected(word, selected_words_normalized)
         ]
         created_word_items = [word for word in created_words if word is not None]
+        dialog_turns = _dialog_turns_for_save(preview_phrases=preview_phrases, fallback_phrases=plan.phrases)
+        dialog_audio_url = ""
+        if create_dialog_audio:
+            dialog_lines = [turn["target_text"] for turn in dialog_turns if turn.get("target_text", "").strip()]
+            dialog_audio_url = create_dialog_audio_file(dialog_lines, target_language=target_language)
+        saved_dialog = save_dialog(
+            topic=topic,
+            context=context,
+            source_language=source_language,
+            target_language=target_language,
+            turns=dialog_turns,
+            audio_url=dialog_audio_url,
+        )
         logger.info(
-            "content.confirm.completed topic=%s created_phrases=%d created_words=%d excluded_words=%d",
+            "content.confirm.completed topic=%s created_phrases=%d created_words=%d excluded_words=%d dialog_id=%s dialog_audio=%s",
             topic,
             len(created_phrase_items),
             len(created_word_items),
             len(words_to_exclude),
+            saved_dialog.id,
+            bool(dialog_audio_url),
         )
 
         return Response(
@@ -176,6 +195,9 @@ class ContentConfirmView(APIView):
                 "created_phrases_count": len(created_phrase_items),
                 "created_words_count": len(created_word_items),
                 "created_words": [item.spanish_text for item in created_word_items],
+                "saved_dialog_id": saved_dialog.id,
+                "saved_dialog_turns": dialog_turns,
+                "dialog_audio_url": dialog_audio_url,
             }
         )
 
@@ -256,3 +278,22 @@ def _selected_preview_word_candidates(
         seen_keys.add(selection_key)
         candidates.append(candidate)
     return candidates
+
+
+def _dialog_turns_for_save(*, preview_phrases: list[dict], fallback_phrases: list[ContentCandidate]) -> list[dict[str, str]]:
+    if preview_phrases:
+        turns: list[dict[str, str]] = []
+        for phrase in preview_phrases:
+            if not isinstance(phrase, dict):
+                continue
+            source_text = str(phrase.get("spanish_text", "")).strip()
+            target_text = str(phrase.get("german_text", "")).strip()
+            if not source_text and not target_text:
+                continue
+            turns.append({"source_text": source_text, "target_text": target_text})
+        return turns
+    return [
+        {"source_text": phrase.spanish_text.strip(), "target_text": phrase.german_text.strip()}
+        for phrase in fallback_phrases
+        if phrase.spanish_text.strip() or phrase.german_text.strip()
+    ]

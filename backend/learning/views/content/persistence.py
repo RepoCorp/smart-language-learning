@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
+import wave
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
+from random import sample
 from uuid import uuid4
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
-from ...models import ExcludedWordSuggestion, Item
+from ...models import ExcludedWordSuggestion, Item, SavedDialog
 from .selection import normalize_word_pair, word_selection_id
 from .types import ContentCandidate, ContentPlan
 
@@ -20,6 +26,9 @@ TTS_LANGUAGE_BY_STUDY_LANGUAGE = {
     "italian": "it",
     "portuguese": "pt",
 }
+OPENAI_TTS_VOICES = ("alloy", "echo", "fable", "onyx", "nova", "shimmer")
+OPENAI_TTS_SAMPLE_RATE = 24000
+OPENAI_TTS_DEFAULT_SPEED = 1.25
 
 
 def get_excluded_words_lookup() -> set[tuple[str, str]]:
@@ -208,3 +217,106 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german") -
         tts_language,
     )
     return audio_url
+
+
+def _openai_tts_pcm(text: str, voice: str) -> bytes | None:
+    api_key = settings.OPENAI_API_KEY
+    if not api_key:
+        return None
+    model = getattr(settings, "OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
+    body = {
+        "model": model,
+        "voice": voice,
+        "input": text,
+        "speed": float(getattr(settings, "OPENAI_TTS_SPEED", OPENAI_TTS_DEFAULT_SPEED)),
+        "response_format": "pcm",
+    }
+    request = UrlRequest(
+        "https://api.openai.com/v1/audio/speech",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            return response.read()
+    except (HTTPError, URLError, TimeoutError):
+        return None
+
+
+def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "german") -> str:
+    cleaned_lines = [line.strip() for line in dialog_lines if line and line.strip()]
+    if len(cleaned_lines) < 2:
+        return ""
+    if len(OPENAI_TTS_VOICES) < 2:
+        return ""
+
+    voice_a, voice_b = sample(list(OPENAI_TTS_VOICES), 2)
+    silence = b"\x00\x00" * int(OPENAI_TTS_SAMPLE_RATE * 0.12)
+    pcm_chunks: list[bytes] = []
+    futures: list[tuple[int, str, Future[bytes | None]]] = []
+    max_workers = min(6, len(cleaned_lines))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for index, line in enumerate(cleaned_lines):
+            voice = voice_a if index % 2 == 0 else voice_b
+            futures.append((index, voice, executor.submit(_openai_tts_pcm, line, voice)))
+
+        for index, voice, future in futures:
+            pcm = future.result()
+            if not pcm:
+                logger.warning("content.audio.dialog.turn_failed line_index=%d voice=%s", index, voice)
+                continue
+            pcm_chunks.append(pcm)
+            pcm_chunks.append(silence)
+
+    if not pcm_chunks:
+        return ""
+
+    audio_dir = Path(settings.MEDIA_ROOT) / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"dialog-{uuid4().hex[:12]}.wav"
+    file_path = audio_dir / filename
+
+    try:
+        with wave.open(str(file_path), "wb") as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(OPENAI_TTS_SAMPLE_RATE)
+            wav_file.writeframes(b"".join(pcm_chunks))
+    except Exception:
+        logger.warning("content.audio.dialog.failed filename=%s", filename)
+        return ""
+
+    relative_url = f"{settings.MEDIA_URL.rstrip('/')}/audio/{filename}"
+    audio_url = f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
+    logger.info(
+        "content.audio.dialog.created filename=%s voices=%s,%s target_language=%s",
+        filename,
+        voice_a,
+        voice_b,
+        target_language,
+    )
+    return audio_url
+
+
+def save_dialog(
+    *,
+    topic: str,
+    context: str,
+    source_language: str,
+    target_language: str,
+    turns: list[dict[str, str]],
+    audio_url: str,
+) -> SavedDialog:
+    return SavedDialog.objects.create(
+        topic=topic,
+        context=context,
+        source_language=source_language,
+        target_language=target_language,
+        turns=turns,
+        audio_url=audio_url,
+    )

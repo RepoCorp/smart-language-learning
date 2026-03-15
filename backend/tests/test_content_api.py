@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item, SavedTopic
+from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item, SavedDialog, SavedTopic
 
 
 @pytest.mark.django_db
@@ -856,3 +856,84 @@ def test_content_topic_delete_endpoint_removes_topic_for_language_pair():
     assert response.status_code == 204
     assert SavedTopic.objects.filter(topic="travel", source_language="spanish", target_language="german").exists() is False
     assert SavedTopic.objects.filter(topic="travel", source_language="english", target_language="french").exists() is True
+
+
+@pytest.mark.django_db
+def test_content_confirm_saves_dialog_and_returns_turns(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(
+        content_views,
+        "generate_conversation_with_chatgpt",
+        lambda topic, context="", **kwargs: [
+            {"spanish_text": "Hola.", "german_text": "Hallo.", "notes": ""},
+            {"spanish_text": "Necesito ayuda.", "german_text": "Ich brauche Hilfe.", "notes": ""},
+        ],
+    )
+    monkeypatch.setattr(content_views, "generate_keywords_for_phrase_with_chatgpt", lambda s, g, **kwargs: [])
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/confirm",
+        {"topic": "help", "selected_words": []},
+        format="json",
+    )
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert payload["dialog_audio_url"] == ""
+    assert len(payload["saved_dialog_turns"]) == 2
+    assert isinstance(payload["saved_dialog_id"], int)
+
+    saved_dialog = SavedDialog.objects.get(id=payload["saved_dialog_id"])
+    assert saved_dialog.topic == "help"
+    assert len(saved_dialog.turns) == 2
+    assert saved_dialog.audio_url == ""
+
+
+@pytest.mark.django_db
+def test_content_confirm_generates_dialog_audio_when_requested(monkeypatch):
+    from learning.views import content as content_views
+
+    captured_dialog_lines = []
+
+    monkeypatch.setattr(
+        content_views,
+        "generate_conversation_with_chatgpt",
+        lambda topic, context="", **kwargs: [
+            {"spanish_text": "Buenos dias.", "german_text": "Guten Morgen.", "notes": ""},
+            {"spanish_text": "Como estas?", "german_text": "Wie geht es dir?", "notes": ""},
+        ],
+    )
+    monkeypatch.setattr(content_views, "generate_keywords_for_phrase_with_chatgpt", lambda s, g, **kwargs: [])
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    def fake_dialog_audio(lines, target_language="german"):
+        captured_dialog_lines.extend(lines)
+        return "http://localhost:8000/media/audio/dialog-mock.wav"
+
+    monkeypatch.setattr(content_views, "create_dialog_audio_file", fake_dialog_audio)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/confirm",
+        {"topic": "greetings", "selected_words": [], "create_dialog_audio": True},
+        format="json",
+    )
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert payload["dialog_audio_url"] == "http://localhost:8000/media/audio/dialog-mock.wav"
+    assert captured_dialog_lines == ["Guten Morgen.", "Wie geht es dir?"]
+
+    saved_dialog = SavedDialog.objects.get(id=payload["saved_dialog_id"])
+    assert saved_dialog.audio_url == "http://localhost:8000/media/audio/dialog-mock.wav"

@@ -98,6 +98,7 @@ export async function confirmContent(
   context = "",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  createDialogAudio = false,
   previewPhrases: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
   previewWords: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
 ): Promise<ContentConfirmResponse> {
@@ -109,6 +110,7 @@ export async function confirmContent(
       context,
       source_language: sourceLanguage,
       target_language: targetLanguage,
+      create_dialog_audio: createDialogAudio,
       selected_phrases: selectedPhrases,
       selected_words: selectedWords,
       preview_phrases: previewPhrases,

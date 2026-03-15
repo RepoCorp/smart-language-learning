@@ -7,12 +7,14 @@ from .generation import (
 )
 from .persistence import (
     count_new_items,
+    create_dialog_audio_file,
     create_audio_file,
     create_phrase_if_missing,
     create_word_if_missing,
     enrich_notes_with_plural,
     get_excluded_words_lookup,
     item_exists,
+    save_dialog,
     save_excluded_words,
     serialize_candidate,
 )
@@ -34,6 +36,7 @@ __all__ = [
     "build_content_plan",
     "call_openai_json",
     "count_new_items",
+    "create_dialog_audio_file",
     "create_audio_file",
     "create_phrase_if_missing",
     "create_word_if_missing",
@@ -47,6 +50,7 @@ __all__ = [
     "get_excluded_words_lookup",
     "is_word_selected",
     "item_exists",
+    "save_dialog",
     "normalize_topic",
     "normalize_word_key",
     "normalize_word_pair",

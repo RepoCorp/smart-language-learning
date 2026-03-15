@@ -117,3 +117,19 @@ class ConversationFingerprint(models.Model):
 
     def __str__(self) -> str:
         return self.first_line
+
+
+class SavedDialog(models.Model):
+    topic = models.CharField(max_length=120)
+    context = models.CharField(max_length=400, blank=True)
+    source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
+    target_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="german")
+    turns = models.JSONField(default=list, blank=True)
+    audio_url = models.URLField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.topic} ({self.source_language}->{self.target_language})"
