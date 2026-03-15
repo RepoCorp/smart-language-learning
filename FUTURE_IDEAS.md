@@ -18,11 +18,12 @@
 - Add pagination and filtering for future admin/content APIs.
 - Add idempotency strategy for review submissions.
 
-## Spaced repetition
+## Spaced repetition - User study plan
 
 - Upgrade from fixed intervals to SM-2 or FSRS.
 - Track answer quality score, latency, and streak.
 - Add adaptive hint penalties and confidence scoring.
+- Start the session asking for a time commitment and adjust session size dynamically.
 
 ## Frontend
 
