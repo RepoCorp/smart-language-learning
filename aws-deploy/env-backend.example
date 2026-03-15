@@ -1,0 +1,9 @@
+DJANGO_DEBUG=0
+DJANGO_ALLOWED_HOSTS=api.yourdomain.com
+POSTGRES_DB=smart_language_learning
+POSTGRES_USER=smart_language_learning
+POSTGRES_HOST=<RDS_ENDPOINT>
+POSTGRES_PORT=5432
+# Set in Secrets Manager
+DJANGO_SECRET_KEY=<secret>
+POSTGRES_PASSWORD=<secret>

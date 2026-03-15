@@ -1,0 +1,2 @@
+# Build-time variable used by Vite in frontend.Dockerfile.prod
+VITE_API_URL=https://api.yourdomain.com/api

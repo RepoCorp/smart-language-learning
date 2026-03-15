@@ -1,0 +1,20 @@
+export type ItemType = "word" | "phrase";
+export type SessionMode = "new" | "review";
+export type ReviewDirection = "es_to_de" | "de_to_es";
+
+export interface SessionItem {
+  id: number;
+  item_type: ItemType;
+  spanish_text: string;
+  german_text: string;
+  example_sentence?: string;
+  notes?: string;
+  audio_url?: string;
+  mode: SessionMode;
+  direction?: ReviewDirection | null;
+  options: string[];
+}
+
+export interface SessionResponse {
+  items: SessionItem[];
+}

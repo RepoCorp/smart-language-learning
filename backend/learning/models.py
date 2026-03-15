@@ -1,0 +1,39 @@
+from django.db import models
+
+
+class Item(models.Model):
+    class ItemType(models.TextChoices):
+        WORD = "word", "Word"
+        PHRASE = "phrase", "Phrase"
+
+    class ReviewDirection(models.TextChoices):
+        SPANISH_TO_GERMAN = "es_to_de", "Spanish to German"
+        GERMAN_TO_SPANISH = "de_to_es", "German to Spanish"
+
+    item_type = models.CharField(max_length=10, choices=ItemType.choices)
+    spanish_text = models.CharField(max_length=255)
+    german_text = models.CharField(max_length=255)
+    example_sentence = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    audio_url = models.URLField(blank=True)
+
+    repetition_count = models.PositiveIntegerField(default=0)
+    interval_days = models.PositiveIntegerField(default=1)
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
+    due_at = models.DateTimeField(null=True, blank=True)
+
+    repetition_count_es_to_de = models.PositiveIntegerField(default=0)
+    interval_days_es_to_de = models.PositiveIntegerField(default=1)
+    last_reviewed_at_es_to_de = models.DateTimeField(null=True, blank=True)
+    due_at_es_to_de = models.DateTimeField(null=True, blank=True)
+
+    repetition_count_de_to_es = models.PositiveIntegerField(default=0)
+    interval_days_de_to_es = models.PositiveIntegerField(default=1)
+    last_reviewed_at_de_to_es = models.DateTimeField(null=True, blank=True)
+    due_at_de_to_es = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.item_type}: {self.spanish_text} -> {self.german_text}"
