@@ -30,3 +30,15 @@ class SubmitReviewSerializer(serializers.Serializer):
 
 class MarkSeenSerializer(serializers.Serializer):
     item_id = serializers.IntegerField()
+
+
+class ContentTopicSerializer(serializers.Serializer):
+    topic = serializers.CharField(max_length=120)
+
+
+class ContentConfirmSerializer(ContentTopicSerializer):
+    selected_words = serializers.ListField(
+        child=serializers.CharField(max_length=255),
+        required=False,
+        allow_empty=True,
+    )

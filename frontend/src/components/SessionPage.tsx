@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { fetchSession, markSeen, submitReview } from "../api";
 import type { SessionItem } from "../types";
@@ -105,6 +106,9 @@ export default function SessionPage(): JSX.Element {
   return (
     <main className="container" data-testid="session-page">
       <h1>Learning session</h1>
+      <p>
+        <Link to="/content/create">Create content</Link>
+      </p>
       <p>
         Item {index + 1} of {items.length}
       </p>

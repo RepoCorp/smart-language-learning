@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 
 from django.utils import timezone
@@ -10,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Item
-from .serializers import MarkSeenSerializer, SessionItemSerializer, SubmitReviewSerializer
+from .serializers import ContentConfirmSerializer, ContentTopicSerializer, MarkSeenSerializer, SessionItemSerializer, SubmitReviewSerializer
 from .srs import apply_review_result, mark_item_seen
 
 
@@ -76,6 +77,51 @@ class MarkSeenView(APIView):
 class HealthView(APIView):
     def get(self, request: Request) -> Response:
         return Response({"status": "ok", "service": "smart-language-learning-backend", "timestamp": timezone.now().isoformat()})
+
+
+class ContentPreviewView(APIView):
+    def post(self, request: Request) -> Response:
+        serializer = ContentTopicSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        topic = serializer.validated_data["topic"].strip()
+        plan = build_content_plan(topic)
+        return Response(
+            {
+                "topic": topic,
+                "phrase": serialize_candidate(plan.phrase),
+                "words": [serialize_candidate(word) for word in plan.words],
+                "new_items_count": count_new_items(plan),
+            }
+        )
+
+
+class ContentConfirmView(APIView):
+    def post(self, request: Request) -> Response:
+        serializer = ContentConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        topic = serializer.validated_data["topic"].strip()
+        selected_words = serializer.validated_data.get("selected_words", [])
+        selected_words_normalized = {word.strip().lower() for word in selected_words if word.strip()}
+        plan = build_content_plan(topic)
+
+        created_phrase = create_phrase_if_missing(plan.phrase, topic)
+        created_words = [
+            create_word_if_missing(word, plan.phrase.spanish_text, topic)
+            for word in plan.words
+            if word.spanish_text.lower() in selected_words_normalized
+        ]
+        created_word_items = [word for word in created_words if word is not None]
+
+        return Response(
+            {
+                "topic": topic,
+                "created_phrase": created_phrase is not None,
+                "created_words_count": len(created_word_items),
+                "created_words": [item.spanish_text for item in created_word_items],
+            }
+        )
 
 
 def build_session_entries(size: int, now) -> list[SessionEntry]:
@@ -261,3 +307,108 @@ def build_phrase_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
         options_map[entry_key(entry)] = choices
 
     return options_map
+
+
+@dataclass(frozen=True)
+class ContentCandidate:
+    spanish_text: str
+    german_text: str
+    exists: bool
+
+
+@dataclass(frozen=True)
+class ContentPlan:
+    phrase: ContentCandidate
+    words: list[ContentCandidate]
+
+
+SPANISH_COMMON_WORDS = {
+    "a", "al", "ante", "bajo", "cabe", "con", "contra", "de", "del", "desde", "durante", "en", "entre",
+    "hacia", "hasta", "mediante", "para", "por", "segun", "sin", "so", "sobre", "tras", "el", "la", "los",
+    "las", "un", "una", "unos", "unas", "y", "e", "o", "u", "ni", "que", "si", "no", "yo", "tu", "el", "ella",
+    "nosotros", "vosotros", "ellos", "ellas", "me", "te", "se", "nos", "os", "mi", "tu", "su", "nuestro",
+    "vuestro", "hoy", "estudio", "aprendo", "tema", "sobre", "muy", "mas", "menos", "es", "son", "ser", "estar",
+    "tener", "hacer", "ir", "venir", "decir", "dar", "ver", "saber", "poder", "hola", "gracias", "adios",
+    "perdon", "favor", "casa", "perro", "gato", "comida", "agua", "dia", "noche", "persona", "gente",
+}
+
+
+def build_content_plan(topic: str) -> ContentPlan:
+    normalized_topic = normalize_topic(topic)
+    phrase_es = f"Hoy estudio {normalized_topic}."
+    phrase_de = f"Heute lerne ich {normalized_topic}."
+
+    phrase_exists = Item.objects.filter(item_type=Item.ItemType.PHRASE, spanish_text__iexact=phrase_es).exists()
+    phrase_candidate = ContentCandidate(spanish_text=phrase_es, german_text=phrase_de, exists=phrase_exists)
+
+    words: list[ContentCandidate] = []
+    seen: set[str] = set()
+    for token in extract_non_common_words(phrase_es):
+        key = token.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        exists = Item.objects.filter(item_type=Item.ItemType.WORD, spanish_text__iexact=token).exists()
+        words.append(ContentCandidate(spanish_text=token, german_text=token.capitalize(), exists=exists))
+
+    return ContentPlan(phrase=phrase_candidate, words=words)
+
+
+def normalize_topic(topic: str) -> str:
+    cleaned = " ".join(topic.split()).strip()
+    if not cleaned:
+        return "un tema"
+    return cleaned
+
+
+def extract_non_common_words(sentence: str) -> list[str]:
+    tokens = re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+", sentence)
+    result: list[str] = []
+    for token in tokens:
+        normalized = token.lower()
+        if normalized in SPANISH_COMMON_WORDS:
+            continue
+        if len(normalized) <= 2:
+            continue
+        result.append(token)
+    return result
+
+
+def serialize_candidate(candidate: ContentCandidate) -> dict:
+    return {
+        "spanish_text": candidate.spanish_text,
+        "german_text": candidate.german_text,
+        "exists": candidate.exists,
+    }
+
+
+def count_new_items(plan: ContentPlan) -> int:
+    count = 0
+    if not plan.phrase.exists:
+        count += 1
+    count += sum(1 for word in plan.words if not word.exists)
+    return count
+
+
+def create_phrase_if_missing(candidate: ContentCandidate, topic: str) -> Item | None:
+    if Item.objects.filter(item_type=Item.ItemType.PHRASE, spanish_text__iexact=candidate.spanish_text).exists():
+        return None
+    return Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text=candidate.spanish_text,
+        german_text=candidate.german_text,
+        notes=f"Auto-created from topic: {topic}",
+        example_sentence=candidate.spanish_text,
+    )
+
+
+def create_word_if_missing(candidate: ContentCandidate, sentence: str, topic: str) -> Item | None:
+    if Item.objects.filter(item_type=Item.ItemType.WORD, spanish_text__iexact=candidate.spanish_text).exists():
+        return None
+    return Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text=candidate.spanish_text,
+        german_text=candidate.german_text,
+        notes=f"Auto-created from topic: {topic}",
+        example_sentence=sentence,
+    )

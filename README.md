@@ -19,6 +19,7 @@ Web prototype for language learning (Spanish -> German) using simple spaced repe
   3. If still not enough, upcoming review items (earliest `due_at` first).
 - Word and phrase reviews are tested in both directions (`Spanish -> German` and `German -> Spanish`) with separate progress per direction.
 - New items show full content (example sentence, notes, audio URL).
+- Content creation flow from a user topic with preview + confirmation before saving (including per-word checkbox selection).
 - Review for words: text input + letter hints.
 - Review for phrases: multiple choice.
 - Simple fixed spaced-repetition intervals: `1, 3, 7, 14, 30` days.
@@ -71,6 +72,8 @@ docker compose run --rm frontend npm test -- --run
 - `GET /api/session?size=5`
 - `POST /api/review`
 - `POST /api/seen` (mark a new item as shown without grading)
+- `POST /api/content/preview`
+- `POST /api/content/confirm`
 
 Review payload:
 
