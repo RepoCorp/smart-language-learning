@@ -1,11 +1,21 @@
 import type {
   ContentConfirmResponse,
   ContentPreviewResponse,
+  OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const OVERVIEW_STATS_UPDATED_EVENT = "overview-stats-updated";
+
+function notifyOverviewStatsUpdated(): void {
+  window.dispatchEvent(new CustomEvent(OVERVIEW_STATS_UPDATED_EVENT));
+}
+
+export function getOverviewStatsUpdatedEventName(): string {
+  return OVERVIEW_STATS_UPDATED_EVENT;
+}
 
 export async function fetchSession(size = 5): Promise<SessionResponse> {
   const response = await fetch(`${API_BASE}/session?size=${size}`);
@@ -30,6 +40,7 @@ export async function submitReview(itemId: number, correct: boolean, direction?:
   if (!response.ok) {
     throw new Error("Failed to submit answer");
   }
+  notifyOverviewStatsUpdated();
 }
 
 export async function markSeen(itemId: number): Promise<void> {
@@ -42,6 +53,7 @@ export async function markSeen(itemId: number): Promise<void> {
   if (!response.ok) {
     throw new Error("Failed to mark item as seen");
   }
+  notifyOverviewStatsUpdated();
 }
 
 export async function previewContent(topic: string): Promise<ContentPreviewResponse> {
@@ -68,5 +80,14 @@ export async function confirmContent(topic: string, selectedWords: string[]): Pr
   if (!response.ok) {
     throw new Error("Failed to save generated content");
   }
+  notifyOverviewStatsUpdated();
   return (await response.json()) as ContentConfirmResponse;
+}
+
+export async function fetchOverviewStats(): Promise<OverviewStatsResponse> {
+  const response = await fetch(`${API_BASE}/overview-stats`);
+  if (!response.ok) {
+    throw new Error("Failed to load overview stats");
+  }
+  return (await response.json()) as OverviewStatsResponse;
 }

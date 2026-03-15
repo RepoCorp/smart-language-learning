@@ -20,6 +20,9 @@ Web prototype for language learning (Spanish -> German) using simple spaced repe
 - Word and phrase reviews are tested in both directions (`Spanish -> German` and `German -> Spanish`) with separate progress per direction.
 - New items show full content (example sentence, notes, audio URL).
 - Content creation flow from a user topic with preview + confirmation before saving (including per-word checkbox selection).
+  - If `OPENAI_API_KEY` is set, phrase generation uses ChatGPT API.
+  - If not set (or request fails), it falls back to the local simple template.
+- Top bar in all pages with counts for ready reviews, future reviews, and not-started items.
 - Review for words: text input + letter hints.
 - Review for phrases: multiple choice.
 - Simple fixed spaced-repetition intervals: `1, 3, 7, 14, 30` days.
@@ -52,6 +55,11 @@ If you prefer the raw compose command:
 docker compose up --build
 ```
 
+Optional environment variables for AI phrase generation:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (default: `gpt-4o-mini`)
+
 ## Tests (minimal structure)
 
 Backend:
@@ -69,6 +77,7 @@ docker compose run --rm frontend npm test -- --run
 ## API endpoints
 
 - `GET /api/health`
+- `GET /api/overview-stats`
 - `GET /api/session?size=5`
 - `POST /api/review`
 - `POST /api/seen` (mark a new item as shown without grading)

@@ -36,6 +36,7 @@
 - Add static typing checks (`mypy`) and stricter type coverage over time.
 - Add frontend lint/format tooling (`eslint`, `prettier`).
 - Add pre-commit hooks for backend and frontend checks.
+- Add Factories for test data generation.
 
 ## Testing
 

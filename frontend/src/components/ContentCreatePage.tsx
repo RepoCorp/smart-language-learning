@@ -58,6 +58,7 @@ export default function ContentCreatePage(): JSX.Element {
       } else {
         setResult(`Saved: ${response.created_words_count} word(s), ${phraseMessage}.`);
       }
+      setTopic("");
       setPreview(null);
       setSelectedWords({});
     } catch (err) {
@@ -119,22 +120,22 @@ export default function ContentCreatePage(): JSX.Element {
           })()}
 
           <p><strong>Candidate words:</strong></p>
-          <ul>
+          <ul className="word-preview-list">
             {preview.words.map((word) => (
-              <li key={word.spanish_text.toLowerCase()}>
+              <li key={word.spanish_text.toLowerCase()} className="word-preview-item">
                 {word.exists ? (
                   <>
-                    {word.spanish_text} (already exists)
+                    {word.spanish_text} - {word.german_text} (already exists)
                   </>
                 ) : (
-                  <label>
+                  <label className="word-preview-label">
                     <input
                       type="checkbox"
                       checked={Boolean(selectedWords[word.spanish_text.toLowerCase()])}
                       onChange={() => toggleWordSelection(word.spanish_text.toLowerCase())}
                       disabled={saving}
-                    />{" "}
-                    {word.spanish_text} (new)
+                    />
+                    {word.spanish_text} - {word.german_text} (new)
                   </label>
                 )}
               </li>

@@ -37,3 +37,20 @@ class Item(models.Model):
 
     def __str__(self) -> str:
         return f"{self.item_type}: {self.spanish_text} -> {self.german_text}"
+
+
+class ExcludedWordSuggestion(models.Model):
+    spanish_text = models.CharField(max_length=255)
+    german_text = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("spanish_text", "german_text"),
+                name="learning_excludedwordsuggestion_es_de_uniq",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.spanish_text} -> {self.german_text}"

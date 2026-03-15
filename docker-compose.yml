@@ -18,6 +18,8 @@ services:
   backend:
     build:
       context: ./backend
+    env_file:
+      - ./.env
     environment:
       DJANGO_DEBUG: "1"
       DJANGO_SECRET_KEY: dev-secret-key
@@ -27,6 +29,8 @@ services:
       POSTGRES_PASSWORD: smart_language_learning
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
     depends_on:
       db:
         condition: service_healthy

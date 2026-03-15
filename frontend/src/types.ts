@@ -38,3 +38,9 @@ export interface ContentConfirmResponse {
   created_words_count: number;
   created_words: string[];
 }
+
+export interface OverviewStatsResponse {
+  ready_to_review: number;
+  future_reviews: number;
+  not_started: number;
+}
