@@ -1,3 +1,8 @@
+# Todos
+
+Arreglar todos los usos de español y aleman en el codigo.
+Añadir manejo del casing para todos los idiomas usando el modelo 
+
 # Future Ideas
 
 ## Deployment and operations

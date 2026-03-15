@@ -219,6 +219,46 @@ export default function ContentCreatePage(): JSX.Element {
     }));
   };
 
+  const unselectAllPhrases = (): void => {
+    setSelectedPhrases((current) => {
+      const next: Record<string, boolean> = {};
+      for (const key of Object.keys(current)) {
+        next[key] = false;
+      }
+      return next;
+    });
+  };
+
+  const selectAllPhrases = (): void => {
+    setSelectedPhrases((current) => {
+      const next: Record<string, boolean> = {};
+      for (const key of Object.keys(current)) {
+        next[key] = true;
+      }
+      return next;
+    });
+  };
+
+  const unselectAllWords = (): void => {
+    setSelectedWords((current) => {
+      const next: Record<string, boolean> = {};
+      for (const key of Object.keys(current)) {
+        next[key] = false;
+      }
+      return next;
+    });
+  };
+
+  const selectAllWords = (): void => {
+    setSelectedWords((current) => {
+      const next: Record<string, boolean> = {};
+      for (const key of Object.keys(current)) {
+        next[key] = true;
+      }
+      return next;
+    });
+  };
+
   return (
     <main className="container" data-testid="content-create-page">
       <h1>{t("content.title")}</h1>
@@ -298,6 +338,14 @@ export default function ContentCreatePage(): JSX.Element {
         <section className="card">
           <h2>{t("content.preview.title")}</h2>
           <p><strong>{t("content.preview.phrases")}</strong></p>
+          <div className="actions">
+            <button onClick={selectAllPhrases} disabled={saving}>
+              {t("content.preview.selectAllPhrases")}
+            </button>
+            <button onClick={unselectAllPhrases} disabled={saving}>
+              {t("content.preview.unselectAllPhrases")}
+            </button>
+          </div>
           <ul className="conversation-preview-list">
             {preview.phrases.map((phrase, index) => {
               const phraseKey = phrase.selection_key || `${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}`;
@@ -345,6 +393,14 @@ export default function ContentCreatePage(): JSX.Element {
           })()}
 
           <p><strong>{t("content.preview.words")}</strong></p>
+          <div className="actions">
+            <button onClick={selectAllWords} disabled={saving}>
+              {t("content.preview.selectAllWords")}
+            </button>
+            <button onClick={unselectAllWords} disabled={saving}>
+              {t("content.preview.unselectAllWords")}
+            </button>
+          </div>
           <ul className="word-preview-list">
             {preview.words.map((word) => (
               <li

@@ -1,1 +1,4 @@
 .env
+
+# Generated media artifacts
+backend/media/audio/*
