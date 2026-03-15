@@ -34,11 +34,21 @@ class MarkSeenSerializer(serializers.Serializer):
 
 class ContentTopicSerializer(serializers.Serializer):
     topic = serializers.CharField(max_length=120)
+    context = serializers.CharField(
+        max_length=400,
+        required=False,
+        allow_blank=True,
+    )
 
 
 class ContentConfirmSerializer(ContentTopicSerializer):
+    selected_phrases = serializers.ListField(
+        child=serializers.CharField(max_length=600),
+        required=False,
+        allow_empty=True,
+    )
     selected_words = serializers.ListField(
-        child=serializers.CharField(max_length=255),
+        child=serializers.CharField(max_length=600),
         required=False,
         allow_empty=True,
     )

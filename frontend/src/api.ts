@@ -1,6 +1,8 @@
 import type {
   ContentConfirmResponse,
   ContentPreviewResponse,
+  ContentTopicContextsResponse,
+  ContentTopicsResponse,
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
@@ -56,11 +58,11 @@ export async function markSeen(itemId: number): Promise<void> {
   notifyOverviewStatsUpdated();
 }
 
-export async function previewContent(topic: string): Promise<ContentPreviewResponse> {
+export async function previewContent(topic: string, context = ""): Promise<ContentPreviewResponse> {
   const response = await fetch(`${API_BASE}/content/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic }),
+    body: JSON.stringify({ topic, context }),
   });
   if (!response.ok) {
     throw new Error("Failed to generate content preview");
@@ -68,12 +70,19 @@ export async function previewContent(topic: string): Promise<ContentPreviewRespo
   return (await response.json()) as ContentPreviewResponse;
 }
 
-export async function confirmContent(topic: string, selectedWords: string[]): Promise<ContentConfirmResponse> {
+export async function confirmContent(
+  topic: string,
+  selectedPhrases: string[],
+  selectedWords: string[],
+  context = "",
+): Promise<ContentConfirmResponse> {
   const response = await fetch(`${API_BASE}/content/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       topic,
+      context,
+      selected_phrases: selectedPhrases,
       selected_words: selectedWords,
     }),
   });
@@ -82,6 +91,23 @@ export async function confirmContent(topic: string, selectedWords: string[]): Pr
   }
   notifyOverviewStatsUpdated();
   return (await response.json()) as ContentConfirmResponse;
+}
+
+export async function fetchContentTopics(): Promise<ContentTopicsResponse> {
+  const response = await fetch(`${API_BASE}/content/topics`);
+  if (!response.ok) {
+    throw new Error("Failed to load previous topics");
+  }
+  return (await response.json()) as ContentTopicsResponse;
+}
+
+export async function fetchContentTopicContexts(topic: string): Promise<ContentTopicContextsResponse> {
+  const params = new URLSearchParams({ topic });
+  const response = await fetch(`${API_BASE}/content/topic-contexts?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to load topic contexts");
+  }
+  return (await response.json()) as ContentTopicContextsResponse;
 }
 
 export async function fetchOverviewStats(): Promise<OverviewStatsResponse> {

@@ -54,3 +54,32 @@ class ExcludedWordSuggestion(models.Model):
 
     def __str__(self) -> str:
         return f"{self.spanish_text} -> {self.german_text}"
+
+
+class SavedTopic(models.Model):
+    topic = models.CharField(max_length=120, unique=True)
+    used_count = models.PositiveIntegerField(default=1)
+    last_used_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return self.topic
+
+
+class SavedTopicContext(models.Model):
+    topic = models.ForeignKey(SavedTopic, on_delete=models.CASCADE, related_name="contexts")
+    context = models.CharField(max_length=400)
+    used_count = models.PositiveIntegerField(default=1)
+    last_used_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("topic", "context"),
+                name="learning_savedtopiccontext_topic_context_uniq",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.topic.topic}: {self.context}"

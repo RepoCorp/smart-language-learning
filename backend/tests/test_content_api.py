@@ -29,8 +29,8 @@ def test_content_preview_returns_phrase_and_model_keywords(monkeypatch):
 
     assert response.status_code == 200
     payload = response.json()
-    assert "phrase" in payload
-    assert payload["phrase"]["spanish_text"] == "Hoy estudio python para ciencia de datos."
+    assert "phrases" in payload
+    assert payload["phrases"][0]["spanish_text"] == "Hoy estudio python para ciencia de datos."
     words = payload["words"]
     spanish_words = [word["spanish_text"].lower() for word in words]
     assert "python" in spanish_words
@@ -353,3 +353,144 @@ def test_content_confirm_adds_plural_to_word_notes(monkeypatch):
     assert response.status_code == 200
     word = Item.objects.get(item_type=Item.ItemType.WORD, spanish_text="jardin", german_text="der Garten")
     assert word.notes == "Common noun. Plural: die Garten"
+
+
+@pytest.mark.django_db
+def test_content_topics_endpoint_returns_recent_topics(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(
+        content_views,
+        "generate_content_with_chatgpt",
+        lambda topic: (
+            f"Hoy estudio {topic}.",
+            f"Heute lerne ich {topic}.",
+            "",
+            [],
+        ),
+    )
+    monkeypatch.setattr(content_views, "generate_conversation_with_chatgpt", lambda topic: None)
+
+    client = APIClient()
+    preview_one = client.post("/api/content/preview", {"topic": "travel"}, format="json")
+    preview_two = client.post("/api/content/preview", {"topic": "cooking"}, format="json")
+    assert preview_one.status_code == 200
+    assert preview_two.status_code == 200
+
+    response = client.get("/api/content/topics")
+    assert response.status_code == 200
+    topics = response.json()["topics"]
+    assert "travel" in topics
+    assert "cooking" in topics
+
+
+@pytest.mark.django_db
+def test_content_topic_contexts_endpoint_returns_contexts_for_topic(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(content_views, "generate_conversation_with_chatgpt", lambda topic, context="": None)
+    monkeypatch.setattr(
+        content_views,
+        "generate_content_with_chatgpt",
+        lambda topic, context="": (
+            f"Hoy estudio {topic}.",
+            f"Heute lerne ich {topic}.",
+            "",
+            [],
+        ),
+    )
+
+    client = APIClient()
+    response_one = client.post(
+        "/api/content/preview",
+        {"topic": "travel", "context": "at the airport"},
+        format="json",
+    )
+    response_two = client.post(
+        "/api/content/preview",
+        {"topic": "travel", "context": "buying train tickets"},
+        format="json",
+    )
+    assert response_one.status_code == 200
+    assert response_two.status_code == 200
+
+    contexts_response = client.get("/api/content/topic-contexts", {"topic": "travel"})
+    assert contexts_response.status_code == 200
+    contexts = contexts_response.json()["contexts"]
+    assert "at the airport" in contexts
+    assert "buying train tickets" in contexts
+
+
+@pytest.mark.django_db
+def test_content_confirm_creates_only_selected_phrases(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(
+        content_views,
+        "generate_conversation_with_chatgpt",
+        lambda topic, context="": [
+            {"spanish_text": "Hola.", "german_text": "Hallo.", "notes": ""},
+            {"spanish_text": "Como estas?", "german_text": "Wie geht's?", "notes": ""},
+        ],
+    )
+    monkeypatch.setattr(content_views, "generate_keywords_for_phrase_with_chatgpt", lambda s, g: [])
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/confirm",
+        {
+            "topic": "greetings",
+            "selected_phrases": ["hola.|||hallo."],
+            "selected_words": [],
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+
+    assert Item.objects.filter(item_type=Item.ItemType.PHRASE, spanish_text="Hola.", german_text="Hallo.").exists()
+    assert (
+        Item.objects.filter(item_type=Item.ItemType.PHRASE, spanish_text="Como estas?", german_text="Wie geht's?").exists()
+        is False
+    )
+
+
+@pytest.mark.django_db
+def test_content_preview_skips_keywords_not_present_in_phrase(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(
+        content_views,
+        "generate_conversation_with_chatgpt",
+        lambda topic, context="": [
+            {
+                "spanish_text": "Hola, cuanto es en total?",
+                "german_text": "Hallo, wie viel macht das insgesamt?",
+                "notes": "",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        content_views,
+        "generate_keywords_for_phrase_with_chatgpt",
+        lambda spanish_phrase, german_phrase: [
+            {
+                "spanish_text": "total",
+                "german_text": "der Gesamtbetrag",
+                "notes": "",
+                "plural_german": "",
+            }
+        ],
+    )
+
+    client = APIClient()
+    response = client.post("/api/content/preview", {"topic": "shopping"}, format="json")
+
+    assert response.status_code == 200
+    words = response.json()["words"]
+    german_words = [word["german_text"] for word in words]
+    assert "der Gesamtbetrag" not in german_words

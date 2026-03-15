@@ -3,6 +3,8 @@ from django.urls import path
 from .views import (
     ContentConfirmView,
     ContentPreviewView,
+    ContentTopicContextsView,
+    ContentTopicsView,
     HealthView,
     MarkSeenView,
     OverviewStatsView,
@@ -18,4 +20,6 @@ urlpatterns = [
     path("seen", MarkSeenView.as_view(), name="seen"),
     path("content/preview", ContentPreviewView.as_view(), name="content-preview"),
     path("content/confirm", ContentConfirmView.as_view(), name="content-confirm"),
+    path("content/topics", ContentTopicsView.as_view(), name="content-topics"),
+    path("content/topic-contexts", ContentTopicContextsView.as_view(), name="content-topic-contexts"),
 ]
