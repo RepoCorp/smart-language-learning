@@ -51,6 +51,87 @@ export default function WordsPage(): JSX.Element {
     return [...selectedItem.related_dialogs].sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [selectedItem]);
 
+  useEffect(() => {
+    if (!selectedItem) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      const firstMatch = document.querySelector(".related-dialogs-modal .turn-highlight");
+      if (firstMatch instanceof HTMLElement) {
+        firstMatch.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 30);
+    return () => window.clearTimeout(timeoutId);
+  }, [selectedItem, sortedDialogs.length]);
+
+  const wordCandidates = (word: string): string[] => {
+    const normalized = word.trim();
+    if (!normalized) {
+      return [];
+    }
+    const candidates = [normalized];
+    const withoutArticle = normalized.replace(/^(der|die|das)\s+/i, "").trim();
+    if (withoutArticle && withoutArticle.toLowerCase() !== normalized.toLowerCase()) {
+      candidates.push(withoutArticle);
+    }
+    return candidates.sort((a, b) => b.length - a.length);
+  };
+
+  const containsWordInTurn = (turnTargetText: string, word: string): boolean => {
+    const text = turnTargetText.trim();
+    if (!text) {
+      return false;
+    }
+    for (const candidate of wordCandidates(word)) {
+      const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(`\\b${escaped}\\b`, "i");
+      if (pattern.test(text)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const renderTargetTurn = (turnTargetText: string, word: string): JSX.Element => {
+    for (const candidate of wordCandidates(word)) {
+      const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(`\\b${escaped}\\b`, "i");
+      const match = pattern.exec(turnTargetText);
+      if (match && match.index >= 0) {
+        const start = match.index;
+        const end = start + match[0].length;
+        return (
+          <>
+            {turnTargetText.slice(0, start)}
+            <mark className="turn-word-highlight">{turnTargetText.slice(start, end)}</mark>
+            {turnTargetText.slice(end)}
+          </>
+        );
+      }
+    }
+    return <>{turnTargetText}</>;
+  };
+
+  const playTurnAudio = async (phraseAudioUrl: string, turnIndex: number, includeWord: boolean): Promise<void> => {
+    const wordAudioUrl = selectedItem?.audio_url || "";
+    if (!phraseAudioUrl || (includeWord && !wordAudioUrl)) {
+      return;
+    }
+    const sequence = includeWord ? [wordAudioUrl, phraseAudioUrl] : [phraseAudioUrl];
+    for (let index = 0; index < sequence.length; index += 1) {
+      const source = sequence[index];
+      await new Promise<void>((resolve) => {
+        const audio = new Audio(source);
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        void audio.play().catch(() => resolve());
+      });
+      if (index === 0 && turnIndex >= 0) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
+      }
+    }
+  };
+
   return (
     <main className="container">
       <h1>{t("words.title")}</h1>
@@ -100,7 +181,6 @@ export default function WordsPage(): JSX.Element {
           <div className="blocking-modal related-dialogs-modal">
             <p><strong>{t("words.itemTitle")}</strong></p>
             <p><strong>{selectedItem.spanish_text}</strong> - {selectedItem.german_text}</p>
-            <p><strong>{t("newItem.example")}</strong> {selectedItem.example_sentence || "-"}</p>
             <p><strong>{t("newItem.notes")}</strong> {selectedItem.notes || "-"}</p>
             {selectedItem.audio_url && (
               <audio controls src={selectedItem.audio_url}>
@@ -121,17 +201,30 @@ export default function WordsPage(): JSX.Element {
                         </audio>
                       )}
                       <ul className="conversation-preview-list">
-                        {dialog.turns.map((turn, index) => (
+                        {dialog.turns.map((turn, index) => {
+                          const includeWord = containsWordInTurn(turn.target_text, selectedItem.german_text);
+                          return (
                           <li
                             key={`${dialog.dialog_id}-${index}`}
                             className={`conversation-turn ${index % 2 === 0 ? "speaker-a" : "speaker-b"} ${
                               matchedTurnIndexes.has(index) ? "turn-highlight" : ""
                             }`}
                           >
+                            <p className="conversation-line conversation-line-translation">
+                              {renderTargetTurn(turn.target_text, selectedItem.german_text)}
+                              <button
+                                type="button"
+                                className="turn-audio-button"
+                                disabled={!turn.phrase_audio_url || (includeWord && !selectedItem.audio_url)}
+                                onClick={() => void playTurnAudio(turn.phrase_audio_url || "", index, includeWord)}
+                              >
+                                {t("newItem.playTurnAudio")}
+                              </button>
+                            </p>
                             <p className="conversation-line">{turn.source_text}</p>
-                            <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     </div>
                   );

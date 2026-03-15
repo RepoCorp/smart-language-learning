@@ -23,6 +23,7 @@ export interface SessionItem {
     turns: Array<{
       source_text: string;
       target_text: string;
+      phrase_audio_url?: string;
     }>;
     matched_turns: Array<{
       turn_index: number;
@@ -102,6 +103,7 @@ export interface WordLibraryItem {
     turns: Array<{
       source_text: string;
       target_text: string;
+      phrase_audio_url?: string;
     }>;
     matched_turns: Array<{
       turn_index: number;

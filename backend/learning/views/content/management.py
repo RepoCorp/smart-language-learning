@@ -112,7 +112,7 @@ def _related_dialogs_by_item_ids(item_ids: list[int], per_item_limit: int = 8) -
                 "context": occurrence.dialog.context,
                 "audio_url": occurrence.dialog.audio_url,
                 "created_at": occurrence.dialog.created_at.isoformat(),
-                "turns": occurrence.dialog.turns if isinstance(occurrence.dialog.turns, list) else [],
+                "turns": _dialog_turns_with_phrase_audio(occurrence.dialog),
                 "matched_turns": [],
             }
             dialogs_for_item[occurrence.dialog_id] = dialog_payload
@@ -126,3 +126,44 @@ def _related_dialogs_by_item_ids(item_ids: list[int], per_item_limit: int = 8) -
         if matched_turn not in dialog_payload["matched_turns"]:
             dialog_payload["matched_turns"].append(matched_turn)
     return {item_id: list(dialogs.values()) for item_id, dialogs in by_item_dialog.items()}
+
+
+def _dialog_turns_with_phrase_audio(dialog) -> list[dict]:
+    raw_turns = dialog.turns if isinstance(dialog.turns, list) else []
+    normalized_turns: list[dict] = []
+    key_pairs: set[tuple[str, str]] = set()
+    for turn in raw_turns:
+        if not isinstance(turn, dict):
+            continue
+        source_text = str(turn.get("source_text", "")).strip()
+        target_text = str(turn.get("target_text", "")).strip()
+        normalized_turns.append({"source_text": source_text, "target_text": target_text})
+        if source_text and target_text:
+            key_pairs.add((source_text.lower(), target_text.lower()))
+
+    phrase_audio_by_key: dict[tuple[str, str], str] = {}
+    if key_pairs:
+        query = Q()
+        for source_text, target_text in key_pairs:
+            query |= Q(spanish_text__iexact=source_text, german_text__iexact=target_text)
+        phrase_items = Item.objects.filter(
+            item_type=Item.ItemType.PHRASE,
+            source_language=dialog.source_language,
+            target_language=dialog.target_language,
+        ).filter(query).values("spanish_text", "german_text", "audio_url")
+        phrase_audio_by_key = {
+            (str(item["spanish_text"]).strip().lower(), str(item["german_text"]).strip().lower()): str(item["audio_url"] or "")
+            for item in phrase_items
+        }
+
+    return [
+        {
+            "source_text": turn["source_text"],
+            "target_text": turn["target_text"],
+            "phrase_audio_url": phrase_audio_by_key.get(
+                (turn["source_text"].lower(), turn["target_text"].lower()),
+                "",
+            ),
+        }
+        for turn in normalized_turns
+    ]

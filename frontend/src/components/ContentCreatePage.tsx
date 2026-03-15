@@ -361,8 +361,8 @@ export default function ContentCreatePage(): JSX.Element {
                   className={`conversation-turn ${index % 2 === 0 ? "speaker-a" : "speaker-b"}`}
                 >
                   <p className="conversation-speaker">{index % 2 === 0 ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                  <p className="conversation-line">{turn.source_text}</p>
                   <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
+                  <p className="conversation-line">{turn.source_text}</p>
                 </li>
               ))}
             </ul>
@@ -402,8 +402,8 @@ export default function ContentCreatePage(): JSX.Element {
                   className={`conversation-turn ${index % 2 === 0 ? "speaker-a" : "speaker-b"}`}
                 >
                   <p className="conversation-speaker">{index % 2 === 0 ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                  <p className="conversation-line">{phrase.spanish_text}</p>
                   <p className="conversation-line conversation-line-translation">{phrase.german_text}</p>
+                  <p className="conversation-line">{phrase.spanish_text}</p>
                   {phrase.exists ? (
                     <p className="conversation-status">{t("content.preview.exists")}</p>
                   ) : (
@@ -477,13 +477,13 @@ export default function ContentCreatePage(): JSX.Element {
             ))}
           </ul>
           <div className="actions">
-            <label>
+            <label className="content-audio-option">
               <input
                 type="checkbox"
                 checked={createDialogAudio}
                 onChange={(e) => setCreateDialogAudio(e.target.checked)}
                 disabled={saving}
-              />{" "}
+              />
               {t("content.createDialogAudio")}
             </label>
           </div>

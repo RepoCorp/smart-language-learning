@@ -18,17 +18,18 @@ from .selection import normalize_word_pair, word_selection_id
 from .types import ContentCandidate, ContentPlan
 
 logger = logging.getLogger(__name__)
-TTS_LANGUAGE_BY_STUDY_LANGUAGE = {
-    "spanish": "es",
-    "english": "en",
-    "german": "de",
-    "french": "fr",
-    "italian": "it",
-    "portuguese": "pt",
+OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE = {
+    "spanish": "nova",
+    "english": "alloy",
+    "german": "onyx",
+    "french": "shimmer",
+    "italian": "echo",
+    "portuguese": "fable",
 }
 OPENAI_TTS_VOICES = ("alloy", "echo", "fable", "onyx", "nova", "shimmer")
 OPENAI_TTS_SAMPLE_RATE = 24000
 OPENAI_TTS_DEFAULT_SPEED = 1.25
+OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
 
 
 def get_excluded_words_lookup() -> set[tuple[str, str]]:
@@ -181,12 +182,6 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german") -
         logger.warning("content.audio.skipped prefix=%s reason=empty_text", prefix)
         return ""
 
-    try:
-        from gtts import gTTS
-    except ImportError:
-        logger.warning("content.audio.skipped prefix=%s reason=gtts_not_installed", prefix)
-        return ""
-
     audio_dir = Path(settings.MEDIA_ROOT) / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
 
@@ -196,30 +191,41 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german") -
     filename = f"{prefix}-{slug[:32]}-{uuid4().hex[:8]}.mp3"
     file_path = audio_dir / filename
 
-    tts_language = TTS_LANGUAGE_BY_STUDY_LANGUAGE.get(target_language, "de")
+    voice = OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE.get(target_language, "alloy")
+    audio_bytes = _openai_tts_audio(
+        text=text,
+        voice=voice,
+        speed=float(getattr(settings, "OPENAI_TTS_ITEM_SPEED", OPENAI_TTS_ITEM_DEFAULT_SPEED)),
+        response_format="mp3",
+    )
+    if not audio_bytes:
+        logger.warning("content.audio.failed prefix=%s filename=%s target_language=%s", prefix, filename, target_language)
+        return ""
     try:
-        gTTS(text=text, lang=tts_language, slow=False).save(str(file_path))
+        file_path.write_bytes(audio_bytes)
     except Exception:
-        logger.warning(
-            "content.audio.failed prefix=%s filename=%s tts_language=%s",
-            prefix,
-            filename,
-            tts_language,
-        )
+        logger.warning("content.audio.failed_write prefix=%s filename=%s", prefix, filename)
         return ""
 
     relative_url = f"{settings.MEDIA_URL.rstrip('/')}/audio/{filename}"
     audio_url = f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
     logger.info(
-        "content.audio.created prefix=%s filename=%s tts_language=%s",
+        "content.audio.created prefix=%s filename=%s target_language=%s voice=%s",
         prefix,
         filename,
-        tts_language,
+        target_language,
+        voice,
     )
     return audio_url
 
 
-def _openai_tts_pcm(text: str, voice: str) -> bytes | None:
+def _openai_tts_audio(
+    *,
+    text: str,
+    voice: str,
+    speed: float,
+    response_format: str,
+) -> bytes | None:
     api_key = settings.OPENAI_API_KEY
     if not api_key:
         return None
@@ -228,8 +234,8 @@ def _openai_tts_pcm(text: str, voice: str) -> bytes | None:
         "model": model,
         "voice": voice,
         "input": text,
-        "speed": float(getattr(settings, "OPENAI_TTS_SPEED", OPENAI_TTS_DEFAULT_SPEED)),
-        "response_format": "pcm",
+        "speed": speed,
+        "response_format": response_format,
     }
     request = UrlRequest(
         "https://api.openai.com/v1/audio/speech",
@@ -245,6 +251,15 @@ def _openai_tts_pcm(text: str, voice: str) -> bytes | None:
             return response.read()
     except (HTTPError, URLError, TimeoutError):
         return None
+
+
+def _openai_tts_pcm(text: str, voice: str) -> bytes | None:
+    return _openai_tts_audio(
+        text=text,
+        voice=voice,
+        speed=float(getattr(settings, "OPENAI_TTS_SPEED", OPENAI_TTS_DEFAULT_SPEED)),
+        response_format="pcm",
+    )
 
 
 def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "german") -> str:

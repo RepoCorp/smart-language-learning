@@ -224,6 +224,23 @@ select {
   margin-top: 2px;
 }
 
+.turn-audio-button {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #9fb3c8;
+  background: #ffffff;
+  color: #102a43;
+  font-size: 12px;
+}
+
+.turn-word-highlight {
+  background: #fde68a;
+  color: #1f2933;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
 .conversation-status {
   margin: 6px 0 0 0;
   font-size: 12px;
@@ -258,6 +275,20 @@ select {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #334e68;
+}
+
+.content-audio-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  text-align: left;
+}
+
+.content-audio-option input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
 }
 
 .related-dialogs {

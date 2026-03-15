@@ -32,6 +32,7 @@ escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
 - Start the session asking for a time commitment and adjust session size dynamically. 
 - Add article handling (e.g. for gendered languages) and more complex item types (e.g. sentences, audio).
 - Añadir imagen de dancing apple ... 
+- Add a free context input that won't be saved 
 
 ## Frontend
 
