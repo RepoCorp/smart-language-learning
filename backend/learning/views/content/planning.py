@@ -193,7 +193,6 @@ def build_content_plan(
                 continue
             if target_language == "german" and not german_word_has_article(german_word):
                 skipped_without_article += 1
-                continue
             key = normalize_word_pair(spanish_word, german_word)
             if key in excluded_words:
                 skipped_excluded += 1
@@ -204,9 +203,7 @@ def build_content_plan(
             seen.add(key)
             keyword_notes = str(keyword.get("notes", "")).strip()
             if not _keyword_matches_phrase(spanish_word, german_word, phrase_spanish, phrase_german):
-                if not keyword_notes:
-                    skipped_not_in_phrase += 1
-                    continue
+                skipped_not_in_phrase += 1
                 keyword_notes = _append_non_literal_note(keyword_notes, spanish_word, german_word)
             plural_german = str(keyword.get("plural_german", "")).strip()
             keyword_notes = enrich_notes_with_plural(keyword_notes, plural_german)

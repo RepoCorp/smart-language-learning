@@ -58,8 +58,8 @@ Return strict JSON with this exact shape:
 }
 
 Rules:
-- Include only non-common vocabulary words from the phrase.
-- Do not include articles, prepositions, conjunctions, pronouns, or very basic function words.
+- Include useful beginner vocabulary from the phrase, including common content words (nouns, verbs, adjectives, adverbs) when they help learning.
+- Exclude only pure function words (articles, prepositions, conjunctions, pronouns) unless they are part of a fixed expression worth learning.
 - Use the language mapping provided in the user input.
 - Prefer keyword forms that literally appear in the provided phrase (surface form).
 - Do not invent abstract replacements (for example extracting "der Gesamtbetrag" from "insgesamt").

@@ -400,6 +400,9 @@ def generate_keywords_for_phrase_with_chatgpt(
             f"Target language ({_language_label(target_language)}) phrase in target_text: {german_phrase}\n"
             f"{article_requirement}"
         ),
+        temperature=0.5,
+        top_p=0.9,
+        presence_penalty=0.2,
     )
     if parsed is None:
         return None
