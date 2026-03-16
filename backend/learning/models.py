@@ -27,6 +27,7 @@ class Item(models.Model):
     example_sentence = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     audio_url = models.URLField(blank=True)
+    exercise_phrases = models.JSONField(default=dict, blank=True)
     is_learned = models.BooleanField(default=False)
 
     repetition_count = models.PositiveIntegerField(default=0)

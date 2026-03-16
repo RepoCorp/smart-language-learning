@@ -4,6 +4,7 @@ from .generation import (
     generate_content_with_chatgpt,
     generate_conversation_with_chatgpt,
     generate_keywords_for_phrase_with_chatgpt,
+    generate_word_exercise_phrases_with_chatgpt,
 )
 from .persistence import (
     count_new_items,
@@ -48,6 +49,7 @@ __all__ = [
     "generate_content_with_chatgpt",
     "generate_conversation_with_chatgpt",
     "generate_keywords_for_phrase_with_chatgpt",
+    "generate_word_exercise_phrases_with_chatgpt",
     "german_word_has_article",
     "is_candidate_selected",
     "get_excluded_words_lookup",

@@ -140,6 +140,7 @@ def create_word_if_missing(
     topic: str,
     source_language: str = "spanish",
     target_language: str = "german",
+    exercise_phrases: dict | None = None,
 ) -> Item | None:
     if item_exists(
         Item.ItemType.WORD,
@@ -166,6 +167,7 @@ def create_word_if_missing(
         notes=candidate.notes,
         example_sentence=phrase_german,
         audio_url=audio_url,
+        exercise_phrases=exercise_phrases or {},
     )
     logger.info(
         "content.create.word.created topic=%s item_id=%s spanish=%s has_audio=%s",

@@ -14,6 +14,7 @@ from .core import (
     create_dialog_audio_file,
     create_phrase_if_missing,
     create_word_if_missing,
+    generate_word_exercise_phrases_with_chatgpt,
     is_candidate_selected,
     is_word_selected,
     save_dialog,
@@ -155,16 +156,26 @@ class ContentConfirmView(APIView):
             )
         ]
         created_phrase_items = [phrase for phrase in created_phrases if phrase is not None]
-        created_words = [
-            create_word_if_missing(
-                word,
-                topic,
+        created_words = []
+        for word in selected_word_candidates:
+            if not is_word_selected(word, selected_words_normalized):
+                continue
+            exercise_phrases = generate_word_exercise_phrases_with_chatgpt(
+                word.spanish_text,
+                word.german_text,
+                notes=word.notes,
                 source_language=source_language,
                 target_language=target_language,
             )
-            for word in selected_word_candidates
-            if is_word_selected(word, selected_words_normalized)
-        ]
+            created_words.append(
+                create_word_if_missing(
+                    word,
+                    topic,
+                    source_language=source_language,
+                    target_language=target_language,
+                    exercise_phrases=exercise_phrases,
+                )
+            )
         created_word_items = [word for word in created_words if word is not None]
         dialog_turns = _dialog_turns_for_save(preview_phrases=preview_phrases, fallback_phrases=plan.phrases)
         dialog_audio_url = ""

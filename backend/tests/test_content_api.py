@@ -276,6 +276,54 @@ def test_word_audio_includes_word_and_phrase(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_confirm_saves_generated_exercise_phrases_for_word(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(
+        content_views,
+        "generate_content_with_chatgpt",
+        lambda topic: (
+            "Hoy practico leer.",
+            "Heute uebe ich lesen.",
+            [
+                {"spanish_text": "leer", "german_text": "lesen"},
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        content_views,
+        "generate_word_exercise_phrases_with_chatgpt",
+        lambda spanish_word, german_word, **kwargs: {
+            "first_section": [
+                {"source_text": "Yo quiero leer.", "target_text": "Ich will lesen."},
+                {"source_text": "Yo puedo leer.", "target_text": "Ich kann lesen."},
+            ],
+            "second_section": [
+                {"source_text": "La lectura esta aqui.", "target_text": "Das Lesen ist hier."},
+                {"source_text": "Yo veo la lectura.", "target_text": "Ich sehe das Lesen."},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/confirm",
+        {"topic": "leer", "selected_words": ["leer"]},
+        format="json",
+    )
+    assert response.status_code == 200
+
+    created_word = Item.objects.get(item_type=Item.ItemType.WORD, spanish_text="leer", german_text="lesen")
+    assert created_word.exercise_phrases["first_section"][0]["target_text"] == "Ich will lesen."
+    assert created_word.exercise_phrases["second_section"][1]["target_text"] == "Ich sehe das Lesen."
+
+
+@pytest.mark.django_db
 def test_content_confirm_saves_model_notes_when_present(monkeypatch):
     from learning.views import content as content_views
 

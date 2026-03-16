@@ -89,6 +89,7 @@ export default function ContentManagePage(): JSX.Element {
           example_sentence: detail.example_sentence || "",
           notes: detail.notes || "",
           audio_url: detail.audio_url || "",
+          exercise_phrases: detail.exercise_phrases || {},
           mode: "new",
           direction: null,
           options: [],

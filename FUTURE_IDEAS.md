@@ -1,8 +1,12 @@
 # Todos
 
+Arreglar la generacion de fraases para los ejercicios
+The first time you generate content it is always returning just one phrase
+
 Arreglar todos los usos de español y aleman en el codigo.
 Añadir manejo del casing para todos los idiomas usando el modelo 
 escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
+Opcion para escuchar todos los dialogos
 
 # Future Ideas
 

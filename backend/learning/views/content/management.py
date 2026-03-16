@@ -99,6 +99,7 @@ class ContentItemDetailView(APIView):
                 "example_sentence": item.example_sentence,
                 "notes": item.notes,
                 "audio_url": item.audio_url,
+                "exercise_phrases": item.exercise_phrases or {},
                 "created_at": item.created_at,
                 "related_dialogs": related_dialogs_map.get(item.id, []),
             }

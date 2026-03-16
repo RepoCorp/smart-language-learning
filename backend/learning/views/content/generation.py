@@ -11,7 +11,7 @@ from urllib.request import Request as UrlRequest, urlopen
 from django.conf import settings
 
 from ...models import ConversationFingerprint
-from ...prompts import CONVERSATION_GENERATION_PROMPT, PHRASE_KEYWORDS_PROMPT
+from ...prompts import CONVERSATION_GENERATION_PROMPT, PHRASE_KEYWORDS_PROMPT, WORD_EXERCISES_PROMPT
 
 logger = logging.getLogger(__name__)
 STYLE_SEEDS = ("casual", "polite", "urgent", "friendly", "problem-solving", "small-talk")
@@ -71,6 +71,83 @@ STUDY_LANGUAGE_LABELS = {
     "italian": "Italian",
     "portuguese": "Portuguese",
 }
+
+
+def _fallback_word_exercise_phrases(
+    spanish_word: str,
+    german_word: str,
+    target_language: str,
+) -> dict:
+    source = spanish_word.strip()
+    target = german_word.strip()
+    if target_language == "german":
+        first_section = [
+            {"source_text": f"Yo quiero {source}.", "target_text": f"Ich will {target}."},
+            {"source_text": f"Yo puedo {source}.", "target_text": f"Ich kann {target}."},
+        ]
+        second_section = [
+            {"source_text": f"{source.capitalize()} está aquí.", "target_text": f"{target.capitalize()} ist hier."},
+            {"source_text": f"Yo veo {source}.", "target_text": f"Ich sehe {target}."},
+        ]
+        return {"first_section": first_section, "second_section": second_section}
+
+    first_section = [
+        {"source_text": f"Yo quiero {source}.", "target_text": f"I want {target}."},
+        {"source_text": f"Yo puedo {source}.", "target_text": f"I can {target}."},
+    ]
+    second_section = [
+        {"source_text": f"{source.capitalize()} está aquí.", "target_text": f"{target.capitalize()} is here."},
+        {"source_text": f"Yo veo {source}.", "target_text": f"I see {target}."},
+    ]
+    return {"first_section": first_section, "second_section": second_section}
+
+
+def _clean_exercise_section(value) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, str]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        source_text = str(entry.get("source_text", "")).strip()
+        target_text = str(entry.get("target_text", "")).strip()
+        if not source_text or not target_text:
+            continue
+        result.append({"source_text": source_text, "target_text": target_text})
+        if len(result) >= 2:
+            break
+    return result
+
+
+def generate_word_exercise_phrases_with_chatgpt(
+    spanish_word: str,
+    german_word: str,
+    notes: str = "",
+    source_language: str = "spanish",
+    target_language: str = "german",
+) -> dict:
+    parsed = call_openai_json(
+        WORD_EXERCISES_PROMPT,
+        (
+            f"Word source_text ({_language_label(source_language)}): {spanish_word}\n"
+            f"Word target_text ({_language_label(target_language)}): {german_word}\n"
+            f"Optional notes: {notes}\n"
+            f"Language mapping: source_text={_language_label(source_language)}, target_text={_language_label(target_language)}"
+        ),
+        timeout_seconds=12,
+        temperature=0.8,
+        top_p=0.9,
+        presence_penalty=0.6,
+    )
+    if parsed is None:
+        return _fallback_word_exercise_phrases(spanish_word, german_word, target_language)
+
+    first_section = _clean_exercise_section(parsed.get("first_section"))
+    second_section = _clean_exercise_section(parsed.get("second_section"))
+    if len(first_section) < 2 or len(second_section) < 2:
+        return _fallback_word_exercise_phrases(spanish_word, german_word, target_language)
+
+    return {"first_section": first_section, "second_section": second_section}
 
 
 def call_openai_json(

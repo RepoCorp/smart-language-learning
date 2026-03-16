@@ -69,3 +69,47 @@ Rules:
 - Keep keywords unique by source_text.
 - Return JSON only, no markdown and no extra text.
 """.strip()
+
+
+WORD_EXERCISES_PROMPT = """
+Generate exercise phrases for one vocabulary item.
+
+Return strict JSON with this exact shape:
+{
+  "first_section": [
+    {"source_text": "string", "target_text": "string"},
+    {"source_text": "string", "target_text": "string"}
+  ],
+  "second_section": [
+    {"source_text": "string", "target_text": "string"},
+    {"source_text": "string", "target_text": "string"}
+  ]
+}
+
+Rules for first_section (word-type patterns):
+- If word type is verb:
+  1) "Ich will …"
+  2) "Ich kann …"
+- If word type is abstract noun:
+  1) "Ich brauche …"
+  2) "Ich habe …"
+- If word type is thing:
+  1) "Ich esse …"
+  2) "Ich trinke …"
+- For any other type:
+  1) "Ich verliere …"
+  2) "Ich finde …"
+
+Rules for second_section:
+- Use two different grammatical classes.
+- For German target language:
+  - First phrase should illustrate nominative usage.
+  - Second phrase should illustrate accusative usage.
+- Keep phrases beginner-level and short.
+
+General:
+- Keep source_text and target_text equivalent in meaning.
+- Use the exact language mapping provided by the user input.
+- Return exactly 2 phrases per section.
+- Return JSON only, no markdown and no extra text.
+""".strip()

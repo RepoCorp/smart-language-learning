@@ -35,6 +35,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const exerciseTimerRef = useRef<number | null>(null);
   const exerciseRunRef = useRef<number>(0);
   const exerciseRunningRef = useRef<boolean>(false);
+  const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const markAsSeen = async (): Promise<void> => {
     if (saving || !onContinue) {
@@ -91,6 +92,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     }
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
+    }
+    if (exerciseAudioRef.current) {
+      exerciseAudioRef.current.pause();
+      exerciseAudioRef.current.currentTime = 0;
+      exerciseAudioRef.current = null;
     }
   }, []);
 
@@ -171,26 +177,177 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const stripCommonArticle = (text: string): string =>
     text.replace(/^(der|die|das|ein|eine|einen|einem|einer)\s+/i, "").trim();
 
+  type ExerciseWordClass = "verb" | "abstract_noun" | "thing" | "other";
+  const capitalizeFirst = (value: string): string => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
   const baseWord = item.german_text.trim();
-  const wordWithoutArticle = stripCommonArticle(baseWord);
   const exerciseWord = baseWord || item.german_text;
-  const basicWord = (wordWithoutArticle || exerciseWord).trim();
-  const basicWordCapitalized = basicWord ? basicWord.charAt(0).toUpperCase() + basicWord.slice(1) : basicWord;
+  const verbLikeWord = stripCommonArticle(exerciseWord) || exerciseWord;
+  const sourceWord = item.spanish_text.trim() || item.spanish_text;
+  const sourceWordCapitalized = capitalizeFirst(sourceWord);
+  const notesLower = (item.notes || "").toLowerCase();
+  const firstTokenLower = exerciseWord.split(/\s+/)[0]?.toLowerCase() || "";
+  const nounArticles = new Set(["der", "die", "das", "ein", "eine", "einen", "einem", "einer"]);
 
-  const fixedExerciseLines = [
-    `Ich esse die ${exerciseWord}.`,
-    `Ich tanze mit der ${exerciseWord}.`,
-  ];
-  const basicExerciseLines = [
-    `Ich kaufe ${basicWordCapitalized}.`,
-    `${basicWordCapitalized} sind teuer.`,
-  ];
+  const spanishWord = sourceWord.toLowerCase();
 
-  const exerciseLines = selectedExerciseSection === "fixed" ? fixedExerciseLines : basicExerciseLines;
+  const detectWordClass = (): ExerciseWordClass => {
+    if (/\bverb\b|\bverbo\b/.test(notesLower)) {
+      return "verb";
+    }
+    if (
+      !nounArticles.has(firstTokenLower)
+      && (/(en|eln|ern)$/i.test(verbLikeWord) || /(ar|er|ir)$/i.test(spanishWord))
+    ) {
+      return "verb";
+    }
+    if (
+      /\babstract\b|\babstrakt\b|\babstracto\b/.test(notesLower)
+      || /(heit|keit|ung|ion|schaft|tät|ik|ismus|enz|anz)$/i.test(verbLikeWord)
+      || /(cion|sion|dad|tad|ez|eza|ura|encia|ancia)$/i.test(spanishWord)
+    ) {
+      return "abstract_noun";
+    }
+    if (nounArticles.has(firstTokenLower)) {
+      return "thing";
+    }
+    return "other";
+  };
 
-  const stopExercise = (): void => {
+  const wordClass = detectWordClass();
+
+  const firstSectionWord = wordClass === "verb" ? (verbLikeWord || exerciseWord) : exerciseWord;
+
+  const firstSectionByClass: Record<ExerciseWordClass, Array<{ target: string; source: string }>> = {
+    verb: [
+      { target: `Ich will ${firstSectionWord}.`, source: `Yo quiero ${sourceWord}.` },
+      { target: `Ich kann ${firstSectionWord}.`, source: `Yo puedo ${sourceWord}.` },
+    ],
+    abstract_noun: [
+      { target: `Ich brauche ${firstSectionWord}.`, source: `Yo necesito ${sourceWord}.` },
+      { target: `Ich habe ${firstSectionWord}.`, source: `Yo tengo ${sourceWord}.` },
+    ],
+    thing: [
+      { target: `Ich esse ${firstSectionWord}.`, source: `Yo como ${sourceWord}.` },
+      { target: `Ich trinke ${firstSectionWord}.`, source: `Yo bebo ${sourceWord}.` },
+    ],
+    other: [
+      { target: `Ich verliere ${firstSectionWord}.`, source: `Yo pierdo ${sourceWord}.` },
+      { target: `Ich finde ${firstSectionWord}.`, source: `Yo encuentro ${sourceWord}.` },
+    ],
+  };
+
+  const splitArticleAndNoun = (value: string): { article: string; noun: string } => {
+    const parts = value.trim().split(/\s+/);
+    if (parts.length < 2 || !nounArticles.has(parts[0].toLowerCase())) {
+      return { article: "", noun: value.trim() };
+    }
+    return { article: parts[0], noun: parts.slice(1).join(" ") };
+  };
+
+  const toGermanAccusativeArticle = (article: string): string => {
+    const normalized = article.toLowerCase();
+    if (normalized === "der") {
+      return "den";
+    }
+    if (normalized === "ein") {
+      return "einen";
+    }
+    if (["die", "das", "eine", "einen", "den"].includes(normalized)) {
+      return normalized;
+    }
+    return normalized;
+  };
+
+  const buildSecondSectionEntries = (): Array<{ target: string; source: string }> => {
+    if (targetLanguage === "german") {
+      const { article, noun } = splitArticleAndNoun(exerciseWord);
+      const nominativePhrase = article ? `${capitalizeFirst(article)} ${noun}` : capitalizeFirst(exerciseWord);
+      const accusativeArticle = article ? toGermanAccusativeArticle(article) : "";
+      const accusativePhrase = accusativeArticle ? `${accusativeArticle} ${noun}` : exerciseWord;
+      return [
+        {
+          target: `${nominativePhrase} ist hier.`,
+          source: `${sourceWordCapitalized} está aquí.`,
+        },
+        {
+          target: `Ich sehe ${accusativePhrase}.`,
+          source: `Yo veo ${sourceWord}.`,
+        },
+      ];
+    }
+    return [
+      {
+        target: `${capitalizeFirst(exerciseWord)} ist hier.`,
+        source: `${sourceWordCapitalized} está aquí.`,
+      },
+      {
+        target: `Ich sehe ${exerciseWord}.`,
+        source: `Yo veo ${sourceWord}.`,
+      },
+    ];
+  };
+
+  const sanitizeExerciseEntries = (entries?: Array<{ source_text?: string; target_text?: string }>): Array<{ source: string; target: string }> => {
+    if (!entries || !entries.length) {
+      return [];
+    }
+    return entries
+      .map((entry) => ({
+        source: String(entry.source_text || "").trim(),
+        target: String(entry.target_text || "").trim(),
+      }))
+      .filter((entry) => entry.source && entry.target)
+      .slice(0, 2);
+  };
+
+  const savedFirstSection = sanitizeExerciseEntries(item.exercise_phrases?.first_section);
+  const savedSecondSection = sanitizeExerciseEntries(item.exercise_phrases?.second_section);
+
+  const fixedExerciseEntries =
+    savedFirstSection.length === 2
+      ? savedFirstSection
+      : firstSectionByClass[wordClass].map((entry) => ({ source: entry.source, target: entry.target }));
+  const basicExerciseEntries =
+    savedSecondSection.length === 2
+      ? savedSecondSection
+      : buildSecondSectionEntries().map((entry) => ({ source: entry.source, target: entry.target }));
+
+  const selectedExerciseEntries = item.item_type === "phrase"
+    ? [{ source: item.spanish_text, target: item.german_text }]
+    : (selectedExerciseSection === "fixed" ? fixedExerciseEntries : basicExerciseEntries);
+  const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
+
+  const playExerciseDoneSound = (): void => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) {
+      return;
+    }
+    const audioContext = new AudioContextClass();
+    const now = audioContext.currentTime;
+    const gain = audioContext.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.03, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+    gain.connect(audioContext.destination);
+
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(659.25, now);
+    oscillator.frequency.setValueAtTime(783.99, now + 0.2);
+    oscillator.connect(gain);
+    oscillator.start(now);
+    oscillator.stop(now + 0.46);
+    oscillator.onended = () => {
+      void audioContext.close();
+    };
+  };
+
+  const stopExercise = (resetToFullTime = true): void => {
     setExerciseRunning(false);
-    setExerciseSecondsLeft(30);
+    setExerciseSecondsLeft(resetToFullTime ? 30 : 0);
     exerciseRunRef.current += 1;
     if (exerciseTimerRef.current !== null) {
       window.clearInterval(exerciseTimerRef.current);
@@ -199,6 +356,27 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
+    if (exerciseAudioRef.current) {
+      exerciseAudioRef.current.pause();
+      exerciseAudioRef.current.currentTime = 0;
+      exerciseAudioRef.current = null;
+    }
+  };
+
+  const playAudioSourcesOnce = async (sources: string[], runId: number): Promise<void> => {
+    for (const source of sources) {
+      if (!source || exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
+        continue;
+      }
+      await new Promise<void>((resolve) => {
+        const audio = new Audio(source);
+        exerciseAudioRef.current = audio;
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        void audio.play().catch(() => resolve());
+      });
+    }
+    exerciseAudioRef.current = null;
   };
 
   const speakLinesOnce = async (lines: string[], runId: number): Promise<void> => {
@@ -238,15 +416,21 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     exerciseTimerRef.current = window.setInterval(() => {
       setExerciseSecondsLeft((current) => {
         if (current <= 1) {
-          stopExercise();
+          stopExercise(false);
+          playExerciseDoneSound();
           return 0;
         }
         return current - 1;
       });
     }, 1000);
 
+    const phraseExerciseAudioSources = item.item_type === "phrase" && item.audio_url ? [item.audio_url] : [];
+    const playOnce = phraseExerciseAudioSources.length
+      ? () => playAudioSourcesOnce(phraseExerciseAudioSources, runId)
+      : () => speakLinesOnce(exerciseLines, runId);
+
     if (exerciseAudioMode === "once") {
-      void speakLinesOnce(exerciseLines, runId);
+      void playOnce();
       return;
     }
 
@@ -254,7 +438,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
         return;
       }
-      void speakLinesOnce(exerciseLines, runId).then(() => {
+      void playOnce().then(() => {
         if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
           return;
         }
@@ -295,11 +479,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           )}
         </>
       )}
-      {item.item_type === "word" && (
+      {(item.item_type === "word" || item.item_type === "phrase") && (
         <div className="actions">
           <button type="button" onClick={() => setShowDialogsModal(true)}>
             {t("newItem.openRelatedDialogs")}
           </button>
+        </div>
+      )}
+      {(item.item_type === "word" || item.item_type === "phrase") && (
+        <div className="actions">
           <button type="button" onClick={() => setShowExerciseModal(true)}>
             {t("newItem.openExercises")}
           </button>
@@ -319,7 +507,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           </button>
         </div>
       )}
-      {showDialogsModal && item.item_type === "word" && (
+      {showDialogsModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal">
             <p>
@@ -402,41 +590,62 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           </div>
         </div>
       )}
-      {showExerciseModal && item.item_type === "word" && (
+      {showExerciseModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal exercise-modal">
             <p>
               <strong>{t("newItem.exercisesTitle")}</strong>
             </p>
             <p className="hint">{t("newItem.exercisesDescription")}</p>
-            <div className="exercise-section-grid">
-              <button
-                type="button"
-                className={`exercise-section-card ${selectedExerciseSection === "fixed" ? "exercise-section-card-selected" : ""}`}
-                onClick={() => setSelectedExerciseSection("fixed")}
-                disabled={exerciseRunning}
-              >
-                <strong>{t("newItem.exercisesFixedTitle")}</strong>
-                <ul>
-                  {fixedExerciseLines.map((line) => (
-                    <li key={`fixed-${line}`}>{line}</li>
-                  ))}
-                </ul>
-              </button>
-              <button
-                type="button"
-                className={`exercise-section-card ${selectedExerciseSection === "basic" ? "exercise-section-card-selected" : ""}`}
-                onClick={() => setSelectedExerciseSection("basic")}
-                disabled={exerciseRunning}
-              >
-                <strong>{t("newItem.exercisesBasicTitle")}</strong>
-                <ul>
-                  {basicExerciseLines.map((line) => (
-                    <li key={`basic-${line}`}>{line}</li>
-                  ))}
-                </ul>
-              </button>
-            </div>
+            {item.item_type === "word" && (
+              <div className="exercise-section-grid">
+                <button
+                  type="button"
+                  className={`exercise-section-card ${selectedExerciseSection === "fixed" ? "exercise-section-card-selected" : ""}`}
+                  onClick={() => setSelectedExerciseSection("fixed")}
+                  disabled={exerciseRunning}
+                >
+                  <strong>{t("newItem.exercisesFixedTitle")}</strong>
+                  <ul>
+                    {fixedExerciseEntries.map((entry) => (
+                      <li key={`fixed-${entry.target}`}>{entry.target}</li>
+                    ))}
+                  </ul>
+                  <div className="exercise-translation-group">
+                    {sourceLanguageLabel}: {fixedExerciseEntries.map((entry) => entry.source).join(" ")}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`exercise-section-card ${selectedExerciseSection === "basic" ? "exercise-section-card-selected" : ""}`}
+                  onClick={() => setSelectedExerciseSection("basic")}
+                  disabled={exerciseRunning}
+                >
+                  <strong>{t("newItem.exercisesBasicTitle")}</strong>
+                  <ul>
+                    {basicExerciseEntries.map((entry) => (
+                      <li key={`basic-${entry.target}`}>{entry.target}</li>
+                    ))}
+                  </ul>
+                  <div className="exercise-translation-group">
+                    {sourceLanguageLabel}: {basicExerciseEntries.map((entry) => entry.source).join(" ")}
+                  </div>
+                </button>
+              </div>
+            )}
+            {item.item_type === "phrase" && (
+              <div className="exercise-section-grid">
+                <div className="exercise-section-card exercise-section-card-selected">
+                  <strong>{t("newItem.exercisesPhraseTitle")}</strong>
+                  <ul>
+                    <li>{item.german_text}</li>
+                  </ul>
+                  <div className="exercise-translation-group">
+                    {sourceLanguageLabel}: {item.spanish_text}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="exercise-audio-mode">
               <span>{t("newItem.exercisesAudioMode")}</span>

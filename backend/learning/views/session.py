@@ -234,6 +234,7 @@ def serialize_entries(entries: list[SessionEntry]) -> list[dict]:
                 "example_sentence": entry.item.example_sentence,
                 "notes": entry.item.notes,
                 "audio_url": entry.item.audio_url,
+                "exercise_phrases": entry.item.exercise_phrases or {},
                 "mode": entry.mode,
                 "direction": entry.direction,
                 "options": options_map.get(entry_key(entry), []),

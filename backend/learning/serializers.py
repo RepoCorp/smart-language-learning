@@ -13,6 +13,7 @@ class SessionItemSerializer(serializers.Serializer):
     example_sentence = serializers.CharField(allow_blank=True, required=False)
     notes = serializers.CharField(allow_blank=True, required=False)
     audio_url = serializers.CharField(allow_blank=True, required=False)
+    exercise_phrases = serializers.DictField(required=False)
     mode = serializers.ChoiceField(choices=["new", "review"])
     direction = serializers.ChoiceField(
         choices=Item.ReviewDirection.choices,

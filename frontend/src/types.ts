@@ -3,6 +3,16 @@ export type SessionMode = "new" | "review";
 export type ReviewDirection = "es_to_de" | "de_to_es";
 export type StudyLanguageCode = "spanish" | "english" | "german" | "french" | "italian" | "portuguese";
 
+export interface ExercisePhrase {
+  source_text: string;
+  target_text: string;
+}
+
+export interface ItemExercisePhrases {
+  first_section?: ExercisePhrase[];
+  second_section?: ExercisePhrase[];
+}
+
 export interface SessionItem {
   id: number;
   item_type: ItemType;
@@ -11,6 +21,7 @@ export interface SessionItem {
   example_sentence?: string;
   notes?: string;
   audio_url?: string;
+  exercise_phrases?: ItemExercisePhrases;
   mode: SessionMode;
   direction?: ReviewDirection | null;
   options: string[];
@@ -98,6 +109,7 @@ export interface ContentItemDetailResponse {
   notes?: string;
   audio_url?: string;
   created_at: string;
+  exercise_phrases?: ItemExercisePhrases;
   related_dialogs?: SessionItem["related_dialogs"];
 }
 
