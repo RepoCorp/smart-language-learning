@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { deleteContentItem, deleteContentTopic, fetchContentItems, fetchContentTopics, regenerateContentItemAudio, setContentItemLearned } from "../api";
+import { deleteContentItem, deleteContentTopic, fetchContentItemDetail, fetchContentItems, fetchContentTopics, regenerateContentItemAudio, setContentItemLearned } from "../api";
+import NewItem from "./NewItem";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
-import type { ContentItemRecord } from "../types";
+import type { ContentItemRecord, SessionItem } from "../types";
 
 export default function ContentManagePage(): JSX.Element {
   const { t } = useI18n();
@@ -20,7 +21,10 @@ export default function ContentManagePage(): JSX.Element {
   const [markingLearnedItemId, setMarkingLearnedItemId] = useState<number | null>(null);
   const [selectedTopics, setSelectedTopics] = useState<Record<string, boolean>>({});
   const [selectedItems, setSelectedItems] = useState<Record<number, boolean>>({});
+  const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
+  const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
   const filterQuery = searchParams.get("filter") || "";
+  const openedItemParam = searchParams.get("item") || "";
 
   const normalizedFilter = filterQuery.trim().toLowerCase();
   const filteredTopics = topics.filter((topic) => topic.toLowerCase().includes(normalizedFilter));
@@ -61,6 +65,65 @@ export default function ContentManagePage(): JSX.Element {
   useEffect(() => {
     void load();
   }, [sourceLanguage, targetLanguage]);
+
+  useEffect(() => {
+    const itemId = Number.parseInt(openedItemParam, 10);
+    if (!itemId) {
+      setOpenedItem(null);
+      setLoadingOpenedItem(false);
+      return;
+    }
+    let cancelled = false;
+    const loadItem = async (): Promise<void> => {
+      setLoadingOpenedItem(true);
+      try {
+        const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
+        if (cancelled) {
+          return;
+        }
+        setOpenedItem({
+          id: detail.id,
+          item_type: detail.item_type,
+          spanish_text: detail.spanish_text,
+          german_text: detail.german_text,
+          example_sentence: detail.example_sentence || "",
+          notes: detail.notes || "",
+          audio_url: detail.audio_url || "",
+          mode: "new",
+          direction: null,
+          options: [],
+          related_dialogs: detail.related_dialogs || [],
+        });
+      } catch {
+        if (!cancelled) {
+          setOpenedItem(null);
+          setError(t("manage.error.load"));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingOpenedItem(false);
+        }
+      }
+    };
+    void loadItem();
+    return () => {
+      cancelled = true;
+    };
+  }, [openedItemParam, sourceLanguage, targetLanguage]);
+
+  const openItemModal = (itemId: number): void => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("item", String(itemId));
+    setSearchParams(nextParams);
+  };
+
+  const closeItemModal = (): void => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("item");
+    setSearchParams(nextParams);
+    setOpenedItem(null);
+    setLoadingOpenedItem(false);
+  };
 
   const removeSelectedTopics = async (): Promise<void> => {
     if (deletingTopic || deletingItemId !== null || regeneratingAudioItemId !== null || markingLearnedItemId !== null) {
@@ -371,7 +434,13 @@ export default function ContentManagePage(): JSX.Element {
                         }
                       />
                       <div className="manage-item-text">
-                        <span className="manage-item-link">{item.german_text} - {item.spanish_text}</span>
+                        <button
+                          type="button"
+                          className="word-link-button manage-item-link"
+                          onClick={() => openItemModal(item.id)}
+                        >
+                          {item.german_text} - {item.spanish_text}
+                        </button>
                         <span className="manage-item-meta">
                           {item.next_review_days === null || item.next_review_days === undefined
                             ? t("manage.nextReviewNew")
@@ -457,7 +526,13 @@ export default function ContentManagePage(): JSX.Element {
                         }
                       />
                       <div className="manage-item-text">
-                        <span className="manage-item-link">{item.german_text} - {item.spanish_text}</span>
+                        <button
+                          type="button"
+                          className="word-link-button manage-item-link"
+                          onClick={() => openItemModal(item.id)}
+                        >
+                          {item.german_text} - {item.spanish_text}
+                        </button>
                         <span className="manage-item-meta">
                           {item.next_review_days === null || item.next_review_days === undefined
                             ? t("manage.nextReviewNew")
@@ -497,6 +572,16 @@ export default function ContentManagePage(): JSX.Element {
             )}
           </section>
         </>
+      )}
+      {(loadingOpenedItem || openedItem) && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal">
+            {loadingOpenedItem && <p>{t("session.loading")}</p>}
+            {!loadingOpenedItem && openedItem && (
+              <NewItem item={openedItem} readOnly onClose={closeItemModal} />
+            )}
+          </div>
+        </div>
       )}
     </main>
   );

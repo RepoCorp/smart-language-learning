@@ -1,6 +1,7 @@
 import type {
   ContentConfirmResponse,
   ContentItemsResponse,
+  ContentItemDetailResponse,
   ContentPreviewResponse,
   ContentTopicContextsResponse,
   ContentTopicsResponse,
@@ -169,6 +170,22 @@ export async function fetchContentTopicContexts(
     throw new Error("Failed to load topic contexts");
   }
   return (await response.json()) as ContentTopicContextsResponse;
+}
+
+export async function fetchContentItemDetail(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemDetailResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to load content item detail");
+  }
+  return (await response.json()) as ContentItemDetailResponse;
 }
 
 export async function deleteContentItem(

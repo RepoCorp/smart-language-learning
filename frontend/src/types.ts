@@ -89,6 +89,18 @@ export interface ContentItemsResponse {
   items: ContentItemRecord[];
 }
 
+export interface ContentItemDetailResponse {
+  id: number;
+  item_type: ItemType;
+  spanish_text: string;
+  german_text: string;
+  example_sentence?: string;
+  notes?: string;
+  audio_url?: string;
+  created_at: string;
+  related_dialogs?: SessionItem["related_dialogs"];
+}
+
 export interface ContentTopicContextsResponse {
   contexts: string[];
 }

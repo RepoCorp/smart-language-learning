@@ -317,6 +317,71 @@ select {
   flex-direction: column;
 }
 
+.exercise-modal {
+  width: min(760px, 95vw);
+}
+
+.exercise-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.exercise-section-card {
+  text-align: left;
+  background: #f8fafc;
+  color: #102a43;
+  border: 1px solid #bcccdc;
+}
+
+.exercise-section-card-selected {
+  border-color: #0b4fc4;
+  box-shadow: 0 0 0 2px rgba(11, 79, 196, 0.18);
+  background: #e1effe;
+}
+
+.exercise-section-card ul {
+  margin: 8px 0 0 16px;
+  padding: 0;
+}
+
+.exercise-audio-mode {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.exercise-radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid #bcccdc;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334e68;
+  cursor: pointer;
+  user-select: none;
+}
+
+.exercise-radio-option input[type="radio"] {
+  width: auto;
+  margin: 0;
+}
+
+.exercise-radio-option-selected {
+  border-color: #0b4fc4;
+  background: #e1effe;
+  color: #102a43;
+  box-shadow: 0 0 0 2px rgba(11, 79, 196, 0.12);
+}
+
+.exercise-timer {
+  margin: 10px 0;
+}
+
 .related-dialogs-scroll {
   overflow-y: auto;
   padding-right: 4px;
@@ -484,5 +549,9 @@ select {
 
   .card {
     padding: 14px;
+  }
+
+  .exercise-section-grid {
+    grid-template-columns: 1fr;
   }
 }
