@@ -24,7 +24,7 @@ body {
 }
 
 .overview-stats-content {
-  max-width: 760px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: 10px 24px;
   display: flex;
@@ -91,7 +91,7 @@ body {
 }
 
 .container {
-  max-width: 760px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -132,6 +132,12 @@ button {
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.secondary-button {
+  background: #f0f4f8;
+  color: #334e68;
+  border: 1px solid #bcccdc;
 }
 
 input {
@@ -340,6 +346,42 @@ select {
   text-align: left;
 }
 
+.manage-item-row {
+  align-items: flex-start;
+}
+
+.manage-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.manage-item-main input[type="checkbox"] {
+  width: auto;
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.manage-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.manage-item-link {
+  color: #0b4fc4;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.manage-item-meta {
+  color: #486581;
+  font-size: 12px;
+}
+
 .word-link-button {
   background: none;
   border: none;
@@ -375,6 +417,24 @@ select {
   min-width: 140px;
   white-space: nowrap;
   text-align: center;
+}
+
+.manage-item-action-button {
+  min-width: 150px;
+  text-align: center;
+  border: 1px solid transparent;
+}
+
+.manage-item-action-button-mark {
+  background: #e8f7ee;
+  color: #0f5132;
+  border-color: #a3cfbb;
+}
+
+.manage-item-action-button-unmark {
+  background: #fff4e5;
+  color: #7a3e00;
+  border-color: #f3c88f;
 }
 
 .blocking-modal-overlay {

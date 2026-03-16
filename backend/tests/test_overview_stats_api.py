@@ -74,3 +74,38 @@ def test_overview_stats_filters_by_language_pair():
     assert payload["ready_to_review"] == 1
     assert payload["future_reviews"] == 0
     assert payload["not_started"] == 0
+
+
+@pytest.mark.django_db
+def test_overview_stats_excludes_items_marked_as_learned():
+    now = timezone.now()
+
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="Hallo",
+        source_language="spanish",
+        target_language="german",
+        is_learned=True,
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="nuevo",
+        german_text="neu",
+        source_language="spanish",
+        target_language="german",
+        is_learned=False,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/overview-stats",
+        {"source_language": "spanish", "target_language": "german"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ready_to_review"] == 0
+    assert payload["future_reviews"] == 0
+    assert payload["not_started"] == 1

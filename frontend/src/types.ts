@@ -80,43 +80,13 @@ export interface ContentItemRecord {
   spanish_text: string;
   german_text: string;
   created_at: string;
+  next_review_days?: number | null;
+  audio_url?: string;
+  is_learned?: boolean;
 }
 
 export interface ContentItemsResponse {
   items: ContentItemRecord[];
-}
-
-export interface WordLibraryItem {
-  id: number;
-  spanish_text: string;
-  german_text: string;
-  example_sentence?: string;
-  notes?: string;
-  audio_url?: string;
-  created_at: string;
-  related_dialogs: Array<{
-    dialog_id: number;
-    topic: string;
-    context: string;
-    audio_url: string;
-    created_at: string;
-    turns: Array<{
-      source_text: string;
-      target_text: string;
-      phrase_audio_url?: string;
-    }>;
-    matched_turns: Array<{
-      turn_index: number;
-      side: "source" | "target";
-      match_score: number;
-      source_text: string;
-      target_text: string;
-    }>;
-  }>;
-}
-
-export interface ContentWordsResponse {
-  words: WordLibraryItem[];
 }
 
 export interface ContentTopicContextsResponse {

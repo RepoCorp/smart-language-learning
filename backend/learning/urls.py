@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     ContentConfirmView,
     ContentItemDetailView,
+    ContentItemMarkLearnedView,
     ContentItemsView,
     ContentPreviewView,
     ContentTopicContextsView,
@@ -27,6 +28,7 @@ urlpatterns = [
     path("content/items", ContentItemsView.as_view(), name="content-items"),
     path("content/words", ContentWordsView.as_view(), name="content-words"),
     path("content/items/<int:item_id>", ContentItemDetailView.as_view(), name="content-item-detail"),
+    path("content/items/<int:item_id>/mark-learned", ContentItemMarkLearnedView.as_view(), name="content-item-mark-learned"),
     path("content/topics", ContentTopicsView.as_view(), name="content-topics"),
     path("content/topics/delete", ContentTopicDeleteView.as_view(), name="content-topic-delete"),
     path("content/topic-contexts", ContentTopicContextsView.as_view(), name="content-topic-contexts"),

@@ -184,6 +184,41 @@ def test_session_filters_items_by_language_pair():
 
 
 @pytest.mark.django_db
+def test_session_excludes_items_marked_as_learned():
+    now = timezone.now()
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        is_learned=True,
+        source_language="spanish",
+        target_language="german",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+    available = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="casa",
+        german_text="Haus",
+        is_learned=False,
+        source_language="spanish",
+        target_language="german",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/session",
+        {"size": 5, "source_language": "spanish", "target_language": "german"},
+    )
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()["items"]]
+    assert available.id in ids
+    assert len(ids) == 1
+
+
+@pytest.mark.django_db
 def test_session_includes_related_dialogs_for_item():
     item = Item.objects.create(
         item_type=Item.ItemType.WORD,

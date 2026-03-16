@@ -843,6 +843,53 @@ def test_content_item_delete_endpoint_removes_item_for_language_pair():
 
 
 @pytest.mark.django_db
+def test_content_item_mark_learned_endpoint_updates_item_for_language_pair():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        source_language="spanish",
+        target_language="german",
+        is_learned=False,
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/mark-learned",
+        {"source_language": "spanish", "target_language": "german"},
+        format="json",
+    )
+    assert response.status_code == 200
+
+    item.refresh_from_db()
+    assert item.is_learned is True
+
+
+@pytest.mark.django_db
+def test_content_item_mark_learned_endpoint_can_unmark_item():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        source_language="spanish",
+        target_language="german",
+        is_learned=True,
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/mark-learned",
+        {"source_language": "spanish", "target_language": "german", "is_learned": False},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.json()["is_learned"] is False
+
+    item.refresh_from_db()
+    assert item.is_learned is False
+
+
+@pytest.mark.django_db
 def test_content_topic_delete_endpoint_removes_topic_for_language_pair():
     SavedTopic.objects.create(topic="travel", source_language="spanish", target_language="german")
     SavedTopic.objects.create(topic="travel", source_language="english", target_language="french")
@@ -987,3 +1034,34 @@ def test_content_words_endpoint_filters_and_returns_related_dialogs():
     assert len(payload) == 1
     assert payload[0]["id"] == word.id
     assert payload[0]["related_dialogs"][0]["dialog_id"] == dialog.id
+
+
+@pytest.mark.django_db
+def test_content_item_regenerate_audio_updates_audio_url(monkeypatch):
+    from learning.views import content as content_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="taxi",
+        german_text="das Taxi",
+        source_language="spanish",
+        target_language="german",
+        example_sentence="Ich brauche ein Taxi.",
+        audio_url="",
+    )
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": "http://localhost:8000/media/audio/word-regenerated.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}",
+        {"source_language": "spanish", "target_language": "german"},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.json()["audio_url"] == "http://localhost:8000/media/audio/word-regenerated.mp3"
+    item.refresh_from_db()
+    assert item.audio_url == "http://localhost:8000/media/audio/word-regenerated.mp3"

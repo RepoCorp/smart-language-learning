@@ -14,6 +14,7 @@ class OverviewStatsView(APIView):
         ready_to_review = count_ready_reviews(now, source_language=source_language, target_language=target_language)
         future_reviews = count_future_reviews(now, source_language=source_language, target_language=target_language)
         not_started = Item.objects.filter(
+            is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=True,
@@ -32,12 +33,14 @@ class OverviewStatsView(APIView):
 def count_ready_reviews(now, source_language: str, target_language: str) -> int:
     return (
         Item.objects.filter(
+            is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=False,
             due_at_es_to_de__lte=now,
         ).count()
         + Item.objects.filter(
+            is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_de_to_es__isnull=False,
@@ -49,12 +52,14 @@ def count_ready_reviews(now, source_language: str, target_language: str) -> int:
 def count_future_reviews(now, source_language: str, target_language: str) -> int:
     return (
         Item.objects.filter(
+            is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=False,
             due_at_es_to_de__gt=now,
         ).count()
         + Item.objects.filter(
+            is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_de_to_es__isnull=False,

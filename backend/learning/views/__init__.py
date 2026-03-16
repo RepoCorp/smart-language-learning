@@ -1,6 +1,7 @@
 from .content import (
     ContentConfirmView,
     ContentItemDetailView,
+    ContentItemMarkLearnedView,
     ContentItemsView,
     ContentPreviewView,
     ContentTopicContextsView,
@@ -17,6 +18,7 @@ from .session import SessionView
 __all__ = [
     "ContentConfirmView",
     "ContentItemDetailView",
+    "ContentItemMarkLearnedView",
     "ContentItemsView",
     "ContentPreviewView",
     "ContentTopicDeleteView",

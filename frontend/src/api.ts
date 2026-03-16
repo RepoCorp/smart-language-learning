@@ -4,7 +4,6 @@ import type {
   ContentPreviewResponse,
   ContentTopicContextsResponse,
   ContentTopicsResponse,
-  ContentWordsResponse,
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
@@ -155,25 +154,6 @@ export async function fetchContentItems(
   return (await response.json()) as ContentItemsResponse;
 }
 
-export async function fetchContentWords(
-  sourceLanguage: StudyLanguageCode = "spanish",
-  targetLanguage: StudyLanguageCode = "german",
-  query = "",
-): Promise<ContentWordsResponse> {
-  const params = new URLSearchParams({
-    source_language: sourceLanguage,
-    target_language: targetLanguage,
-  });
-  if (query.trim()) {
-    params.set("q", query.trim());
-  }
-  const response = await fetch(`${API_BASE}/content/words?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error("Failed to load words");
-  }
-  return (await response.json()) as ContentWordsResponse;
-}
-
 export async function fetchContentTopicContexts(
   topic: string,
   sourceLanguage: StudyLanguageCode = "spanish",
@@ -205,6 +185,46 @@ export async function deleteContentItem(
   });
   if (!response.ok) {
     throw new Error("Failed to delete item");
+  }
+  notifyOverviewStatsUpdated();
+}
+
+export async function regenerateContentItemAudio(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<string> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to regenerate item audio");
+  }
+  const payload = (await response.json()) as { audio_url?: string };
+  return payload.audio_url || "";
+}
+
+export async function setContentItemLearned(
+  itemId: number,
+  isLearned: boolean,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<void> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/items/${itemId}/mark-learned?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_learned: isLearned }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to update item learned status");
   }
   notifyOverviewStatsUpdated();
 }

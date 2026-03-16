@@ -68,6 +68,7 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
 
     phrase_due_es_to_de = Item.objects.filter(
         item_type=Item.ItemType.PHRASE,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_es_to_de__isnull=False,
@@ -78,6 +79,7 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
 
     phrase_due_de_to_es = Item.objects.filter(
         item_type=Item.ItemType.PHRASE,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_de_to_es__isnull=False,
@@ -88,6 +90,7 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
 
     word_due_es_to_de = Item.objects.filter(
         item_type=Item.ItemType.WORD,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_es_to_de__isnull=False,
@@ -98,6 +101,7 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
 
     word_due_de_to_es = Item.objects.filter(
         item_type=Item.ItemType.WORD,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_de_to_es__isnull=False,
@@ -114,6 +118,7 @@ def build_new_entries(limit: int, source_language: str, target_language: str) ->
     new_words = list(
         Item.objects.filter(
             item_type=Item.ItemType.WORD,
+            is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=True,
@@ -123,6 +128,7 @@ def build_new_entries(limit: int, source_language: str, target_language: str) ->
     new_phrases = list(
         Item.objects.filter(
             item_type=Item.ItemType.PHRASE,
+            is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=True,
@@ -145,6 +151,7 @@ def build_upcoming_entries(
 
     phrase_upcoming_es_to_de = Item.objects.filter(
         item_type=Item.ItemType.PHRASE,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_es_to_de__isnull=False,
@@ -155,6 +162,7 @@ def build_upcoming_entries(
 
     phrase_upcoming_de_to_es = Item.objects.filter(
         item_type=Item.ItemType.PHRASE,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_de_to_es__isnull=False,
@@ -165,6 +173,7 @@ def build_upcoming_entries(
 
     word_upcoming_es_to_de = Item.objects.filter(
         item_type=Item.ItemType.WORD,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_es_to_de__isnull=False,
@@ -175,6 +184,7 @@ def build_upcoming_entries(
 
     word_upcoming_de_to_es = Item.objects.filter(
         item_type=Item.ItemType.WORD,
+        is_learned=False,
         source_language=source_language,
         target_language=target_language,
         last_reviewed_at_de_to_es__isnull=False,
@@ -248,6 +258,7 @@ def build_phrase_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
         all_phrase_answers_es_to_de_by_pair[(source_language, target_language)] = list(
             Item.objects.filter(
                 item_type=Item.ItemType.PHRASE,
+                is_learned=False,
                 source_language=source_language,
                 target_language=target_language,
             ).values_list("german_text", flat=True)
@@ -255,6 +266,7 @@ def build_phrase_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
         all_phrase_answers_de_to_es_by_pair[(source_language, target_language)] = list(
             Item.objects.filter(
                 item_type=Item.ItemType.PHRASE,
+                is_learned=False,
                 source_language=source_language,
                 target_language=target_language,
             ).values_list("spanish_text", flat=True)

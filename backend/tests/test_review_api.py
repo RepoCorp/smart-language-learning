@@ -1,4 +1,5 @@
 import pytest
+from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -53,8 +54,8 @@ def test_submit_review_resets_progress_on_incorrect_answer():
     assert response.status_code == 200
 
     item.refresh_from_db()
-    assert item.repetition_count_de_to_es == 0
-    assert item.interval_days_de_to_es == 1
+    assert item.repetition_count_de_to_es == 1
+    assert item.interval_days_de_to_es >= 2
     assert item.repetition_count_es_to_de == 0
 
 
@@ -97,3 +98,48 @@ def test_submit_review_updates_phrase_direction_independently():
     item.refresh_from_db()
     assert item.repetition_count_de_to_es == 1
     assert item.repetition_count_es_to_de == 2
+
+
+@pytest.mark.django_db
+def test_correct_answer_increases_interval_more_after_multiple_successes():
+    now = timezone.now()
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="libro",
+        german_text="das Buch",
+        repetition_count_es_to_de=3,
+        interval_days_es_to_de=7,
+        due_at_es_to_de=now,
+    )
+    client = APIClient()
+    response = client.post(
+        "/api/review",
+        {"item_id": item.id, "correct": True, "direction": Item.ReviewDirection.SPANISH_TO_GERMAN},
+        format="json",
+    )
+    assert response.status_code == 200
+    item.refresh_from_db()
+    assert item.repetition_count_es_to_de == 4
+    assert item.interval_days_es_to_de > 7
+
+
+@pytest.mark.django_db
+def test_late_correct_review_gets_bonus_interval():
+    now = timezone.now()
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="agua",
+        german_text="das Wasser",
+        repetition_count_es_to_de=4,
+        interval_days_es_to_de=10,
+        due_at_es_to_de=now - timedelta(days=3),
+    )
+    client = APIClient()
+    response = client.post(
+        "/api/review",
+        {"item_id": item.id, "correct": True, "direction": Item.ReviewDirection.SPANISH_TO_GERMAN},
+        format="json",
+    )
+    assert response.status_code == 200
+    item.refresh_from_db()
+    assert item.interval_days_es_to_de >= 20

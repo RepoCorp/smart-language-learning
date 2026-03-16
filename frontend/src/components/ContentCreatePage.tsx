@@ -281,8 +281,7 @@ export default function ContentCreatePage(): JSX.Element {
       <p>{t("content.description")}</p>
       <p>
         <Link to="/session">{t("content.backToSession")}</Link> |{" "}
-        <Link to="/content/manage">{t("content.manageLink")}</Link> |{" "}
-        <Link to="/words">{t("session.wordsLibrary")}</Link>
+        <Link to="/content/manage">{t("content.manageLink")}</Link>
       </p>
 
       <section className="card">
