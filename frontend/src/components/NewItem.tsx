@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { fetchContentItemDetail, quickAddWordFromDialog } from "../api";
 import { useI18n } from "../i18n";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
@@ -32,6 +33,16 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [exerciseAudioMode, setExerciseAudioMode] = useState<"once" | "repeat">("once");
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
   const [exerciseRunning, setExerciseRunning] = useState<boolean>(false);
+  const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
+  const [pendingWordAdd, setPendingWordAdd] = useState<{
+    key: string;
+    source: string;
+    target: string;
+    dialogId: number;
+    turnIndex: number;
+  } | null>(null);
+  const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
+  const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
   const exerciseTimerRef = useRef<number | null>(null);
   const exerciseRunRef = useRef<number>(0);
   const exerciseRunningRef = useRef<boolean>(false);
@@ -128,26 +139,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return false;
   };
 
-  const renderTargetTurn = (turnTargetText: string, word: string): JSX.Element => {
-    for (const candidate of wordCandidates(word)) {
-      const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const pattern = new RegExp(`\\b${escaped}\\b`, "i");
-      const match = pattern.exec(turnTargetText);
-      if (match && match.index >= 0) {
-        const start = match.index;
-        const end = start + match[0].length;
-        return (
-          <>
-            {turnTargetText.slice(0, start)}
-            <mark className="turn-word-highlight">{turnTargetText.slice(start, end)}</mark>
-            {turnTargetText.slice(end)}
-          </>
-        );
-      }
-    }
-    return <>{turnTargetText}</>;
-  };
-
   const playTurnAudio = async (phraseAudioUrl: string, turnIndex: number, includeWord: boolean): Promise<void> => {
     if (!phraseAudioUrl) {
       return;
@@ -176,6 +167,128 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
 
   const stripCommonArticle = (text: string): string =>
     text.replace(/^(der|die|das|ein|eine|einen|einem|einer)\s+/i, "").trim();
+
+  const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
+
+  const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
+
+  const requestAddWordFromDialogToken = async (
+    key: string,
+    sourceTokenRaw: string,
+    targetTokenRaw: string,
+    dialogId: number,
+    turnIndex: number,
+  ): Promise<void> => {
+    const sourceToken = cleanToken(sourceTokenRaw);
+    const targetToken = cleanToken(targetTokenRaw);
+    if (!sourceToken || !targetToken) {
+      return;
+    }
+
+    setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
+    try {
+      const check = await quickAddWordFromDialog(
+        sourceToken,
+        targetToken,
+        sourceLanguage,
+        targetLanguage,
+        dialogId,
+        turnIndex,
+        true,
+      );
+      if (check.exists && check.id) {
+        setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
+        setLoadingLinkedWord(true);
+        try {
+          const detail = await fetchContentItemDetail(check.id, sourceLanguage, targetLanguage);
+          setOpenedLinkedWord({
+            id: detail.id,
+            item_type: detail.item_type,
+            spanish_text: detail.spanish_text,
+            german_text: detail.german_text,
+            example_sentence: detail.example_sentence || "",
+            notes: detail.notes || "",
+            audio_url: detail.audio_url || "",
+            exercise_phrases: detail.exercise_phrases || {},
+            mode: "new",
+            direction: null,
+            options: [],
+            related_dialogs: detail.related_dialogs || [],
+          });
+        } finally {
+          setLoadingLinkedWord(false);
+        }
+        return;
+      }
+      setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
+      setPendingWordAdd({ key, source: sourceToken, target: targetToken, dialogId, turnIndex });
+    } catch {
+      setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+    }
+  };
+
+  const confirmAddWordFromDialog = async (): Promise<void> => {
+    if (!pendingWordAdd) {
+      return;
+    }
+
+    const { key, source, target, dialogId, turnIndex } = pendingWordAdd;
+    setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
+    try {
+      const result = await quickAddWordFromDialog(source, target, sourceLanguage, targetLanguage, dialogId, turnIndex);
+      setWordActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+    } catch {
+      setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+    } finally {
+      setPendingWordAdd(null);
+    }
+  };
+
+  const renderTargetTurnWithLinks = ({
+    dialogId,
+    turnIndex,
+    sourceText,
+    targetText,
+    highlightWord,
+  }: {
+    dialogId: number;
+    turnIndex: number;
+    sourceText: string;
+    targetText: string;
+    highlightWord?: string;
+  }): JSX.Element => {
+    const sourceTokens = lineTokens(sourceText);
+    const targetTokens = lineTokens(targetText);
+
+    return (
+      <>
+        {targetTokens.map((token, tokenIndex) => {
+          const sourceToken = sourceTokens[tokenIndex] || sourceTokens[sourceTokens.length - 1] || "";
+          const targetToken = targetTokens[tokenIndex] || targetTokens[targetTokens.length - 1] || "";
+          const statusKey = `${dialogId}-${turnIndex}-target-${tokenIndex}`;
+          const status = wordActionStatus[statusKey] || "idle";
+          const showHighlight = !!highlightWord && containsWordInTurn(token, highlightWord);
+          return (
+            <span key={statusKey} className="turn-token-wrap">
+              <button
+                type="button"
+                className={`turn-token-button ${showHighlight ? "turn-word-highlight" : ""}`}
+                onClick={() => void requestAddWordFromDialogToken(statusKey, sourceToken, targetToken, dialogId, turnIndex)}
+                disabled={status === "saving"}
+              >
+                {token}
+              </button>
+              {tokenIndex < targetTokens.length - 1 ? " " : ""}
+              {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
+              {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
+              {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
+              {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
+            </span>
+          );
+        })}
+      </>
+    );
+  };
 
   type ExerciseWordClass = "verb" | "abstract_noun" | "thing" | "other";
   const capitalizeFirst = (value: string): string => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
@@ -555,7 +668,13 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                               {index % 2 === 0 ? t("content.preview.personA") : t("content.preview.personB")}
                             </p>
                             <p className="conversation-line conversation-line-translation">
-                              {item.item_type === "word" ? renderTargetTurn(turn.target_text, item.german_text) : turn.target_text}
+                              {renderTargetTurnWithLinks({
+                                dialogId: dialog.dialog_id,
+                                turnIndex: index,
+                                sourceText: turn.source_text,
+                                targetText: turn.target_text,
+                                highlightWord: item.item_type === "word" ? item.german_text : "",
+                              })}
                               <button
                                 type="button"
                                 className="turn-audio-button"
@@ -565,7 +684,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                                 {t("newItem.playTurnAudio")}
                               </button>
                             </p>
-                            <p className="conversation-line">{turn.source_text}</p>
+                            <p className="conversation-line">
+                              {turn.source_text}
+                            </p>
                           </li>
                             );
                           })}
@@ -690,6 +811,42 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 {t("newItem.closeRelatedDialogs")}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {pendingWordAdd && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal add-word-modal">
+            <p className="add-word-modal-title">
+              <strong>{t("newItem.wordAddTitle")}</strong>
+            </p>
+            <p className="add-word-modal-word">{pendingWordAdd.target}</p>
+            <p className="add-word-modal-meaning">
+              {t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}
+            </p>
+            <p className="hint">{t("newItem.wordAddPrompt")}</p>
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)}>
+                {t("newItem.wordAddCancel")}
+              </button>
+              <button type="button" onClick={() => void confirmAddWordFromDialog()}>
+                {t("newItem.wordAddConfirmButton")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {loadingLinkedWord && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal add-word-modal">
+            <p>{t("session.loading")}</p>
+          </div>
+        </div>
+      )}
+      {openedLinkedWord && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal words-item-modal">
+            <NewItem item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
           </div>
         </div>
       )}

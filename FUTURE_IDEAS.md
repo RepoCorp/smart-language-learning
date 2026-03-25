@@ -15,6 +15,8 @@ Arreglar allowed hosts de Django
 Hacer menu para moverse entre funciones en lugar de los links que hay ahora
 Aleman a español es seleccion multiple
 Repetir audio al final o ppio de los tests
+Make sure audio is in the same language as the text
+Revisar que si pueda guardar varias referencias a otros dialogos
 
 Add settings to deploy files, like updated roles permissions, env...
 

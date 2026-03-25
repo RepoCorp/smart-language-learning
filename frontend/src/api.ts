@@ -250,6 +250,38 @@ export async function setContentItemLearned(
   notifyOverviewStatsUpdated();
 }
 
+export async function quickAddWordFromDialog(
+  sourceText: string,
+  targetText: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+  dialogId?: number,
+  turnIndex?: number,
+  checkOnly = false,
+): Promise<{ created: boolean; exists: boolean; id?: number | null }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/words/add?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source_text: sourceText,
+      target_text: targetText,
+      notes: "Added from dialog click",
+      dialog_id: dialogId,
+      turn_index: turnIndex,
+      check_only: checkOnly,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to add word from dialog");
+  }
+  notifyOverviewStatsUpdated();
+  return (await response.json()) as { created: boolean; exists: boolean; id?: number | null };
+}
+
 export async function deleteContentTopic(
   topic: string,
   sourceLanguage: StudyLanguageCode = "spanish",

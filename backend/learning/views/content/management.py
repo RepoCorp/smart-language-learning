@@ -9,9 +9,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ...models import Item, ItemDialogOccurrence, SavedTopic
+from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog, SavedTopic
 from ...serializers import ContentTopicSerializer
-from .core import create_audio_file
+from .core import ContentCandidate, create_audio_file, create_word_if_missing, item_exists
 
 
 def _normalized_pair(request: Request) -> tuple[str, str]:
@@ -159,6 +159,143 @@ class ContentItemMarkLearnedView(APIView):
         if updated == 0:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"ok": True, "is_learned": is_learned})
+
+
+class ContentWordQuickAddView(APIView):
+    def post(self, request: Request) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        source_text = str(request.data.get("source_text", "")).strip()
+        target_text = str(request.data.get("target_text", "")).strip()
+        notes = str(request.data.get("notes", "")).strip()
+        dialog_id_raw = request.data.get("dialog_id")
+        turn_index_raw = request.data.get("turn_index")
+        check_only_raw = request.data.get("check_only", False)
+        if isinstance(check_only_raw, str):
+            check_only = check_only_raw.strip().lower() in {"1", "true", "yes", "on"}
+        else:
+            check_only = bool(check_only_raw)
+
+        if not source_text or not target_text:
+            return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        exists = item_exists(
+            "word",
+            source_text,
+            target_text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        if exists:
+            existing = (
+                Item.objects.filter(
+                    item_type=Item.ItemType.WORD,
+                    source_language=source_language,
+                    target_language=target_language,
+                    spanish_text__iexact=source_text,
+                    german_text__iexact=target_text,
+                )
+                .order_by("-id")
+                .first()
+            )
+            if check_only:
+                return Response(
+                    {
+                        "created": False,
+                        "exists": True,
+                        "id": existing.id if existing else None,
+                        "source_text": source_text,
+                        "target_text": target_text,
+                    }
+                )
+            if existing:
+                _link_word_to_dialog_turn(
+                    item=existing,
+                    dialog_id_raw=dialog_id_raw,
+                    turn_index_raw=turn_index_raw,
+                )
+            return Response(
+                {
+                    "created": False,
+                    "exists": True,
+                    "id": existing.id if existing else None,
+                    "source_text": source_text,
+                    "target_text": target_text,
+                }
+            )
+
+        if check_only:
+            return Response(
+                {
+                    "created": False,
+                    "exists": False,
+                    "id": None,
+                    "source_text": source_text,
+                    "target_text": target_text,
+                }
+            )
+
+        candidate = ContentCandidate(
+            spanish_text=source_text,
+            german_text=target_text,
+            exists=False,
+            notes=notes,
+        )
+        created = create_word_if_missing(
+            candidate,
+            topic="dialog-click",
+            source_language=source_language,
+            target_language=target_language,
+        )
+        if created is None:
+            return Response(
+                {
+                    "created": False,
+                    "exists": True,
+                    "source_text": source_text,
+                    "target_text": target_text,
+                }
+            )
+
+        _link_word_to_dialog_turn(
+            item=created,
+            dialog_id_raw=dialog_id_raw,
+            turn_index_raw=turn_index_raw,
+        )
+        return Response(
+            {
+                "created": True,
+                "exists": False,
+                "id": created.id,
+                "source_text": created.spanish_text,
+                "target_text": created.german_text,
+                "audio_url": created.audio_url,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+def _link_word_to_dialog_turn(*, item: Item, dialog_id_raw, turn_index_raw) -> None:
+    try:
+        dialog_id = int(dialog_id_raw)
+        turn_index = int(turn_index_raw)
+    except (TypeError, ValueError):
+        return
+
+    dialog = SavedDialog.objects.filter(id=dialog_id).first()
+    if not dialog:
+        return
+    turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
+    if not turn:
+        return
+
+    ItemDialogOccurrence.objects.get_or_create(
+        item=item,
+        dialog=dialog,
+        turn=turn,
+        turn_index=turn_index,
+        side=ItemDialogOccurrence.Side.TARGET,
+        defaults={"match_score": 1.0},
+    )
 
 
 class ContentTopicDeleteView(APIView):
