@@ -8,10 +8,23 @@ import SessionPage from "../src/components/SessionPage";
 vi.mock("../src/api", () => ({
   fetchSession: vi.fn(),
   markSeen: vi.fn().mockResolvedValue(undefined),
+  setContentItemLearned: vi.fn().mockResolvedValue(undefined),
   submitReview: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { fetchSession, markSeen, submitReview } from "../src/api";
+
+async function renderSessionPageAndStart(): Promise<void> {
+  render(
+    <BrowserRouter>
+      <SessionPage />
+    </BrowserRouter>
+  );
+  const durationInput = await screen.findByTestId("duration-minutes-input");
+  await userEvent.clear(durationInput);
+  await userEvent.type(durationInput, "10");
+  await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+}
 
 describe("SessionPage", () => {
   beforeEach(() => {
@@ -35,11 +48,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     expect(await screen.findByText("New word")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
@@ -61,11 +70,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     await screen.findByText("New word");
     await userEvent.keyboard("{Enter}");
@@ -87,11 +92,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Write in German/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -113,11 +114,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     await screen.findByText(/Write in German/);
     const hintButton = screen.getByRole("button", { name: "Hint" });
@@ -145,11 +142,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     await screen.findByText(/Write in German/);
     const input = screen.getByTestId("word-input");
@@ -175,11 +168,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -210,11 +199,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "danke");
@@ -236,11 +221,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "d");
@@ -267,11 +248,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     await screen.findByTestId("word-input");
     await userEvent.click(screen.getByRole("button", { name: "Check" }));
@@ -295,11 +272,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "x");
@@ -335,11 +308,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Write in German/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -368,11 +337,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Write in Spanish: haus/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -397,11 +362,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
@@ -428,11 +389,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "h");
@@ -457,11 +414,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Select the correct Spanish translation: Ich verstehe nicht/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "No entiendo" }));
@@ -483,11 +436,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     expect(await screen.findByRole("button", { name: "1. No entiendo" })).toBeInTheDocument();
     await userEvent.keyboard("1");
@@ -509,11 +458,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     await screen.findByText(/Select the correct Spanish translation: Ich verstehe nicht/);
     await userEvent.click(screen.getByRole("button", { name: "I recognized it, mark wrong" }));
@@ -545,11 +490,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
@@ -585,11 +526,7 @@ describe("SessionPage", () => {
       ],
     });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
@@ -601,7 +538,7 @@ describe("SessionPage", () => {
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(42, false, "es_to_de"));
   });
 
-  it("starts a new session after completing the current one", async () => {
+  it("ends the session when selected items are completed", async () => {
     vi.mocked(fetchSession)
       .mockResolvedValueOnce({
         items: [
@@ -614,31 +551,14 @@ describe("SessionPage", () => {
             options: [],
           },
         ],
-      })
-      .mockResolvedValueOnce({
-        items: [
-          {
-            id: 22,
-            mode: "new",
-            item_type: "word",
-            spanish_text: "perro",
-            german_text: "hund",
-            options: [],
-          },
-        ],
       });
 
-    render(
-      <BrowserRouter>
-        <SessionPage />
-      </BrowserRouter>
-    );
+    await renderSessionPageAndStart();
 
     expect(await screen.findByText("hola")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
 
-    await waitFor(() => expect(fetchSession).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText("perro")).toBeInTheDocument();
-    expect(screen.queryByText("Session completed.")).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchSession).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Session completed")).toBeInTheDocument();
   });
 });

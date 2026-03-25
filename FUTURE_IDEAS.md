@@ -12,6 +12,9 @@ Usar Load Balancer
 Ensayar otros modelos
 Seguridad de S3
 Arreglar allowed hosts de Django
+Hacer menu para moverse entre funciones en lugar de los links que hay ahora
+Aleman a español es seleccion multiple
+Repetir audio al final o ppio de los tests
 
 Add settings to deploy files, like updated roles permissions, env...
 

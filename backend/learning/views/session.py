@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import math
 from dataclasses import dataclass
 from collections import defaultdict
 
@@ -22,15 +23,23 @@ class SessionEntry:
     due_at_sort: object | None = None
 
 
+REVIEW_WORD_SECONDS = 15
+REVIEW_PHRASE_SECONDS = 20
+NEW_WORD_SECONDS = 45
+NEW_PHRASE_SECONDS = 45
+
+
 class SessionView(APIView):
     def get(self, request: Request) -> Response:
-        size = int(request.query_params.get("size", 5))
+        size = _safe_int(request.query_params.get("size"), default=5, minimum=1, maximum=100)
+        duration_minutes = _safe_int(request.query_params.get("duration_minutes"), default=None, minimum=1, maximum=180)
         source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
         target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
         now = timezone.now()
 
         entries = build_session_entries(
             size=size,
+            duration_minutes=duration_minutes,
             now=now,
             source_language=source_language,
             target_language=target_language,
@@ -40,7 +49,21 @@ class SessionView(APIView):
         return Response({"items": serializer.data})
 
 
-def build_session_entries(size: int, now, source_language: str, target_language: str) -> list[SessionEntry]:
+def build_session_entries(
+    size: int,
+    now,
+    source_language: str,
+    target_language: str,
+    duration_minutes: int | None = None,
+) -> list[SessionEntry]:
+    if duration_minutes is not None:
+        return build_duration_based_session_entries(
+            duration_minutes=duration_minutes,
+            now=now,
+            source_language=source_language,
+            target_language=target_language,
+        )
+
     due_entries = build_due_entries(now=now, limit=size, source_language=source_language, target_language=target_language)
 
     remaining = size - len(due_entries)
@@ -61,6 +84,72 @@ def build_session_entries(size: int, now, source_language: str, target_language:
         )
 
     return due_entries + new_entries + upcoming_entries
+
+
+def build_duration_based_session_entries(
+    duration_minutes: int,
+    now,
+    source_language: str,
+    target_language: str,
+) -> list[SessionEntry]:
+    target_seconds = duration_minutes * 60
+    planning_limit = max(1, math.ceil(target_seconds / REVIEW_WORD_SECONDS) + 4)
+
+    due_entries = build_due_entries(
+        now=now,
+        limit=planning_limit,
+        source_language=source_language,
+        target_language=target_language,
+    )
+    remaining = planning_limit - len(due_entries)
+
+    new_entries: list[SessionEntry] = []
+    if remaining > 0:
+        new_entries = build_new_entries(limit=remaining, source_language=source_language, target_language=target_language)
+    remaining -= len(new_entries)
+
+    upcoming_entries: list[SessionEntry] = []
+    if remaining > 0:
+        selected_keys = {entry_key(entry) for entry in due_entries + new_entries}
+        upcoming_entries = build_upcoming_entries(
+            now=now,
+            limit=remaining,
+            excluded_keys=selected_keys,
+            source_language=source_language,
+            target_language=target_language,
+        )
+
+    ordered_entries = due_entries + new_entries + upcoming_entries
+    return trim_entries_to_target_duration(ordered_entries, target_seconds=target_seconds)
+
+
+def trim_entries_to_target_duration(entries: list[SessionEntry], target_seconds: int) -> list[SessionEntry]:
+    if target_seconds <= 0:
+        return []
+    selected: list[SessionEntry] = []
+    elapsed = 0
+    for entry in entries:
+        selected.append(entry)
+        elapsed += estimated_seconds_for_entry(entry)
+        if elapsed >= target_seconds:
+            break
+    return selected
+
+
+def estimated_seconds_for_entry(entry: SessionEntry) -> int:
+    if entry.mode == "new":
+        return NEW_PHRASE_SECONDS if entry.item.item_type == Item.ItemType.PHRASE else NEW_WORD_SECONDS
+    return REVIEW_PHRASE_SECONDS if entry.item.item_type == Item.ItemType.PHRASE else REVIEW_WORD_SECONDS
+
+
+def _safe_int(raw_value, *, default: int | None, minimum: int, maximum: int) -> int | None:
+    if raw_value is None:
+        return default
+    try:
+        parsed = int(str(raw_value))
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, parsed))
 
 
 def build_due_entries(now, limit: int, source_language: str, target_language: str) -> list[SessionEntry]:
@@ -111,7 +200,9 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
         rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
 
     rows.sort(key=lambda row: (row[0], row[1], row[2]))
-    return [review_entry(item=row[3], direction=row[2], due_at=row[0]) for row in rows[:limit]]
+    entries = [review_entry(item=row[3], direction=row[2], due_at=row[0]) for row in rows[:limit]]
+    randomize_review_order(entries)
+    return entries
 
 
 def build_new_entries(limit: int, source_language: str, target_language: str) -> list[SessionEntry]:
@@ -204,7 +295,12 @@ def build_upcoming_entries(
         if len(entries) >= limit:
             break
 
+    randomize_review_order(entries)
     return entries
+
+
+def randomize_review_order(entries: list[SessionEntry]) -> None:
+    random.shuffle(entries)
 
 
 def review_entry(item: Item, direction: str | None, due_at) -> SessionEntry:

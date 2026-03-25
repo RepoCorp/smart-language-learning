@@ -26,12 +26,16 @@ export async function fetchSession(
   size = 5,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  durationMinutes?: number,
 ): Promise<SessionResponse> {
   const params = new URLSearchParams({
     size: String(size),
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
+  if (durationMinutes !== undefined) {
+    params.set("duration_minutes", String(durationMinutes));
+  }
   const response = await fetch(`${API_BASE}/session?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load session");

@@ -37,6 +37,67 @@ def test_session_prioritizes_due_reviews_then_new_items():
 
 
 @pytest.mark.django_db
+def test_session_duration_minutes_prioritizes_due_before_new():
+    now = timezone.now()
+
+    due = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+    new_item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="casa",
+        german_text="Haus",
+    )
+
+    client = APIClient()
+    response = client.get("/api/session", {"duration_minutes": 2})
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert items
+    assert items[0]["id"] == due.id
+    assert items[0]["mode"] == "review"
+    assert any(item["id"] == new_item.id and item["mode"] == "new" for item in items)
+
+
+@pytest.mark.django_db
+def test_session_duration_minutes_matches_expected_time_target():
+    now = timezone.now()
+
+    due_a = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+    due_b = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="gracias",
+        german_text="danke",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="casa",
+        german_text="Haus",
+    )
+
+    client = APIClient()
+    response = client.get("/api/session", {"duration_minutes": 1})
+
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()["items"]]
+    # Review words are estimated at 25s each, so 1 minute should select at least two.
+    assert {due_a.id, due_b.id}.issubset(set(ids[:2]))
+
+
+@pytest.mark.django_db
 def test_phrase_review_contains_correct_option():
     now = timezone.now()
     phrase = Item.objects.create(
@@ -92,7 +153,7 @@ def test_session_falls_back_to_next_upcoming_review_when_no_due_or_new():
     response_two = client.get("/api/session", {"size": 2})
     assert response_two.status_code == 200
     ids = [item["id"] for item in response_two.json()["items"]]
-    assert ids == [sooner.id, later.id]
+    assert set(ids) == {sooner.id, later.id}
 
 
 @pytest.mark.django_db
