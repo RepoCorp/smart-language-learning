@@ -2,14 +2,18 @@
   "family": "smart-language-learning-backend",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
+  "runtimePlatform": {
+    "operatingSystemFamily": "LINUX",
+    "cpuArchitecture": "X86_64"
+  },
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/smartLanguageLearningTaskRole",
+  "executionRoleArn": "arn:aws:iam::330056673401:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::330056673401:role/smartLanguageLearningTaskRole",
   "containerDefinitions": [
     {
       "name": "backend",
-      "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/smart-language-learning-backend:<TAG>",
+      "image": "330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-backend:latest",
       "essential": true,
       "portMappings": [
         {
@@ -19,27 +23,26 @@
       ],
       "environment": [
         { "name": "DJANGO_DEBUG", "value": "0" },
-        { "name": "DJANGO_ALLOWED_HOSTS", "value": "api.yourdomain.com" },
-        { "name": "POSTGRES_DB", "value": "smart_language_learning" },
-        { "name": "POSTGRES_USER", "value": "smart_language_learning" },
-        { "name": "POSTGRES_HOST", "value": "<RDS_ENDPOINT>" },
-        { "name": "POSTGRES_PORT", "value": "5432" }
-      ],
-      "secrets": [
-        {
-          "name": "DJANGO_SECRET_KEY",
-          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:smart-language-learning/DJANGO_SECRET_KEY"
-        },
-        {
-          "name": "POSTGRES_PASSWORD",
-          "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:smart-language-learning/POSTGRES_PASSWORD"
-        }
+        { "name": "DJANGO_ALLOWED_HOSTS", "value": "sll-alb-1301042143.us-east-1.elb.amazonaws.com" },
+        { "name": "POSTGRES_DB", "value": "postgres" },
+        { "name": "POSTGRES_USER", "value": "postgres" },
+        { "name": "POSTGRES_HOST", "value": "sll-database-1.cnb5lwju2hhj.us-east-1.rds.amazonaws.com" },
+        { "name": "POSTGRES_PORT", "value": "5432" },
+        { "name": "POSTGRES_PASSWORD", "value": "ks.cfNXh2T2ahGzpZif3" },
+        { "name": "DJANGO_SECRET_KEY", "value": "notsosecretafterall" },
+        { "name": "GUNICORN_TIMEOUT", "value": "120" },
+        { "name": "OPENAI_REQUEST_TIMEOUT_SECONDS", "value": "30" },
+        { "name": "OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", "value": "40" },
+        { "name": "AUDIO_STORAGE_BACKEND", "value": "s3" },
+        { "name": "AWS_S3_AUDIO_BUCKET", "value": "<S3_BUCKET_NAME>" },
+        { "name": "AWS_S3_AUDIO_PREFIX", "value": "audio" },
+        { "name": "AWS_S3_AUDIO_REGION", "value": "us-east-1" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/smart-language-learning-backend",
-          "awslogs-region": "<REGION>",
+          "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
       },

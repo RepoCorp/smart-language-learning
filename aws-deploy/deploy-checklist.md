@@ -5,40 +5,46 @@ Replace placeholders: `<ACCOUNT_ID>`, `<REGION>`, `<CLUSTER_NAME>`, `<VPC_ID>`, 
 ## 1) Create ECR repositories
 
 ```bash
-aws ecr create-repository --repository-name smart-language-learning-backend --region <REGION>
-aws ecr create-repository --repository-name smart-language-learning-frontend --region <REGION>
+aws ecr create-repository --repository-name smart-language-learning-backend --region us-east-1
+aws ecr create-repository --repository-name smart-language-learning-frontend --region us-east-1
 ```
 
 ## 2) Build and push images
 
 ```bash
-aws ecr get-login-password --region <REGION> | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 330056673401.dkr.ecr.us-east-1.amazonaws.com
 
 # Backend
-docker build -f aws-deploy/backend.Dockerfile.prod -t smart-language-learning-backend:latest .
-docker tag smart-language-learning-backend:latest <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/smart-language-learning-backend:latest
-docker push <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/smart-language-learning-backend:latest
+docker build --platform linux/amd64 -f aws-deploy/backend.Dockerfile.prod -t smart-language-learning-backend:latest .
+docker tag smart-language-learning-backend:latest 330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-backend:latest
+docker push 330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-backend:latest
+
 
 # Frontend (inject API URL at build time)
-docker build -f aws-deploy/frontend.Dockerfile.prod --build-arg VITE_API_URL=https://api.yourdomain.com/api -t smart-language-learning-frontend:latest .
-docker tag smart-language-learning-frontend:latest <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/smart-language-learning-frontend:latest
-docker push <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/smart-language-learning-frontend:latest
+docker build --platform linux/amd64 -f aws-deploy/frontend.Dockerfile.prod --build-arg VITE_API_URL=http://sll-alb-1301042143.us-east-1.elb.amazonaws.com/api -t smart-language-learning-frontend:latest .
+docker tag smart-language-learning-frontend:latest 330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-frontend:latest
+docker push 330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-frontend:latest
 ```
+330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-frontend:latest
+
+arn:aws:secretsmanager:us-east-1:330056673401:secret:sll-OfCtnN/OPENAI_API_KEY
+
 
 ## 3) Create CloudWatch log groups
 
 ```bash
-aws logs create-log-group --log-group-name /ecs/smart-language-learning-backend --region <REGION>
-aws logs create-log-group --log-group-name /ecs/smart-language-learning-frontend --region <REGION>
+aws logs create-log-group --log-group-name /ecs/smart-language-learning-backend --region us-east-1
+aws logs create-log-group --log-group-name /ecs/smart-language-learning-frontend --region us-east-1
 ```
 
 ## 4) Register task definitions
 
 Update `ecs-task-backend.json` and `ecs-task-frontend.json` placeholders first.
+These task definitions are pinned to `X86_64`; keep image builds on `linux/amd64` unless you explicitly switch both to `ARM64`.
 
 ```bash
-aws ecs register-task-definition --cli-input-json file://aws-deploy/ecs-task-backend.json --region <REGION>
-aws ecs register-task-definition --cli-input-json file://aws-deploy/ecs-task-frontend.json --region <REGION>
+aws ecs register-task-definition --cli-input-json file://aws-deploy/ecs-task-backend.json --region us-east-1
+aws ecs register-task-definition --cli-input-json file://aws-deploy/ecs-task-frontend.json --region us-east-1
 ```
 
 ## 5) Create ALB target groups

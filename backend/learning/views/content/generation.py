@@ -185,8 +185,11 @@ def call_openai_json(
         method="POST",
     )
 
+    configured_timeout = int(getattr(settings, "OPENAI_REQUEST_TIMEOUT_SECONDS", 30))
+    effective_timeout = max(timeout_seconds, configured_timeout)
+
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with urlopen(request, timeout=effective_timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         logger.warning("content.generate.chatgpt.request_failed error=%s", exc.__class__.__name__)

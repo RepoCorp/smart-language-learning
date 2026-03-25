@@ -1,7 +1,29 @@
 # Todos
 
-Arreglar la generacion de fraases para los ejercicios
+Arreglar la generacion de frases para los ejercicios
 The first time you generate content it is always returning just one phrase
+Links to words from dialog turns and phrase pages
+Posibilidad de regenerar otras cosas, como las traducciones que a veces estan mal, especialmente en el ejercicio
+Que cuando esta viendo una frase y le da click a la palabra, se la muestre y le permita marcarla para empezar a testearla
+Si la palabra no esta que permita añadirla
+Que el test de un sentido y el otro no los haga seguido al menos la primera vez
+
+Usar Load Balancer 
+Ensayar otros modelos
+Seguridad de S3
+Arreglar allowed hosts de Django
+
+Add settings to deploy files, like updated roles permissions, env...
+
+Audio mas rapido y mas "ofuscado"
+Crear multiple dialogos a la vez
+
+red semántica: si hay tres palabras que se relacionan, hacer el ejercicio de la frase con las tres palabras: 
+Ich esse die Lederhose.
+Ich esse die Jacke.
+Ich esse die Schuhe.
+Que las frases hagan sentido absurdo
+
 
 Arreglar todos los usos de español y aleman en el codigo.
 Añadir manejo del casing para todos los idiomas usando el modelo 

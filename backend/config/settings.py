@@ -79,6 +79,13 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_REQUEST_TIMEOUT_SECONDS = int(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "30"))
+OPENAI_TTS_REQUEST_TIMEOUT_SECONDS = int(os.getenv("OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", "40"))
+AUDIO_STORAGE_BACKEND = os.getenv("AUDIO_STORAGE_BACKEND", "local").strip().lower()
+AWS_S3_AUDIO_BUCKET = os.getenv("AWS_S3_AUDIO_BUCKET", "").strip()
+AWS_S3_AUDIO_PREFIX = os.getenv("AWS_S3_AUDIO_PREFIX", "audio").strip().strip("/")
+AWS_S3_AUDIO_REGION = os.getenv("AWS_S3_AUDIO_REGION", os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", ""))).strip()
+AWS_S3_AUDIO_BASE_URL = os.getenv("AWS_S3_AUDIO_BASE_URL", "").strip().rstrip("/")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
 LOGGING = {

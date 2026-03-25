@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
 import re
@@ -30,6 +31,93 @@ OPENAI_TTS_VOICES = ("alloy", "echo", "fable", "onyx", "nova", "shimmer")
 OPENAI_TTS_SAMPLE_RATE = 24000
 OPENAI_TTS_DEFAULT_SPEED = 1.25
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
+
+
+def _build_local_audio_url(filename: str) -> str:
+    relative_url = f"{settings.MEDIA_URL.rstrip('/')}/audio/{filename}"
+    return f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
+
+
+def _build_s3_audio_url(key: str) -> str:
+    explicit_base_url = str(getattr(settings, "AWS_S3_AUDIO_BASE_URL", "")).strip().rstrip("/")
+    if explicit_base_url:
+        normalized_key = key.lstrip("/")
+        prefix = str(getattr(settings, "AWS_S3_AUDIO_PREFIX", "audio")).strip().strip("/")
+        if prefix:
+            base_suffix = f"/{prefix.lower()}"
+            key_prefix = f"{prefix.lower()}/"
+            if explicit_base_url.lower().endswith(base_suffix) and normalized_key.lower().startswith(key_prefix):
+                normalized_key = normalized_key[len(prefix) + 1 :]
+        return f"{explicit_base_url}/{normalized_key}"
+
+    bucket = str(getattr(settings, "AWS_S3_AUDIO_BUCKET", "")).strip()
+    region = str(getattr(settings, "AWS_S3_AUDIO_REGION", "")).strip()
+    if region:
+        return f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
+    return f"https://{bucket}.s3.amazonaws.com/{key}"
+
+
+def _store_audio_bytes(filename: str, payload: bytes, content_type: str) -> str:
+    storage_backend = str(getattr(settings, "AUDIO_STORAGE_BACKEND", "local")).strip().lower()
+    if storage_backend == "s3":
+        bucket = str(getattr(settings, "AWS_S3_AUDIO_BUCKET", "")).strip()
+        if not bucket:
+            logger.warning("content.audio.failed_s3 reason=missing_bucket filename=%s", filename)
+            return ""
+
+        prefix = str(getattr(settings, "AWS_S3_AUDIO_PREFIX", "audio")).strip().strip("/")
+        key = f"{prefix}/{filename}" if prefix else filename
+
+        try:
+            import boto3
+        except Exception:
+            logger.warning("content.audio.failed_s3 reason=missing_boto3 filename=%s", filename)
+            return ""
+
+        s3_client_kwargs: dict[str, str] = {}
+        region = str(getattr(settings, "AWS_S3_AUDIO_REGION", "")).strip()
+        if region:
+            s3_client_kwargs["region_name"] = region
+
+        logger.info(
+            "content.audio.s3.upload_started filename=%s bucket=%s key=%s content_type=%s bytes=%d region=%s",
+            filename,
+            bucket,
+            key,
+            content_type,
+            len(payload),
+            region or "default",
+        )
+        try:
+            boto3.client("s3", **s3_client_kwargs).put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=payload,
+                ContentType=content_type,
+            )
+        except Exception as exc:
+            logger.warning(
+                "content.audio.failed_s3_upload filename=%s bucket=%s key=%s error=%s",
+                filename,
+                bucket,
+                key,
+                exc.__class__.__name__,
+            )
+            return ""
+
+        audio_url = _build_s3_audio_url(key)
+        logger.info("content.audio.s3.upload_succeeded filename=%s bucket=%s key=%s", filename, bucket, key)
+        return audio_url
+
+    audio_dir = Path(settings.MEDIA_ROOT) / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    file_path = audio_dir / filename
+    try:
+        file_path.write_bytes(payload)
+    except Exception:
+        logger.warning("content.audio.failed_write filename=%s", filename)
+        return ""
+    return _build_local_audio_url(filename)
 
 
 def get_excluded_words_lookup() -> set[tuple[str, str]]:
@@ -184,14 +272,10 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german") -
         logger.warning("content.audio.skipped prefix=%s reason=empty_text", prefix)
         return ""
 
-    audio_dir = Path(settings.MEDIA_ROOT) / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     if not slug:
         slug = "audio"
     filename = f"{prefix}-{slug[:32]}-{uuid4().hex[:8]}.mp3"
-    file_path = audio_dir / filename
 
     voice = OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE.get(target_language, "alloy")
     audio_bytes = _openai_tts_audio(
@@ -203,14 +287,10 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german") -
     if not audio_bytes:
         logger.warning("content.audio.failed prefix=%s filename=%s target_language=%s", prefix, filename, target_language)
         return ""
-    try:
-        file_path.write_bytes(audio_bytes)
-    except Exception:
-        logger.warning("content.audio.failed_write prefix=%s filename=%s", prefix, filename)
+    audio_url = _store_audio_bytes(filename, audio_bytes, content_type="audio/mpeg")
+    if not audio_url:
+        logger.warning("content.audio.failed_store prefix=%s filename=%s", prefix, filename)
         return ""
-
-    relative_url = f"{settings.MEDIA_URL.rstrip('/')}/audio/{filename}"
-    audio_url = f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
     logger.info(
         "content.audio.created prefix=%s filename=%s target_language=%s voice=%s",
         prefix,
@@ -248,8 +328,9 @@ def _openai_tts_audio(
         },
         method="POST",
     )
+    timeout_seconds = int(getattr(settings, "OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", 40))
     try:
-        with urlopen(request, timeout=20) as response:
+        with urlopen(request, timeout=timeout_seconds) as response:
             return response.read()
     except (HTTPError, URLError, TimeoutError):
         return None
@@ -293,13 +374,11 @@ def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "ge
     if not pcm_chunks:
         return ""
 
-    audio_dir = Path(settings.MEDIA_ROOT) / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
     filename = f"dialog-{uuid4().hex[:12]}.wav"
-    file_path = audio_dir / filename
 
     try:
-        with wave.open(str(file_path), "wb") as wav_file:
+        audio_buffer = io.BytesIO()
+        with wave.open(audio_buffer, "wb") as wav_file:
             wav_file.setnchannels(1)
             wav_file.setsampwidth(2)
             wav_file.setframerate(OPENAI_TTS_SAMPLE_RATE)
@@ -308,8 +387,10 @@ def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "ge
         logger.warning("content.audio.dialog.failed filename=%s", filename)
         return ""
 
-    relative_url = f"{settings.MEDIA_URL.rstrip('/')}/audio/{filename}"
-    audio_url = f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
+    audio_url = _store_audio_bytes(filename, audio_buffer.getvalue(), content_type="audio/wav")
+    if not audio_url:
+        logger.warning("content.audio.dialog.failed_store filename=%s", filename)
+        return ""
     logger.info(
         "content.audio.dialog.created filename=%s voices=%s,%s target_language=%s",
         filename,
