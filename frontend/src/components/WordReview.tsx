@@ -36,6 +36,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const isSpanishToGerman = item.direction !== "de_to_es";
+  const useMultipleChoice = !isSpanishToGerman && item.options.length > 0;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
   const languageLabel = isSpanishToGerman
@@ -64,7 +65,18 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     setAwaitingWrongAccept(true);
   };
 
+  const choose = async (choice: string): Promise<void> => {
+    if (!useMultipleChoice || isSubmitting) {
+      return;
+    }
+    const correct = normalize(choice) === normalize(expectedAnswer);
+    await submitWithFeedback(correct, correct ? t("word.feedback.correct") : t("word.feedback.incorrect", { answer: expectedAnswer }));
+  };
+
   const showInputAwareHint = (): void => {
+    if (useMultipleChoice) {
+      return;
+    }
     if (isSubmitting) {
       return;
     }
@@ -96,6 +108,9 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   };
 
   const check = async (): Promise<void> => {
+    if (useMultipleChoice) {
+      return;
+    }
     if (isSubmitting) {
       return;
     }
@@ -125,6 +140,9 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   };
 
   const handleAnswerChange = (value: string): void => {
+    if (useMultipleChoice) {
+      return;
+    }
     if (isSubmitting) {
       return;
     }
@@ -162,11 +180,13 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   };
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (!useMultipleChoice) {
+      inputRef.current?.focus();
+    }
+  }, [useMultipleChoice]);
 
   useEffect(() => {
-    if (!awaitingWrongAccept) {
+    if (useMultipleChoice || !awaitingWrongAccept) {
       return;
     }
 
@@ -182,7 +202,46 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [awaitingWrongAccept, isSubmitting]);
+  }, [awaitingWrongAccept, isSubmitting, useMultipleChoice]);
+
+  useEffect(() => {
+    if (!useMultipleChoice || isSubmitting) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const index = Number.parseInt(event.key, 10);
+      if (!Number.isInteger(index)) {
+        return;
+      }
+      if (index < 1 || index > item.options.length) {
+        return;
+      }
+      event.preventDefault();
+      void choose(item.options[index - 1]);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isSubmitting, item.options, useMultipleChoice]);
+
+  if (useMultipleChoice) {
+    return (
+      <div>
+        <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
+        <div className="options">
+          {item.options.map((option, idx) => (
+            <button key={option} onClick={() => void choose(option)} disabled={isSubmitting}>
+              {idx + 1}. {option}
+            </button>
+          ))}
+        </div>
+        {feedback && <p>{feedback}</p>}
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -316,7 +316,7 @@ def entry_key(entry: SessionEntry) -> tuple[int, str | None]:
 
 
 def serialize_entries(entries: list[SessionEntry]) -> list[dict]:
-    options_map = build_phrase_options(entries)
+    options_map = build_review_options(entries)
     related_dialogs_map = build_related_dialogs_map(entries)
     payload: list[dict] = []
 
@@ -341,16 +341,26 @@ def serialize_entries(entries: list[SessionEntry]) -> list[dict]:
     return payload
 
 
-def build_phrase_options(entries: list[SessionEntry]) -> dict[tuple[int, str | None], list[str]]:
-    phrase_review_entries = [
-        entry for entry in entries if entry.item.item_type == Item.ItemType.PHRASE and entry.mode == "review"
+def build_review_options(entries: list[SessionEntry]) -> dict[tuple[int, str | None], list[str]]:
+    review_entries_with_options = [
+        entry
+        for entry in entries
+        if entry.mode == "review"
+        and (
+            entry.item.item_type == Item.ItemType.PHRASE
+            or (
+                entry.item.item_type == Item.ItemType.WORD
+                and entry.direction == Item.ReviewDirection.GERMAN_TO_SPANISH
+            )
+        )
     ]
-    if not phrase_review_entries:
+    if not review_entries_with_options:
         return {}
 
-    pair_set = {(entry.item.source_language, entry.item.target_language) for entry in phrase_review_entries}
+    pair_set = {(entry.item.source_language, entry.item.target_language) for entry in review_entries_with_options}
     all_phrase_answers_es_to_de_by_pair: dict[tuple[str, str], list[str]] = {}
     all_phrase_answers_de_to_es_by_pair: dict[tuple[str, str], list[str]] = {}
+    all_word_answers_de_to_es_by_pair: dict[tuple[str, str], list[str]] = {}
     for source_language, target_language in pair_set:
         all_phrase_answers_es_to_de_by_pair[(source_language, target_language)] = list(
             Item.objects.filter(
@@ -368,25 +378,44 @@ def build_phrase_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
                 target_language=target_language,
             ).values_list("spanish_text", flat=True)
         )
+        all_word_answers_de_to_es_by_pair[(source_language, target_language)] = list(
+            Item.objects.filter(
+                item_type=Item.ItemType.WORD,
+                is_learned=False,
+                source_language=source_language,
+                target_language=target_language,
+            ).values_list("spanish_text", flat=True)
+        )
     options_map: dict[tuple[int, str | None], list[str]] = {}
 
-    for entry in phrase_review_entries:
+    for entry in review_entries_with_options:
         item = entry.item
-        is_es_to_de = entry.direction == Item.ReviewDirection.SPANISH_TO_GERMAN
-        correct_answer = item.german_text if is_es_to_de else item.spanish_text
         pair_key = (item.source_language, item.target_language)
-        source_answers = (
-            all_phrase_answers_es_to_de_by_pair[pair_key]
-            if is_es_to_de
-            else all_phrase_answers_de_to_es_by_pair[pair_key]
-        )
-        distractors = [answer for answer in source_answers if answer != correct_answer]
-        random.shuffle(distractors)
-        choices = distractors[:3] + [correct_answer]
-        random.shuffle(choices)
+        if item.item_type == Item.ItemType.PHRASE:
+            is_es_to_de = entry.direction == Item.ReviewDirection.SPANISH_TO_GERMAN
+            correct_answer = item.german_text if is_es_to_de else item.spanish_text
+            source_answers = (
+                all_phrase_answers_es_to_de_by_pair[pair_key]
+                if is_es_to_de
+                else all_phrase_answers_de_to_es_by_pair[pair_key]
+            )
+            choices = build_choices(correct_answer, source_answers)
+        else:
+            correct_answer = item.spanish_text
+            source_answers = all_word_answers_de_to_es_by_pair[pair_key]
+            choices = build_choices(correct_answer, source_answers)
         options_map[entry_key(entry)] = choices
 
     return options_map
+
+
+def build_choices(correct_answer: str, source_answers: list[str]) -> list[str]:
+    unique_answers = list(dict.fromkeys(source_answers))
+    distractors = [answer for answer in unique_answers if answer != correct_answer]
+    random.shuffle(distractors)
+    choices = distractors[:3] + [correct_answer]
+    random.shuffle(choices)
+    return choices
 
 
 def build_related_dialogs_map(entries: list[SessionEntry], per_item_limit: int = 4) -> dict[int, list[dict]]:

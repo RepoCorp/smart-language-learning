@@ -122,6 +122,31 @@ def test_phrase_review_contains_correct_option():
 
 
 @pytest.mark.django_db
+def test_word_review_de_to_es_contains_multiple_choice_options():
+    now = timezone.now()
+    word = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="casa",
+        german_text="Haus",
+        last_reviewed_at_de_to_es=now,
+        due_at_de_to_es=now,
+    )
+    Item.objects.create(item_type=Item.ItemType.WORD, spanish_text="perro", german_text="Hund")
+    Item.objects.create(item_type=Item.ItemType.WORD, spanish_text="gato", german_text="Katze")
+    Item.objects.create(item_type=Item.ItemType.WORD, spanish_text="gracias", german_text="Danke")
+
+    client = APIClient()
+    response = client.get("/api/session", {"size": 1})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["id"] == word.id
+    assert item["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
+    assert word.spanish_text in item["options"]
+    assert len(item["options"]) >= 2
+
+
+@pytest.mark.django_db
 def test_session_falls_back_to_next_upcoming_review_when_no_due_or_new():
     now = timezone.now()
 

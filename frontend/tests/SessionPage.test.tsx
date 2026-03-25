@@ -332,18 +332,15 @@ describe("SessionPage", () => {
           spanish_text: "casa",
           german_text: "haus",
           direction: "de_to_es",
-          options: [],
+          options: ["casa", "perro", "gato", "gracias"],
         },
       ],
     });
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByText(/Write in Spanish: haus/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
-    expect(screen.getByText("Hint: c")).toBeInTheDocument();
-    await userEvent.type(screen.getByTestId("word-input"), "casa");
-    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+    expect(await screen.findByText(/Select the correct Spanish translation: haus/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /casa/i }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(12, true, "de_to_es"));
   });
 
