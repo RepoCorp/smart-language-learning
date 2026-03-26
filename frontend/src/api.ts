@@ -324,6 +324,9 @@ export async function quickAddWordFromDialog(
   dialogId?: number,
   turnIndex?: number,
   checkOnly = false,
+  sourceLine = "",
+  targetLine = "",
+  clickedTargetToken = "",
 ): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
@@ -339,10 +342,47 @@ export async function quickAddWordFromDialog(
       dialog_id: dialogId,
       turn_index: turnIndex,
       check_only: checkOnly,
+      source_line: sourceLine,
+      target_line: targetLine,
+      clicked_target_token: clickedTargetToken,
     }),
   });
   if (!response.ok) {
     throw new Error("Failed to add word from dialog");
+  }
+  notifyOverviewStatsUpdated();
+  return (await response.json()) as {
+    created: boolean;
+    exists: boolean;
+    id?: number | null;
+    source_text?: string;
+    target_text?: string;
+  };
+}
+
+export async function quickAddPhraseFromConversation(
+  sourceText: string,
+  targetText: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+  checkOnly = false,
+): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/phrases/add?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source_text: sourceText,
+      target_text: targetText,
+      notes: "Added from conversation",
+      check_only: checkOnly,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to add phrase from conversation");
   }
   notifyOverviewStatsUpdated();
   return (await response.json()) as {

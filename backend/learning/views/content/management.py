@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 
 from ...models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
 from ...serializers import ContentTopicSerializer
-from .core import ContentCandidate, call_openai_json, create_audio_file, create_word_if_missing, item_exists
+from .core import ContentCandidate, call_openai_json, create_audio_file, create_phrase_if_missing, create_word_if_missing, item_exists
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +249,9 @@ class ContentWordQuickAddView(APIView):
         source_language, target_language = _normalized_pair(request)
         source_text = str(request.data.get("source_text", "")).strip()
         target_text = str(request.data.get("target_text", "")).strip()
+        source_line = str(request.data.get("source_line", "")).strip()
+        target_line = str(request.data.get("target_line", "")).strip()
+        clicked_target_token = str(request.data.get("clicked_target_token", "")).strip()
         notes = str(request.data.get("notes", "")).strip()
         dialog_id_raw = request.data.get("dialog_id")
         turn_index_raw = request.data.get("turn_index")
@@ -268,6 +271,9 @@ class ContentWordQuickAddView(APIView):
             target_language=target_language,
             dialog_id_raw=dialog_id_raw,
             turn_index_raw=turn_index_raw,
+            source_line=source_line,
+            target_line=target_line,
+            clicked_target_token=clicked_target_token,
         )
 
         exists = item_exists(
@@ -366,6 +372,95 @@ class ContentWordQuickAddView(APIView):
         )
 
 
+class ContentPhraseQuickAddView(APIView):
+    def post(self, request: Request) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        source_text = str(request.data.get("source_text", "")).strip()
+        target_text = str(request.data.get("target_text", "")).strip()
+        notes = str(request.data.get("notes", "")).strip()
+        check_only_raw = request.data.get("check_only", False)
+        if isinstance(check_only_raw, str):
+            check_only = check_only_raw.strip().lower() in {"1", "true", "yes", "on"}
+        else:
+            check_only = bool(check_only_raw)
+
+        if not source_text or not target_text:
+            return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        exists = item_exists(
+            Item.ItemType.PHRASE,
+            source_text,
+            target_text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        if exists:
+            existing = (
+                Item.objects.filter(
+                    item_type=Item.ItemType.PHRASE,
+                    source_language=source_language,
+                    target_language=target_language,
+                    spanish_text__iexact=source_text,
+                    german_text__iexact=target_text,
+                )
+                .order_by("-id")
+                .first()
+            )
+            return Response(
+                {
+                    "created": False,
+                    "exists": True,
+                    "id": existing.id if existing else None,
+                    "source_text": source_text,
+                    "target_text": target_text,
+                }
+            )
+
+        if check_only:
+            return Response(
+                {
+                    "created": False,
+                    "exists": False,
+                    "id": None,
+                    "source_text": source_text,
+                    "target_text": target_text,
+                }
+            )
+
+        candidate = ContentCandidate(
+            spanish_text=source_text,
+            german_text=target_text,
+            exists=False,
+            notes=notes,
+        )
+        created = create_phrase_if_missing(
+            candidate,
+            topic="conversation-click",
+            source_language=source_language,
+            target_language=target_language,
+        )
+        if created is None:
+            return Response(
+                {
+                    "created": False,
+                    "exists": True,
+                    "source_text": source_text,
+                    "target_text": target_text,
+                }
+            )
+        return Response(
+            {
+                "created": True,
+                "exists": False,
+                "id": created.id,
+                "source_text": created.spanish_text,
+                "target_text": created.german_text,
+                "audio_url": created.audio_url,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class ContentItemConversationView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
         source_language, target_language = _normalized_pair(request)
@@ -398,6 +493,7 @@ class ContentItemConversationView(APIView):
         user_translation_text = assistant_payload.get("user_source_translation", "")
         user_corrected_text = assistant_payload.get("corrected_user_text", "")
         user_corrected_translation_text = assistant_payload.get("corrected_user_source_translation", "")
+        user_correction_explanation = assistant_payload.get("corrected_user_explanation", "")
         assistant_audio_url = ""
         if assistant_text:
             assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
@@ -408,6 +504,7 @@ class ContentItemConversationView(APIView):
                 "user_translation_text": user_translation_text,
                 "user_corrected_text": user_corrected_text,
                 "user_corrected_translation_text": user_corrected_translation_text,
+                "user_correction_explanation": user_correction_explanation,
                 "assistant_text": assistant_text,
                 "assistant_translation_text": assistant_translation_text,
                 "assistant_audio_url": assistant_audio_url,
@@ -423,12 +520,23 @@ def _resolve_dialog_click_word_pair(
     target_language: str,
     dialog_id_raw,
     turn_index_raw,
+    source_line: str = "",
+    target_line: str = "",
+    clicked_target_token: str = "",
 ) -> tuple[str, str]:
     try:
         dialog_id = int(dialog_id_raw)
         turn_index = int(turn_index_raw)
     except (TypeError, ValueError):
-        return source_text, target_text
+        return _resolve_word_pair_from_inline_context(
+            source_text=source_text,
+            target_text=target_text,
+            source_language=source_language,
+            target_language=target_language,
+            source_line=source_line,
+            target_line=target_line,
+            clicked_target_token=clicked_target_token,
+        )
 
     dialog = SavedDialog.objects.filter(
         id=dialog_id,
@@ -436,10 +544,26 @@ def _resolve_dialog_click_word_pair(
         target_language=target_language,
     ).first()
     if not dialog:
-        return source_text, target_text
+        return _resolve_word_pair_from_inline_context(
+            source_text=source_text,
+            target_text=target_text,
+            source_language=source_language,
+            target_language=target_language,
+            source_line=source_line,
+            target_line=target_line,
+            clicked_target_token=clicked_target_token,
+        )
     turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
     if not turn:
-        return source_text, target_text
+        return _resolve_word_pair_from_inline_context(
+            source_text=source_text,
+            target_text=target_text,
+            source_language=source_language,
+            target_language=target_language,
+            source_line=source_line,
+            target_line=target_line,
+            clicked_target_token=clicked_target_token,
+        )
 
     parsed = call_openai_json(
         """
@@ -474,10 +598,72 @@ Rules:
         presence_penalty=0.0,
     )
     if not isinstance(parsed, dict):
-        return source_text, target_text
+        return _resolve_word_pair_from_inline_context(
+            source_text=source_text,
+            target_text=target_text,
+            source_language=source_language,
+            target_language=target_language,
+            source_line=source_line,
+            target_line=target_line,
+            clicked_target_token=clicked_target_token,
+        )
 
     resolved_source = str(parsed.get("source_text", source_text)).strip()
     resolved_target = str(parsed.get("target_text", target_text)).strip()
+    if not resolved_source:
+        resolved_source = source_text
+    if not resolved_target:
+        resolved_target = target_text
+    return resolved_source[:120], resolved_target[:120]
+
+
+def _resolve_word_pair_from_inline_context(
+    *,
+    source_text: str,
+    target_text: str,
+    source_language: str,
+    target_language: str,
+    source_line: str,
+    target_line: str,
+    clicked_target_token: str,
+) -> tuple[str, str]:
+    if not source_line or not target_line or not clicked_target_token:
+        return source_text, target_text
+
+    parsed = call_openai_json(
+        """
+Resolve a clicked word translation from inline parallel sentence context.
+
+Return strict JSON:
+{
+  "source_text": "string",
+  "target_text": "string"
+}
+
+Rules:
+- target_text must be the clicked target token (trim punctuation only).
+- source_text must be the best source-language translation for that clicked token in this sentence context.
+- Keep source_text short (1-3 words) when possible.
+- If uncertain, keep provided source_text.
+- JSON only.
+""".strip(),
+        (
+            f"Source language: {_language_display_name(source_language)}\n"
+            f"Target language: {_language_display_name(target_language)}\n"
+            f"Full source line: {source_line}\n"
+            f"Full target line: {target_line}\n"
+            f"Clicked target token: {clicked_target_token}\n"
+            f"Provided source token: {source_text}\n"
+        ),
+        timeout_seconds=6,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        return source_text, target_text
+    resolved_source = str(parsed.get("source_text", source_text)).strip()
+    resolved_target = str(parsed.get("target_text", clicked_target_token or target_text)).strip()
     if not resolved_source:
         resolved_source = source_text
     if not resolved_target:
@@ -590,7 +776,7 @@ def _generate_item_conversation_reply(
 
     parsed = call_openai_json(
         """
-You are a language tutor. Continue a short voice conversation focused on one study item.
+You are a conversation partner. Continue a short voice conversation focused on one study item.
 
 Return strict JSON:
 {
@@ -598,21 +784,24 @@ Return strict JSON:
   "source_translation": "string",
   "user_source_translation": "string",
   "corrected_user_text": "string",
-  "corrected_user_source_translation": "string"
+  "corrected_user_source_translation": "string",
+  "corrected_user_explanation": "string"
 }
 
 Rules:
 - Write reply_text in the TARGET language only.
 - Write source_translation in the SOURCE language only.
 - user_source_translation must be the SOURCE-language translation of the learner input.
-- corrected_user_text must be in TARGET language and should only be provided when a correction is needed.
+- Keep a natural peer-to-peer tone, like regular conversation with another person.
+- Do not act like a teacher, tutor, or evaluator.
+- corrected_user_text must be in TARGET language and should only be provided if the user explicitly asks for correction/help.
 - corrected_user_source_translation must be in SOURCE language and only for corrected_user_text.
-- Keep reply_text as the normal tutor response (as before), without embedding correction formatting.
-- If a correction is needed, put it in corrected_user_text and keep reply_text conversational.
+- corrected_user_explanation must be a short explanation in SOURCE language (1 short line), only when correction exists.
+- Never include correction content inside reply_text.
 - Keep it concise: 1 to 3 short sentences.
 - Keep source_translation concise and natural, aligned to reply_text meaning.
 - Keep the conversation centered on this specific item and its usage.
-- Correct obvious learner mistakes briefly and naturally when needed.
+- Do not proactively correct mistakes unless the user explicitly asks for correction/help.
 - End with one simple follow-up question to keep the conversation going.
 - JSON only.
 """.strip(),
@@ -636,6 +825,7 @@ Rules:
         user_source_translation = str(parsed.get("user_source_translation", "")).strip()
         corrected_user_text = str(parsed.get("corrected_user_text", "")).strip()
         corrected_user_source_translation = str(parsed.get("corrected_user_source_translation", "")).strip()
+        corrected_user_explanation = str(parsed.get("corrected_user_explanation", "")).strip()
         if reply_text:
             return {
                 "reply_text": reply_text[:1200],
@@ -643,6 +833,7 @@ Rules:
                 "user_source_translation": user_source_translation[:1200],
                 "corrected_user_text": corrected_user_text[:1200],
                 "corrected_user_source_translation": corrected_user_source_translation[:1200],
+                "corrected_user_explanation": corrected_user_explanation[:1200],
             }
 
     fallback_by_language = {
@@ -662,6 +853,7 @@ Rules:
         "user_source_translation": "",
         "corrected_user_text": "",
         "corrected_user_source_translation": "",
+        "corrected_user_explanation": "",
     }
 
 

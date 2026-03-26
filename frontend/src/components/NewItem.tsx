@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { askContentItemQuestion, fetchContentItemDetail, quickAddWordFromDialog, sendContentItemConversationAudio } from "../api";
+import {
+  askContentItemQuestion,
+  fetchContentItemDetail,
+  quickAddPhraseFromConversation,
+  quickAddWordFromDialog,
+  sendContentItemConversationAudio,
+} from "../api";
 import { useI18n } from "../i18n";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
@@ -17,6 +23,7 @@ interface ConversationTurn {
   user_translation_text?: string;
   user_corrected_text?: string;
   user_corrected_translation_text?: string;
+  user_correction_explanation?: string;
   assistant_text: string;
   assistant_translation_text?: string;
   assistant_audio_url?: string;
@@ -46,12 +53,18 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
   const [exerciseRunning, setExerciseRunning] = useState<boolean>(false);
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
+  const [sentenceActionStatus, setSentenceActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error" | "missing_source">>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<{
     key: string;
     source: string;
     target: string;
-    dialogId: number;
-    turnIndex: number;
+    dialogId?: number;
+    turnIndex?: number;
+  } | null>(null);
+  const [pendingSentenceAdd, setPendingSentenceAdd] = useState<{
+    key: string;
+    source: string;
+    target: string;
   } | null>(null);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
@@ -171,6 +184,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setConversationTranslationVisible({});
     setConversationCorrectionVisible({});
     setConversationUserTranslationVisible({});
+    setSentenceActionStatus({});
+    setPendingSentenceAdd(null);
   }, [item.id, item.item_questions]);
 
   useEffect(() => {
@@ -274,8 +289,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     key: string,
     sourceTokenRaw: string,
     targetTokenRaw: string,
-    dialogId: number,
-    turnIndex: number,
+    dialogId?: number,
+    turnIndex?: number,
+    sourceContextLine = "",
+    targetContextLine = "",
   ): Promise<void> => {
     const sourceToken = cleanToken(sourceTokenRaw);
     const targetToken = cleanToken(targetTokenRaw);
@@ -293,6 +310,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         dialogId,
         turnIndex,
         true,
+        sourceContextLine,
+        targetContextLine,
+        targetToken,
       );
       if (check.exists && check.id) {
         setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
@@ -384,14 +404,21 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     targetText: string;
     highlightWord?: string;
   }): JSX.Element => {
-    const sourceTokens = lineTokens(sourceText);
     const targetTokens = lineTokens(targetText);
 
     return (
       <>
         {targetTokens.map((token, tokenIndex) => {
-          const sourceToken = sourceTokens[tokenIndex] || sourceTokens[sourceTokens.length - 1] || "";
-          const targetToken = targetTokens[tokenIndex] || targetTokens[targetTokens.length - 1] || "";
+          const targetToken = cleanToken(token);
+          const isWordToken = targetToken.length > 0;
+          if (!isWordToken) {
+            return (
+              <span key={`${dialogId}-${turnIndex}-punct-${tokenIndex}`} className="turn-token-wrap">
+                {token}
+                {tokenIndex < targetTokens.length - 1 ? " " : ""}
+              </span>
+            );
+          }
           const statusKey = `${dialogId}-${turnIndex}-target-${tokenIndex}`;
           const status = wordActionStatus[statusKey] || "idle";
           const showHighlight = !!highlightWord && containsWordInTurn(token, highlightWord);
@@ -400,7 +427,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               <button
                 type="button"
                 className={`turn-token-button ${showHighlight ? "turn-word-highlight" : ""}`}
-                onClick={() => void requestAddWordFromDialogToken(statusKey, sourceToken, targetToken, dialogId, turnIndex)}
+                onClick={() => void requestAddWordFromDialogToken(
+                  statusKey,
+                  targetToken,
+                  targetToken,
+                  dialogId,
+                  turnIndex,
+                  sourceText,
+                  targetText,
+                )}
                 disabled={status === "saving"}
               >
                 {token}
@@ -415,6 +450,135 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         })}
       </>
     );
+  };
+
+  const renderConversationTurnWithLinks = ({
+    conversationIndex,
+    sourceText,
+    targetText,
+  }: {
+    conversationIndex: number;
+    sourceText: string;
+    targetText: string;
+  }): JSX.Element => {
+    const targetTokens = lineTokens(targetText);
+    if (!targetTokens.length) {
+      return <>{targetText}</>;
+    }
+
+    return (
+      <>
+        {targetTokens.map((token, tokenIndex) => {
+          const targetToken = cleanToken(token);
+          const isWordToken = targetToken.length > 0;
+          if (!isWordToken) {
+            return (
+              <span key={`conversation-punct-${conversationIndex}-${tokenIndex}`} className="turn-token-wrap">
+                {token}
+                {tokenIndex < targetTokens.length - 1 ? " " : ""}
+              </span>
+            );
+          }
+          const statusKey = `conversation-${conversationIndex}-target-${tokenIndex}`;
+          const status = wordActionStatus[statusKey] || "idle";
+          return (
+            <span key={statusKey} className="turn-token-wrap">
+              <button
+                type="button"
+                className="turn-token-button"
+                onClick={() => void requestAddWordFromDialogToken(
+                  statusKey,
+                  targetToken,
+                  targetToken,
+                  undefined,
+                  undefined,
+                  sourceText,
+                  targetText,
+                )}
+                disabled={status === "saving"}
+              >
+                {token}
+              </button>
+              {tokenIndex < targetTokens.length - 1 ? " " : ""}
+              {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
+              {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
+              {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
+              {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
+            </span>
+          );
+        })}
+      </>
+    );
+  };
+
+  const requestAddSentenceFromConversation = async (
+    key: string,
+    sourceTextRaw: string,
+    targetTextRaw: string,
+  ): Promise<void> => {
+    const sourceText = sourceTextRaw.trim();
+    const targetText = targetTextRaw.trim();
+    if (!targetText) {
+      return;
+    }
+    if (!sourceText) {
+      setSentenceActionStatus((current) => ({ ...current, [key]: "missing_source" }));
+      return;
+    }
+
+    setSentenceActionStatus((current) => ({ ...current, [key]: "saving" }));
+    try {
+      const check = await quickAddPhraseFromConversation(sourceText, targetText, sourceLanguage, targetLanguage, true);
+      if (check.exists && check.id) {
+        setSentenceActionStatus((current) => ({ ...current, [key]: "exists" }));
+        setLoadingLinkedWord(true);
+        try {
+          const detail = await fetchContentItemDetail(check.id, sourceLanguage, targetLanguage);
+          setOpenedLinkedWord({
+            id: detail.id,
+            item_type: detail.item_type,
+            spanish_text: detail.spanish_text,
+            german_text: detail.german_text,
+            example_sentence: detail.example_sentence || "",
+            notes: detail.notes || "",
+            audio_url: detail.audio_url || "",
+            exercise_phrases: detail.exercise_phrases || {},
+            mode: "new",
+            direction: null,
+            options: [],
+            related_dialogs: detail.related_dialogs || [],
+            item_questions: detail.item_questions || [],
+          });
+        } finally {
+          setLoadingLinkedWord(false);
+        }
+        return;
+      }
+      setSentenceActionStatus((current) => ({ ...current, [key]: "idle" }));
+      setPendingSentenceAdd({
+        key,
+        source: check.source_text || sourceText,
+        target: check.target_text || targetText,
+      });
+    } catch {
+      setSentenceActionStatus((current) => ({ ...current, [key]: "error" }));
+    }
+  };
+
+  const confirmAddSentenceFromConversation = async (): Promise<void> => {
+    if (!pendingSentenceAdd) {
+      return;
+    }
+    const { key, source, target } = pendingSentenceAdd;
+    setSentenceActionStatus((current) => ({ ...current, [key]: "saving" }));
+    try {
+      const result = await quickAddPhraseFromConversation(source, target, sourceLanguage, targetLanguage);
+      setSentenceActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+    } catch {
+      setSentenceActionStatus((current) => ({ ...current, [key]: "error" }));
+    } finally {
+      setPendingSentenceAdd(null);
+    }
   };
 
   type ExerciseWordClass = "verb" | "abstract_noun" | "thing" | "other";
@@ -1134,69 +1298,131 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                   <div className="item-chat-message item-chat-user">
                     <p className="item-chat-meta">{t("newItem.conversationLabelYou")}</p>
                     <p className="item-chat-bubble">{turn.user_text}</p>
-                    {!!turn.user_translation_text && (
-                      <button
-                        type="button"
-                        className="item-conversation-correction-toggle"
-                        onClick={() => {
-                          setConversationUserTranslationVisible((current) => ({ ...current, [index]: !current[index] }));
-                        }}
-                      >
-                        {conversationUserTranslationVisible[index]
-                          ? t("newItem.conversationHideUserTranslation")
-                          : t("newItem.conversationShowUserTranslation")}
-                      </button>
-                    )}
-                    {!!turn.user_translation_text && conversationUserTranslationVisible[index] && (
+                    <button
+                      type="button"
+                      className="item-conversation-correction-toggle"
+                      onClick={() => {
+                        setConversationUserTranslationVisible((current) => ({ ...current, [index]: !current[index] }));
+                      }}
+                    >
+                      {conversationUserTranslationVisible[index]
+                        ? t("newItem.conversationHideUserTranslation")
+                        : t("newItem.conversationShowUserTranslation")}
+                    </button>
+                    {conversationUserTranslationVisible[index] && (
                       <p className="item-conversation-correction item-conversation-correction-translation">
-                        <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text}
+                        <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
                     )}
-                    {!!turn.user_corrected_text
+                    <button
+                      type="button"
+                      className="item-conversation-correction-toggle"
+                      onClick={() => {
+                        setConversationCorrectionVisible((current) => ({ ...current, [index]: !current[index] }));
+                      }}
+                    >
+                      {conversationCorrectionVisible[index]
+                        ? t("newItem.conversationHideCorrection")
+                        : t("newItem.conversationShowCorrection")}
+                    </button>
+                    {conversationCorrectionVisible[index] && !!turn.user_corrected_text
                       && turn.user_corrected_text.trim().toLowerCase() !== turn.user_text.trim().toLowerCase() && (
-                      <button
-                        type="button"
-                        className="item-conversation-correction-toggle"
-                        onClick={() => {
-                          setConversationCorrectionVisible((current) => ({ ...current, [index]: !current[index] }));
-                        }}
-                      >
-                        {conversationCorrectionVisible[index]
-                          ? t("newItem.conversationHideCorrection")
-                          : t("newItem.conversationShowCorrection")}
-                      </button>
-                    )}
-                    {!!turn.user_corrected_text && conversationCorrectionVisible[index] && (
                       <p className="item-conversation-correction">
                         <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
                       </p>
                     )}
-                    {!!turn.user_corrected_translation_text && conversationCorrectionVisible[index] && (
+                    {conversationCorrectionVisible[index]
+                      && !!turn.user_corrected_text
+                      && turn.user_corrected_text.trim().toLowerCase() !== turn.user_text.trim().toLowerCase()
+                      && !!turn.user_corrected_translation_text && (
                       <p className="item-conversation-correction item-conversation-correction-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.user_corrected_translation_text}
                       </p>
                     )}
+                    {conversationCorrectionVisible[index]
+                      && !!turn.user_corrected_text
+                      && turn.user_corrected_text.trim().toLowerCase() !== turn.user_text.trim().toLowerCase()
+                      && !!turn.user_correction_explanation && (
+                      <p className="item-conversation-correction item-conversation-correction-explanation">
+                        <strong>{t("newItem.conversationCorrectionExplanationLabel")}</strong> {turn.user_correction_explanation}
+                      </p>
+                    )}
+                    {conversationCorrectionVisible[index]
+                      && (!turn.user_corrected_text
+                        || turn.user_corrected_text.trim().toLowerCase() === turn.user_text.trim().toLowerCase()) && (
+                      <p className="item-conversation-correction item-conversation-correction-translation">
+                        {t("newItem.conversationNoCorrection")}
+                      </p>
+                    )}
+                    {conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
+                      <>
+                        <button
+                          type="button"
+                          className="item-conversation-correction-toggle"
+                          onClick={() => void requestAddSentenceFromConversation(
+                            `conversation-corrected-${index}`,
+                            turn.user_corrected_translation_text || "",
+                            turn.user_corrected_text,
+                          )}
+                        >
+                          {t("newItem.sentenceAddButton")}
+                        </button>
+                        {(sentenceActionStatus[`conversation-corrected-${index}`] || "idle") !== "idle" && (
+                          <span className="turn-token-status">
+                            {sentenceActionStatus[`conversation-corrected-${index}`] === "saving" && `(${t("newItem.sentenceAddSaving")})`}
+                            {sentenceActionStatus[`conversation-corrected-${index}`] === "added" && `(${t("newItem.sentenceAddAdded")})`}
+                            {sentenceActionStatus[`conversation-corrected-${index}`] === "exists" && `(${t("newItem.sentenceAddExists")})`}
+                            {sentenceActionStatus[`conversation-corrected-${index}`] === "error" && `(${t("newItem.sentenceAddError")})`}
+                            {sentenceActionStatus[`conversation-corrected-${index}`] === "missing_source" && `(${t("newItem.sentenceAddMissingSource")})`}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div className="item-chat-message item-chat-assistant">
                     <p className="item-chat-meta">{t("newItem.conversationLabelTutor")}</p>
-                    <p className="item-chat-bubble">{turn.assistant_text}</p>
-                    {!!turn.assistant_translation_text && (
-                      <button
-                        type="button"
-                        className="item-conversation-translation-toggle"
-                        onClick={() => {
-                          setConversationTranslationVisible((current) => ({ ...current, [index]: !current[index] }));
-                        }}
-                      >
-                        {conversationTranslationVisible[index]
-                          ? t("newItem.conversationHideTranslation")
-                          : t("newItem.conversationShowTranslation")}
-                      </button>
-                    )}
-                    {!!turn.assistant_translation_text && conversationTranslationVisible[index] && (
+                    <p className="item-chat-bubble">
+                      {renderConversationTurnWithLinks({
+                        conversationIndex: index,
+                        sourceText: turn.assistant_translation_text || "",
+                        targetText: turn.assistant_text,
+                      })}
+                    </p>
+                    <button
+                      type="button"
+                      className="item-conversation-translation-toggle"
+                      onClick={() => {
+                        setConversationTranslationVisible((current) => ({ ...current, [index]: !current[index] }));
+                      }}
+                    >
+                      {conversationTranslationVisible[index]
+                        ? t("newItem.conversationHideTranslation")
+                        : t("newItem.conversationShowTranslation")}
+                    </button>
+                    {conversationTranslationVisible[index] && (
                       <p className="item-conversation-translation">
-                        <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text}
+                        <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
+                    )}
+                    <button
+                      type="button"
+                      className="item-conversation-translation-toggle"
+                      onClick={() => void requestAddSentenceFromConversation(
+                        `conversation-assistant-${index}`,
+                        turn.assistant_translation_text || "",
+                        turn.assistant_text,
+                      )}
+                    >
+                      {t("newItem.sentenceAddButton")}
+                    </button>
+                    {(sentenceActionStatus[`conversation-assistant-${index}`] || "idle") !== "idle" && (
+                      <span className="turn-token-status">
+                        {sentenceActionStatus[`conversation-assistant-${index}`] === "saving" && `(${t("newItem.sentenceAddSaving")})`}
+                        {sentenceActionStatus[`conversation-assistant-${index}`] === "added" && `(${t("newItem.sentenceAddAdded")})`}
+                        {sentenceActionStatus[`conversation-assistant-${index}`] === "exists" && `(${t("newItem.sentenceAddExists")})`}
+                        {sentenceActionStatus[`conversation-assistant-${index}`] === "error" && `(${t("newItem.sentenceAddError")})`}
+                        {sentenceActionStatus[`conversation-assistant-${index}`] === "missing_source" && `(${t("newItem.sentenceAddMissingSource")})`}
+                      </span>
                     )}
                   </div>
                 </article>
@@ -1245,6 +1471,28 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               </button>
               <button type="button" onClick={() => void confirmAddWordFromDialog()}>
                 {t("newItem.wordAddConfirmButton")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {pendingSentenceAdd && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal add-word-modal">
+            <p className="add-word-modal-title">
+              <strong>{t("newItem.sentenceAddTitle")}</strong>
+            </p>
+            <p className="add-word-modal-word">{pendingSentenceAdd.target}</p>
+            <p className="add-word-modal-meaning">
+              {t("newItem.sentenceAddTranslation", { translation: pendingSentenceAdd.source })}
+            </p>
+            <p className="hint">{t("newItem.sentenceAddPrompt")}</p>
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={() => setPendingSentenceAdd(null)}>
+                {t("newItem.sentenceAddCancel")}
+              </button>
+              <button type="button" onClick={() => void confirmAddSentenceFromConversation()}>
+                {t("newItem.sentenceAddConfirmButton")}
               </button>
             </div>
           </div>

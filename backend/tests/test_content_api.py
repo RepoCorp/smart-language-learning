@@ -1320,6 +1320,7 @@ def test_item_conversation_audio_returns_transcript_reply_and_audio(monkeypatch)
             "user_source_translation": "Necesito un taxi.",
             "corrected_user_text": "Ich brauche ein Taxi.",
             "corrected_user_source_translation": "Necesito un taxi.",
+            "corrected_user_explanation": "Usa 'brauche' para necesidad directa en este contexto.",
         },
     )
     monkeypatch.setattr(
@@ -1344,6 +1345,7 @@ def test_item_conversation_audio_returns_transcript_reply_and_audio(monkeypatch)
     assert payload["user_translation_text"] == "Necesito un taxi."
     assert payload["user_corrected_text"] == "Ich brauche ein Taxi."
     assert payload["user_corrected_translation_text"] == "Necesito un taxi."
+    assert payload["user_correction_explanation"] == "Usa 'brauche' para necesidad directa en este contexto."
     assert payload["assistant_text"] == "Sehr gut. Wohin moechtest du mit dem Taxi fahren?"
     assert payload["assistant_translation_text"] == "Muy bien. A donde quieres ir en taxi?"
     assert payload["assistant_audio_url"] == "http://localhost:8000/media/audio/conversation-reply.mp3"
@@ -1368,3 +1370,55 @@ def test_item_conversation_audio_requires_audio_file():
 
     assert response.status_code == 400
     assert response.json()["detail"] == "audio file is required"
+
+
+@pytest.mark.django_db
+def test_quick_add_phrase_creates_item(monkeypatch):
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": "http://localhost:8000/media/audio/phrase-from-conversation.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/phrases/add?source_language=spanish&target_language=german",
+        {"source_text": "Necesito un taxi ahora.", "target_text": "Ich brauche jetzt ein Taxi."},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["created"] is True
+    assert payload["exists"] is False
+    assert Item.objects.filter(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Necesito un taxi ahora.",
+        german_text="Ich brauche jetzt ein Taxi.",
+        source_language="spanish",
+        target_language="german",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_quick_add_phrase_returns_existing():
+    existing = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Necesito un taxi ahora.",
+        german_text="Ich brauche jetzt ein Taxi.",
+        source_language="spanish",
+        target_language="german",
+    )
+    client = APIClient()
+    response = client.post(
+        "/api/content/phrases/add?source_language=spanish&target_language=german",
+        {"source_text": "Necesito un taxi ahora.", "target_text": "Ich brauche jetzt ein Taxi."},
+        format="json",
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created"] is False
+    assert payload["exists"] is True
+    assert payload["id"] == existing.id

@@ -135,6 +135,7 @@ export interface ContentItemConversationResponse {
   user_translation_text?: string;
   user_corrected_text?: string;
   user_corrected_translation_text?: string;
+  user_correction_explanation?: string;
   assistant_text: string;
   assistant_translation_text?: string;
   assistant_audio_url?: string;
