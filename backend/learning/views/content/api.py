@@ -6,6 +6,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ...auth import get_request_user
 from ...serializers import ContentConfirmSerializer, ContentTopicSerializer
 from .core import (
     ContentCandidate,
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class ContentPreviewView(APIView):
     def post(self, request: Request) -> Response:
+        user = get_request_user(request)
         serializer = ContentTopicSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -41,14 +43,16 @@ class ContentPreviewView(APIView):
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
         save_topic(
-            topic,
-            context,
+            user=user,
+            topic=topic,
+            context=context,
             source_language=source_language,
             target_language=target_language,
         )
         logger.info("content.preview.started topic=%s", topic)
         plan = build_content_plan(
-            topic,
+            user=user,
+            topic=topic,
             context=context,
             source_language=source_language,
             target_language=target_language,
@@ -76,6 +80,7 @@ class ContentPreviewView(APIView):
 
 class ContentConfirmView(APIView):
     def post(self, request: Request) -> Response:
+        user = get_request_user(request)
         serializer = ContentConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -84,8 +89,9 @@ class ContentConfirmView(APIView):
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
         save_topic(
-            topic,
-            context,
+            user=user,
+            topic=topic,
+            context=context,
             source_language=source_language,
             target_language=target_language,
         )
@@ -112,13 +118,15 @@ class ContentConfirmView(APIView):
             if word.strip()
         }
         plan = build_content_plan(
-            topic,
+            user=user,
+            topic=topic,
             context=context,
             source_language=source_language,
             target_language=target_language,
         )
         selected_word_candidates = (
             _selected_preview_word_candidates(
+                user=user,
                 preview_words=preview_words,
                 source_language=source_language,
                 target_language=target_language,
@@ -135,13 +143,15 @@ class ContentConfirmView(APIView):
 
         created_phrases = [
             create_phrase_if_missing(
-                phrase,
-                topic,
+                user=user,
+                candidate=phrase,
+                topic=topic,
                 source_language=source_language,
                 target_language=target_language,
             )
             for phrase in (
                 _selected_preview_phrase_candidates(
+                    user=user,
                     preview_phrases=preview_phrases,
                     selected_phrases_normalized=selected_phrases_normalized,
                     source_language=source_language,
@@ -169,8 +179,9 @@ class ContentConfirmView(APIView):
             )
             created_words.append(
                 create_word_if_missing(
-                    word,
-                    topic,
+                    user=user,
+                    candidate=word,
+                    topic=topic,
                     source_language=source_language,
                     target_language=target_language,
                     exercise_phrases=exercise_phrases,
@@ -183,6 +194,7 @@ class ContentConfirmView(APIView):
             dialog_lines = [turn["target_text"] for turn in dialog_turns if turn.get("target_text", "").strip()]
             dialog_audio_url = create_dialog_audio_file(dialog_lines, target_language=target_language)
         saved_dialog = save_dialog(
+            user=user,
             topic=topic,
             context=context,
             source_language=source_language,
@@ -192,12 +204,14 @@ class ContentConfirmView(APIView):
         )
         created_turns = save_dialog_turns(saved_dialog, dialog_turns)
         phrase_occurrences = save_phrase_dialog_occurrences(
+            user=user,
             dialog=saved_dialog,
             turns=created_turns,
             source_language=source_language,
             target_language=target_language,
         )
         word_occurrences = save_word_dialog_occurrences(
+            user=user,
             dialog=saved_dialog,
             turns=created_turns,
             word_candidates=selected_word_candidates,
@@ -235,6 +249,7 @@ class ContentConfirmView(APIView):
 
 def _selected_preview_phrase_candidates(
     *,
+    user,
     preview_phrases: list[dict],
     selected_phrases_normalized: set[str] | None,
     source_language: str,
@@ -257,9 +272,10 @@ def _selected_preview_phrase_candidates(
             spanish_text=spanish_text,
             german_text=german_text,
             exists=item_exists(
-                "phrase",
-                spanish_text,
-                german_text,
+                user=user,
+                item_type="phrase",
+                spanish_text=spanish_text,
+                german_text=german_text,
                 source_language=source_language,
                 target_language=target_language,
             ),
@@ -277,6 +293,7 @@ def _selected_preview_phrase_candidates(
 
 def _selected_preview_word_candidates(
     *,
+    user,
     preview_words: list[dict],
     source_language: str,
     target_language: str,
@@ -295,9 +312,10 @@ def _selected_preview_word_candidates(
             spanish_text=spanish_text,
             german_text=german_text,
             exists=item_exists(
-                "word",
-                spanish_text,
-                german_text,
+                user=user,
+                item_type="word",
+                spanish_text=spanish_text,
+                german_text=german_text,
                 source_language=source_language,
                 target_language=target_language,
             ),

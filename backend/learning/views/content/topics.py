@@ -6,10 +6,13 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ...auth import apply_user_scope, get_request_user
 from ...models import SavedTopic, SavedTopicContext
 
 
 def save_topic(
+    *,
+    user,
     topic: str,
     context: str = "",
     source_language: str = "spanish",
@@ -18,13 +21,14 @@ def save_topic(
     normalized = " ".join(topic.split()).strip()
     if not normalized:
         return
-    topic_obj, created = SavedTopic.objects.get_or_create(
+    topic_obj, created = apply_user_scope(SavedTopic.objects, user).get_or_create(
         topic=normalized,
         source_language=source_language,
         target_language=target_language,
+        defaults={"user": user},
     )
     if not created:
-        SavedTopic.objects.filter(
+        apply_user_scope(SavedTopic.objects, user).filter(
             topic=normalized,
             source_language=source_language,
             target_language=target_language,
@@ -53,10 +57,11 @@ def save_topic(
 
 class ContentTopicsView(APIView):
     def get(self, request: Request) -> Response:
+        user = get_request_user(request)
         source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
         target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
         topics = list(
-            SavedTopic.objects.filter(
+            apply_user_scope(SavedTopic.objects, user).filter(
                 source_language=source_language,
                 target_language=target_language,
             )
@@ -68,6 +73,7 @@ class ContentTopicsView(APIView):
 
 class ContentTopicContextsView(APIView):
     def get(self, request: Request) -> Response:
+        user = get_request_user(request)
         topic = " ".join((request.query_params.get("topic", "") or "").split()).strip()
         source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
         target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
@@ -75,7 +81,8 @@ class ContentTopicContextsView(APIView):
             return Response({"contexts": []})
 
         contexts = list(
-            SavedTopicContext.objects.filter(
+            apply_user_scope(SavedTopicContext.objects, user, field="topic__user")
+            .filter(
                 topic__topic=topic,
                 topic__source_language=source_language,
                 topic__target_language=target_language,

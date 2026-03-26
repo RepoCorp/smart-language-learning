@@ -1,5 +1,15 @@
 # Smart Language Learning (Prototype)
 
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+User.objects.create_user(
+    username="catalina",
+    email="cata2@example.com",
+    password="1234",  
+)
+
+
 Web prototype for language learning (Spanish -> German) using simple spaced repetition.
 
 ## Stack

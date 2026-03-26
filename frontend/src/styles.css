@@ -923,3 +923,41 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+.auth-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e2e2;
+  background: #fafafa;
+}
+
+.auth-bar-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.auth-bar-form,
+.auth-bar-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-bar-form input {
+  min-width: 160px;
+}
+
+.auth-bar-form button {
+  min-width: 120px;
+}
+
+.auth-bar-error {
+  color: #b42318;
+  font-size: 0.85rem;
+}

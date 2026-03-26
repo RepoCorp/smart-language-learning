@@ -3,6 +3,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..auth import apply_user_scope, get_request_user
 from ..models import Item
 from ..serializers import SubmitReviewSerializer
 from ..srs import apply_review_result
@@ -10,6 +11,7 @@ from ..srs import apply_review_result
 
 class SubmitReviewView(APIView):
     def post(self, request: Request) -> Response:
+        user = get_request_user(request)
         serializer = SubmitReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -18,7 +20,7 @@ class SubmitReviewView(APIView):
         direction = serializer.validated_data.get("direction")
 
         try:
-            item = Item.objects.get(id=item_id)
+            item = apply_user_scope(Item.objects, user).get(id=item_id)
         except Item.DoesNotExist:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 

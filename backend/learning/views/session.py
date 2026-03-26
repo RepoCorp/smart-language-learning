@@ -11,6 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..auth import apply_user_scope, get_request_user
 from ..models import Item, ItemDialogOccurrence
 from ..serializers import SessionItemSerializer
 
@@ -31,6 +32,7 @@ NEW_PHRASE_SECONDS = 45
 
 class SessionView(APIView):
     def get(self, request: Request) -> Response:
+        user = get_request_user(request)
         size = _safe_int(request.query_params.get("size"), default=5, minimum=1, maximum=100)
         duration_minutes = _safe_int(request.query_params.get("duration_minutes"), default=None, minimum=1, maximum=180)
         source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
@@ -38,18 +40,21 @@ class SessionView(APIView):
         now = timezone.now()
 
         entries = build_session_entries(
+            user=user,
             size=size,
             duration_minutes=duration_minutes,
             now=now,
             source_language=source_language,
             target_language=target_language,
         )
-        payload = serialize_entries(entries)
+        payload = serialize_entries(entries, user=user)
         serializer = SessionItemSerializer(payload, many=True)
         return Response({"items": serializer.data})
 
 
 def build_session_entries(
+    *,
+    user,
     size: int,
     now,
     source_language: str,
@@ -58,24 +63,26 @@ def build_session_entries(
 ) -> list[SessionEntry]:
     if duration_minutes is not None:
         return build_duration_based_session_entries(
+            user=user,
             duration_minutes=duration_minutes,
             now=now,
             source_language=source_language,
             target_language=target_language,
         )
 
-    due_entries = build_due_entries(now=now, limit=size, source_language=source_language, target_language=target_language)
+    due_entries = build_due_entries(user=user, now=now, limit=size, source_language=source_language, target_language=target_language)
 
     remaining = size - len(due_entries)
     new_entries: list[SessionEntry] = []
     if remaining > 0:
-        new_entries = build_new_entries(limit=remaining, source_language=source_language, target_language=target_language)
+        new_entries = build_new_entries(user=user, limit=remaining, source_language=source_language, target_language=target_language)
 
     remaining -= len(new_entries)
     upcoming_entries: list[SessionEntry] = []
     if remaining > 0:
         selected_keys = {entry_key(entry) for entry in due_entries + new_entries}
         upcoming_entries = build_upcoming_entries(
+            user=user,
             now=now,
             limit=remaining,
             excluded_keys=selected_keys,
@@ -87,6 +94,8 @@ def build_session_entries(
 
 
 def build_duration_based_session_entries(
+    *,
+    user,
     duration_minutes: int,
     now,
     source_language: str,
@@ -96,6 +105,7 @@ def build_duration_based_session_entries(
     planning_limit = max(1, math.ceil(target_seconds / REVIEW_WORD_SECONDS) + 4)
 
     due_entries = build_due_entries(
+        user=user,
         now=now,
         limit=planning_limit,
         source_language=source_language,
@@ -105,13 +115,14 @@ def build_duration_based_session_entries(
 
     new_entries: list[SessionEntry] = []
     if remaining > 0:
-        new_entries = build_new_entries(limit=remaining, source_language=source_language, target_language=target_language)
+        new_entries = build_new_entries(user=user, limit=remaining, source_language=source_language, target_language=target_language)
     remaining -= len(new_entries)
 
     upcoming_entries: list[SessionEntry] = []
     if remaining > 0:
         selected_keys = {entry_key(entry) for entry in due_entries + new_entries}
         upcoming_entries = build_upcoming_entries(
+            user=user,
             now=now,
             limit=remaining,
             excluded_keys=selected_keys,
@@ -152,10 +163,10 @@ def _safe_int(raw_value, *, default: int | None, minimum: int, maximum: int) -> 
     return max(minimum, min(maximum, parsed))
 
 
-def build_due_entries(now, limit: int, source_language: str, target_language: str) -> list[SessionEntry]:
+def build_due_entries(*, user, now, limit: int, source_language: str, target_language: str) -> list[SessionEntry]:
     rows: list[tuple[object, int, str, Item]] = []
 
-    phrase_due_es_to_de = Item.objects.filter(
+    phrase_due_es_to_de = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.PHRASE,
         is_learned=False,
         source_language=source_language,
@@ -166,7 +177,7 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
     for item in phrase_due_es_to_de:
         rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
 
-    phrase_due_de_to_es = Item.objects.filter(
+    phrase_due_de_to_es = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.PHRASE,
         is_learned=False,
         source_language=source_language,
@@ -177,7 +188,7 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
     for item in phrase_due_de_to_es:
         rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
 
-    word_due_es_to_de = Item.objects.filter(
+    word_due_es_to_de = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.WORD,
         is_learned=False,
         source_language=source_language,
@@ -188,7 +199,7 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
     for item in word_due_es_to_de:
         rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
 
-    word_due_de_to_es = Item.objects.filter(
+    word_due_de_to_es = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.WORD,
         is_learned=False,
         source_language=source_language,
@@ -205,9 +216,9 @@ def build_due_entries(now, limit: int, source_language: str, target_language: st
     return entries
 
 
-def build_new_entries(limit: int, source_language: str, target_language: str) -> list[SessionEntry]:
+def build_new_entries(*, user, limit: int, source_language: str, target_language: str) -> list[SessionEntry]:
     new_words = list(
-        Item.objects.filter(
+        apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.WORD,
             is_learned=False,
             source_language=source_language,
@@ -217,7 +228,7 @@ def build_new_entries(limit: int, source_language: str, target_language: str) ->
         ).order_by("created_at", "id")
     )
     new_phrases = list(
-        Item.objects.filter(
+        apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.PHRASE,
             is_learned=False,
             source_language=source_language,
@@ -232,6 +243,8 @@ def build_new_entries(limit: int, source_language: str, target_language: str) ->
 
 
 def build_upcoming_entries(
+    *,
+    user,
     now,
     limit: int,
     excluded_keys: set[tuple[int, str | None]],
@@ -240,7 +253,7 @@ def build_upcoming_entries(
 ) -> list[SessionEntry]:
     rows: list[tuple[object, int, str, Item]] = []
 
-    phrase_upcoming_es_to_de = Item.objects.filter(
+    phrase_upcoming_es_to_de = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.PHRASE,
         is_learned=False,
         source_language=source_language,
@@ -251,7 +264,7 @@ def build_upcoming_entries(
     for item in phrase_upcoming_es_to_de:
         rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
 
-    phrase_upcoming_de_to_es = Item.objects.filter(
+    phrase_upcoming_de_to_es = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.PHRASE,
         is_learned=False,
         source_language=source_language,
@@ -262,7 +275,7 @@ def build_upcoming_entries(
     for item in phrase_upcoming_de_to_es:
         rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
 
-    word_upcoming_es_to_de = Item.objects.filter(
+    word_upcoming_es_to_de = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.WORD,
         is_learned=False,
         source_language=source_language,
@@ -273,7 +286,7 @@ def build_upcoming_entries(
     for item in word_upcoming_es_to_de:
         rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
 
-    word_upcoming_de_to_es = Item.objects.filter(
+    word_upcoming_de_to_es = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.WORD,
         is_learned=False,
         source_language=source_language,
@@ -315,9 +328,9 @@ def entry_key(entry: SessionEntry) -> tuple[int, str | None]:
     return entry.item.id, entry.direction
 
 
-def serialize_entries(entries: list[SessionEntry]) -> list[dict]:
-    options_map = build_review_options(entries)
-    related_dialogs_map = build_related_dialogs_map(entries)
+def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
+    options_map = build_review_options(entries, user=user)
+    related_dialogs_map = build_related_dialogs_map(entries, user=user)
     payload: list[dict] = []
 
     for entry in entries:
@@ -341,7 +354,7 @@ def serialize_entries(entries: list[SessionEntry]) -> list[dict]:
     return payload
 
 
-def build_review_options(entries: list[SessionEntry]) -> dict[tuple[int, str | None], list[str]]:
+def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int, str | None], list[str]]:
     review_entries_with_options = [
         entry
         for entry in entries
@@ -363,7 +376,7 @@ def build_review_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
     all_word_answers_de_to_es_by_pair: dict[tuple[str, str], list[str]] = {}
     for source_language, target_language in pair_set:
         all_phrase_answers_es_to_de_by_pair[(source_language, target_language)] = list(
-            Item.objects.filter(
+            apply_user_scope(Item.objects, user).filter(
                 item_type=Item.ItemType.PHRASE,
                 is_learned=False,
                 source_language=source_language,
@@ -371,7 +384,7 @@ def build_review_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
             ).values_list("german_text", flat=True)
         )
         all_phrase_answers_de_to_es_by_pair[(source_language, target_language)] = list(
-            Item.objects.filter(
+            apply_user_scope(Item.objects, user).filter(
                 item_type=Item.ItemType.PHRASE,
                 is_learned=False,
                 source_language=source_language,
@@ -379,7 +392,7 @@ def build_review_options(entries: list[SessionEntry]) -> dict[tuple[int, str | N
             ).values_list("spanish_text", flat=True)
         )
         all_word_answers_de_to_es_by_pair[(source_language, target_language)] = list(
-            Item.objects.filter(
+            apply_user_scope(Item.objects, user).filter(
                 item_type=Item.ItemType.WORD,
                 is_learned=False,
                 source_language=source_language,
@@ -418,13 +431,14 @@ def build_choices(correct_answer: str, source_answers: list[str]) -> list[str]:
     return choices
 
 
-def build_related_dialogs_map(entries: list[SessionEntry], per_item_limit: int = 4) -> dict[int, list[dict]]:
+def build_related_dialogs_map(entries: list[SessionEntry], *, user, per_item_limit: int = 4) -> dict[int, list[dict]]:
     item_ids = {entry.item.id for entry in entries}
     if not item_ids:
         return {}
 
     occurrences = (
-        ItemDialogOccurrence.objects.filter(item_id__in=item_ids)
+        apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
+        .filter(item_id__in=item_ids)
         .select_related("dialog", "turn")
         .order_by("-created_at", "-match_score", "-dialog__created_at", "-id")
     )
@@ -442,7 +456,7 @@ def build_related_dialogs_map(entries: list[SessionEntry], per_item_limit: int =
                 "context": occurrence.dialog.context,
                 "audio_url": occurrence.dialog.audio_url,
                 "created_at": occurrence.dialog.created_at.isoformat(),
-                "turns": _dialog_turns_with_phrase_audio(occurrence.dialog),
+                "turns": _dialog_turns_with_phrase_audio(occurrence.dialog, user=user),
                 "matched_turns": [],
             }
             dialogs_for_item[occurrence.dialog_id] = dialog_payload
@@ -463,7 +477,7 @@ def build_related_dialogs_map(entries: list[SessionEntry], per_item_limit: int =
     }
 
 
-def _dialog_turns_with_phrase_audio(dialog) -> list[dict]:
+def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
     raw_turns = dialog.turns if isinstance(dialog.turns, list) else []
     normalized_turns: list[dict] = []
     key_pairs: set[tuple[str, str]] = set()
@@ -481,7 +495,7 @@ def _dialog_turns_with_phrase_audio(dialog) -> list[dict]:
         query = Q()
         for source_text, target_text in key_pairs:
             query |= Q(spanish_text__iexact=source_text, german_text__iexact=target_text)
-        phrase_items = Item.objects.filter(
+        phrase_items = apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.PHRASE,
             source_language=dialog.source_language,
             target_language=dialog.target_language,

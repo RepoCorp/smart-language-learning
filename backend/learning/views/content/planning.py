@@ -112,6 +112,8 @@ def _append_non_literal_note(notes: str, spanish_word: str, german_word: str) ->
 
 
 def build_content_plan(
+    *,
+    user,
     topic: str,
     context: str = "",
     source_language: str = "spanish",
@@ -159,9 +161,10 @@ def build_content_plan(
     phrases: list[ContentCandidate] = []
     for phrase_es, phrase_de, phrase_notes, _ in phrase_sources:
         phrase_exists = item_exists(
-            Item.ItemType.PHRASE,
-            phrase_es,
-            phrase_de,
+            user=user,
+            item_type=Item.ItemType.PHRASE,
+            spanish_text=phrase_es,
+            german_text=phrase_de,
             source_language=source_language,
             target_language=target_language,
         )
@@ -208,9 +211,10 @@ def build_content_plan(
             plural_german = str(keyword.get("plural_german", "")).strip()
             keyword_notes = enrich_notes_with_plural(keyword_notes, plural_german)
             exists = item_exists(
-                Item.ItemType.WORD,
-                spanish_word,
-                german_word,
+                user=user,
+                item_type=Item.ItemType.WORD,
+                spanish_text=spanish_word,
+                german_text=german_word,
                 source_language=source_language,
                 target_language=target_language,
             )

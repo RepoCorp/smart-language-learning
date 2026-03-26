@@ -15,14 +15,82 @@ import type {
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const AUTH_TOKEN_KEY = "smart-language-learning-auth-token";
+const AUTH_USER_KEY = "smart-language-learning-auth-user";
 const OVERVIEW_STATS_UPDATED_EVENT = "overview-stats-updated";
+
+export type AuthUser = {
+  id: number;
+  username: string;
+  email: string;
+};
 
 function notifyOverviewStatsUpdated(): void {
   window.dispatchEvent(new CustomEvent(OVERVIEW_STATS_UPDATED_EVENT));
 }
 
+function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const token = getAuthToken();
+  const headers = new Headers(init?.headers || {});
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(input, { ...init, headers });
+}
+
+export function getAuthToken(): string {
+  return window.localStorage.getItem(AUTH_TOKEN_KEY) || "";
+}
+
+export function getStoredAuthUser(): AuthUser | null {
+  try {
+    const raw = window.localStorage.getItem(AUTH_USER_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as AuthUser;
+    if (!parsed || typeof parsed.id !== "number") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function storeAuthSession(token: string, user: AuthUser): void {
+  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+  window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+}
+
+function clearStoredAuthSession(): void {
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  window.localStorage.removeItem(AUTH_USER_KEY);
+}
+
 export function getOverviewStatsUpdatedEventName(): string {
   return OVERVIEW_STATS_UPDATED_EVENT;
+}
+
+export async function loginWithPin(identifier: string, pin: string): Promise<AuthUser> {
+  const response = await apiFetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier, pin }),
+  });
+  if (!response.ok) {
+    throw new Error("Invalid credentials");
+  }
+  const payload = (await response.json()) as { token: string; user: AuthUser };
+  storeAuthSession(payload.token, payload.user);
+  notifyOverviewStatsUpdated();
+  return payload.user;
+}
+
+export async function logoutFromPinSession(): Promise<void> {
+  await apiFetch(`${API_BASE}/auth/logout`, { method: "POST" });
+  clearStoredAuthSession();
+  notifyOverviewStatsUpdated();
 }
 
 export async function fetchSession(
@@ -39,7 +107,7 @@ export async function fetchSession(
   if (durationMinutes !== undefined) {
     params.set("duration_minutes", String(durationMinutes));
   }
-  const response = await fetch(`${API_BASE}/session?${params.toString()}`);
+  const response = await apiFetch(`${API_BASE}/session?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load session");
   }
@@ -52,7 +120,7 @@ export async function submitReview(itemId: number, correct: boolean, direction?:
     payload.direction = direction;
   }
 
-  const response = await fetch(`${API_BASE}/review`, {
+  const response = await apiFetch(`${API_BASE}/review`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -65,7 +133,7 @@ export async function submitReview(itemId: number, correct: boolean, direction?:
 }
 
 export async function markSeen(itemId: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/seen`, {
+  const response = await apiFetch(`${API_BASE}/seen`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ item_id: itemId }),
@@ -83,7 +151,7 @@ export async function previewContent(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentPreviewResponse> {
-  const response = await fetch(`${API_BASE}/content/preview`, {
+  const response = await apiFetch(`${API_BASE}/content/preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -110,7 +178,7 @@ export async function confirmContent(
   previewPhrases: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
   previewWords: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
 ): Promise<ContentConfirmResponse> {
-  const response = await fetch(`${API_BASE}/content/confirm`, {
+  const response = await apiFetch(`${API_BASE}/content/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -140,7 +208,7 @@ export async function fetchContentTopics(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/topics?${params.toString()}`);
+  const response = await apiFetch(`${API_BASE}/content/topics?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load previous topics");
   }
@@ -155,7 +223,7 @@ export async function fetchContentItems(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/items?${params.toString()}`);
+  const response = await apiFetch(`${API_BASE}/content/items?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load saved items");
   }
@@ -172,7 +240,7 @@ export async function fetchContentTopicContexts(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/topic-contexts?${params.toString()}`);
+  const response = await apiFetch(`${API_BASE}/content/topic-contexts?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load topic contexts");
   }
@@ -188,7 +256,7 @@ export async function fetchContentItemDetail(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`);
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load content item detail");
   }
@@ -204,7 +272,7 @@ export async function deleteContentItem(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`, {
     method: "DELETE",
   });
   if (!response.ok) {
@@ -222,7 +290,7 @@ export async function regenerateContentItemAudio(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}?${params.toString()}`, {
     method: "POST",
   });
   if (!response.ok) {
@@ -242,7 +310,7 @@ export async function setContentItemLearned(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/items/${itemId}/mark-learned?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/mark-learned?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ is_learned: isLearned }),
@@ -263,7 +331,7 @@ export async function askContentItemQuestion(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/items/${itemId}/question?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/question?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question_text: questionText }),
@@ -298,7 +366,7 @@ export async function sendContentItemConversationAudio(
   formData.append("audio", audioBlob, "speech.webm");
   formData.append("history", JSON.stringify(history));
 
-  const response = await fetch(`${API_BASE}/content/items/${itemId}/conversation?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/conversation?${params.toString()}`, {
     method: "POST",
     body: formData,
   });
@@ -328,7 +396,7 @@ export async function startTopicConversation(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/conversation/start?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/conversation/start?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ topic, notes, role_text: roleText }),
@@ -370,7 +438,7 @@ export async function sendTopicConversationAudio(
   formData.append("role_text", roleText);
   formData.append("goal_text", goalText);
 
-  const response = await fetch(`${API_BASE}/content/conversation/turn?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/conversation/turn?${params.toString()}`, {
     method: "POST",
     body: formData,
   });
@@ -405,7 +473,7 @@ export async function quickAddWordFromDialog(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/words/add?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/words/add?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -444,7 +512,7 @@ export async function quickAddPhraseFromConversation(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/content/phrases/add?${params.toString()}`, {
+  const response = await apiFetch(`${API_BASE}/content/phrases/add?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -472,7 +540,7 @@ export async function deleteContentTopic(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<void> {
-  const response = await fetch(`${API_BASE}/content/topics/delete`, {
+  const response = await apiFetch(`${API_BASE}/content/topics/delete`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -494,7 +562,7 @@ export async function fetchOverviewStats(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await fetch(`${API_BASE}/overview-stats?${params.toString()}`);
+  const response = await apiFetch(`${API_BASE}/overview-stats?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load overview stats");
   }

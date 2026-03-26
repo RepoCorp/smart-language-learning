@@ -1,3 +1,6 @@
+import secrets
+
+from django.conf import settings
 from django.db import models
 
 STUDY_LANGUAGE_CHOICES = (
@@ -19,6 +22,13 @@ class Item(models.Model):
         SPANISH_TO_GERMAN = "es_to_de", "Spanish to German"
         GERMAN_TO_SPANISH = "de_to_es", "German to Spanish"
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_items",
+        null=True,
+        blank=True,
+    )
     item_type = models.CharField(max_length=10, choices=ItemType.choices)
     spanish_text = models.CharField(max_length=255)
     german_text = models.CharField(max_length=255)
@@ -70,6 +80,13 @@ class ExcludedWordSuggestion(models.Model):
 
 
 class SavedTopic(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_saved_topics",
+        null=True,
+        blank=True,
+    )
     topic = models.CharField(max_length=120)
     source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
     target_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="german")
@@ -80,8 +97,8 @@ class SavedTopic(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=("topic", "source_language", "target_language"),
-                name="learning_savedtopic_topic_langpair_uniq",
+                fields=("user", "topic", "source_language", "target_language"),
+                name="learning_savedtopic_user_topic_langpair_uniq",
             )
         ]
 
@@ -122,6 +139,13 @@ class ConversationFingerprint(models.Model):
 
 
 class SavedDialog(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_saved_dialogs",
+        null=True,
+        blank=True,
+    )
     topic = models.CharField(max_length=120)
     context = models.CharField(max_length=400, blank=True)
     source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
@@ -208,3 +232,24 @@ class ItemQuestionExchange(models.Model):
 
     def __str__(self) -> str:
         return f"Item {self.item_id} {self.question_type}"
+
+
+def _generate_auth_token_key() -> str:
+    return secrets.token_urlsafe(32)
+
+
+class UserAuthToken(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_auth_tokens",
+    )
+    key = models.CharField(max_length=128, unique=True, default=_generate_auth_token_key)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"Token for user {self.user_id}"

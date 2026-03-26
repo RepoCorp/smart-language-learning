@@ -1,6 +1,9 @@
 from django.urls import path
 
 from .views import (
+    AuthLoginView,
+    AuthLogoutView,
+    AuthMeView,
     ContentConfirmView,
     ContentItemConversationView,
     ContentItemDetailView,
@@ -25,6 +28,9 @@ from .views import (
 
 urlpatterns = [
     path("health", HealthView.as_view(), name="health"),
+    path("auth/login", AuthLoginView.as_view(), name="auth-login"),
+    path("auth/logout", AuthLogoutView.as_view(), name="auth-logout"),
+    path("auth/me", AuthMeView.as_view(), name="auth-me"),
     path("overview-stats", OverviewStatsView.as_view(), name="overview-stats"),
     path("session", SessionView.as_view(), name="session"),
     path("review", SubmitReviewView.as_view(), name="review"),

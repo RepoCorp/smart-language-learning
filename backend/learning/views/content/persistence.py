@@ -14,6 +14,7 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
+from ...auth import apply_user_scope
 from ...models import DialogTurn, ExcludedWordSuggestion, Item, ItemDialogOccurrence, SavedDialog
 from .selection import normalize_word_pair, word_selection_id
 from .types import ContentCandidate, ContentPlan
@@ -147,13 +148,15 @@ def save_excluded_words(words: list[ContentCandidate]) -> None:
 
 
 def item_exists(
+    *,
+    user,
     item_type: str,
     spanish_text: str,
     german_text: str,
     source_language: str = "spanish",
     target_language: str = "german",
 ) -> bool:
-    return Item.objects.filter(
+    return apply_user_scope(Item.objects, user).filter(
         item_type=item_type,
         spanish_text__iexact=spanish_text,
         german_text__iexact=german_text,
@@ -177,15 +180,18 @@ def count_new_items(plan: ContentPlan) -> int:
 
 
 def create_phrase_if_missing(
+    *,
+    user,
     candidate: ContentCandidate,
     topic: str,
     source_language: str = "spanish",
     target_language: str = "german",
 ) -> Item | None:
     if item_exists(
-        Item.ItemType.PHRASE,
-        candidate.spanish_text,
-        candidate.german_text,
+        user=user,
+        item_type=Item.ItemType.PHRASE,
+        spanish_text=candidate.spanish_text,
+        german_text=candidate.german_text,
         source_language=source_language,
         target_language=target_language,
     ):
@@ -197,6 +203,7 @@ def create_phrase_if_missing(
         # Backward compatibility for tests/mocks that still accept only (text, prefix).
         audio_url = create_audio_file(candidate.german_text, "phrase")
     item = Item.objects.create(
+        user=user,
         item_type=Item.ItemType.PHRASE,
         spanish_text=candidate.spanish_text,
         german_text=candidate.german_text,
@@ -224,6 +231,8 @@ def enrich_notes_with_plural(notes: str, plural_german: str) -> str:
 
 
 def create_word_if_missing(
+    *,
+    user,
     candidate: ContentCandidate,
     topic: str,
     source_language: str = "spanish",
@@ -231,9 +240,10 @@ def create_word_if_missing(
     exercise_phrases: dict | None = None,
 ) -> Item | None:
     if item_exists(
-        Item.ItemType.WORD,
-        candidate.spanish_text,
-        candidate.german_text,
+        user=user,
+        item_type=Item.ItemType.WORD,
+        spanish_text=candidate.spanish_text,
+        german_text=candidate.german_text,
         source_language=source_language,
         target_language=target_language,
     ):
@@ -247,6 +257,7 @@ def create_word_if_missing(
         # Backward compatibility for tests/mocks that still accept only (text, prefix).
         audio_url = create_audio_file(audio_text, "word")
     item = Item.objects.create(
+        user=user,
         item_type=Item.ItemType.WORD,
         spanish_text=candidate.spanish_text,
         german_text=candidate.german_text,
@@ -403,6 +414,7 @@ def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "ge
 
 def save_dialog(
     *,
+    user,
     topic: str,
     context: str,
     source_language: str,
@@ -411,6 +423,7 @@ def save_dialog(
     audio_url: str,
 ) -> SavedDialog:
     return SavedDialog.objects.create(
+        user=user,
         topic=topic,
         context=context,
         source_language=source_language,
@@ -438,6 +451,7 @@ def save_dialog_turns(dialog: SavedDialog, turns: list[dict[str, str]]) -> list[
 
 def save_phrase_dialog_occurrences(
     *,
+    user,
     dialog: SavedDialog,
     turns: list[DialogTurn],
     source_language: str,
@@ -445,7 +459,7 @@ def save_phrase_dialog_occurrences(
 ) -> int:
     created = 0
     for turn in turns:
-        phrase_item = Item.objects.filter(
+        phrase_item = apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.PHRASE,
             source_language=source_language,
             target_language=target_language,
@@ -469,6 +483,7 @@ def save_phrase_dialog_occurrences(
 
 def save_word_dialog_occurrences(
     *,
+    user,
     dialog: SavedDialog,
     turns: list[DialogTurn],
     word_candidates: list[ContentCandidate],
@@ -477,7 +492,7 @@ def save_word_dialog_occurrences(
 ) -> int:
     created = 0
     for candidate in word_candidates:
-        matching_word_items = Item.objects.filter(
+        matching_word_items = apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.WORD,
             source_language=source_language,
             target_language=target_language,

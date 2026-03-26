@@ -16,6 +16,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ...auth import apply_user_scope, get_request_user
 from ...models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
 from ...serializers import ContentTopicSerializer
 from .core import ContentCandidate, call_openai_json, create_audio_file, create_phrase_if_missing, create_word_if_missing, item_exists
@@ -31,10 +32,11 @@ def _normalized_pair(request: Request) -> tuple[str, str]:
 
 class ContentItemsView(APIView):
     def get(self, request: Request) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         now = timezone.now()
         rows = list(
-            Item.objects.filter(source_language=source_language, target_language=target_language)
+            apply_user_scope(Item.objects, user).filter(source_language=source_language, target_language=target_language)
             .order_by("-created_at", "-id")[:200]
         )
         items = [
@@ -55,10 +57,11 @@ class ContentItemsView(APIView):
 
 class ContentWordsView(APIView):
     def get(self, request: Request) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         query = (request.query_params.get("q", "") or "").strip()
 
-        words_queryset = Item.objects.filter(
+        words_queryset = apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.WORD,
             source_language=source_language,
             target_language=target_language,
@@ -81,7 +84,7 @@ class ContentWordsView(APIView):
             )[:1000]
         )
         item_ids = [word["id"] for word in words]
-        related_dialogs_map = _related_dialogs_by_item_ids(item_ids)
+        related_dialogs_map = _related_dialogs_by_item_ids(item_ids, user=user)
         for word in words:
             word["related_dialogs"] = related_dialogs_map.get(word["id"], [])
         return Response({"words": words})
@@ -89,8 +92,9 @@ class ContentWordsView(APIView):
 
 class ContentItemDetailView(APIView):
     def get(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
-        item = Item.objects.filter(
+        item = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             source_language=source_language,
             target_language=target_language,
@@ -98,7 +102,7 @@ class ContentItemDetailView(APIView):
         if not item:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12)
+        related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
         return Response(
             {
                 "id": item.id,
@@ -116,8 +120,9 @@ class ContentItemDetailView(APIView):
         )
 
     def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
-        item = Item.objects.filter(
+        item = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             source_language=source_language,
             target_language=target_language,
@@ -142,8 +147,9 @@ class ContentItemDetailView(APIView):
         return Response({"audio_url": audio_url})
 
     def delete(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
-        deleted, _ = Item.objects.filter(
+        deleted, _ = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             source_language=source_language,
             target_language=target_language,
@@ -155,13 +161,14 @@ class ContentItemDetailView(APIView):
 
 class ContentItemMarkLearnedView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         is_learned_raw = request.data.get("is_learned", True)
         if isinstance(is_learned_raw, str):
             is_learned = is_learned_raw.strip().lower() in {"1", "true", "yes", "on"}
         else:
             is_learned = bool(is_learned_raw)
-        updated = Item.objects.filter(
+        updated = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             source_language=source_language,
             target_language=target_language,
@@ -173,8 +180,9 @@ class ContentItemMarkLearnedView(APIView):
 
 class ContentItemQuestionView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
-        item = Item.objects.filter(
+        item = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             source_language=source_language,
             target_language=target_language,
@@ -247,6 +255,7 @@ class ContentItemQuestionView(APIView):
 
 class ContentWordQuickAddView(APIView):
     def post(self, request: Request) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         source_text = str(request.data.get("source_text", "")).strip()
         target_text = str(request.data.get("target_text", "")).strip()
@@ -266,6 +275,7 @@ class ContentWordQuickAddView(APIView):
             return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         source_text, target_text = _resolve_dialog_click_word_pair(
+            user=user,
             source_text=source_text,
             target_text=target_text,
             source_language=source_language,
@@ -278,15 +288,16 @@ class ContentWordQuickAddView(APIView):
         )
 
         exists = item_exists(
-            "word",
-            source_text,
-            target_text,
+            user=user,
+            item_type="word",
+            spanish_text=source_text,
+            german_text=target_text,
             source_language=source_language,
             target_language=target_language,
         )
         if exists:
             existing = (
-                Item.objects.filter(
+                apply_user_scope(Item.objects, user).filter(
                     item_type=Item.ItemType.WORD,
                     source_language=source_language,
                     target_language=target_language,
@@ -308,6 +319,7 @@ class ContentWordQuickAddView(APIView):
                 )
             if existing:
                 _link_word_to_dialog_turn(
+                    user=user,
                     item=existing,
                     dialog_id_raw=dialog_id_raw,
                     turn_index_raw=turn_index_raw,
@@ -340,7 +352,8 @@ class ContentWordQuickAddView(APIView):
             notes=notes,
         )
         created = create_word_if_missing(
-            candidate,
+            user=user,
+            candidate=candidate,
             topic="dialog-click",
             source_language=source_language,
             target_language=target_language,
@@ -356,6 +369,7 @@ class ContentWordQuickAddView(APIView):
             )
 
         _link_word_to_dialog_turn(
+            user=user,
             item=created,
             dialog_id_raw=dialog_id_raw,
             turn_index_raw=turn_index_raw,
@@ -375,6 +389,7 @@ class ContentWordQuickAddView(APIView):
 
 class ContentPhraseQuickAddView(APIView):
     def post(self, request: Request) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         source_text = str(request.data.get("source_text", "")).strip()
         target_text = str(request.data.get("target_text", "")).strip()
@@ -389,15 +404,16 @@ class ContentPhraseQuickAddView(APIView):
             return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         exists = item_exists(
-            Item.ItemType.PHRASE,
-            source_text,
-            target_text,
+            user=user,
+            item_type=Item.ItemType.PHRASE,
+            spanish_text=source_text,
+            german_text=target_text,
             source_language=source_language,
             target_language=target_language,
         )
         if exists:
             existing = (
-                Item.objects.filter(
+                apply_user_scope(Item.objects, user).filter(
                     item_type=Item.ItemType.PHRASE,
                     source_language=source_language,
                     target_language=target_language,
@@ -435,7 +451,8 @@ class ContentPhraseQuickAddView(APIView):
             notes=notes,
         )
         created = create_phrase_if_missing(
-            candidate,
+            user=user,
+            candidate=candidate,
             topic="conversation-click",
             source_language=source_language,
             target_language=target_language,
@@ -464,8 +481,9 @@ class ContentPhraseQuickAddView(APIView):
 
 class ContentItemConversationView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
-        item = Item.objects.filter(
+        item = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             source_language=source_language,
             target_language=target_language,
@@ -614,6 +632,7 @@ class ContentTopicConversationTurnView(APIView):
 
 def _resolve_dialog_click_word_pair(
     *,
+    user,
     source_text: str,
     target_text: str,
     source_language: str,
@@ -638,7 +657,7 @@ def _resolve_dialog_click_word_pair(
             clicked_target_token=clicked_target_token,
         )
 
-    dialog = SavedDialog.objects.filter(
+    dialog = apply_user_scope(SavedDialog.objects, user).filter(
         id=dialog_id,
         source_language=source_language,
         target_language=target_language,
@@ -1277,14 +1296,14 @@ Rules:
     }
 
 
-def _link_word_to_dialog_turn(*, item: Item, dialog_id_raw, turn_index_raw) -> None:
+def _link_word_to_dialog_turn(*, user, item: Item, dialog_id_raw, turn_index_raw) -> None:
     try:
         dialog_id = int(dialog_id_raw)
         turn_index = int(turn_index_raw)
     except (TypeError, ValueError):
         return
 
-    dialog = SavedDialog.objects.filter(id=dialog_id).first()
+    dialog = apply_user_scope(SavedDialog.objects, user).filter(id=dialog_id).first()
     if not dialog:
         return
     turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
@@ -1303,13 +1322,14 @@ def _link_word_to_dialog_turn(*, item: Item, dialog_id_raw, turn_index_raw) -> N
 
 class ContentTopicDeleteView(APIView):
     def delete(self, request: Request) -> Response:
+        user = get_request_user(request)
         serializer = ContentTopicSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         topic = serializer.validated_data["topic"].strip()
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
 
-        deleted, _ = SavedTopic.objects.filter(
+        deleted, _ = apply_user_scope(SavedTopic.objects, user).filter(
             topic=topic,
             source_language=source_language,
             target_language=target_language,
@@ -1319,11 +1339,12 @@ class ContentTopicDeleteView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def _related_dialogs_by_item_ids(item_ids: list[int], per_item_limit: int = 8) -> dict[int, list[dict]]:
+def _related_dialogs_by_item_ids(item_ids: list[int], *, user, per_item_limit: int = 8) -> dict[int, list[dict]]:
     if not item_ids:
         return {}
     occurrences = (
-        ItemDialogOccurrence.objects.filter(item_id__in=item_ids)
+        apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
+        .filter(item_id__in=item_ids)
         .select_related("dialog", "turn")
         .order_by("-created_at", "-match_score", "-dialog__created_at", "-id")
     )
@@ -1340,7 +1361,7 @@ def _related_dialogs_by_item_ids(item_ids: list[int], per_item_limit: int = 8) -
                 "context": occurrence.dialog.context,
                 "audio_url": occurrence.dialog.audio_url,
                 "created_at": occurrence.dialog.created_at.isoformat(),
-                "turns": _dialog_turns_with_phrase_audio(occurrence.dialog),
+                "turns": _dialog_turns_with_phrase_audio(occurrence.dialog, user=user),
                 "matched_turns": [],
             }
             dialogs_for_item[occurrence.dialog_id] = dialog_payload
@@ -1365,7 +1386,7 @@ def _next_review_days(item: Item, now) -> int | None:
     return max(0, int(math.ceil(delta_days)))
 
 
-def _dialog_turns_with_phrase_audio(dialog) -> list[dict]:
+def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
     raw_turns = dialog.turns if isinstance(dialog.turns, list) else []
     normalized_turns: list[dict] = []
     key_pairs: set[tuple[str, str]] = set()
@@ -1383,7 +1404,7 @@ def _dialog_turns_with_phrase_audio(dialog) -> list[dict]:
         query = Q()
         for source_text, target_text in key_pairs:
             query |= Q(spanish_text__iexact=source_text, german_text__iexact=target_text)
-        phrase_items = Item.objects.filter(
+        phrase_items = apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.PHRASE,
             source_language=dialog.source_language,
             target_language=dialog.target_language,
