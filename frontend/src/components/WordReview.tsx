@@ -46,7 +46,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const hint = useMemo(() => hintLetter, [hintLetter]);
 
   const hasExceededHintLimit = (value: string): boolean => {
-    return value.length > 0 && hintedLetters / value.length > 0.3;
+    return value.length > 0 && hintedLetters > 1 && hintedLetters / value.length > 0.3;
   };
 
   const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
