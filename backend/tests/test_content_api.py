@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item, SavedDialog, SavedTopic
+from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
 
 
 @pytest.mark.django_db
@@ -1113,3 +1113,73 @@ def test_content_item_regenerate_audio_updates_audio_url(monkeypatch):
     assert response.json()["audio_url"] == "http://localhost:8000/media/audio/word-regenerated.mp3"
     item.refresh_from_db()
     assert item.audio_url == "http://localhost:8000/media/audio/word-regenerated.mp3"
+
+
+@pytest.mark.django_db
+def test_content_item_question_saves_conversation(monkeypatch):
+    from learning.views.content import management as management_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="gracias",
+        german_text="danke",
+        source_language="spanish",
+        target_language="german",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "call_openai_json",
+        lambda *args, **kwargs: {"related": True, "result_code": "RELATED_OK", "answer": "Use this for polite thanks."},
+    )
+
+    client = APIClient()
+    response_one = client.post(
+        f"/api/content/items/{item.id}/question?source_language=spanish&target_language=german",
+        {"question_text": "Can you explain how to use danke politely?"},
+        format="json",
+    )
+    response_two = client.post(
+        f"/api/content/items/{item.id}/question?source_language=spanish&target_language=german",
+        {"question_text": "Give me two more examples with danke."},
+        format="json",
+    )
+
+    assert response_one.status_code == 201
+    assert response_two.status_code == 201
+    payload = response_two.json()
+    assert len(payload["conversation"]) == 2
+    assert payload["conversation"][0]["question_text"] == "Give me two more examples with danke."
+    assert payload["conversation"][1]["question_text"] == "Can you explain how to use danke politely?"
+    assert payload["exchange"]["answer_text"] == "Use this for polite thanks."
+    assert ItemQuestionExchange.objects.filter(item=item).count() == 2
+
+    detail = client.get(f"/api/content/items/{item.id}?source_language=spanish&target_language=german")
+    assert detail.status_code == 200
+    assert len(detail.json()["item_questions"]) == 2
+
+
+@pytest.mark.django_db
+def test_content_item_question_rejects_unrelated_questions(monkeypatch):
+    from learning.views.content import management as management_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="hola",
+        german_text="hallo",
+        source_language="spanish",
+        target_language="german",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "call_openai_json",
+        lambda *args, **kwargs: {"related": False, "result_code": "UNRELATED_QUESTION", "answer": ""},
+    )
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/question?source_language=spanish&target_language=german",
+        {"question_text": "Who won the world cup?"},
+        format="json",
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "UNRELATED_QUESTION"
+    assert ItemQuestionExchange.objects.filter(item=item).count() == 0

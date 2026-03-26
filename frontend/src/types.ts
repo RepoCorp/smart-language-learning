@@ -44,6 +44,17 @@ export interface SessionItem {
       target_text: string;
     }>;
   }>;
+  item_questions?: ItemQuestionExchange[];
+}
+
+export type ItemQuestionType = "grammar_explanation" | "more_examples" | "common_mistakes" | "custom_related";
+
+export interface ItemQuestionExchange {
+  id: number;
+  question_type: ItemQuestionType;
+  question_text: string;
+  answer_text: string;
+  created_at: string;
 }
 
 export interface SessionResponse {
@@ -111,6 +122,12 @@ export interface ContentItemDetailResponse {
   created_at: string;
   exercise_phrases?: ItemExercisePhrases;
   related_dialogs?: SessionItem["related_dialogs"];
+  item_questions?: ItemQuestionExchange[];
+}
+
+export interface ContentItemQuestionResponse {
+  exchange: ItemQuestionExchange;
+  conversation: ItemQuestionExchange[];
 }
 
 export interface ContentTopicContextsResponse {

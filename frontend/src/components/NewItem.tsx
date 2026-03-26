@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { fetchContentItemDetail, quickAddWordFromDialog } from "../api";
+import { askContentItemQuestion, fetchContentItemDetail, quickAddWordFromDialog } from "../api";
 import { useI18n } from "../i18n";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
@@ -29,6 +29,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
+  const [showQuestionsModal, setShowQuestionsModal] = useState<boolean>(false);
   const [selectedExerciseSection, setSelectedExerciseSection] = useState<"fixed" | "basic">("fixed");
   const [exerciseAudioMode, setExerciseAudioMode] = useState<"once" | "repeat">("once");
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
@@ -43,6 +44,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   } | null>(null);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
+  const [itemQuestions, setItemQuestions] = useState<NonNullable<SessionItem["item_questions"]>>(item.item_questions || []);
+  const [itemQuestionError, setItemQuestionError] = useState<string>("");
+  const [itemQuestionInput, setItemQuestionInput] = useState<string>("");
+  const [askingQuestion, setAskingQuestion] = useState<boolean>(false);
   const exerciseTimerRef = useRef<number | null>(null);
   const exerciseRunRef = useRef<number>(0);
   const exerciseRunningRef = useRef<boolean>(false);
@@ -65,6 +70,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
+      if (showQuestionsModal || showDialogsModal || showExerciseModal) {
+        return;
+      }
       if (event.key !== "Enter") {
         return;
       }
@@ -76,7 +84,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly]);
+  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal]);
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -110,6 +118,36 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       exerciseAudioRef.current = null;
     }
   }, []);
+
+  useEffect(() => {
+    setItemQuestions(item.item_questions || []);
+    setItemQuestionError("");
+    setItemQuestionInput("");
+    setAskingQuestion(false);
+    setShowQuestionsModal(false);
+  }, [item.id, item.item_questions]);
+
+  useEffect(() => {
+    if (!showDialogsModal && !showQuestionsModal) {
+      return;
+    }
+    let cancelled = false;
+    const loadLatestItemHistory = async (): Promise<void> => {
+      try {
+        const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
+        if (cancelled) {
+          return;
+        }
+        setItemQuestions(detail.item_questions || []);
+      } catch {
+        // Keep existing state if refresh fails.
+      }
+    };
+    void loadLatestItemHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [showDialogsModal, showQuestionsModal, item.id, sourceLanguage, targetLanguage]);
 
   const wordCandidates = (word: string): string[] => {
     const normalized = word.trim();
@@ -214,6 +252,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             direction: null,
             options: [],
             related_dialogs: detail.related_dialogs || [],
+            item_questions: detail.item_questions || [],
           });
         } finally {
           setLoadingLinkedWord(false);
@@ -224,6 +263,28 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       setPendingWordAdd({ key, source: sourceToken, target: targetToken, dialogId, turnIndex });
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+    }
+  };
+
+  const askItemQuestion = async (): Promise<void> => {
+    const questionText = itemQuestionInput.trim();
+    if (askingQuestion || !questionText) {
+      return;
+    }
+    setAskingQuestion(true);
+    setItemQuestionError("");
+    try {
+      const response = await askContentItemQuestion(item.id, questionText, sourceLanguage, targetLanguage);
+      setItemQuestions(response.conversation || []);
+      setItemQuestionInput("");
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setItemQuestionError(error.message);
+      } else {
+        setItemQuestionError(t("newItem.questionsError"));
+      }
+    } finally {
+      setAskingQuestion(false);
     }
   };
 
@@ -606,6 +667,13 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           </button>
         </div>
       )}
+      {(item.item_type === "word" || item.item_type === "phrase") && (
+        <div className="actions">
+          <button type="button" onClick={() => setShowQuestionsModal(true)}>
+            {t("newItem.openQuestions")}
+          </button>
+        </div>
+      )}
       {!readOnly && (
         <div className="actions">
           <button onClick={markAsSeen} disabled={saving}>
@@ -626,6 +694,27 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             <p>
               <strong>{t("newItem.relatedDialogs", { count: item.related_dialogs?.length || 0 })}</strong>
             </p>
+            {!!itemQuestions.length && (
+              <>
+                <p>
+                  <strong>{t("newItem.questionsTitle")}</strong>
+                </p>
+                <div className="item-questions-history item-chat-thread">
+                  {itemQuestions.map((entry) => (
+                    <article key={`dialogs-${entry.id}`} className="item-question-entry item-chat-entry">
+                      <div className="item-chat-message item-chat-user">
+                        <p className="item-chat-meta">{t("newItem.questionsLabelQuestion")}</p>
+                        <p className="item-chat-bubble">{entry.question_text}</p>
+                      </div>
+                      <div className="item-chat-message item-chat-assistant">
+                        <p className="item-chat-meta">{t("newItem.questionsLabelAnswer")}</p>
+                        <p className="item-chat-bubble">{entry.answer_text}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
             {!item.related_dialogs?.length && <p>{t("newItem.noRelatedDialogs")}</p>}
             {!!item.related_dialogs?.length && (
               <div className="related-dialogs-scroll">
@@ -808,6 +897,62 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 </button>
               )}
               <button type="button" className="secondary-button" onClick={closeExerciseModal}>
+                {t("newItem.closeRelatedDialogs")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showQuestionsModal && (item.item_type === "word" || item.item_type === "phrase") && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal questions-modal">
+            <p>
+              <strong>{t("newItem.questionsTitle")}</strong>
+            </p>
+            <div className="questions-modal-item-texts">
+              <p className="questions-modal-item-text">
+                <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {item.spanish_text}
+              </p>
+              <p className="questions-modal-item-text">
+                <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {item.german_text}
+              </p>
+            </div>
+            <form
+              className="item-questions-actions"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void askItemQuestion();
+              }}
+            >
+              <input
+                value={itemQuestionInput}
+                onChange={(event) => setItemQuestionInput(event.target.value)}
+                placeholder={t("newItem.questionsPlaceholder")}
+                disabled={askingQuestion}
+              />
+              <button type="submit" disabled={askingQuestion || !itemQuestionInput.trim()}>
+                {askingQuestion ? t("newItem.questionsLoading") : t("newItem.questionsAskButton")}
+              </button>
+            </form>
+            {itemQuestionError && <p className="error">{itemQuestionError}</p>}
+            {!!itemQuestions.length && (
+              <div className="item-questions-history item-chat-thread">
+                {itemQuestions.map((entry) => (
+                  <article key={entry.id} className="item-question-entry item-chat-entry">
+                    <div className="item-chat-message item-chat-user">
+                      <p className="item-chat-meta">{t("newItem.questionsLabelQuestion")}</p>
+                      <p className="item-chat-bubble">{entry.question_text}</p>
+                    </div>
+                    <div className="item-chat-message item-chat-assistant">
+                      <p className="item-chat-meta">{t("newItem.questionsLabelAnswer")}</p>
+                      <p className="item-chat-bubble">{entry.answer_text}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={() => setShowQuestionsModal(false)}>
                 {t("newItem.closeRelatedDialogs")}
               </button>
             </div>

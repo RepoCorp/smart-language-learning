@@ -94,6 +94,7 @@ export default function ContentManagePage(): JSX.Element {
           direction: null,
           options: [],
           related_dialogs: detail.related_dialogs || [],
+          item_questions: detail.item_questions || [],
         });
       } catch {
         if (!cancelled) {

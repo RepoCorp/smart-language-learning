@@ -2,6 +2,7 @@ import type {
   ContentConfirmResponse,
   ContentItemsResponse,
   ContentItemDetailResponse,
+  ContentItemQuestionResponse,
   ContentPreviewResponse,
   ContentTopicContextsResponse,
   ContentTopicsResponse,
@@ -248,6 +249,36 @@ export async function setContentItemLearned(
     throw new Error("Failed to update item learned status");
   }
   notifyOverviewStatsUpdated();
+}
+
+export async function askContentItemQuestion(
+  itemId: number,
+  questionText: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemQuestionResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/items/${itemId}/question?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question_text: questionText }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to answer item question";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemQuestionResponse;
 }
 
 export async function quickAddWordFromDialog(

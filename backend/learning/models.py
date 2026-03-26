@@ -183,3 +183,28 @@ class ItemDialogOccurrence(models.Model):
 
     def __str__(self) -> str:
         return f"Item {self.item_id} in dialog {self.dialog_id} turn {self.turn_index}"
+
+
+class ItemQuestionExchange(models.Model):
+    class QuestionType(models.TextChoices):
+        GRAMMAR_EXPLANATION = "grammar_explanation", "Grammar explanation"
+        MORE_EXAMPLES = "more_examples", "More examples"
+        COMMON_MISTAKES = "common_mistakes", "Common mistakes"
+        CUSTOM_RELATED = "custom_related", "Custom related question"
+
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="question_exchanges")
+    source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
+    target_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="german")
+    question_type = models.CharField(max_length=40, choices=QuestionType.choices)
+    question_text = models.CharField(max_length=255)
+    answer_text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        indexes = [
+            models.Index(fields=("item", "created_at"), name="lrn_iq_item_created_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Item {self.item_id} {self.question_type}"

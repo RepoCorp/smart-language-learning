@@ -17,6 +17,8 @@ Aleman a español es seleccion multiple
 Repetir audio al final o ppio de los tests
 Make sure audio is in the same language as the text
 Revisar que si pueda guardar varias referencias a otros dialogos
+Failed to delete item
+When adding a new word from the conversation the translation is wrong 
 
 Add settings to deploy files, like updated roles permissions, env...
 

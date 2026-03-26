@@ -3,6 +3,7 @@ from .core import *  # noqa: F401,F403
 from .management import (
     ContentItemDetailView,
     ContentItemMarkLearnedView,
+    ContentItemQuestionView,
     ContentItemsView,
     ContentTopicDeleteView,
     ContentWordQuickAddView,
@@ -14,6 +15,7 @@ __all__ = [
     "ContentConfirmView",
     "ContentItemDetailView",
     "ContentItemMarkLearnedView",
+    "ContentItemQuestionView",
     "ContentItemsView",
     "ContentPreviewView",
     "ContentTopicDeleteView",

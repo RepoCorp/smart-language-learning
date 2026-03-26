@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import logging
 
 from django.db.models import Q
 from django.utils import timezone
@@ -9,9 +10,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog, SavedTopic
+from ...models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
 from ...serializers import ContentTopicSerializer
-from .core import ContentCandidate, create_audio_file, create_word_if_missing, item_exists
+from .core import ContentCandidate, call_openai_json, create_audio_file, create_word_if_missing, item_exists
+
+logger = logging.getLogger(__name__)
 
 
 def _normalized_pair(request: Request) -> tuple[str, str]:
@@ -102,6 +105,7 @@ class ContentItemDetailView(APIView):
                 "exercise_phrases": item.exercise_phrases or {},
                 "created_at": item.created_at,
                 "related_dialogs": related_dialogs_map.get(item.id, []),
+                "item_questions": _item_question_history(item),
             }
         )
 
@@ -159,6 +163,80 @@ class ContentItemMarkLearnedView(APIView):
         if updated == 0:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"ok": True, "is_learned": is_learned})
+
+
+class ContentItemQuestionView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        item = Item.objects.filter(
+            id=item_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        question_text = str(request.data.get("question_text", "")).strip()
+        logger.info(
+            "content.item_question.received item_id=%s source_lang=%s target_lang=%s question=%r",
+            item_id,
+            source_language,
+            target_language,
+            question_text[:255],
+        )
+        if not question_text:
+            logger.info("content.item_question.rejected item_id=%s code=EMPTY_QUESTION", item_id)
+            return Response({"detail": "question_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(question_text) > 255:
+            logger.info("content.item_question.rejected item_id=%s code=QUESTION_TOO_LONG len=%s", item_id, len(question_text))
+            return Response({"detail": "question_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
+
+        decision = _model_answer_or_reject_item_question(
+            item=item,
+            question_text=question_text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        if not decision["related"]:
+            logger.info(
+                "content.item_question.rejected item_id=%s code=%s reason=%r question=%r",
+                item_id,
+                decision["code"],
+                decision.get("reason", ""),
+                question_text[:255],
+            )
+            return Response(
+                {
+                    "detail": "Question must be related to learning this specific item.",
+                    "code": decision["code"],
+                    "reason": decision.get("reason", ""),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        answer_text = decision["answer"]
+        logger.info(
+            "content.item_question.accepted item_id=%s code=%s answer_len=%s",
+            item_id,
+            decision["code"],
+            len(answer_text),
+        )
+        exchange = ItemQuestionExchange.objects.create(
+            item=item,
+            source_language=source_language,
+            target_language=target_language,
+            question_type=ItemQuestionExchange.QuestionType.CUSTOM_RELATED,
+            question_text=question_text,
+            answer_text=answer_text,
+        )
+        conversation = _item_question_history(item)
+        return Response(
+            {
+                "exchange": _serialize_question_exchange(exchange),
+                "conversation": conversation,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ContentWordQuickAddView(APIView):
@@ -401,3 +479,207 @@ def _dialog_turns_with_phrase_audio(dialog) -> list[dict]:
         }
         for turn in normalized_turns
     ]
+
+
+def _language_display_name(language_code: str) -> str:
+    names = {
+        "spanish": "Spanish",
+        "english": "English",
+        "german": "German",
+        "french": "French",
+        "italian": "Italian",
+        "portuguese": "Portuguese",
+    }
+    return names.get(language_code, language_code.capitalize())
+
+
+def _normalize_text(value: str) -> str:
+    lowered = value.lower()
+    return " ".join("".join(ch if ch.isalnum() or ch.isspace() else " " for ch in lowered).split())
+
+
+def _looks_clearly_unrelated(normalized_question: str) -> bool:
+    unrelated_terms = {
+        "world cup",
+        "president",
+        "election",
+        "stock",
+        "bitcoin",
+        "crypto",
+        "weather",
+        "recipe",
+        "movie",
+        "netflix",
+        "politics",
+        "programming",
+        "python code",
+        "bug fix",
+    }
+    for term in unrelated_terms:
+        if term in normalized_question:
+            return True
+    return False
+
+
+def _model_answer_or_reject_item_question(
+    *,
+    item: Item,
+    question_text: str,
+    source_language: str,
+    target_language: str,
+) -> dict:
+    normalized_question = _normalize_text(question_text)
+    if not normalized_question:
+        return {"related": False, "code": "EMPTY_QUESTION", "answer": ""}
+
+    # Single model request: decide relatedness and answer if related.
+    item_source_norm = _normalize_text(item.spanish_text)
+    item_target_norm = _normalize_text(item.german_text)
+    question_norm = _normalize_text(question_text)
+    direct_item_overlap = bool(item_source_norm and item_source_norm in question_norm) or bool(
+        item_target_norm and item_target_norm in question_norm
+    )
+
+    parsed = call_openai_json(
+        """
+Decide if a learner question is related to learning a specific item.
+If related, answer it. If not related, return a rejection code.
+
+Return strict JSON:
+{
+  "related": true,
+  "result_code": "RELATED_OK",
+  "answer": "string",
+  "reason": "string"
+}
+
+Rules:
+- If question is related to learning/using/understanding this item, set:
+  related=true, result_code="RELATED_OK", and provide concise answer (3 to 6 short lines, A1-A2), reason="".
+- If question is NOT related to this item, set:
+  related=false, result_code="UNRELATED_QUESTION", answer="", and provide a short reason.
+- Assume the learner's primary interest is the TARGET language usage/meaning.
+- Do not reinterpret the question as source-language-focused unless the learner explicitly asks for source-language analysis.
+- Be permissive with typos, misspellings, partial matches, and paraphrases.
+- If the question could reasonably be about this item, treat it as related.
+- Questions about words/phrases in either study language can still be related to this item
+  when asked in the communicative context of the item.
+- Do not assume language from spelling alone. A token may exist in both languages.
+- If the learner asks about a word "in {target language}" or within the item context, treat it as related.
+- Only mark unrelated when it is clearly about a different domain/topic.
+- Do not answer unrelated questions.
+- Mention both languages where useful when answering.
+- JSON only.
+""".strip(),
+        (
+            f"Question: {question_text}\n"
+            f"Study pair: source={_language_display_name(source_language)}, target={_language_display_name(target_language)}\n"
+            f"Item being asked about: {item.german_text} ({_language_display_name(target_language)})"
+            f" / {item.spanish_text} ({_language_display_name(source_language)})\n"
+            f"Item source text ({_language_display_name(source_language)}): {item.spanish_text}\n"
+            f"Item target text ({_language_display_name(target_language)}): {item.german_text}\n"
+            f"Item notes: {item.notes}\n"
+            f"Item example: {item.example_sentence}\n"
+        ),
+        timeout_seconds=8,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    logger.info(
+        "content.item_question.decision item_id=%s direct_overlap=%s model_payload=%r",
+        item.id,
+        direct_item_overlap,
+        parsed if isinstance(parsed, dict) else None,
+    )
+
+    if isinstance(parsed, dict):
+        related = bool(parsed.get("related"))
+        result_code = str(parsed.get("result_code", "")).strip() or ("RELATED_OK" if related else "UNRELATED_QUESTION")
+        answer = str(parsed.get("answer", "")).strip()
+        reason = str(parsed.get("reason", "")).strip()
+        if related:
+            if answer:
+                return {"related": True, "code": result_code, "answer": answer[:3000], "reason": reason}
+            return {
+                "related": True,
+                "code": "RELATED_FALLBACK",
+                "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+                "reason": reason,
+            }
+
+        # If model says unrelated but question still appears tied to the item, allow it.
+        if direct_item_overlap:
+            return {
+                "related": True,
+                "code": "RELATED_OVERLAP_OVERRIDE",
+                "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+                "reason": reason,
+            }
+
+        # Only hard-block explicit unrelated when it is also clearly unrelated by fallback check.
+        if result_code == "UNRELATED_QUESTION":
+            if _looks_clearly_unrelated(normalized_question):
+                return {"related": False, "code": result_code, "answer": "", "reason": reason}
+            return {
+                "related": True,
+                "code": "RELATED_SOFT_OVERRIDE",
+                "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+                "reason": reason,
+            }
+        return {
+            "related": True,
+            "code": "RELATED_AMBIGUOUS_OVERRIDE",
+            "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+            "reason": reason,
+        }
+
+    # If the model classifier is unavailable, block only clearly unrelated questions.
+    if _looks_clearly_unrelated(normalized_question):
+        return {"related": False, "code": "UNRELATED_FALLBACK", "answer": "", "reason": "fallback clearly unrelated term"}
+    return {
+        "related": True,
+        "code": "RELATED_FALLBACK",
+        "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+        "reason": "fallback allow",
+    }
+
+
+def _fallback_item_question_answer(*, item: Item, question_text: str) -> str:
+    target = item.german_text.strip()
+    source = item.spanish_text.strip()
+    normalized_question = _normalize_text(question_text)
+    if "example" in normalized_question or "ejemplo" in normalized_question:
+        return (
+            f"{target} = {source}\n"
+            f"Example 1: I use '{target}' in a short sentence.\n"
+            f"Example 2: I ask a question with '{target}'."
+        )
+    if "grammar" in normalized_question or "gramatica" in normalized_question:
+        return (
+            f"{target} = {source}\n"
+            "Pay attention to article/word order in the target language.\n"
+            "Keep the same pattern and replace only one word at a time."
+        )
+    return (
+        f"{target} = {source}\n"
+        "Focus on meaning, pronunciation, and one clean sentence pattern.\n"
+        "Ask about grammar, examples, or common mistakes for this same item."
+    )
+
+
+def _serialize_question_exchange(exchange: ItemQuestionExchange) -> dict:
+    return {
+        "id": exchange.id,
+        "question_type": exchange.question_type,
+        "question_text": exchange.question_text,
+        "answer_text": exchange.answer_text,
+        "created_at": exchange.created_at.isoformat(),
+    }
+
+
+def _item_question_history(item: Item) -> list[dict]:
+    rows = list(
+        item.question_exchanges.order_by("-created_at", "-id")[:120]
+    )
+    return [_serialize_question_exchange(row) for row in rows]
