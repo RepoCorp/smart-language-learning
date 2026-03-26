@@ -517,6 +517,75 @@ select {
   color: #486581;
 }
 
+.conversation-goal-card {
+  background: #eef2ff;
+  border-color: #9fb3c8;
+}
+
+.conversation-notes-wrap {
+  margin-top: 10px;
+}
+
+.conversation-notes-input {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid #9fb3c8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  color: #102a43;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.conversation-notes-input::placeholder {
+  color: #829ab1;
+}
+
+.conversation-notes-input:focus {
+  outline: none;
+  border-color: #0b4fc4;
+  box-shadow: 0 0 0 3px rgba(11, 79, 196, 0.14);
+  background: #ffffff;
+}
+
+.conversation-notes-input:disabled {
+  cursor: not-allowed;
+  color: #627d98;
+  background: #f0f4f8;
+}
+
+.conversation-role-input {
+  width: 100%;
+  border: 1px solid #9fb3c8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  color: #102a43;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.conversation-role-input::placeholder {
+  color: #829ab1;
+}
+
+.conversation-role-input:focus {
+  outline: none;
+  border-color: #0b4fc4;
+  box-shadow: 0 0 0 3px rgba(11, 79, 196, 0.14);
+  background: #ffffff;
+}
+
+.conversation-role-input:disabled {
+  cursor: not-allowed;
+  color: #627d98;
+  background: #f0f4f8;
+}
+
 .topic-options {
   display: flex;
   flex-wrap: wrap;

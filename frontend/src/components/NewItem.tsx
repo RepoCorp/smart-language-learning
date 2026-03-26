@@ -42,6 +42,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   };
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
   const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
+  const hasCorrectionForTurn = (turn: ConversationTurn): boolean => {
+    const corrected = (turn.user_corrected_text || "").trim().toLowerCase();
+    const original = (turn.user_text || "").trim().toLowerCase();
+    return Boolean(corrected && corrected !== original);
+  };
   const [saving, setSaving] = useState<boolean>(false);
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
@@ -1007,9 +1012,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
           </button>
-          <button type="button" className="secondary-button item-action-button" onClick={() => setShowConversationModal(true)}>
-            {t("newItem.openConversation")}
-          </button>
         </div>
       )}
       {!readOnly && (
@@ -1314,47 +1316,35 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                         <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
                     )}
-                    <button
-                      type="button"
-                      className="item-conversation-correction-toggle"
-                      onClick={() => {
-                        setConversationCorrectionVisible((current) => ({ ...current, [index]: !current[index] }));
-                      }}
-                    >
-                      {conversationCorrectionVisible[index]
-                        ? t("newItem.conversationHideCorrection")
-                        : t("newItem.conversationShowCorrection")}
-                    </button>
-                    {conversationCorrectionVisible[index] && !!turn.user_corrected_text
-                      && turn.user_corrected_text.trim().toLowerCase() !== turn.user_text.trim().toLowerCase() && (
+                    {hasCorrectionForTurn(turn) && (
+                      <button
+                        type="button"
+                        className="item-conversation-correction-toggle"
+                        onClick={() => {
+                          setConversationCorrectionVisible((current) => ({ ...current, [index]: !current[index] }));
+                        }}
+                      >
+                        {conversationCorrectionVisible[index]
+                          ? t("newItem.conversationHideCorrection")
+                          : t("newItem.conversationShowCorrection")}
+                      </button>
+                    )}
+                    {conversationCorrectionVisible[index] && hasCorrectionForTurn(turn) && (
                       <p className="item-conversation-correction">
                         <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
                       </p>
                     )}
-                    {conversationCorrectionVisible[index]
-                      && !!turn.user_corrected_text
-                      && turn.user_corrected_text.trim().toLowerCase() !== turn.user_text.trim().toLowerCase()
-                      && !!turn.user_corrected_translation_text && (
+                    {conversationCorrectionVisible[index] && hasCorrectionForTurn(turn) && !!turn.user_corrected_translation_text && (
                       <p className="item-conversation-correction item-conversation-correction-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.user_corrected_translation_text}
                       </p>
                     )}
-                    {conversationCorrectionVisible[index]
-                      && !!turn.user_corrected_text
-                      && turn.user_corrected_text.trim().toLowerCase() !== turn.user_text.trim().toLowerCase()
-                      && !!turn.user_correction_explanation && (
+                    {conversationCorrectionVisible[index] && hasCorrectionForTurn(turn) && !!turn.user_correction_explanation && (
                       <p className="item-conversation-correction item-conversation-correction-explanation">
                         <strong>{t("newItem.conversationCorrectionExplanationLabel")}</strong> {turn.user_correction_explanation}
                       </p>
                     )}
-                    {conversationCorrectionVisible[index]
-                      && (!turn.user_corrected_text
-                        || turn.user_corrected_text.trim().toLowerCase() === turn.user_text.trim().toLowerCase()) && (
-                      <p className="item-conversation-correction item-conversation-correction-translation">
-                        {t("newItem.conversationNoCorrection")}
-                      </p>
-                    )}
-                    {conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
+                    {conversationCorrectionVisible[index] && hasCorrectionForTurn(turn) && (
                       <>
                         <button
                           type="button"

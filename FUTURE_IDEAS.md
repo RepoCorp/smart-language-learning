@@ -20,6 +20,15 @@ Revisar que si pueda guardar varias referencias a otros dialogos
 Failed to delete item
 When adding a new word from the conversation the translation is wrong 
 Mejorar velocidad de respuesta de la conversacion 
+Que pida algo de definicion del usuario para que en las conversaciones ese sea siempre su rol
+En lugar de validar longitud de entradas como el rol limitar desde el input
+Remove some text in some places that I don't really need, like These notes are only used for this conversation and are not saved. 
+Evaluar cuando se consigio el objetivo
+Session store algunos de los parametros  
+
+Do not force finishing of the session on countdown end, just on completing the planned session. Actually don't use a countdown, just a timer.
+Para la conversacion, en los detalles incluir quien soy yo y quien es el usuario, de pronto si guardar estas opciones en el backend
+Ser mas especifico en el goal de la conversacion 
 
 
 Add settings to deploy files, like updated roles permissions, env...

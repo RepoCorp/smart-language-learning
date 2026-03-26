@@ -145,6 +145,16 @@ export interface ContentTopicContextsResponse {
   contexts: string[];
 }
 
+export interface TopicConversationStartResponse {
+  topic: string;
+  notes?: string;
+  role_text?: string;
+  goal_text: string;
+  opening_text?: string;
+  opening_translation_text?: string;
+  opening_audio_url?: string;
+}
+
 export interface OverviewStatsResponse {
   ready_to_review: number;
   future_reviews: number;

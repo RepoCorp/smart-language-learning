@@ -1295,6 +1295,78 @@ def test_quick_add_word_creates_item_with_contextual_translation(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_quick_add_word_inline_context_fallback_avoids_target_language_source(monkeypatch):
+    from learning.views.content import management as management_views
+
+    monkeypatch.setattr(management_views, "call_openai_json", lambda *args, **kwargs: None)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "Ecke",
+            "target_text": "Ecke",
+            "check_only": True,
+            "source_line": "Está justo a la vuelta de la esquina.",
+            "target_line": "Es ist gleich um die Ecke.",
+            "clicked_target_token": "Ecke",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created"] is False
+    assert payload["exists"] is False
+    assert payload["source_text"] == "esquina"
+    assert payload["target_text"] == "Ecke"
+
+
+@pytest.mark.django_db
+def test_quick_add_word_dialog_resolution_sanitizes_target_language_source(monkeypatch):
+    from learning.views.content import management as management_views
+
+    dialog = SavedDialog.objects.create(
+        topic="transporte",
+        context="estacion",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Está justo a la vuelta de la esquina.", "target_text": "Es ist gleich um die Ecke."}],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Está justo a la vuelta de la esquina.",
+        target_text="Es ist gleich um die Ecke.",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "call_openai_json",
+        lambda *args, **kwargs: {"source_text": "Ecke", "target_text": "Ecke"},
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "Ecke",
+            "target_text": "Ecke",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created"] is False
+    assert payload["exists"] is False
+    assert payload["source_text"] == "esquina"
+    assert payload["target_text"] == "Ecke"
+
+
+@pytest.mark.django_db
 def test_item_conversation_audio_returns_transcript_reply_and_audio(monkeypatch):
     from learning.views import content as content_views
     from learning.views.content import management as management_views

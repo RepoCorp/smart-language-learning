@@ -6,6 +6,7 @@ import type {
   ContentItemQuestionResponse,
   ContentPreviewResponse,
   ContentTopicContextsResponse,
+  TopicConversationStartResponse,
   ContentTopicsResponse,
   OverviewStatsResponse,
   ReviewDirection,
@@ -298,6 +299,78 @@ export async function sendContentItemConversationAudio(
   formData.append("history", JSON.stringify(history));
 
   const response = await fetch(`${API_BASE}/content/items/${itemId}/conversation?${params.toString()}`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    let detail = "Failed to process conversation audio";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemConversationResponse;
+}
+
+export async function startTopicConversation(
+  topic: string,
+  notes: string,
+  roleText: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<TopicConversationStartResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await fetch(`${API_BASE}/content/conversation/start?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, notes, role_text: roleText }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to start conversation";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as TopicConversationStartResponse;
+}
+
+export async function sendTopicConversationAudio(
+  topic: string,
+  notes: string,
+  roleText: string,
+  goalText: string,
+  audioBlob: Blob,
+  history: Array<{ user_text: string; assistant_text: string }>,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemConversationResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "speech.webm");
+  formData.append("history", JSON.stringify(history));
+  formData.append("topic", topic);
+  formData.append("notes", notes);
+  formData.append("role_text", roleText);
+  formData.append("goal_text", goalText);
+
+  const response = await fetch(`${API_BASE}/content/conversation/turn?${params.toString()}`, {
     method: "POST",
     body: formData,
   });
