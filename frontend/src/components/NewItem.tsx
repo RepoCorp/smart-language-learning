@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { askContentItemQuestion, fetchContentItemDetail, quickAddWordFromDialog } from "../api";
+import { askContentItemQuestion, fetchContentItemDetail, quickAddWordFromDialog, sendContentItemConversationAudio } from "../api";
 import { useI18n } from "../i18n";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
@@ -10,6 +10,16 @@ interface NewItemProps {
   onContinue?: () => Promise<void>;
   readOnly?: boolean;
   onClose?: () => void;
+}
+
+interface ConversationTurn {
+  user_text: string;
+  user_translation_text?: string;
+  user_corrected_text?: string;
+  user_corrected_translation_text?: string;
+  assistant_text: string;
+  assistant_translation_text?: string;
+  assistant_audio_url?: string;
 }
 
 export default function NewItem({ item, onContinue, readOnly = false, onClose }: NewItemProps): JSX.Element {
@@ -30,6 +40,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
   const [showQuestionsModal, setShowQuestionsModal] = useState<boolean>(false);
+  const [showConversationModal, setShowConversationModal] = useState<boolean>(false);
   const [selectedExerciseSection, setSelectedExerciseSection] = useState<"fixed" | "basic">("fixed");
   const [exerciseAudioMode, setExerciseAudioMode] = useState<"once" | "repeat">("once");
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
@@ -48,10 +59,24 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
   const [itemQuestionInput, setItemQuestionInput] = useState<string>("");
   const [askingQuestion, setAskingQuestion] = useState<boolean>(false);
+  const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([]);
+  const [conversationError, setConversationError] = useState<string>("");
+  const [conversationRecording, setConversationRecording] = useState<boolean>(false);
+  const [conversationLoading, setConversationLoading] = useState<boolean>(false);
+  const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
+  const [conversationTranslationVisible, setConversationTranslationVisible] = useState<Record<number, boolean>>({});
+  const [conversationCorrectionVisible, setConversationCorrectionVisible] = useState<Record<number, boolean>>({});
+  const [conversationUserTranslationVisible, setConversationUserTranslationVisible] = useState<Record<number, boolean>>({});
   const exerciseTimerRef = useRef<number | null>(null);
   const exerciseRunRef = useRef<number>(0);
   const exerciseRunningRef = useRef<boolean>(false);
   const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
+  const conversationRecorderRef = useRef<MediaRecorder | null>(null);
+  const conversationStreamRef = useRef<MediaStream | null>(null);
+  const conversationChunksRef = useRef<Blob[]>([]);
+  const conversationShouldSubmitRef = useRef<boolean>(false);
+  const conversationTimerRef = useRef<number | null>(null);
+  const conversationHistoryRef = useRef<HTMLDivElement | null>(null);
 
   const markAsSeen = async (): Promise<void> => {
     if (saving || !onContinue) {
@@ -70,7 +95,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (showQuestionsModal || showDialogsModal || showExerciseModal) {
+      if (showQuestionsModal || showDialogsModal || showExerciseModal || showConversationModal) {
         return;
       }
       if (event.key !== "Enter") {
@@ -84,7 +109,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal]);
+  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showConversationModal]);
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -117,6 +142,18 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       exerciseAudioRef.current.currentTime = 0;
       exerciseAudioRef.current = null;
     }
+    if (conversationRecorderRef.current && conversationRecorderRef.current.state !== "inactive") {
+      conversationShouldSubmitRef.current = false;
+      conversationRecorderRef.current.stop();
+    }
+    if (conversationTimerRef.current !== null) {
+      window.clearInterval(conversationTimerRef.current);
+      conversationTimerRef.current = null;
+    }
+    if (conversationStreamRef.current) {
+      conversationStreamRef.current.getTracks().forEach((track) => track.stop());
+      conversationStreamRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -125,6 +162,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setItemQuestionInput("");
     setAskingQuestion(false);
     setShowQuestionsModal(false);
+    setShowConversationModal(false);
+    setConversationTurns([]);
+    setConversationError("");
+    setConversationRecording(false);
+    setConversationLoading(false);
+    setConversationRecordingSeconds(0);
+    setConversationTranslationVisible({});
+    setConversationCorrectionVisible({});
+    setConversationUserTranslationVisible({});
   }, [item.id, item.item_questions]);
 
   useEffect(() => {
@@ -148,6 +194,20 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       cancelled = true;
     };
   }, [showDialogsModal, showQuestionsModal, item.id, sourceLanguage, targetLanguage]);
+
+  useEffect(() => {
+    if (!showConversationModal) {
+      return;
+    }
+    const historyElement = conversationHistoryRef.current;
+    if (!historyElement) {
+      return;
+    }
+    historyElement.scrollTo({
+      top: historyElement.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [showConversationModal, conversationTurns, conversationLoading]);
 
   const wordCandidates = (word: string): string[] => {
     const normalized = word.trim();
@@ -633,6 +693,119 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowExerciseModal(false);
   };
 
+  const stopConversationRecording = (submit: boolean): void => {
+    conversationShouldSubmitRef.current = submit;
+    const recorder = conversationRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    if (conversationTimerRef.current !== null) {
+      window.clearInterval(conversationTimerRef.current);
+      conversationTimerRef.current = null;
+    }
+    if (!submit && conversationStreamRef.current) {
+      conversationStreamRef.current.getTracks().forEach((track) => track.stop());
+      conversationStreamRef.current = null;
+      setConversationRecording(false);
+      setConversationRecordingSeconds(0);
+    }
+  };
+
+  const submitConversationAudio = async (audioBlob: Blob): Promise<void> => {
+    setConversationLoading(true);
+    setConversationError("");
+    try {
+      const response = await sendContentItemConversationAudio(
+        item.id,
+        audioBlob,
+        conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
+        sourceLanguage,
+        targetLanguage,
+      );
+      setConversationTurns((current) => [...current, response]);
+      if (response.assistant_audio_url) {
+        const audio = new Audio(response.assistant_audio_url);
+        void audio.play().catch(() => undefined);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setConversationError(error.message);
+      } else {
+        setConversationError(t("newItem.questionsError"));
+      }
+    } finally {
+      setConversationLoading(false);
+    }
+  };
+
+  const startConversationRecording = async (): Promise<void> => {
+    if (conversationRecording || conversationLoading) {
+      return;
+    }
+    if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.mediaDevices || typeof MediaRecorder === "undefined") {
+      setConversationError(t("newItem.conversationMicUnsupported"));
+      return;
+    }
+
+    setConversationError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      conversationStreamRef.current = stream;
+      const preferredMime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType: preferredMime });
+      conversationRecorderRef.current = recorder;
+      conversationChunksRef.current = [];
+      conversationShouldSubmitRef.current = true;
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data.size > 0) {
+          conversationChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        const shouldSubmit = conversationShouldSubmitRef.current;
+        if (conversationTimerRef.current !== null) {
+          window.clearInterval(conversationTimerRef.current);
+          conversationTimerRef.current = null;
+        }
+        const streamRef = conversationStreamRef.current;
+        if (streamRef) {
+          streamRef.getTracks().forEach((track) => track.stop());
+          conversationStreamRef.current = null;
+        }
+        setConversationRecording(false);
+        setConversationRecordingSeconds(0);
+        conversationRecorderRef.current = null;
+        const recordedBlob = new Blob(conversationChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        conversationChunksRef.current = [];
+        if (!shouldSubmit || recordedBlob.size === 0) {
+          return;
+        }
+        void submitConversationAudio(recordedBlob);
+      };
+      recorder.start();
+      setConversationRecording(true);
+      setConversationRecordingSeconds(0);
+      conversationTimerRef.current = window.setInterval(() => {
+        setConversationRecordingSeconds((current) => current + 1);
+      }, 1000);
+    } catch {
+      setConversationError(t("newItem.conversationMicDenied"));
+      if (conversationStreamRef.current) {
+        conversationStreamRef.current.getTracks().forEach((track) => track.stop());
+        conversationStreamRef.current = null;
+      }
+      conversationRecorderRef.current = null;
+      setConversationRecording(false);
+      setConversationRecordingSeconds(0);
+    }
+  };
+
+  const closeConversationModal = (): void => {
+    stopConversationRecording(false);
+    setShowConversationModal(false);
+    setConversationError("");
+  };
+
   return (
     <div>
       <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
@@ -669,6 +842,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           </button>
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
+          </button>
+          <button type="button" className="secondary-button item-action-button" onClick={() => setShowConversationModal(true)}>
+            {t("newItem.openConversation")}
           </button>
         </div>
       )}
@@ -930,6 +1106,122 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             )}
             <div className="actions">
               <button type="button" className="secondary-button" onClick={() => setShowQuestionsModal(false)}>
+                {t("newItem.closeRelatedDialogs")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showConversationModal && (item.item_type === "word" || item.item_type === "phrase") && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal questions-modal conversation-modal">
+            <p>
+              <strong>{t("newItem.conversationTitle")}</strong>
+            </p>
+            <p className="hint">{t("newItem.conversationDescription")}</p>
+            <div className="questions-modal-item-texts">
+              <p className="questions-modal-item-text">
+                <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {item.spanish_text}
+              </p>
+              <p className="questions-modal-item-text">
+                <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {item.german_text}
+              </p>
+            </div>
+            <div ref={conversationHistoryRef} className="item-questions-history item-chat-thread item-conversation-history">
+              {!conversationTurns.length && <p className="hint item-conversation-empty">{t("newItem.conversationEmpty")}</p>}
+              {conversationTurns.map((turn, index) => (
+                <article key={`conv-${index}`} className="item-question-entry item-chat-entry">
+                  <div className="item-chat-message item-chat-user">
+                    <p className="item-chat-meta">{t("newItem.conversationLabelYou")}</p>
+                    <p className="item-chat-bubble">{turn.user_text}</p>
+                    {!!turn.user_translation_text && (
+                      <button
+                        type="button"
+                        className="item-conversation-correction-toggle"
+                        onClick={() => {
+                          setConversationUserTranslationVisible((current) => ({ ...current, [index]: !current[index] }));
+                        }}
+                      >
+                        {conversationUserTranslationVisible[index]
+                          ? t("newItem.conversationHideUserTranslation")
+                          : t("newItem.conversationShowUserTranslation")}
+                      </button>
+                    )}
+                    {!!turn.user_translation_text && conversationUserTranslationVisible[index] && (
+                      <p className="item-conversation-correction item-conversation-correction-translation">
+                        <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text}
+                      </p>
+                    )}
+                    {!!turn.user_corrected_text
+                      && turn.user_corrected_text.trim().toLowerCase() !== turn.user_text.trim().toLowerCase() && (
+                      <button
+                        type="button"
+                        className="item-conversation-correction-toggle"
+                        onClick={() => {
+                          setConversationCorrectionVisible((current) => ({ ...current, [index]: !current[index] }));
+                        }}
+                      >
+                        {conversationCorrectionVisible[index]
+                          ? t("newItem.conversationHideCorrection")
+                          : t("newItem.conversationShowCorrection")}
+                      </button>
+                    )}
+                    {!!turn.user_corrected_text && conversationCorrectionVisible[index] && (
+                      <p className="item-conversation-correction">
+                        <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
+                      </p>
+                    )}
+                    {!!turn.user_corrected_translation_text && conversationCorrectionVisible[index] && (
+                      <p className="item-conversation-correction item-conversation-correction-translation">
+                        <strong>{sourceLanguageLabel}:</strong> {turn.user_corrected_translation_text}
+                      </p>
+                    )}
+                  </div>
+                  <div className="item-chat-message item-chat-assistant">
+                    <p className="item-chat-meta">{t("newItem.conversationLabelTutor")}</p>
+                    <p className="item-chat-bubble">{turn.assistant_text}</p>
+                    {!!turn.assistant_translation_text && (
+                      <button
+                        type="button"
+                        className="item-conversation-translation-toggle"
+                        onClick={() => {
+                          setConversationTranslationVisible((current) => ({ ...current, [index]: !current[index] }));
+                        }}
+                      >
+                        {conversationTranslationVisible[index]
+                          ? t("newItem.conversationHideTranslation")
+                          : t("newItem.conversationShowTranslation")}
+                      </button>
+                    )}
+                    {!!turn.assistant_translation_text && conversationTranslationVisible[index] && (
+                      <p className="item-conversation-translation">
+                        <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+            {conversationError && <p className="error">{conversationError}</p>}
+            {conversationRecording && (
+              <p className="item-conversation-listening">
+                <span className="item-conversation-listening-dot" />
+                {t("newItem.conversationListening", { seconds: conversationRecordingSeconds })}
+              </p>
+            )}
+            {conversationLoading && <p className="hint">{t("newItem.conversationProcessing")}</p>}
+            <div className="actions">
+              {!conversationRecording && (
+                <button type="button" onClick={() => void startConversationRecording()} disabled={conversationLoading}>
+                  {t("newItem.conversationStartRecording")}
+                </button>
+              )}
+              {conversationRecording && (
+                <button type="button" className="secondary-button" onClick={() => stopConversationRecording(true)}>
+                  {t("newItem.conversationStopRecording")}
+                </button>
+              )}
+              <button type="button" className="secondary-button" onClick={closeConversationModal} disabled={conversationLoading}>
                 {t("newItem.closeRelatedDialogs")}
               </button>
             </div>

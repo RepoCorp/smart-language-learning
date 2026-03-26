@@ -1,4 +1,5 @@
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from learning.models import ConversationFingerprint, DialogTurn, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
@@ -1291,3 +1292,79 @@ def test_quick_add_word_creates_item_with_contextual_translation(monkeypatch):
         source_language="spanish",
         target_language="german",
     ).exists()
+
+
+@pytest.mark.django_db
+def test_item_conversation_audio_returns_transcript_reply_and_audio(monkeypatch):
+    from learning.views import content as content_views
+    from learning.views.content import management as management_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="taxi",
+        german_text="das Taxi",
+        source_language="spanish",
+        target_language="german",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "_openai_transcribe_audio_upload",
+        lambda *args, **kwargs: "Ich brauche ein Taxi.",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "call_openai_json",
+        lambda *args, **kwargs: {
+            "reply_text": "Sehr gut. Wohin moechtest du mit dem Taxi fahren?",
+            "source_translation": "Muy bien. A donde quieres ir en taxi?",
+            "user_source_translation": "Necesito un taxi.",
+            "corrected_user_text": "Ich brauche ein Taxi.",
+            "corrected_user_source_translation": "Necesito un taxi.",
+        },
+    )
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": "http://localhost:8000/media/audio/conversation-reply.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/conversation?source_language=spanish&target_language=german",
+        {
+            "audio": SimpleUploadedFile("speech.webm", b"fake-audio-bytes", content_type="audio/webm"),
+            "history": "[]",
+        },
+        format="multipart",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["user_text"] == "Ich brauche ein Taxi."
+    assert payload["user_translation_text"] == "Necesito un taxi."
+    assert payload["user_corrected_text"] == "Ich brauche ein Taxi."
+    assert payload["user_corrected_translation_text"] == "Necesito un taxi."
+    assert payload["assistant_text"] == "Sehr gut. Wohin moechtest du mit dem Taxi fahren?"
+    assert payload["assistant_translation_text"] == "Muy bien. A donde quieres ir en taxi?"
+    assert payload["assistant_audio_url"] == "http://localhost:8000/media/audio/conversation-reply.mp3"
+
+
+@pytest.mark.django_db
+def test_item_conversation_audio_requires_audio_file():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="taxi",
+        german_text="das Taxi",
+        source_language="spanish",
+        target_language="german",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/conversation?source_language=spanish&target_language=german",
+        {"history": "[]"},
+        format="multipart",
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "audio file is required"

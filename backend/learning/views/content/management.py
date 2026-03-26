@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import json
 import math
 import logging
+from uuid import uuid4
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest, urlopen
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
@@ -361,6 +366,55 @@ class ContentWordQuickAddView(APIView):
         )
 
 
+class ContentItemConversationView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        item = Item.objects.filter(
+            id=item_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        audio_file = request.FILES.get("audio")
+        if audio_file is None:
+            return Response({"detail": "audio file is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        history = _parse_item_conversation_history(request.data.get("history"))
+        user_text = _openai_transcribe_audio_upload(audio_file, target_language=target_language)
+        if not user_text:
+            return Response({"detail": "Could not transcribe audio"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        assistant_payload = _generate_item_conversation_reply(
+            item=item,
+            user_text=user_text,
+            history=history,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        assistant_text = assistant_payload["reply_text"]
+        assistant_translation_text = assistant_payload.get("source_translation", "")
+        user_translation_text = assistant_payload.get("user_source_translation", "")
+        user_corrected_text = assistant_payload.get("corrected_user_text", "")
+        user_corrected_translation_text = assistant_payload.get("corrected_user_source_translation", "")
+        assistant_audio_url = ""
+        if assistant_text:
+            assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
+
+        return Response(
+            {
+                "user_text": user_text,
+                "user_translation_text": user_translation_text,
+                "user_corrected_text": user_corrected_text,
+                "user_corrected_translation_text": user_corrected_translation_text,
+                "assistant_text": assistant_text,
+                "assistant_translation_text": assistant_translation_text,
+                "assistant_audio_url": assistant_audio_url,
+            }
+        )
+
+
 def _resolve_dialog_click_word_pair(
     *,
     source_text: str,
@@ -429,6 +483,186 @@ Rules:
     if not resolved_target:
         resolved_target = target_text
     return resolved_source[:120], resolved_target[:120]
+
+
+def _parse_item_conversation_history(raw_value) -> list[dict[str, str]]:
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, str):
+        try:
+            parsed = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return []
+    elif isinstance(raw_value, list):
+        parsed = raw_value
+    else:
+        return []
+
+    cleaned: list[dict[str, str]] = []
+    for entry in parsed:
+        if not isinstance(entry, dict):
+            continue
+        user_text = str(entry.get("user_text", "")).strip()
+        assistant_text = str(entry.get("assistant_text", "")).strip()
+        if not user_text and not assistant_text:
+            continue
+        cleaned.append({"user_text": user_text[:500], "assistant_text": assistant_text[:800]})
+    return cleaned[-8:]
+
+
+def _openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> str:
+    api_key = settings.OPENAI_API_KEY
+    if not api_key:
+        return ""
+
+    try:
+        file_bytes = uploaded_file.read()
+        if hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
+    except Exception:
+        return ""
+    if not file_bytes:
+        return ""
+
+    model_name = str(getattr(settings, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")).strip() or "gpt-4o-mini-transcribe"
+    filename = str(getattr(uploaded_file, "name", "")).strip() or f"speech-{uuid4().hex[:8]}.webm"
+    content_type = str(getattr(uploaded_file, "content_type", "")).strip() or "application/octet-stream"
+    language_hint = {
+        "spanish": "es",
+        "english": "en",
+        "german": "de",
+        "french": "fr",
+        "italian": "it",
+        "portuguese": "pt",
+    }.get(target_language, "")
+
+    boundary = f"----smartlang-{uuid4().hex}"
+    body = bytearray()
+
+    def append_field(name: str, value: str) -> None:
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"))
+        body.extend(value.encode("utf-8"))
+        body.extend(b"\r\n")
+
+    append_field("model", model_name)
+    if language_hint:
+        append_field("language", language_hint)
+    body.extend(f"--{boundary}\r\n".encode("utf-8"))
+    body.extend(f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode("utf-8"))
+    body.extend(f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"))
+    body.extend(file_bytes)
+    body.extend(b"\r\n")
+    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+
+    request = UrlRequest(
+        "https://api.openai.com/v1/audio/transcriptions",
+        data=bytes(body),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    timeout_seconds = int(getattr(settings, "OPENAI_REQUEST_TIMEOUT_SECONDS", 30))
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        return ""
+    return str(payload.get("text", "")).strip()[:1000]
+
+
+def _generate_item_conversation_reply(
+    *,
+    item: Item,
+    user_text: str,
+    history: list[dict[str, str]],
+    source_language: str,
+    target_language: str,
+) -> dict[str, str]:
+    history_lines: list[str] = []
+    for row in history:
+        if row.get("user_text"):
+            history_lines.append(f"Learner: {row['user_text']}")
+        if row.get("assistant_text"):
+            history_lines.append(f"Tutor: {row['assistant_text']}")
+
+    parsed = call_openai_json(
+        """
+You are a language tutor. Continue a short voice conversation focused on one study item.
+
+Return strict JSON:
+{
+  "reply_text": "string",
+  "source_translation": "string",
+  "user_source_translation": "string",
+  "corrected_user_text": "string",
+  "corrected_user_source_translation": "string"
+}
+
+Rules:
+- Write reply_text in the TARGET language only.
+- Write source_translation in the SOURCE language only.
+- user_source_translation must be the SOURCE-language translation of the learner input.
+- corrected_user_text must be in TARGET language and should only be provided when a correction is needed.
+- corrected_user_source_translation must be in SOURCE language and only for corrected_user_text.
+- Keep reply_text as the normal tutor response (as before), without embedding correction formatting.
+- If a correction is needed, put it in corrected_user_text and keep reply_text conversational.
+- Keep it concise: 1 to 3 short sentences.
+- Keep source_translation concise and natural, aligned to reply_text meaning.
+- Keep the conversation centered on this specific item and its usage.
+- Correct obvious learner mistakes briefly and naturally when needed.
+- End with one simple follow-up question to keep the conversation going.
+- JSON only.
+""".strip(),
+        (
+            f"Source language: {_language_display_name(source_language)}\n"
+            f"Target language: {_language_display_name(target_language)}\n"
+            f"Item source text: {item.spanish_text}\n"
+            f"Item target text: {item.german_text}\n"
+            f"Item notes: {item.notes}\n"
+            f"Recent conversation:\n{chr(10).join(history_lines[-12:])}\n"
+            f"Learner new message: {user_text}\n"
+        ),
+        timeout_seconds=10,
+        temperature=0.4,
+        top_p=0.9,
+        presence_penalty=0.2,
+    )
+    if isinstance(parsed, dict):
+        reply_text = str(parsed.get("reply_text", "")).strip()
+        source_translation = str(parsed.get("source_translation", "")).strip()
+        user_source_translation = str(parsed.get("user_source_translation", "")).strip()
+        corrected_user_text = str(parsed.get("corrected_user_text", "")).strip()
+        corrected_user_source_translation = str(parsed.get("corrected_user_source_translation", "")).strip()
+        if reply_text:
+            return {
+                "reply_text": reply_text[:1200],
+                "source_translation": source_translation[:1200],
+                "user_source_translation": user_source_translation[:1200],
+                "corrected_user_text": corrected_user_text[:1200],
+                "corrected_user_source_translation": corrected_user_source_translation[:1200],
+            }
+
+    fallback_by_language = {
+        "german": f"{item.german_text} ist wichtig. Kannst du einen kurzen Satz mit {item.german_text} sagen?",
+        "spanish": f"{item.german_text} es importante. Puedes decir una frase corta con {item.german_text}?",
+        "english": f"{item.german_text} is important. Can you say one short sentence with {item.german_text}?",
+        "french": f"{item.german_text} est important. Peux-tu dire une phrase courte avec {item.german_text} ?",
+        "italian": f"{item.german_text} e importante. Puoi dire una frase breve con {item.german_text}?",
+        "portuguese": f"{item.german_text} e importante. Voce pode dizer uma frase curta com {item.german_text}?",
+    }
+    return {
+        "reply_text": fallback_by_language.get(
+            target_language,
+            f"{item.german_text} is important. Can you say one short sentence with {item.german_text}?",
+        ),
+        "source_translation": "",
+        "user_source_translation": "",
+        "corrected_user_text": "",
+        "corrected_user_source_translation": "",
+    }
 
 
 def _link_word_to_dialog_turn(*, item: Item, dialog_id_raw, turn_index_raw) -> None:

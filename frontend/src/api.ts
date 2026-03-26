@@ -2,6 +2,7 @@ import type {
   ContentConfirmResponse,
   ContentItemsResponse,
   ContentItemDetailResponse,
+  ContentItemConversationResponse,
   ContentItemQuestionResponse,
   ContentPreviewResponse,
   ContentTopicContextsResponse,
@@ -279,6 +280,40 @@ export async function askContentItemQuestion(
     throw new Error(detail);
   }
   return (await response.json()) as ContentItemQuestionResponse;
+}
+
+export async function sendContentItemConversationAudio(
+  itemId: number,
+  audioBlob: Blob,
+  history: Array<{ user_text: string; assistant_text: string }>,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemConversationResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "speech.webm");
+  formData.append("history", JSON.stringify(history));
+
+  const response = await fetch(`${API_BASE}/content/items/${itemId}/conversation?${params.toString()}`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    let detail = "Failed to process conversation audio";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemConversationResponse;
 }
 
 export async function quickAddWordFromDialog(
