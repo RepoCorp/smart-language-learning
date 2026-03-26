@@ -114,6 +114,28 @@ body {
   margin-top: 12px;
 }
 
+.item-actions-toolbar {
+  flex-wrap: wrap;
+}
+
+.item-action-button {
+  background: #f8fafc;
+  color: #102a43;
+  border: 1px solid #9fb3c8;
+}
+
+.item-got-it-button {
+  background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+  border: 1px solid #166534;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(22, 101, 52, 0.2);
+}
+
+.item-got-it-button:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
 .options {
   display: grid;
   grid-template-columns: 1fr;

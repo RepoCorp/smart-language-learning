@@ -256,6 +256,15 @@ class ContentWordQuickAddView(APIView):
         if not source_text or not target_text:
             return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        source_text, target_text = _resolve_dialog_click_word_pair(
+            source_text=source_text,
+            target_text=target_text,
+            source_language=source_language,
+            target_language=target_language,
+            dialog_id_raw=dialog_id_raw,
+            turn_index_raw=turn_index_raw,
+        )
+
         exists = item_exists(
             "word",
             source_text,
@@ -350,6 +359,76 @@ class ContentWordQuickAddView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+def _resolve_dialog_click_word_pair(
+    *,
+    source_text: str,
+    target_text: str,
+    source_language: str,
+    target_language: str,
+    dialog_id_raw,
+    turn_index_raw,
+) -> tuple[str, str]:
+    try:
+        dialog_id = int(dialog_id_raw)
+        turn_index = int(turn_index_raw)
+    except (TypeError, ValueError):
+        return source_text, target_text
+
+    dialog = SavedDialog.objects.filter(
+        id=dialog_id,
+        source_language=source_language,
+        target_language=target_language,
+    ).first()
+    if not dialog:
+        return source_text, target_text
+    turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
+    if not turn:
+        return source_text, target_text
+
+    parsed = call_openai_json(
+        """
+Resolve a clicked word translation in context for a language-learning dialog turn.
+
+Return strict JSON:
+{
+  "source_text": "string",
+  "target_text": "string"
+}
+
+Rules:
+- Keep target_text equal to the clicked target token, except trim punctuation/spacing.
+- source_text must be the best source-language translation in THIS turn context.
+- Prefer dictionary-style compact form (1-3 words).
+- If uncertain, keep the clicked source_text.
+- JSON only.
+""".strip(),
+        (
+            f"Source language: {_language_display_name(source_language)}\n"
+            f"Target language: {_language_display_name(target_language)}\n"
+            f"Dialog topic: {dialog.topic}\n"
+            f"Dialog context: {dialog.context}\n"
+            f"Full source line: {turn.source_text}\n"
+            f"Full target line: {turn.target_text}\n"
+            f"Clicked source token: {source_text}\n"
+            f"Clicked target token: {target_text}\n"
+        ),
+        timeout_seconds=6,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        return source_text, target_text
+
+    resolved_source = str(parsed.get("source_text", source_text)).strip()
+    resolved_target = str(parsed.get("target_text", target_text)).strip()
+    if not resolved_source:
+        resolved_source = source_text
+    if not resolved_target:
+        resolved_target = target_text
+    return resolved_source[:120], resolved_target[:120]
 
 
 def _link_word_to_dialog_turn(*, item: Item, dialog_id_raw, turn_index_raw) -> None:

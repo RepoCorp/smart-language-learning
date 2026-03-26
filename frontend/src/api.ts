@@ -289,7 +289,7 @@ export async function quickAddWordFromDialog(
   dialogId?: number,
   turnIndex?: number,
   checkOnly = false,
-): Promise<{ created: boolean; exists: boolean; id?: number | null }> {
+): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
@@ -310,7 +310,13 @@ export async function quickAddWordFromDialog(
     throw new Error("Failed to add word from dialog");
   }
   notifyOverviewStatsUpdated();
-  return (await response.json()) as { created: boolean; exists: boolean; id?: number | null };
+  return (await response.json()) as {
+    created: boolean;
+    exists: boolean;
+    id?: number | null;
+    source_text?: string;
+    target_text?: string;
+  };
 }
 
 export async function deleteContentTopic(

@@ -260,7 +260,13 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         return;
       }
       setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
-      setPendingWordAdd({ key, source: sourceToken, target: targetToken, dialogId, turnIndex });
+      setPendingWordAdd({
+        key,
+        source: check.source_text || sourceToken,
+        target: check.target_text || targetToken,
+        dialogId,
+        turnIndex,
+      });
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
     }
@@ -654,29 +660,21 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         </>
       )}
       {(item.item_type === "word" || item.item_type === "phrase") && (
-        <div className="actions">
-          <button type="button" onClick={() => setShowDialogsModal(true)}>
+        <div className="actions item-actions-toolbar">
+          <button type="button" className="secondary-button item-action-button" onClick={() => setShowDialogsModal(true)}>
             {t("newItem.openRelatedDialogs")}
           </button>
-        </div>
-      )}
-      {(item.item_type === "word" || item.item_type === "phrase") && (
-        <div className="actions">
-          <button type="button" onClick={() => setShowExerciseModal(true)}>
+          <button type="button" className="secondary-button item-action-button" onClick={() => setShowExerciseModal(true)}>
             {t("newItem.openExercises")}
           </button>
-        </div>
-      )}
-      {(item.item_type === "word" || item.item_type === "phrase") && (
-        <div className="actions">
-          <button type="button" onClick={() => setShowQuestionsModal(true)}>
+          <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
           </button>
         </div>
       )}
       {!readOnly && (
         <div className="actions">
-          <button onClick={markAsSeen} disabled={saving}>
+          <button type="button" className="item-got-it-button" onClick={markAsSeen} disabled={saving}>
             {saving ? t("newItem.saving") : t("newItem.gotIt")}
           </button>
         </div>
@@ -694,27 +692,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             <p>
               <strong>{t("newItem.relatedDialogs", { count: item.related_dialogs?.length || 0 })}</strong>
             </p>
-            {!!itemQuestions.length && (
-              <>
-                <p>
-                  <strong>{t("newItem.questionsTitle")}</strong>
-                </p>
-                <div className="item-questions-history item-chat-thread">
-                  {itemQuestions.map((entry) => (
-                    <article key={`dialogs-${entry.id}`} className="item-question-entry item-chat-entry">
-                      <div className="item-chat-message item-chat-user">
-                        <p className="item-chat-meta">{t("newItem.questionsLabelQuestion")}</p>
-                        <p className="item-chat-bubble">{entry.question_text}</p>
-                      </div>
-                      <div className="item-chat-message item-chat-assistant">
-                        <p className="item-chat-meta">{t("newItem.questionsLabelAnswer")}</p>
-                        <p className="item-chat-bubble">{entry.answer_text}</p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </>
-            )}
             {!item.related_dialogs?.length && <p>{t("newItem.noRelatedDialogs")}</p>}
             {!!item.related_dialogs?.length && (
               <div className="related-dialogs-scroll">

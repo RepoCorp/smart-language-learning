@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import ConversationFingerprint, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
+from learning.models import ConversationFingerprint, DialogTurn, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
 
 
 @pytest.mark.django_db
@@ -1183,3 +1183,111 @@ def test_content_item_question_rejects_unrelated_questions(monkeypatch):
     assert response.status_code == 400
     assert response.json()["code"] == "UNRELATED_QUESTION"
     assert ItemQuestionExchange.objects.filter(item=item).count() == 0
+
+
+@pytest.mark.django_db
+def test_quick_add_word_uses_contextual_translation_for_existing_item(monkeypatch):
+    from learning.views.content import management as management_views
+
+    existing = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="vuelta",
+        german_text="runde",
+        source_language="spanish",
+        target_language="german",
+    )
+    dialog = SavedDialog.objects.create(
+        topic="transporte",
+        context="estacion",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Está justo a la vuelta de la esquina.", "target_text": "Es ist gleich um die Ecke."}],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Está justo a la vuelta de la esquina.",
+        target_text="Es ist gleich um die Ecke.",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "call_openai_json",
+        lambda *args, **kwargs: {"source_text": "vuelta", "target_text": "Runde"},
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "esquina",
+            "target_text": "Runde",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["exists"] is True
+    assert payload["created"] is False
+    assert payload["id"] == existing.id
+    assert payload["source_text"] == "vuelta"
+    assert payload["target_text"] == "Runde"
+
+
+@pytest.mark.django_db
+def test_quick_add_word_creates_item_with_contextual_translation(monkeypatch):
+    from learning.views import content as content_views
+    from learning.views.content import management as management_views
+
+    dialog = SavedDialog.objects.create(
+        topic="transporte",
+        context="estacion",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Está justo a la vuelta de la esquina.", "target_text": "Es ist gleich um die Ecke."}],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Está justo a la vuelta de la esquina.",
+        target_text="Es ist gleich um die Ecke.",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "call_openai_json",
+        lambda *args, **kwargs: {"source_text": "esquina", "target_text": "Ecke"},
+    )
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "vuelta",
+            "target_text": "Runde",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["created"] is True
+    assert payload["exists"] is False
+    assert payload["source_text"] == "esquina"
+    assert payload["target_text"] == "Ecke"
+    assert Item.objects.filter(
+        item_type=Item.ItemType.WORD,
+        spanish_text="esquina",
+        german_text="Ecke",
+        source_language="spanish",
+        target_language="german",
+    ).exists()
