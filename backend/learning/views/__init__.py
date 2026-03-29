@@ -20,7 +20,7 @@ from .overview_stats import OverviewStatsView
 from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
-from .auth import AuthLoginView, AuthLogoutView, AuthMeView
+from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
 
 __all__ = [
     "ContentConfirmView",
@@ -46,4 +46,6 @@ __all__ = [
     "AuthLoginView",
     "AuthLogoutView",
     "AuthMeView",
+    "AuthRegisterView",
+    "AuthBootstrapStatusView",
 ]

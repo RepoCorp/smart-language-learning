@@ -4,6 +4,8 @@ from .views import (
     AuthLoginView,
     AuthLogoutView,
     AuthMeView,
+    AuthRegisterView,
+    AuthBootstrapStatusView,
     ContentConfirmView,
     ContentItemConversationView,
     ContentItemDetailView,
@@ -29,6 +31,8 @@ from .views import (
 urlpatterns = [
     path("health", HealthView.as_view(), name="health"),
     path("auth/login", AuthLoginView.as_view(), name="auth-login"),
+    path("auth/bootstrap-status", AuthBootstrapStatusView.as_view(), name="auth-bootstrap-status"),
+    path("auth/register", AuthRegisterView.as_view(), name="auth-register"),
     path("auth/logout", AuthLogoutView.as_view(), name="auth-logout"),
     path("auth/me", AuthMeView.as_view(), name="auth-me"),
     path("overview-stats", OverviewStatsView.as_view(), name="overview-stats"),

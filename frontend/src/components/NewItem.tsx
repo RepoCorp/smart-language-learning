@@ -1256,24 +1256,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {item.german_text}
               </p>
             </div>
-            <form
-              className="item-questions-actions"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void askItemQuestion();
-              }}
-            >
-              <input
-                value={itemQuestionInput}
-                onChange={(event) => setItemQuestionInput(event.target.value)}
-                placeholder={t("newItem.questionsPlaceholder")}
-                disabled={askingQuestion}
-              />
-              <button type="submit" disabled={askingQuestion || !itemQuestionInput.trim()}>
-                {askingQuestion ? t("newItem.questionsLoading") : t("newItem.questionsAskButton")}
-              </button>
-            </form>
-            {itemQuestionError && <p className="error">{itemQuestionError}</p>}
             {!!itemQuestions.length && (
               <div ref={questionsHistoryRef} className="item-questions-history item-chat-thread">
                 {orderedItemQuestions.map((entry, index) => (
@@ -1294,6 +1276,24 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 ))}
               </div>
             )}
+            <form
+              className="item-questions-actions"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void askItemQuestion();
+              }}
+            >
+              <input
+                value={itemQuestionInput}
+                onChange={(event) => setItemQuestionInput(event.target.value)}
+                placeholder={t("newItem.questionsPlaceholder")}
+                disabled={askingQuestion}
+              />
+              <button type="submit" disabled={askingQuestion || !itemQuestionInput.trim()}>
+                {askingQuestion ? t("newItem.questionsLoading") : t("newItem.questionsAskButton")}
+              </button>
+            </form>
+            {itemQuestionError && <p className="error">{itemQuestionError}</p>}
             <div className="actions">
               <button type="button" className="secondary-button" onClick={() => setShowQuestionsModal(false)}>
                 {t("newItem.closeRelatedDialogs")}

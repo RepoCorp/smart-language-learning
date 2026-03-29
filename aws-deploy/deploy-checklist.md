@@ -21,7 +21,7 @@ docker push 330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning
 
 
 # Frontend (inject API URL at build time)
-docker build --platform linux/amd64 -f aws-deploy/frontend.Dockerfile.prod --build-arg VITE_API_URL=http://sll-alb-1301042143.us-east-1.elb.amazonaws.com/api -t smart-language-learning-frontend:latest .
+docker build --platform linux/amd64 -f aws-deploy/frontend.Dockerfile.prod --build-arg VITE_API_URL=https://www.welearnsmart.com/api -t smart-language-learning-frontend:latest .
 docker tag smart-language-learning-frontend:latest 330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-frontend:latest
 docker push 330056673401.dkr.ecr.us-east-1.amazonaws.com/smart-language-learning-frontend:latest
 ```

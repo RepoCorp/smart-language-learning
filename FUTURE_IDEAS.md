@@ -26,13 +26,20 @@ Remove some text in some places that I don't really need, like These notes are o
 Evaluar cuando se consigio el objetivo
 Session store algunos de los parametros  
 Regenerate audio afectaria a todo el mundo, arreglar de alguna manera. Posiblemente arreglando el codigo para que no haya necesidad de regenerarlo
-
+Safety when creating users and super users, and other things in general
+Usar un model mejor para las preguntas (ENVs para distintos objetivos)
+Cuidado con el audio que usa ingles muchas veces para palabras en aleman
+en los ejercicios no cortar el audio cuando terminan los 30 segundos, simplemente no seguir el bucle
 Do not force finishing of the session on countdown end, just on completing the planned session. Actually don't use a countdown, just a timer.
 Para la conversacion, en los detalles incluir quien soy yo y quien es el usuario, de pronto si guardar estas opciones en el backend
 Ser mas especifico en el goal de la conversacion 
-
-
+Usar servicio de autenticacion de Azure
+Celular friendly
+DNS y certificado SSL
 Add settings to deploy files, like updated roles permissions, env...
+Que header no este fixed para que sea mas facil en mobil 
+Creando content en un mobil, las palabras nuevas salen todas desordenadas
+Alguna manera de revisar repeticion de palabras que pueden ser la misma pero con alguna minima diferencia en como la traducen, pero realmente es lo mismo
 
 Audio mas rapido y mas "ofuscado"
 Crear multiple dialogos a la vez

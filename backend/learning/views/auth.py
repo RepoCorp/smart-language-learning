@@ -37,8 +37,60 @@ class AuthLoginView(APIView):
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
+                    "is_superuser": bool(user.is_superuser),
                 },
             }
+        )
+
+
+class AuthRegisterView(APIView):
+    def post(self, request: Request) -> Response:
+        username = str(request.data.get("username", "")).strip()
+        email = str(request.data.get("email", "")).strip().lower()
+        pin = str(request.data.get("pin", "")).strip()
+        if not username or not email or not pin:
+            return Response({"detail": "username, email and pin are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(pin) < 4:
+            return Response({"detail": "pin must have at least 4 characters"}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        is_first_user = User.objects.count() == 0
+        request_user = get_request_user(request)
+        if (not is_first_user) and (request_user is None or not request_user.is_superuser):
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+
+        if User.objects.filter(username__iexact=username).exists():
+            return Response({"detail": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({"detail": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if is_first_user:
+            user = User.objects.create_superuser(username=username, email=email, password=pin)
+            token = UserAuthToken.objects.create(user=user)
+            return Response(
+                {
+                    "token": token.key,
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email,
+                        "is_superuser": bool(user.is_superuser),
+                    },
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        else:
+            user = User.objects.create_user(username=username, email=email, password=pin)
+        return Response(
+            {
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "is_superuser": bool(user.is_superuser),
+                },
+            },
+            status=status.HTTP_201_CREATED,
         )
 
 
@@ -66,6 +118,13 @@ class AuthMeView(APIView):
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
+                    "is_superuser": bool(user.is_superuser),
                 },
             }
         )
+
+
+class AuthBootstrapStatusView(APIView):
+    def get(self, request: Request) -> Response:
+        User = get_user_model()
+        return Response({"can_public_register": User.objects.count() == 0})

@@ -1521,6 +1521,17 @@ def _model_answer_or_reject_item_question(
         item_target_norm and item_target_norm in question_norm
     )
 
+    history_rows = list(item.question_exchanges.order_by("created_at", "id"))
+    history_lines: list[str] = []
+    for idx, row in enumerate(history_rows, start=1):
+        question = str(row.question_text or "").strip()
+        answer = str(row.answer_text or "").strip()
+        if not question and not answer:
+            continue
+        history_lines.append(f"{idx}. Learner: {question}")
+        history_lines.append(f"{idx}. Tutor: {answer}")
+    history_text = "\n".join(history_lines) if history_lines else "(no previous conversation)"
+
     parsed = call_openai_json(
         """
 Decide if a learner question is related to learning a specific item.
@@ -1549,7 +1560,12 @@ Rules:
 - If the learner asks about a word "in {target language}" or within the item context, treat it as related.
 - Only mark unrelated when it is clearly about a different domain/topic.
 - Do not answer unrelated questions.
-- Mention both languages where useful when answering.
+- Use full conversation history for context and continuity.
+- Keep all explanations/comments focused on TARGET language usage (meaning, grammar, form, pronunciation, and context).
+- If examples or forms are included, they should describe TARGET language usage.
+- Do not include source-language teaching/explanations.
+- The answer text itself must be written in SOURCE language.
+- Before returning, verify your answer satisfies the last 3 rules exactly.
 - JSON only.
 """.strip(),
         (
@@ -1561,6 +1577,7 @@ Rules:
             f"Item target text ({_language_display_name(target_language)}): {item.german_text}\n"
             f"Item notes: {item.notes}\n"
             f"Item example: {item.example_sentence}\n"
+            f"Conversation history (oldest to newest):\n{history_text}\n"
         ),
         timeout_seconds=8,
         temperature=0.0,
@@ -1581,11 +1598,20 @@ Rules:
         reason = str(parsed.get("reason", "")).strip()
         if related:
             if answer:
-                return {"related": True, "code": result_code, "answer": answer[:3000], "reason": reason}
+                return {
+                    "related": True,
+                    "code": result_code,
+                    "answer": answer[:3000],
+                    "reason": reason,
+                }
             return {
                 "related": True,
                 "code": "RELATED_FALLBACK",
-                "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+                "answer": _fallback_item_question_answer(
+                    item=item,
+                    question_text=question_text,
+                    source_language=source_language,
+                ),
                 "reason": reason,
             }
 
@@ -1594,7 +1620,11 @@ Rules:
             return {
                 "related": True,
                 "code": "RELATED_OVERLAP_OVERRIDE",
-                "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+                "answer": _fallback_item_question_answer(
+                    item=item,
+                    question_text=question_text,
+                    source_language=source_language,
+                ),
                 "reason": reason,
             }
 
@@ -1605,13 +1635,21 @@ Rules:
             return {
                 "related": True,
                 "code": "RELATED_SOFT_OVERRIDE",
-                "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+                "answer": _fallback_item_question_answer(
+                    item=item,
+                    question_text=question_text,
+                    source_language=source_language,
+                ),
                 "reason": reason,
             }
         return {
             "related": True,
             "code": "RELATED_AMBIGUOUS_OVERRIDE",
-            "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+            "answer": _fallback_item_question_answer(
+                item=item,
+                question_text=question_text,
+                source_language=source_language,
+            ),
             "reason": reason,
         }
 
@@ -1621,32 +1659,38 @@ Rules:
     return {
         "related": True,
         "code": "RELATED_FALLBACK",
-        "answer": _fallback_item_question_answer(item=item, question_text=question_text),
+        "answer": _fallback_item_question_answer(
+            item=item,
+            question_text=question_text,
+            source_language=source_language,
+        ),
         "reason": "fallback allow",
     }
 
 
-def _fallback_item_question_answer(*, item: Item, question_text: str) -> str:
+def _fallback_item_question_answer(*, item: Item, question_text: str, source_language: str) -> str:
     target = item.german_text.strip()
-    source = item.spanish_text.strip()
     normalized_question = _normalize_text(question_text)
     if "example" in normalized_question or "ejemplo" in normalized_question:
-        return (
-            f"{target} = {source}\n"
-            f"Example 1: I use '{target}' in a short sentence.\n"
-            f"Example 2: I ask a question with '{target}'."
+        base = (
+            f"Use {target} in short target-language sentences.\n"
+            f"Example 1 ({target}): short everyday use.\n"
+            f"Example 2 ({target}): polite conversational use."
         )
+        return _ensure_source_language_text(base, source_language=source_language)
     if "grammar" in normalized_question or "gramatica" in normalized_question:
-        return (
-            f"{target} = {source}\n"
-            "Pay attention to article/word order in the target language.\n"
-            "Keep the same pattern and replace only one word at a time."
+        base = (
+            f"Grammar focus for {target} in the target language:\n"
+            "Pay attention to article and word order.\n"
+            "Keep one sentence pattern and replace one word at a time."
         )
-    return (
-        f"{target} = {source}\n"
-        "Focus on meaning, pronunciation, and one clean sentence pattern.\n"
-        "Ask about grammar, examples, or common mistakes for this same item."
+        return _ensure_source_language_text(base, source_language=source_language)
+    base = (
+        f"Focus on how {target} is used in the target language.\n"
+        "Practice pronunciation and one clean sentence pattern.\n"
+        "Ask for target-language examples, grammar, or common mistakes."
     )
+    return _ensure_source_language_text(base, source_language=source_language)
 
 
 def _serialize_question_exchange(exchange: ItemQuestionExchange) -> dict:

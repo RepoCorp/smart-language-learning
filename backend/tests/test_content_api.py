@@ -1160,6 +1160,45 @@ def test_content_item_question_saves_conversation(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_item_question_sends_full_conversation_context_to_model(monkeypatch):
+    from learning.views.content import management as management_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="gracias",
+        german_text="danke",
+        source_language="spanish",
+        target_language="german",
+    )
+    call_user_payloads: list[str] = []
+
+    def fake_call_openai_json(system_prompt, user_payload, **kwargs):
+        call_user_payloads.append(str(user_payload))
+        return {"related": True, "result_code": "RELATED_OK", "answer": "Nutze es in kurzen Saetzen."}
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+
+    client = APIClient()
+    response_one = client.post(
+        f"/api/content/items/{item.id}/question?source_language=spanish&target_language=german",
+        {"question_text": "How can I use danke in a sentence?"},
+        format="json",
+    )
+    response_two = client.post(
+        f"/api/content/items/{item.id}/question?source_language=spanish&target_language=german",
+        {"question_text": "Give me two more ways to say danke."},
+        format="json",
+    )
+
+    assert response_one.status_code == 201
+    assert response_two.status_code == 201
+    assert len(call_user_payloads) == 2
+    assert "Conversation history (oldest to newest):" in call_user_payloads[1]
+    assert "How can I use danke in a sentence?" in call_user_payloads[1]
+    assert "Nutze es in kurzen Saetzen." in call_user_payloads[1]
+
+
+@pytest.mark.django_db
 def test_content_item_question_rejects_unrelated_questions(monkeypatch):
     from learning.views.content import management as management_views
 

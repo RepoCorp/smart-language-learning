@@ -23,6 +23,7 @@ export type AuthUser = {
   id: number;
   username: string;
   email: string;
+  is_superuser: boolean;
 };
 
 function notifyOverviewStatsUpdated(): void {
@@ -51,6 +52,9 @@ export function getStoredAuthUser(): AuthUser | null {
     const parsed = JSON.parse(raw) as AuthUser;
     if (!parsed || typeof parsed.id !== "number") {
       return null;
+    }
+    if (typeof parsed.is_superuser !== "boolean") {
+      return { ...parsed, is_superuser: false };
     }
     return parsed;
   } catch {
@@ -87,10 +91,67 @@ export async function loginWithPin(identifier: string, pin: string): Promise<Aut
   return payload.user;
 }
 
+export async function registerWithPin(username: string, email: string, pin: string): Promise<AuthUser> {
+  const response = await apiFetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, pin }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to create user";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  const payload = (await response.json()) as { token?: string; user: AuthUser };
+  if (payload.token) {
+    storeAuthSession(payload.token, payload.user);
+    notifyOverviewStatsUpdated();
+  }
+  return payload.user;
+}
+
+export async function createUserWithPin(username: string, email: string, pin: string): Promise<AuthUser> {
+  const response = await apiFetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, pin }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to create user";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  const payload = (await response.json()) as { user: AuthUser };
+  return payload.user;
+}
+
 export async function logoutFromPinSession(): Promise<void> {
   await apiFetch(`${API_BASE}/auth/logout`, { method: "POST" });
   clearStoredAuthSession();
   notifyOverviewStatsUpdated();
+}
+
+export async function fetchAuthBootstrapStatus(): Promise<boolean> {
+  const response = await apiFetch(`${API_BASE}/auth/bootstrap-status`);
+  if (!response.ok) {
+    return false;
+  }
+  const payload = (await response.json()) as { can_public_register?: boolean };
+  return Boolean(payload.can_public_register);
 }
 
 export async function fetchSession(
