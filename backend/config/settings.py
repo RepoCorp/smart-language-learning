@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -79,7 +80,9 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-OPENAI_QUESTION_MODEL = os.getenv("OPENAI_QUESTION_MODEL", OPENAI_MODEL)
+OPENAI_QUESTION_MODEL = os.getenv("OPENAI_QUESTION_MODEL", "").strip()
+if not OPENAI_QUESTION_MODEL:
+    raise ImproperlyConfigured("OPENAI_QUESTION_MODEL is required")
 OPENAI_REQUEST_TIMEOUT_SECONDS = int(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "30"))
 OPENAI_TTS_REQUEST_TIMEOUT_SECONDS = int(os.getenv("OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", "40"))
 AUDIO_STORAGE_BACKEND = os.getenv("AUDIO_STORAGE_BACKEND", "local").strip().lower()

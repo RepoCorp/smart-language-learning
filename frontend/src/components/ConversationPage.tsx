@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  fetchTopicConversationUserCorrection,
+  fetchTopicConversationUserLiteralTranslation,
   fetchContentTopics,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
@@ -15,6 +17,7 @@ import type { ContentItemConversationResponse } from "../types";
 const CREATE_NEW_OPTION = "__create_new__";
 
 interface ConversationTurn extends ContentItemConversationResponse {}
+type GoalDifficulty = "easy" | "medium" | "hard";
 
 export default function ConversationPage(): JSX.Element {
   const { t } = useI18n();
@@ -34,12 +37,14 @@ export default function ConversationPage(): JSX.Element {
   const [customTopic, setCustomTopic] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [role, setRole] = useState<string>("");
+  const [goalDifficulty, setGoalDifficulty] = useState<GoalDifficulty>("medium");
   const [loadingTopics, setLoadingTopics] = useState<boolean>(false);
 
   const [started, setStarted] = useState<boolean>(false);
   const [activeTopic, setActiveTopic] = useState<string>("");
   const [activeNotes, setActiveNotes] = useState<string>("");
   const [activeRole, setActiveRole] = useState<string>("");
+  const [activeGoalDifficulty, setActiveGoalDifficulty] = useState<GoalDifficulty>("medium");
   const [conversationGoal, setConversationGoal] = useState<string>("");
   const [openingText, setOpeningText] = useState<string>("");
   const [openingAudioUrl, setOpeningAudioUrl] = useState<string>("");
@@ -55,6 +60,8 @@ export default function ConversationPage(): JSX.Element {
   const [conversationTranslationVisible, setConversationTranslationVisible] = useState<Record<number, boolean>>({});
   const [conversationCorrectionVisible, setConversationCorrectionVisible] = useState<Record<number, boolean>>({});
   const [conversationUserTranslationVisible, setConversationUserTranslationVisible] = useState<Record<number, boolean>>({});
+  const [conversationUserTranslationLoading, setConversationUserTranslationLoading] = useState<Record<number, boolean>>({});
+  const [conversationUserCorrectionLoading, setConversationUserCorrectionLoading] = useState<Record<number, boolean>>({});
   const [sentenceActionStatus, setSentenceActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error" | "missing_source">>({});
   const [pendingSentenceAdd, setPendingSentenceAdd] = useState<{
     key: string;
@@ -70,6 +77,7 @@ export default function ConversationPage(): JSX.Element {
     targetLine: string;
     clickedTargetToken: string;
   } | null>(null);
+  const [addingWord, setAddingWord] = useState<boolean>(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -131,6 +139,11 @@ export default function ConversationPage(): JSX.Element {
   }, []);
 
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
+  const goalDifficultyLabelByCode: Record<GoalDifficulty, Parameters<typeof t>[0]> = {
+    easy: "conversation.goalDifficultyEasy",
+    medium: "conversation.goalDifficultyMedium",
+    hard: "conversation.goalDifficultyHard",
+  };
   const hideTargetText = targetPromptMode === "audio" && !showTargetText;
 
   const scrollConversationToBottom = (): void => {
@@ -151,16 +164,69 @@ export default function ConversationPage(): JSX.Element {
     }
   };
 
-  const toggleUserTurnTranslation = (index: number): void => {
+  const toggleUserTurnTranslation = async (index: number): Promise<void> => {
     const nextVisible = !Boolean(conversationUserTranslationVisible[index]);
+    if (nextVisible && !conversationTurns[index]?.user_translation_text) {
+      setConversationUserTranslationLoading((current) => ({ ...current, [index]: true }));
+      try {
+        const payload = await fetchTopicConversationUserLiteralTranslation(
+          conversationTurns[index].user_text,
+          sourceLanguage,
+          targetLanguage,
+        );
+        setConversationTurns((current) => current.map((turn, turnIndex) => (
+          turnIndex === index ? { ...turn, user_translation_text: payload.user_translation_text || "" } : turn
+        )));
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "";
+        setConversationError(detail || t("newItem.questionsError"));
+        return;
+      } finally {
+        setConversationUserTranslationLoading((current) => ({ ...current, [index]: false }));
+      }
+    }
     setConversationUserTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
     if (nextVisible) {
       window.setTimeout(scrollConversationToBottom, 0);
     }
   };
 
-  const toggleUserTurnCorrection = (index: number): void => {
+  const toggleUserTurnCorrection = async (index: number): Promise<void> => {
     const nextVisible = !Boolean(conversationCorrectionVisible[index]);
+    if (nextVisible && !conversationTurns[index]?.user_corrected_text) {
+      setConversationUserCorrectionLoading((current) => ({ ...current, [index]: true }));
+      try {
+        const payload = await fetchTopicConversationUserCorrection(
+          activeTopic,
+          activeNotes,
+          activeRole,
+          conversationGoal,
+          conversationTurns[index].user_text,
+          conversationTurns.slice(0, index).map((turn) => ({
+            user_text: turn.user_text,
+            assistant_text: turn.assistant_text,
+          })),
+          sourceLanguage,
+          targetLanguage,
+        );
+        setConversationTurns((current) => current.map((turn, turnIndex) => (
+          turnIndex === index
+            ? {
+              ...turn,
+              user_corrected_text: payload.user_corrected_text || "",
+              user_corrected_translation_text: payload.user_corrected_translation_text || "",
+              user_correction_explanation: payload.user_correction_explanation || "",
+            }
+            : turn
+        )));
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "";
+        setConversationError(detail || t("newItem.questionsError"));
+        return;
+      } finally {
+        setConversationUserCorrectionLoading((current) => ({ ...current, [index]: false }));
+      }
+    }
     setConversationCorrectionVisible((current) => ({ ...current, [index]: nextVisible }));
     if (nextVisible) {
       window.setTimeout(scrollConversationToBottom, 0);
@@ -205,6 +271,7 @@ export default function ConversationPage(): JSX.Element {
         resolvedTopic,
         notes.trim(),
         role.trim(),
+        goalDifficulty,
         sourceLanguage,
         targetLanguage,
       );
@@ -212,6 +279,7 @@ export default function ConversationPage(): JSX.Element {
       setActiveTopic(payload.topic || resolvedTopic);
       setActiveNotes(payload.notes || notes.trim());
       setActiveRole(payload.role_text || role.trim());
+      setActiveGoalDifficulty(payload.goal_difficulty || goalDifficulty);
       setConversationGoal(payload.goal_text || "");
       setOpeningText(payload.opening_text || "");
       setOpeningAudioUrl(payload.opening_audio_url || "");
@@ -221,6 +289,8 @@ export default function ConversationPage(): JSX.Element {
       setConversationTranslationVisible({});
       setConversationCorrectionVisible({});
       setConversationUserTranslationVisible({});
+      setConversationUserTranslationLoading({});
+      setConversationUserCorrectionLoading({});
       setSentenceActionStatus({});
       setWordActionStatus({});
       setPendingWordAdd(null);
@@ -349,6 +419,8 @@ export default function ConversationPage(): JSX.Element {
     setConversationTranslationVisible({});
     setConversationCorrectionVisible({});
     setConversationUserTranslationVisible({});
+    setConversationUserTranslationLoading({});
+    setConversationUserCorrectionLoading({});
     setSentenceActionStatus({});
     setWordActionStatus({});
     setPendingWordAdd(null);
@@ -369,6 +441,7 @@ export default function ConversationPage(): JSX.Element {
     }
     setNotes(activeNotes);
     setRole(activeRole);
+    setGoalDifficulty(activeGoalDifficulty);
   };
 
   const requestAddWordFromTurnToken = async (
@@ -415,12 +488,13 @@ export default function ConversationPage(): JSX.Element {
   };
 
   const confirmAddWordFromDialog = async (): Promise<void> => {
-    if (!pendingWordAdd) {
+    if (!pendingWordAdd || addingWord) {
       return;
     }
 
     const { key, source, target, sourceLine, targetLine, clickedTargetToken } = pendingWordAdd;
     setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
+    setAddingWord(true);
     try {
       const result = await quickAddWordFromDialog(
         source,
@@ -438,6 +512,7 @@ export default function ConversationPage(): JSX.Element {
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
     } finally {
+      setAddingWord(false);
       setPendingWordAdd(null);
     }
   };
@@ -545,6 +620,9 @@ export default function ConversationPage(): JSX.Element {
   };
 
   const hasTurnCorrection = (turn: ConversationTurn): boolean => {
+    if (turn.user_needs_correction) {
+      return true;
+    }
     const corrected = (turn.user_corrected_text || "").trim().toLowerCase();
     const original = (turn.user_text || "").trim().toLowerCase();
     return Boolean(corrected && corrected !== original);
@@ -607,7 +685,41 @@ export default function ConversationPage(): JSX.Element {
               disabled={conversationLoading || started}
             />
           </div>
-          <p className="hint conversation-status">{t("conversation.notesHint")}</p>
+          <div className="conversation-notes-wrap">
+            <label className="prompt conversation-goal-difficulty-label">{t("conversation.goalDifficultyLabel")}</label>
+            <div className="exercise-audio-mode">
+              <label className={`exercise-radio-option ${goalDifficulty === "easy" ? "exercise-radio-option-selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="goal-difficulty"
+                  checked={goalDifficulty === "easy"}
+                  onChange={() => setGoalDifficulty("easy")}
+                  disabled={conversationLoading || started}
+                />
+                <span>{t("conversation.goalDifficultyEasy")}</span>
+              </label>
+              <label className={`exercise-radio-option ${goalDifficulty === "medium" ? "exercise-radio-option-selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="goal-difficulty"
+                  checked={goalDifficulty === "medium"}
+                  onChange={() => setGoalDifficulty("medium")}
+                  disabled={conversationLoading || started}
+                />
+                <span>{t("conversation.goalDifficultyMedium")}</span>
+              </label>
+              <label className={`exercise-radio-option ${goalDifficulty === "hard" ? "exercise-radio-option-selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="goal-difficulty"
+                  checked={goalDifficulty === "hard"}
+                  onChange={() => setGoalDifficulty("hard")}
+                  disabled={conversationLoading || started}
+                />
+                <span>{t("conversation.goalDifficultyHard")}</span>
+              </label>
+            </div>
+          </div>
           {!started && (
             <div className="actions">
               <button type="button" onClick={() => void startConversation()} disabled={conversationLoading || loadingTopics}>
@@ -622,6 +734,7 @@ export default function ConversationPage(): JSX.Element {
             <div className="content-form-section conversation-goal-card">
               <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {activeTopic}</p>
               {activeRole && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {activeRole}</p>}
+              <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {t(goalDifficultyLabelByCode[activeGoalDifficulty])}</p>
               <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {conversationGoal}</p>
               <div className="actions">
                 {targetPromptMode === "audio" && (
@@ -710,7 +823,8 @@ export default function ConversationPage(): JSX.Element {
                       <button
                         type="button"
                         className="item-conversation-correction-toggle"
-                        onClick={() => toggleUserTurnTranslation(index)}
+                        onClick={() => void toggleUserTurnTranslation(index)}
+                        disabled={conversationUserTranslationLoading[index]}
                       >
                         {conversationUserTranslationVisible[index]
                           ? t("newItem.conversationHideUserTranslation")
@@ -721,7 +835,8 @@ export default function ConversationPage(): JSX.Element {
                           <button
                             type="button"
                             className="item-conversation-correction-toggle"
-                            onClick={() => toggleUserTurnCorrection(index)}
+                            onClick={() => void toggleUserTurnCorrection(index)}
+                            disabled={conversationUserCorrectionLoading[index]}
                           >
                             {conversationCorrectionVisible[index]
                               ? t("newItem.conversationHideCorrection")
@@ -768,6 +883,11 @@ export default function ConversationPage(): JSX.Element {
                     {conversationTranslationVisible[index] && (
                       <p className="item-conversation-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text || t("newItem.conversationNoTranslation")}
+                      </p>
+                    )}
+                    {turn.goal_achieved && (
+                      <p className="item-conversation-goal-achieved">
+                        {turn.goal_achievement_message || t("conversation.goalAchievedDefault")}
                       </p>
                     )}
                     <div className="turn-action-row turn-action-row-assistant">
@@ -855,11 +975,12 @@ export default function ConversationPage(): JSX.Element {
                 onClick={() => {
                   setPendingWordAdd(null);
                 }}
+                disabled={addingWord}
               >
                 {t("newItem.wordAddCancel")}
               </button>
-              <button type="button" onClick={() => void confirmAddWordFromDialog()}>
-                {t("newItem.wordAddConfirmButton")}
+              <button type="button" onClick={() => void confirmAddWordFromDialog()} disabled={addingWord}>
+                {addingWord ? t("newItem.wordAddSaving") : t("newItem.wordAddConfirmButton")}
               </button>
             </div>
           </div>

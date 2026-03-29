@@ -136,9 +136,14 @@ export interface ContentItemConversationResponse {
   user_corrected_text?: string;
   user_corrected_translation_text?: string;
   user_correction_explanation?: string;
+  user_is_grammatically_correct?: boolean;
+  user_makes_sense_in_context?: boolean;
+  user_needs_correction?: boolean;
   assistant_text: string;
   assistant_translation_text?: string;
   assistant_audio_url?: string;
+  goal_achieved?: boolean;
+  goal_achievement_message?: string;
 }
 
 export interface ContentTopicContextsResponse {
@@ -149,6 +154,7 @@ export interface TopicConversationStartResponse {
   topic: string;
   notes?: string;
   role_text?: string;
+  goal_difficulty?: "easy" | "medium" | "hard";
   goal_text: string;
   opening_text?: string;
   opening_translation_text?: string;

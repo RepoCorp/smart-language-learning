@@ -620,6 +620,17 @@ textarea {
   color: #7a3e00;
 }
 
+.item-conversation-goal-achieved {
+  margin: 4px 0 0 0;
+  padding: 6px 8px;
+  border: 1px solid #a3cfbb;
+  border-radius: 8px;
+  background: #e8f7ee;
+  color: #0f5132;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .turn-action-row {
   display: flex;
   align-items: center;
@@ -783,6 +794,11 @@ textarea {
   cursor: not-allowed;
   color: #627d98;
   background: #f0f4f8;
+}
+
+.conversation-goal-difficulty-label {
+  display: block;
+  margin-bottom: 8px;
 }
 
 .topic-options {

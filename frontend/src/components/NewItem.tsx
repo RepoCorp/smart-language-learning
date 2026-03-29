@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   askContentItemQuestion,
+  fetchContentItemUserCorrection,
+  fetchContentItemUserLiteralTranslation,
   fetchContentItemDetail,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
@@ -25,6 +27,9 @@ interface ConversationTurn {
   user_corrected_text?: string;
   user_corrected_translation_text?: string;
   user_correction_explanation?: string;
+  user_is_grammatically_correct?: boolean;
+  user_makes_sense_in_context?: boolean;
+  user_needs_correction?: boolean;
   assistant_text: string;
   assistant_translation_text?: string;
   assistant_audio_url?: string;
@@ -45,6 +50,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
   const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
   const hasCorrectionForTurn = (turn: ConversationTurn): boolean => {
+    if (turn.user_needs_correction) {
+      return true;
+    }
     const corrected = (turn.user_corrected_text || "").trim().toLowerCase();
     const original = (turn.user_text || "").trim().toLowerCase();
     return Boolean(corrected && corrected !== original);
@@ -68,6 +76,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     dialogId?: number;
     turnIndex?: number;
   } | null>(null);
+  const [addingWord, setAddingWord] = useState<boolean>(false);
   const [pendingSentenceAdd, setPendingSentenceAdd] = useState<{
     key: string;
     source: string;
@@ -87,6 +96,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [conversationTranslationVisible, setConversationTranslationVisible] = useState<Record<number, boolean>>({});
   const [conversationCorrectionVisible, setConversationCorrectionVisible] = useState<Record<number, boolean>>({});
   const [conversationUserTranslationVisible, setConversationUserTranslationVisible] = useState<Record<number, boolean>>({});
+  const [conversationUserTranslationLoading, setConversationUserTranslationLoading] = useState<Record<number, boolean>>({});
+  const [conversationUserCorrectionLoading, setConversationUserCorrectionLoading] = useState<Record<number, boolean>>({});
   const [showDialogTargetText, setShowDialogTargetText] = useState<boolean>(targetPromptMode === "text");
   const [showConversationTargetText, setShowConversationTargetText] = useState<boolean>(targetPromptMode === "text");
   const exerciseTimerRef = useRef<number | null>(null);
@@ -116,16 +127,73 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     });
   };
 
-  const toggleItemConversationUserTranslation = (index: number): void => {
+  const toggleItemConversationUserTranslation = async (index: number): Promise<void> => {
     const nextVisible = !Boolean(conversationUserTranslationVisible[index]);
+    if (nextVisible && !conversationTurns[index]?.user_translation_text) {
+      setConversationUserTranslationLoading((current) => ({ ...current, [index]: true }));
+      try {
+        const payload = await fetchContentItemUserLiteralTranslation(
+          item.id,
+          conversationTurns[index].user_text,
+          sourceLanguage,
+          targetLanguage,
+        );
+        setConversationTurns((current) => current.map((turn, turnIndex) => (
+          turnIndex === index ? { ...turn, user_translation_text: payload.user_translation_text || "" } : turn
+        )));
+      } catch (error) {
+        if (error instanceof Error && error.message) {
+          setConversationError(error.message);
+        } else {
+          setConversationError(t("newItem.questionsError"));
+        }
+        return;
+      } finally {
+        setConversationUserTranslationLoading((current) => ({ ...current, [index]: false }));
+      }
+    }
     setConversationUserTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
     if (nextVisible) {
       window.setTimeout(scrollItemConversationToBottom, 0);
     }
   };
 
-  const toggleItemConversationCorrection = (index: number): void => {
+  const toggleItemConversationCorrection = async (index: number): Promise<void> => {
     const nextVisible = !Boolean(conversationCorrectionVisible[index]);
+    if (nextVisible && !conversationTurns[index]?.user_corrected_text) {
+      setConversationUserCorrectionLoading((current) => ({ ...current, [index]: true }));
+      try {
+        const payload = await fetchContentItemUserCorrection(
+          item.id,
+          conversationTurns[index].user_text,
+          conversationTurns.slice(0, index).map((turn) => ({
+            user_text: turn.user_text,
+            assistant_text: turn.assistant_text,
+          })),
+          sourceLanguage,
+          targetLanguage,
+        );
+        setConversationTurns((current) => current.map((turn, turnIndex) => (
+          turnIndex === index
+            ? {
+              ...turn,
+              user_corrected_text: payload.user_corrected_text || "",
+              user_corrected_translation_text: payload.user_corrected_translation_text || "",
+              user_correction_explanation: payload.user_correction_explanation || "",
+            }
+            : turn
+        )));
+      } catch (error) {
+        if (error instanceof Error && error.message) {
+          setConversationError(error.message);
+        } else {
+          setConversationError(t("newItem.questionsError"));
+        }
+        return;
+      } finally {
+        setConversationUserCorrectionLoading((current) => ({ ...current, [index]: false }));
+      }
+    }
     setConversationCorrectionVisible((current) => ({ ...current, [index]: nextVisible }));
     if (nextVisible) {
       window.setTimeout(scrollItemConversationToBottom, 0);
@@ -233,6 +301,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setConversationTranslationVisible({});
     setConversationCorrectionVisible({});
     setConversationUserTranslationVisible({});
+    setConversationUserTranslationLoading({});
+    setConversationUserCorrectionLoading({});
     setSentenceActionStatus({});
     setPendingSentenceAdd(null);
   }, [item.id, item.item_questions]);
@@ -455,18 +525,20 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   };
 
   const confirmAddWordFromDialog = async (): Promise<void> => {
-    if (!pendingWordAdd) {
+    if (!pendingWordAdd || addingWord) {
       return;
     }
 
     const { key, source, target, dialogId, turnIndex } = pendingWordAdd;
     setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
+    setAddingWord(true);
     try {
       const result = await quickAddWordFromDialog(source, target, sourceLanguage, targetLanguage, dialogId, turnIndex);
       setWordActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
     } finally {
+      setAddingWord(false);
       setPendingWordAdd(null);
     }
   };
@@ -1409,7 +1481,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                         <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
                     )}
-                    {conversationCorrectionVisible[index] && hasCorrectionForTurn(turn) && (
+                    {conversationCorrectionVisible[index] && hasCorrectionForTurn(turn) && !!turn.user_corrected_text && (
                       <p className="item-conversation-correction">
                         <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
                       </p>
@@ -1428,7 +1500,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                       <button
                         type="button"
                         className="item-conversation-correction-toggle"
-                        onClick={() => toggleItemConversationUserTranslation(index)}
+                        onClick={() => void toggleItemConversationUserTranslation(index)}
+                        disabled={conversationUserTranslationLoading[index]}
                       >
                         {conversationUserTranslationVisible[index]
                           ? t("newItem.conversationHideUserTranslation")
@@ -1439,13 +1512,14 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                           <button
                             type="button"
                             className="item-conversation-correction-toggle"
-                            onClick={() => toggleItemConversationCorrection(index)}
+                            onClick={() => void toggleItemConversationCorrection(index)}
+                            disabled={conversationUserCorrectionLoading[index]}
                           >
                             {conversationCorrectionVisible[index]
                               ? t("newItem.conversationHideCorrection")
                               : t("newItem.conversationShowCorrection")}
                           </button>
-                          {conversationCorrectionVisible[index] && (
+                          {conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
                             <button
                               type="button"
                               className="item-conversation-correction-toggle"
@@ -1569,11 +1643,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             </p>
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
-              <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)}>
+              <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>
                 {t("newItem.wordAddCancel")}
               </button>
-              <button type="button" onClick={() => void confirmAddWordFromDialog()}>
-                {t("newItem.wordAddConfirmButton")}
+              <button type="button" onClick={() => void confirmAddWordFromDialog()} disabled={addingWord}>
+                {addingWord ? t("newItem.wordAddSaving") : t("newItem.wordAddConfirmButton")}
               </button>
             </div>
           </div>

@@ -473,10 +473,62 @@ export async function sendContentItemConversationAudio(
   return (await response.json()) as ContentItemConversationResponse;
 }
 
+export async function fetchContentItemUserLiteralTranslation(
+  itemId: number,
+  userText: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{ user_translation_text: string }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/conversation/user-translation?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_text: userText }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to translate user message");
+  }
+  return (await response.json()) as { user_translation_text: string };
+}
+
+export async function fetchContentItemUserCorrection(
+  itemId: number,
+  userText: string,
+  history: Array<{ user_text: string; assistant_text: string }>,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{
+  user_corrected_text: string;
+  user_corrected_translation_text: string;
+  user_correction_explanation: string;
+}> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/conversation/user-correction?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_text: userText, history }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to generate correction");
+  }
+  return (await response.json()) as {
+    user_corrected_text: string;
+    user_corrected_translation_text: string;
+    user_correction_explanation: string;
+  };
+}
+
 export async function startTopicConversation(
   topic: string,
   notes: string,
   roleText: string,
+  goalDifficulty: "easy" | "medium" | "hard",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<TopicConversationStartResponse> {
@@ -487,7 +539,7 @@ export async function startTopicConversation(
   const response = await apiFetch(`${API_BASE}/content/conversation/start?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, notes, role_text: roleText }),
+    body: JSON.stringify({ topic, notes, role_text: roleText, goal_difficulty: goalDifficulty }),
   });
   if (!response.ok) {
     let detail = "Failed to start conversation";
@@ -543,6 +595,66 @@ export async function sendTopicConversationAudio(
     throw new Error(detail);
   }
   return (await response.json()) as ContentItemConversationResponse;
+}
+
+export async function fetchTopicConversationUserLiteralTranslation(
+  userText: string,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{ user_translation_text: string }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/conversation/user-translation?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_text: userText }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to translate user message");
+  }
+  return (await response.json()) as { user_translation_text: string };
+}
+
+export async function fetchTopicConversationUserCorrection(
+  topic: string,
+  notes: string,
+  roleText: string,
+  goalText: string,
+  userText: string,
+  history: Array<{ user_text: string; assistant_text: string }>,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{
+  user_corrected_text: string;
+  user_corrected_translation_text: string;
+  user_correction_explanation: string;
+}> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/conversation/user-correction?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      topic,
+      notes,
+      role_text: roleText,
+      goal_text: goalText,
+      user_text: userText,
+      history,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to generate correction");
+  }
+  return (await response.json()) as {
+    user_corrected_text: string;
+    user_corrected_translation_text: string;
+    user_correction_explanation: string;
+  };
 }
 
 export async function quickAddWordFromDialog(

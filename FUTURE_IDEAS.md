@@ -8,6 +8,15 @@ Que cuando esta viendo una frase y le da click a la palabra, se la muestre y le 
 Si la palabra no esta que permita añadirla
 Que el test de un sentido y el otro no los haga seguido al menos la primera vez
 
+
+
+We will add a feature that will allow the user to ask for help when trying to communicate something. It will listen to the user request and respond by text, all  in the source language. Do not make this interaction part of the dialog. 
+First translate goal to english,
+
+
+
+Frases de ejercicios, el repeat usa el audio que ya tiene generado 
+Palabras de ejercicios usa text to speech local
 el tema del casing en aleman. Solo mayusculas para sustantivos
 Usar Load Balancer 
 Ensayar otros modelos

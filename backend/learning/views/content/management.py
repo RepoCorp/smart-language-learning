@@ -24,6 +24,44 @@ from .core import ContentCandidate, call_openai_json, create_audio_file, create_
 logger = logging.getLogger(__name__)
 
 
+def _call_openai_json_logged(
+    *,
+    label: str,
+    system_prompt: str,
+    user_input: str,
+    timeout_seconds: int = 10,
+    model: str | None = None,
+    temperature: float = 0.2,
+    top_p: float = 1.0,
+    presence_penalty: float = 0.0,
+) -> dict | None:
+    logger.info(
+        "content.management.model.request label=%s model=%s system_prompt=%s user_input=%s",
+        label,
+        model or "",
+        system_prompt,
+        user_input,
+    )
+    parsed = call_openai_json(
+        system_prompt,
+        user_input,
+        timeout_seconds=timeout_seconds,
+        model=model,
+        temperature=temperature,
+        top_p=top_p,
+        presence_penalty=presence_penalty,
+    )
+    logger.info("content.management.model.response label=%s parsed=%s", label, parsed)
+    return parsed
+
+
+def _require_question_model() -> str:
+    question_model = str(getattr(settings, "OPENAI_QUESTION_MODEL", "")).strip()
+    if not question_model:
+        raise RuntimeError("OPENAI_QUESTION_MODEL is not configured")
+    return question_model
+
+
 def _normalized_pair(request: Request) -> tuple[str, str]:
     source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
     target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
@@ -205,12 +243,15 @@ class ContentItemQuestionView(APIView):
             logger.info("content.item_question.rejected item_id=%s code=QUESTION_TOO_LONG len=%s", item_id, len(question_text))
             return Response({"detail": "question_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
 
-        decision = _model_answer_or_reject_item_question(
-            item=item,
-            question_text=question_text,
-            source_language=source_language,
-            target_language=target_language,
-        )
+        try:
+            decision = _model_answer_or_reject_item_question(
+                item=item,
+                question_text=question_text,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         if not decision["related"]:
             logger.info(
                 "content.item_question.rejected item_id=%s code=%s reason=%r question=%r",
@@ -499,6 +540,21 @@ class ContentItemConversationView(APIView):
         user_text = _openai_transcribe_audio_upload(audio_file, target_language=target_language)
         if not user_text:
             return Response({"detail": "Could not transcribe audio"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        context_label = (
+            f"Item source text: {item.spanish_text}\n"
+            f"Item target text: {item.german_text}\n"
+            f"Item notes: {item.notes}\n"
+        )
+        try:
+            analysis = _analyze_user_turn_with_question_model(
+                user_text=user_text,
+                history=history,
+                source_language=source_language,
+                target_language=target_language,
+                context_label=context_label,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         assistant_payload = _generate_item_conversation_reply(
             item=item,
@@ -509,10 +565,6 @@ class ContentItemConversationView(APIView):
         )
         assistant_text = assistant_payload["reply_text"]
         assistant_translation_text = assistant_payload.get("source_translation", "")
-        user_translation_text = assistant_payload.get("user_source_translation", "")
-        user_corrected_text = assistant_payload.get("corrected_user_text", "")
-        user_corrected_translation_text = assistant_payload.get("corrected_user_source_translation", "")
-        user_correction_explanation = assistant_payload.get("corrected_user_explanation", "")
         assistant_audio_url = ""
         if assistant_text:
             assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
@@ -520,13 +572,89 @@ class ContentItemConversationView(APIView):
         return Response(
             {
                 "user_text": user_text,
-                "user_translation_text": user_translation_text,
-                "user_corrected_text": user_corrected_text,
-                "user_corrected_translation_text": user_corrected_translation_text,
-                "user_correction_explanation": user_correction_explanation,
+                "user_translation_text": "",
+                "user_corrected_text": "",
+                "user_corrected_translation_text": "",
+                "user_correction_explanation": "",
+                "user_is_grammatically_correct": bool(analysis.get("is_grammatically_correct", False)),
+                "user_makes_sense_in_context": bool(analysis.get("makes_sense_in_context", False)),
+                "user_needs_correction": bool(analysis.get("needs_correction", True)),
                 "assistant_text": assistant_text,
                 "assistant_translation_text": assistant_translation_text,
                 "assistant_audio_url": assistant_audio_url,
+                "goal_achieved": False,
+                "goal_achievement_message": "",
+            }
+        )
+
+
+class ContentItemConversationUserTranslationView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        user_text = str(request.data.get("user_text", "")).strip()
+        if not user_text:
+            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_translation_text = _literal_translate_user_text_with_question_model(
+                user_text=user_text,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"user_translation_text": user_translation_text})
+
+
+class ContentItemConversationUserCorrectionView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        user_text = str(request.data.get("user_text", "")).strip()
+        if not user_text:
+            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        history = _parse_item_conversation_history(request.data.get("history"))
+
+        context_label = (
+            f"Item source text: {item.spanish_text}\n"
+            f"Item target text: {item.german_text}\n"
+            f"Item notes: {item.notes}\n"
+        )
+        try:
+            correction_payload = _generate_user_correction_with_question_model(
+                user_text=user_text,
+                history=history,
+                source_language=source_language,
+                target_language=target_language,
+                context_label=context_label,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        explanation = str(correction_payload.get("corrected_user_explanation", "")).strip()
+        if not explanation:
+            explanation = "Explanation not available"
+        return Response(
+            {
+                "user_corrected_text": str(correction_payload.get("corrected_user_text", "")).strip(),
+                "user_corrected_translation_text": str(correction_payload.get("corrected_user_source_translation", "")).strip(),
+                "user_correction_explanation": explanation,
             }
         )
 
@@ -537,6 +665,7 @@ class ContentTopicConversationStartView(APIView):
         topic = str(request.data.get("topic", "")).strip()
         notes = str(request.data.get("notes", "")).strip()
         role_text = str(request.data.get("role_text", "")).strip()
+        goal_difficulty = str(request.data.get("goal_difficulty", "medium")).strip().lower() or "medium"
         if not topic:
             return Response({"detail": "topic is required"}, status=status.HTTP_400_BAD_REQUEST)
         if len(topic) > 120:
@@ -545,17 +674,21 @@ class ContentTopicConversationStartView(APIView):
             return Response({"detail": "notes is too long"}, status=status.HTTP_400_BAD_REQUEST)
         if len(role_text) > 240:
             return Response({"detail": "role_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
+        if goal_difficulty not in {"easy", "medium", "hard"}:
+            return Response({"detail": "goal_difficulty must be easy, medium, or hard"}, status=status.HTTP_400_BAD_REQUEST)
 
         start_payload = _generate_topic_conversation_start(
             topic=topic,
             notes=notes,
             role_text=role_text,
+            goal_difficulty=goal_difficulty,
             source_language=source_language,
             target_language=target_language,
         )
         opening_text = start_payload.get("opening_text", "")
         opening_translation_text = start_payload.get("opening_translation_text", "")
         goal_text = start_payload.get("goal_text", "")
+        selected_goal_difficulty = start_payload.get("goal_difficulty", goal_difficulty)
         opening_audio_url = ""
         if opening_text:
             opening_audio_url = create_audio_file(opening_text, "conversation", target_language=target_language)
@@ -565,6 +698,7 @@ class ContentTopicConversationStartView(APIView):
                 "topic": topic,
                 "notes": notes,
                 "role_text": role_text,
+                "goal_difficulty": selected_goal_difficulty,
                 "goal_text": goal_text,
                 "opening_text": opening_text,
                 "opening_translation_text": opening_translation_text,
@@ -595,23 +729,40 @@ class ContentTopicConversationTurnView(APIView):
         user_text = _openai_transcribe_audio_upload(audio_file, target_language=target_language)
         if not user_text:
             return Response({"detail": "Could not transcribe audio"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        assistant_payload = _generate_topic_conversation_reply(
-            topic=topic,
-            notes=notes,
-            role_text=role_text,
-            goal_text=goal_text,
-            user_text=user_text,
-            history=history,
-            source_language=source_language,
-            target_language=target_language,
+        context_label = (
+            f"Conversation topic: {topic}\n"
+            f"Temporary notes: {notes}\n"
+            f"Learner role: {role_text}\n"
+            f"Conversation goal: {goal_text}\n"
         )
+        try:
+            analysis = _analyze_user_turn_with_question_model(
+                user_text=user_text,
+                history=history,
+                source_language=source_language,
+                target_language=target_language,
+                context_label=context_label,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        try:
+            assistant_payload = _generate_topic_conversation_reply(
+                topic=topic,
+                notes=notes,
+                role_text=role_text,
+                goal_text=goal_text,
+                user_text=user_text,
+                history=history,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         assistant_text = assistant_payload["reply_text"]
         assistant_translation_text = assistant_payload.get("source_translation", "")
-        user_translation_text = assistant_payload.get("user_source_translation", "")
-        user_corrected_text = assistant_payload.get("corrected_user_text", "")
-        user_corrected_translation_text = assistant_payload.get("corrected_user_source_translation", "")
-        user_correction_explanation = assistant_payload.get("corrected_user_explanation", "")
+        goal_achieved = bool(assistant_payload.get("goal_achieved", False))
+        goal_achievement_message = str(assistant_payload.get("goal_achievement_message", "")).strip()
         assistant_audio_url = ""
         if assistant_text:
             assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
@@ -619,13 +770,74 @@ class ContentTopicConversationTurnView(APIView):
         return Response(
             {
                 "user_text": user_text,
-                "user_translation_text": user_translation_text,
-                "user_corrected_text": user_corrected_text,
-                "user_corrected_translation_text": user_corrected_translation_text,
-                "user_correction_explanation": user_correction_explanation,
+                "user_translation_text": "",
+                "user_corrected_text": "",
+                "user_corrected_translation_text": "",
+                "user_correction_explanation": "",
+                "user_is_grammatically_correct": bool(analysis.get("is_grammatically_correct", False)),
+                "user_makes_sense_in_context": bool(analysis.get("makes_sense_in_context", False)),
+                "user_needs_correction": bool(analysis.get("needs_correction", True)),
                 "assistant_text": assistant_text,
                 "assistant_translation_text": assistant_translation_text,
                 "assistant_audio_url": assistant_audio_url,
+                "goal_achieved": goal_achieved,
+                "goal_achievement_message": goal_achievement_message,
+            }
+        )
+
+
+class ContentTopicConversationUserTranslationView(APIView):
+    def post(self, request: Request) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        user_text = str(request.data.get("user_text", "")).strip()
+        if not user_text:
+            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user_translation_text = _literal_translate_user_text_with_question_model(
+                user_text=user_text,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"user_translation_text": user_translation_text})
+
+
+class ContentTopicConversationUserCorrectionView(APIView):
+    def post(self, request: Request) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        topic = str(request.data.get("topic", "")).strip()
+        notes = str(request.data.get("notes", "")).strip()
+        role_text = str(request.data.get("role_text", "")).strip()
+        goal_text = str(request.data.get("goal_text", "")).strip()
+        user_text = str(request.data.get("user_text", "")).strip()
+        if not user_text:
+            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        history = _parse_item_conversation_history(request.data.get("history"))
+        context_label = (
+            f"Conversation topic: {topic}\n"
+            f"Temporary notes: {notes}\n"
+            f"Learner role: {role_text}\n"
+            f"Conversation goal: {goal_text}\n"
+        )
+        try:
+            correction_payload = _generate_user_correction_with_question_model(
+                user_text=user_text,
+                history=history,
+                source_language=source_language,
+                target_language=target_language,
+                context_label=context_label,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        explanation = str(correction_payload.get("corrected_user_explanation", "")).strip()
+        if not explanation:
+            explanation = "Explanation not available"
+        return Response(
+            {
+                "user_corrected_text": str(correction_payload.get("corrected_user_text", "")).strip(),
+                "user_corrected_translation_text": str(correction_payload.get("corrected_user_source_translation", "")).strip(),
+                "user_correction_explanation": explanation,
             }
         )
 
@@ -684,8 +896,9 @@ def _resolve_dialog_click_word_pair(
             clicked_target_token=clicked_target_token,
         )
 
-    parsed = call_openai_json(
-        """
+    parsed = _call_openai_json_logged(
+        label="resolve_dialog_click_word_pair",
+        system_prompt="""
 Resolve a clicked word translation in context for a language-learning dialog turn.
 
 Return strict JSON:
@@ -701,7 +914,7 @@ Rules:
 - If uncertain, keep the clicked source_text.
 - JSON only.
 """.strip(),
-        (
+        user_input=(
             f"Source language: {_language_display_name(source_language)}\n"
             f"Target language: {_language_display_name(target_language)}\n"
             f"Dialog topic: {dialog.topic}\n"
@@ -753,8 +966,9 @@ def _resolve_word_pair_from_inline_context(
     if not source_line or not target_line or not clicked_target_token:
         return source_text, target_text
 
-    parsed = call_openai_json(
-        """
+    parsed = _call_openai_json_logged(
+        label="resolve_word_pair_from_inline_context",
+        system_prompt="""
 Resolve a clicked word translation from inline parallel sentence context.
 
 Return strict JSON:
@@ -770,7 +984,7 @@ Rules:
 - If uncertain, keep provided source_text.
 - JSON only.
 """.strip(),
-        (
+        user_input=(
             f"Source language: {_language_display_name(source_language)}\n"
             f"Target language: {_language_display_name(target_language)}\n"
             f"Full source line: {source_line}\n"
@@ -966,6 +1180,14 @@ def _openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> s
     append_field("model", model_name)
     if language_hint:
         append_field("language", language_hint)
+    append_field(
+        "prompt",
+        (
+            "Transcribe exactly what the speaker says in the original spoken language. "
+            "Do not correct grammar, wording, or mistakes. Keep the utterance as spoken."
+        ),
+    )
+    append_field("temperature", "0")
     body.extend(f"--{boundary}\r\n".encode("utf-8"))
     body.extend(f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode("utf-8"))
     body.extend(f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"))
@@ -991,6 +1213,202 @@ def _openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> s
     return str(payload.get("text", "")).strip()[:1000]
 
 
+def _analyze_user_turn_with_question_model(
+    *,
+    user_text: str,
+    history: list[dict[str, str]],
+    source_language: str,
+    target_language: str,
+    context_label: str,
+) -> dict[str, bool]:
+    user_clean = str(user_text).strip()
+    if not user_clean:
+        return {"is_grammatically_correct": False, "makes_sense_in_context": False, "needs_correction": True}
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    history_lines: list[str] = []
+    for row in history:
+        if row.get("user_text"):
+            history_lines.append(f"Learner: {row['user_text']}")
+        if row.get("assistant_text"):
+            history_lines.append(f"Partner: {row['assistant_text']}")
+    question_model = _require_question_model()
+    parsed = _call_openai_json_logged(
+        label="analyze_user_turn",
+        system_prompt=f"""
+Evaluate one learner message in context.
+
+Return strict JSON:
+{{
+  "is_grammatically_correct": false,
+  "makes_sense_in_context": true,
+  "needs_correction": true
+}}
+
+Rules:
+- Evaluate the learner message only in {target_name}.
+- is_grammatically_correct=true only if grammar is acceptable for this learning level.
+- makes_sense_in_context=true only if the message fits the current conversation context.
+- needs_correction=true when either grammar is not correct OR meaning does not fit context.
+- Use recent history and context to decide meaning fit.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"{context_label}"
+            f"Recent conversation:\n{chr(10).join(history_lines[-12:])}\n"
+            f"Learner message ({target_name}): {user_clean}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    is_grammatically_correct = bool(parsed.get("is_grammatically_correct", False))
+    makes_sense_in_context = bool(parsed.get("makes_sense_in_context", False))
+    needs_correction = bool(parsed.get("needs_correction", (not is_grammatically_correct) or (not makes_sense_in_context)))
+    return {
+        "is_grammatically_correct": is_grammatically_correct,
+        "makes_sense_in_context": makes_sense_in_context,
+        "needs_correction": needs_correction,
+    }
+
+
+def _literal_translate_user_text_with_question_model(
+    *,
+    user_text: str,
+    source_language: str,
+    target_language: str,
+) -> str:
+    user_clean = str(user_text).strip()
+    if not user_clean:
+        return ""
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    question_model = _require_question_model()
+    parsed = _call_openai_json_logged(
+        label="literal_translate_user_text",
+        system_prompt=f"""
+Provide a literal translation of learner text.
+
+Return strict JSON:
+{{
+  "translation": "string"
+}}
+
+Rules:
+- Input is in {target_name}; output must be in {source_name}.
+- Translate literally and preserve errors/odd wording from the original.
+- Do not fix grammar, do not rewrite, do not improve style.
+- Keep concise and faithful to original wording.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Learner text ({target_name}): {user_clean}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    translation = str(parsed.get("translation", "")).strip()
+    if translation:
+        return translation[:1200]
+    return ""
+
+
+def _generate_user_correction_with_question_model(
+    *,
+    user_text: str,
+    history: list[dict[str, str]],
+    source_language: str,
+    target_language: str,
+    context_label: str,
+) -> dict[str, str]:
+    user_clean = str(user_text).strip()
+    if not user_clean:
+        return {
+            "corrected_user_text": "",
+            "corrected_user_source_translation": "",
+            "corrected_user_explanation": "",
+        }
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    history_lines: list[str] = []
+    for row in history:
+        if row.get("user_text"):
+            history_lines.append(f"Learner: {row['user_text']}")
+        if row.get("assistant_text"):
+            history_lines.append(f"Partner: {row['assistant_text']}")
+    question_model = _require_question_model()
+    parsed = _call_openai_json_logged(
+        label="generate_user_correction",
+        system_prompt=f"""
+Correct one learner message and explain the correction.
+
+Return strict JSON:
+{{
+  "corrected_user_text": "string",
+  "corrected_user_source_translation": "string",
+  "corrected_user_explanation": "string"
+}}
+
+Rules:
+- learner message is in {target_name}.
+- corrected_user_text must be the corrected version in {target_name}.
+- corrected_user_source_translation must be a natural translation in {source_name}.
+- corrected_user_explanation must be in {source_name}, and must explain:
+  1) what changed ("<original>" -> "<corrected>" in {target_name}),
+  2) why,
+  3) one short rule.
+- If message is already correct, return corrected_user_text exactly equal to original and explanation="".
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"{context_label}"
+            f"Recent conversation:\n{chr(10).join(history_lines[-12:])}\n"
+            f"Learner message ({target_name}): {user_clean}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    corrected_user_text = str(parsed.get("corrected_user_text", "")).strip()
+    corrected_user_source_translation = str(parsed.get("corrected_user_source_translation", "")).strip()
+    corrected_user_explanation = str(parsed.get("corrected_user_explanation", "")).strip()
+    if not corrected_user_text:
+        corrected_user_text = user_clean
+    if corrected_user_text and corrected_user_text != user_clean and not corrected_user_explanation:
+        corrected_user_explanation = _generate_mistake_explanation_with_question_model(
+            source_language=source_language,
+            target_language=target_language,
+            learner_text=user_clean,
+            corrected_text=corrected_user_text,
+            corrected_source_translation=corrected_user_source_translation,
+            context_label=context_label,
+        )
+    return {
+        "corrected_user_text": corrected_user_text[:1200],
+        "corrected_user_source_translation": corrected_user_source_translation[:1200],
+        "corrected_user_explanation": corrected_user_explanation[:1200],
+    }
+
+
 def _generate_item_conversation_reply(
     *,
     item: Item,
@@ -999,6 +1417,8 @@ def _generate_item_conversation_reply(
     source_language: str,
     target_language: str,
 ) -> dict[str, str]:
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
     history_lines: list[str] = []
     for row in history:
         if row.get("user_text"):
@@ -1006,40 +1426,31 @@ def _generate_item_conversation_reply(
         if row.get("assistant_text"):
             history_lines.append(f"Tutor: {row['assistant_text']}")
 
-    parsed = call_openai_json(
-        """
+    parsed = _call_openai_json_logged(
+        label="generate_item_conversation_reply",
+        system_prompt=f"""
 You are a conversation partner. Continue a short voice conversation focused on one study item.
 
 Return strict JSON:
-{
+{{
   "reply_text": "string",
-  "source_translation": "string",
-  "user_source_translation": "string",
-  "corrected_user_text": "string",
-  "corrected_user_source_translation": "string",
-  "corrected_user_explanation": "string"
-}
+  "source_translation": "string"
+}}
 
 Rules:
-- Write reply_text in the TARGET language only.
-- Write source_translation in the SOURCE language only.
-- user_source_translation must be the SOURCE-language translation of the learner input.
+- Write reply_text in {target_name} only.
+- Write source_translation in {source_name} only.
 - Keep a natural peer-to-peer tone, like regular conversation with another person.
 - Do not act like a teacher, tutor, or evaluator.
-- corrected_user_text must be in TARGET language and should only be provided if the user explicitly asks for correction/help.
-- corrected_user_source_translation must be in SOURCE language and only for corrected_user_text.
-- corrected_user_explanation must be a short explanation in SOURCE language (1 short line), only when correction exists.
-- Never include correction content inside reply_text.
 - Keep it concise: 1 to 3 short sentences.
 - Keep source_translation concise and natural, aligned to reply_text meaning.
 - Keep the conversation centered on this specific item and its usage.
-- Do not proactively correct mistakes unless the user explicitly asks for correction/help.
 - End with one simple follow-up question to keep the conversation going.
 - JSON only.
 """.strip(),
-        (
-            f"Source language: {_language_display_name(source_language)}\n"
-            f"Target language: {_language_display_name(target_language)}\n"
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
             f"Item source text: {item.spanish_text}\n"
             f"Item target text: {item.german_text}\n"
             f"Item notes: {item.notes}\n"
@@ -1053,66 +1464,16 @@ Rules:
     )
     if isinstance(parsed, dict):
         reply_text = str(parsed.get("reply_text", "")).strip()
-        source_translation = _ensure_source_language_text(
-            str(parsed.get("source_translation", "")).strip(),
-            source_language=source_language,
-        )
-        user_source_translation = _ensure_source_language_text(
-            str(parsed.get("user_source_translation", "")).strip(),
-            source_language=source_language,
-        )
-        corrected_user_text = str(parsed.get("corrected_user_text", "")).strip()
-        corrected_user_source_translation = _ensure_source_language_text(
-            str(parsed.get("corrected_user_source_translation", "")).strip(),
-            source_language=source_language,
-        )
-        corrected_user_explanation = _ensure_source_language_text(
-            str(parsed.get("corrected_user_explanation", "")).strip(),
-            source_language=source_language,
-        )
-        if corrected_user_text:
-            refined_explanation = _generate_mistake_explanation_with_question_model(
-                source_language=source_language,
-                target_language=target_language,
-                learner_text=user_text,
-                corrected_text=corrected_user_text,
-                corrected_source_translation=corrected_user_source_translation,
-                context_label=(
-                    f"Item source text: {item.spanish_text}\n"
-                    f"Item target text: {item.german_text}\n"
-                    f"Item notes: {item.notes}\n"
-                ),
-            )
-            if refined_explanation:
-                corrected_user_explanation = refined_explanation
+        source_translation = str(parsed.get("source_translation", "")).strip()
         if reply_text:
             return {
                 "reply_text": reply_text[:1200],
                 "source_translation": source_translation[:1200],
-                "user_source_translation": user_source_translation[:1200],
-                "corrected_user_text": corrected_user_text[:1200],
-                "corrected_user_source_translation": corrected_user_source_translation[:1200],
-                "corrected_user_explanation": corrected_user_explanation[:1200],
             }
 
-    fallback_by_language = {
-        "german": f"{item.german_text} ist wichtig. Kannst du einen kurzen Satz mit {item.german_text} sagen?",
-        "spanish": f"{item.german_text} es importante. Puedes decir una frase corta con {item.german_text}?",
-        "english": f"{item.german_text} is important. Can you say one short sentence with {item.german_text}?",
-        "french": f"{item.german_text} est important. Peux-tu dire une phrase courte avec {item.german_text} ?",
-        "italian": f"{item.german_text} e importante. Puoi dire una frase breve con {item.german_text}?",
-        "portuguese": f"{item.german_text} e importante. Voce pode dizer uma frase curta com {item.german_text}?",
-    }
     return {
-        "reply_text": fallback_by_language.get(
-            target_language,
-            f"{item.german_text} is important. Can you say one short sentence with {item.german_text}?",
-        ),
+        "reply_text": "",
         "source_translation": "",
-        "user_source_translation": "",
-        "corrected_user_text": "",
-        "corrected_user_source_translation": "",
-        "corrected_user_explanation": "",
     }
 
 
@@ -1121,28 +1482,36 @@ def _generate_topic_conversation_start(
     topic: str,
     notes: str,
     role_text: str,
+    goal_difficulty: str,
     source_language: str,
     target_language: str,
 ) -> dict[str, str]:
-    parsed = call_openai_json(
-        """
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    parsed = _call_openai_json_logged(
+        label="generate_topic_conversation_start",
+        system_prompt=f"""
 Create a conversation setup for a language learner.
 
 Return strict JSON:
-{
+{{
   "goal_text": "string",
   "opening_text": "string",
   "opening_translation_text": "string"
-}
+}}
 
 Rules:
-- goal_text must be in SOURCE language and include exactly one concrete condition.
+- goal_text must be in {source_name} and include exactly one concrete condition.
 - The condition must be specific and verifiable (clear done/not-done outcome).
 - Include one concrete target detail (for example a number, exact item, exact decision, or exact piece of information).
 - Keep it achievable in one short conversation.
 - Avoid generic goals like "have a conversation about X".
-- opening_text must be in TARGET language and sound like a normal person starting a conversation.
-- opening_translation_text must be SOURCE-language translation of opening_text.
+- Adapt challenge level to goal_difficulty:
+  - easy: very simple, one clear concrete detail, minimal cognitive load.
+  - medium: balanced challenge with one clear concrete detail and mild constraint.
+  - hard: more demanding but still achievable in one short conversation, with a tighter or multi-part concrete condition.
+- opening_text must be in {target_name} and sound like a normal person starting a conversation.
+- opening_translation_text must be a {source_name} translation of opening_text.
 - Keep goal_text to one concise line.
 - Keep opening_text to 1-2 short sentences and end with a simple question.
 - Match the topic and notes context.
@@ -1153,12 +1522,13 @@ Rules:
 - Do not use teacher or tutor voice.
 - JSON only.
 """.strip(),
-        (
-            f"Source language: {_language_display_name(source_language)}\n"
-            f"Target language: {_language_display_name(target_language)}\n"
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
             f"Topic: {topic}\n"
             f"Temporary notes: {notes}\n"
             f"Learner role: {role_text}\n"
+            f"goal_difficulty: {goal_difficulty}\n"
         ),
         timeout_seconds=10,
         temperature=0.6,
@@ -1174,6 +1544,7 @@ Rules:
                 "goal_text": goal_text[:600],
                 "opening_text": opening_text[:1200],
                 "opening_translation_text": opening_translation_text[:1200],
+                "goal_difficulty": goal_difficulty,
             }
 
     fallback_opening_by_language = {
@@ -1184,13 +1555,56 @@ Rules:
         "italian": f"Ciao. Parliamo di {topic}. Cosa e piu importante per te?",
         "portuguese": f"Ola. Vamos falar sobre {topic}. O que e mais importante para voce?",
     }
+    fallback_goal_prefix_by_language = {
+        "spanish": "Objetivo",
+        "english": "Goal",
+        "german": "Ziel",
+        "french": "Objectif",
+        "italian": "Obiettivo",
+        "portuguese": "Objetivo",
+    }
+    difficulty_goal_fragment_by_language: dict[str, dict[str, str]] = {
+        "spanish": {
+            "easy": f"confirmar un dato concreto sobre {topic}.",
+            "medium": f"obtener un precio exacto y una condicion clara para {topic}.",
+            "hard": f"cerrar dos condiciones concretas (precio y restriccion) sobre {topic}.",
+        },
+        "english": {
+            "easy": f"confirm one concrete detail about {topic}.",
+            "medium": f"get an exact price and one clear condition about {topic}.",
+            "hard": f"close two concrete conditions (price and one restriction) about {topic}.",
+        },
+        "german": {
+            "easy": f"ein konkretes Detail zu {topic} bestaetigen.",
+            "medium": f"einen genauen Preis und eine klare Bedingung zu {topic} erhalten.",
+            "hard": f"zwei konkrete Bedingungen (Preis und eine Einschraenkung) zu {topic} klaeren.",
+        },
+        "french": {
+            "easy": f"confirmer un detail concret sur {topic}.",
+            "medium": f"obtenir un prix exact et une condition claire sur {topic}.",
+            "hard": f"valider deux conditions concretes (prix et contrainte) sur {topic}.",
+        },
+        "italian": {
+            "easy": f"confermare un dettaglio concreto su {topic}.",
+            "medium": f"ottenere un prezzo esatto e una condizione chiara su {topic}.",
+            "hard": f"chiudere due condizioni concrete (prezzo e vincolo) su {topic}.",
+        },
+        "portuguese": {
+            "easy": f"confirmar um detalhe concreto sobre {topic}.",
+            "medium": f"obter um preco exato e uma condicao clara sobre {topic}.",
+            "hard": f"fechar duas condicoes concretas (preco e restricao) sobre {topic}.",
+        },
+    }
+    source_code = source_language if source_language in difficulty_goal_fragment_by_language else "english"
+    level = goal_difficulty if goal_difficulty in {"easy", "medium", "hard"} else "medium"
     return {
-        "goal_text": f"Objetivo: obtener un precio exacto para {topic}.",
+        "goal_text": f"{fallback_goal_prefix_by_language.get(source_code, 'Goal')}: {difficulty_goal_fragment_by_language[source_code][level]}",
         "opening_text": fallback_opening_by_language.get(
             target_language,
             f"Hi. Let's talk about {topic}. What's most important to you?",
         ),
         "opening_translation_text": "",
+        "goal_difficulty": level,
     }
 
 
@@ -1207,48 +1621,174 @@ def _generate_mistake_explanation_with_question_model(
     learner_clean = str(learner_text).strip()
     if not corrected_clean:
         return ""
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
 
-    question_model = str(getattr(settings, "OPENAI_QUESTION_MODEL", settings.OPENAI_MODEL)).strip() or settings.OPENAI_MODEL
-    parsed = call_openai_json(
-        """
+    question_model = _require_question_model()
+    parsed = _call_openai_json_logged(
+        label="generate_mistake_explanation",
+        system_prompt=f"""
 Write a short mistake explanation for a corrected learner sentence.
 
 Return strict JSON:
-{
+{{
   "explanation": "string"
-}
+}}
 
 Rules:
-- explanation must be in SOURCE language only.
-- Keep it concise: one short line.
+- explanation must be in {source_name} only.
+- Keep it concise: one short line, max 220 chars.
 - Include:
-  1) what changed (original -> corrected),
-  2) why it is wrong in this context,
+  1) what changed (exact original -> corrected in {target_name}),
+  2) why the original is wrong in this context ({source_name}),
   3) one short rule of thumb.
-- Focus on TARGET language usage only.
+- The explanation must be about the learner's {target_name} message.
+- Include original and corrected {target_name} text as quoted snippets exactly as provided.
+- Apart from those quoted {target_name} snippets, all other words must be in {source_name}.
+- Focus on {target_name} usage only.
+- Always return a non-empty explanation when corrected text is provided.
+- Never translate or rewrite the quoted {target_name} snippets.
+- If uncertain about grammar details, still provide a brief generic rule in {source_name}.
 - JSON only.
 """.strip(),
-        (
-            f"Source language: {_language_display_name(source_language)}\n"
-            f"Target language: {_language_display_name(target_language)}\n"
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
             f"{context_label}"
-            f"Learner original text ({_language_display_name(target_language)}): {learner_clean}\n"
-            f"Corrected text ({_language_display_name(target_language)}): {corrected_clean}\n"
-            f"Corrected translation ({_language_display_name(source_language)}): {corrected_source_translation}\n"
+            f"Learner original text ({target_name}): {learner_clean}\n"
+            f"Corrected text ({target_name}): {corrected_clean}\n"
+            f"Corrected translation ({source_name}): {corrected_source_translation}\n"
+            f"Output format guidance: \"<original>\" -> \"<corrected>\"; <why in {source_name}>; <rule in {source_name}>\n"
         ),
         timeout_seconds=8,
         model=question_model,
-        temperature=0.1,
+        temperature=0.0,
         top_p=1.0,
         presence_penalty=0.0,
     )
     if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+
+    explanation_candidate = str(parsed.get("explanation", "")).strip()
+    if not explanation_candidate:
+        second_pass = _call_openai_json_logged(
+            label="generate_mistake_explanation_second_pass",
+            system_prompt=f"""
+Write a concise correction explanation.
+
+Return strict JSON:
+{{
+  "text": "string"
+}}
+
+Rules:
+- Write in {source_name} only.
+- Refer to learner {target_name} text as: "<original>" -> "<corrected>".
+- Explain briefly why and give one short rule.
+- One short line only.
+- Always return a non-empty text value.
+- JSON only.
+""".strip(),
+            user_input=(
+                f"Source language: {source_name}\n"
+                f"Target language: {target_name}\n"
+                f"Learner original text ({target_name}): {learner_clean}\n"
+                f"Corrected text ({target_name}): {corrected_clean}\n"
+            ),
+            timeout_seconds=8,
+            model=question_model,
+            temperature=0.0,
+            top_p=1.0,
+            presence_penalty=0.0,
+        )
+        if not isinstance(second_pass, dict):
+            raise RuntimeError("Question model request failed")
+        explanation_candidate = str(second_pass.get("text", "")).strip()
+
+    if not explanation_candidate:
         return ""
-    explanation = _ensure_source_language_text(
-        str(parsed.get("explanation", "")).strip(),
-        source_language=source_language,
+
+    return explanation_candidate[:1200]
+
+
+def _evaluate_goal_achievement_with_question_model(
+    *,
+    topic: str,
+    notes: str,
+    role_text: str,
+    goal_text: str,
+    history: list[dict[str, str]],
+    latest_user_text: str,
+    source_language: str,
+    target_language: str,
+) -> tuple[bool, str]:
+    goal_clean = str(goal_text).strip()
+    if not goal_clean:
+        return False, ""
+
+    history_lines: list[str] = []
+    for row in history:
+        if row.get("user_text"):
+            history_lines.append(f"Learner: {row['user_text']}")
+        if row.get("assistant_text"):
+            history_lines.append(f"Partner: {row['assistant_text']}")
+
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    question_model = _require_question_model()
+    parsed = _call_openai_json_logged(
+        label="evaluate_goal_achievement",
+        system_prompt=f"""
+Evaluate if the learner has already achieved a conversation goal.
+
+Return strict JSON:
+{{
+  "goal_achieved": false,
+  "goal_achievement_message": "string"
+}}
+
+Rules:
+- Assess strictly against the explicit condition(s) in goal_text.
+- Use full history plus latest learner message.
+- If condition is clearly met, set goal_achieved=true and write one short congratulatory message in {source_name}.
+- If not clearly met yet, set goal_achieved=false and goal_achievement_message="".
+- Do not infer success without evidence in learner messages.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Topic: {topic}\n"
+            f"Temporary notes: {notes}\n"
+            f"Learner role: {role_text}\n"
+            f"Goal text: {goal_clean}\n"
+            f"Recent conversation:\n{chr(10).join(history_lines[-14:])}\n"
+            f"Latest learner message: {latest_user_text}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
     )
-    return explanation[:1200]
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+
+    achieved = bool(parsed.get("goal_achieved", False))
+    message = str(parsed.get("goal_achievement_message", "")).strip()
+    if achieved and not message:
+        fallback_message_by_language = {
+            "spanish": "Excelente, ya cumpliste el objetivo.",
+            "english": "Great job, you achieved the goal.",
+            "german": "Sehr gut, du hast das Ziel erreicht.",
+            "french": "Bravo, tu as atteint l'objectif.",
+            "italian": "Ottimo, hai raggiunto l'obiettivo.",
+            "portuguese": "Excelente, voce atingiu o objetivo.",
+        }
+        message = fallback_message_by_language.get(source_language, "Great job, you achieved the goal.")
+    if not achieved:
+        return False, ""
+    return True, message[:600]
 
 
 def _generate_topic_conversation_reply(
@@ -1262,6 +1802,8 @@ def _generate_topic_conversation_reply(
     source_language: str,
     target_language: str,
 ) -> dict[str, str]:
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
     history_lines: list[str] = []
     for row in history:
         if row.get("user_text"):
@@ -1269,46 +1811,38 @@ def _generate_topic_conversation_reply(
         if row.get("assistant_text"):
             history_lines.append(f"Partner: {row['assistant_text']}")
 
-    parsed = call_openai_json(
-        """
+    parsed = _call_openai_json_logged(
+        label="generate_topic_conversation_reply",
+        system_prompt=f"""
 You are a conversation partner in a live speaking practice.
 
 Return strict JSON:
-{
+{{
   "reply_text": "string",
   "source_translation": "string",
-  "user_source_translation": "string",
-  "corrected_user_text": "string",
-  "corrected_user_source_translation": "string",
-  "corrected_user_explanation": "string"
-}
+  "goal_achieved": false,
+  "goal_achievement_message": "string"
+}}
 
 Rules:
-- Write reply_text in TARGET language only.
-- Write source_translation in SOURCE language only.
-- user_source_translation must be SOURCE-language translation of learner input.
+- Write reply_text in {target_name} only.
+- Write source_translation in {source_name} only.
 - Keep natural peer-to-peer tone, like a regular conversation.
 - Do not act like teacher/tutor.
-- Do not proactively correct mistakes.
-- corrected_user_text must be in TARGET language and only if learner explicitly asks for correction/help.
-- corrected_user_source_translation must be in SOURCE language and only for corrected_user_text.
-- corrected_user_explanation must be in SOURCE language and only when correction exists.
-- corrected_user_explanation must clearly include:
-  1) what part changed (original -> corrected),
-  2) why the original is wrong in this context,
-  3) one short rule of thumb to avoid repeating the mistake.
-- Never include correction content inside reply_text.
 - Keep reply concise: 1-3 short sentences.
 - Keep it aligned with topic, notes, and goal.
+- Evaluate whether the learner has achieved the conversation goal considering recent history and latest learner message.
+- If goal is achieved, set goal_achieved=true and provide goal_achievement_message in {source_name}, one short congratulatory line.
+- If goal is not achieved, set goal_achieved=false and goal_achievement_message="".
 - Keep the interaction consistent with learner role when provided.
 - You are always the conversation partner, never the learner role.
 - If learner role is "customer", reply as staff/seller/service person.
 - End with one simple follow-up question.
 - JSON only.
 """.strip(),
-        (
-            f"Source language: {_language_display_name(source_language)}\n"
-            f"Target language: {_language_display_name(target_language)}\n"
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
             f"Conversation topic: {topic}\n"
             f"Temporary notes: {notes}\n"
             f"Learner role: {role_text}\n"
@@ -1323,64 +1857,34 @@ Rules:
     )
     if isinstance(parsed, dict):
         reply_text = str(parsed.get("reply_text", "")).strip()
-        source_translation = _ensure_source_language_text(
-            str(parsed.get("source_translation", "")).strip(),
+        source_translation = str(parsed.get("source_translation", "")).strip()
+        goal_achieved = bool(parsed.get("goal_achieved", False))
+        goal_achievement_message = str(parsed.get("goal_achievement_message", "")).strip()
+        evaluated_goal_achieved, evaluated_goal_message = _evaluate_goal_achievement_with_question_model(
+            topic=topic,
+            notes=notes,
+            role_text=role_text,
+            goal_text=goal_text,
+            history=history,
+            latest_user_text=user_text,
             source_language=source_language,
+            target_language=target_language,
         )
-        user_source_translation = _ensure_source_language_text(
-            str(parsed.get("user_source_translation", "")).strip(),
-            source_language=source_language,
-        )
-        corrected_user_text = str(parsed.get("corrected_user_text", "")).strip()
-        corrected_user_source_translation = _ensure_source_language_text(
-            str(parsed.get("corrected_user_source_translation", "")).strip(),
-            source_language=source_language,
-        )
-        corrected_user_explanation = _ensure_source_language_text(
-            str(parsed.get("corrected_user_explanation", "")).strip(),
-            source_language=source_language,
-        )
-        if corrected_user_text:
-            refined_explanation = _generate_mistake_explanation_with_question_model(
-                source_language=source_language,
-                target_language=target_language,
-                learner_text=user_text,
-                corrected_text=corrected_user_text,
-                corrected_source_translation=corrected_user_source_translation,
-                context_label=(
-                    f"Conversation topic: {topic}\n"
-                    f"Temporary notes: {notes}\n"
-                    f"Learner role: {role_text}\n"
-                    f"Conversation goal: {goal_text}\n"
-                ),
-            )
-            if refined_explanation:
-                corrected_user_explanation = refined_explanation
+        goal_achieved = evaluated_goal_achieved
+        goal_achievement_message = evaluated_goal_message
         if reply_text:
             return {
                 "reply_text": reply_text[:1200],
                 "source_translation": source_translation[:1200],
-                "user_source_translation": user_source_translation[:1200],
-                "corrected_user_text": corrected_user_text[:1200],
-                "corrected_user_source_translation": corrected_user_source_translation[:1200],
-                "corrected_user_explanation": corrected_user_explanation[:1200],
+                "goal_achieved": goal_achieved,
+                "goal_achievement_message": goal_achievement_message[:600],
             }
 
-    fallback_by_language = {
-        "german": "Klingt gut. Kannst du mir ein konkretes Beispiel geben?",
-        "spanish": "Suena bien. Puedes darme un ejemplo concreto?",
-        "english": "Sounds good. Can you give me one concrete example?",
-        "french": "Ca marche. Peux-tu me donner un exemple concret ?",
-        "italian": "Va bene. Mi puoi dare un esempio concreto?",
-        "portuguese": "Parece bom. Voce pode me dar um exemplo concreto?",
-    }
     return {
-        "reply_text": fallback_by_language.get(target_language, "Sounds good. Can you give me one concrete example?"),
+        "reply_text": "",
         "source_translation": "",
-        "user_source_translation": "",
-        "corrected_user_text": "",
-        "corrected_user_source_translation": "",
-        "corrected_user_explanation": "",
+        "goal_achieved": False,
+        "goal_achievement_message": "",
     }
 
 
@@ -1527,41 +2031,6 @@ def _language_display_name(language_code: str) -> str:
     return names.get(language_code, language_code.capitalize())
 
 
-def _ensure_source_language_text(text: str, *, source_language: str) -> str:
-    value = str(text or "").strip()
-    if not value:
-        return ""
-    parsed = call_openai_json(
-        """
-Rewrite the input strictly in SOURCE language.
-
-Return strict JSON:
-{
-  "text": "string"
-}
-
-Rules:
-- Output only in SOURCE language.
-- Keep the same meaning.
-- Keep concise style and similar length.
-- JSON only.
-""".strip(),
-        (
-            f"Source language: {_language_display_name(source_language)}\n"
-            f"Input text: {value}\n"
-        ),
-        timeout_seconds=6,
-        temperature=0.0,
-        top_p=1.0,
-        presence_penalty=0.0,
-    )
-    if isinstance(parsed, dict):
-        rewritten = str(parsed.get("text", "")).strip()
-        if rewritten:
-            return rewritten[:1200]
-    return value[:1200]
-
-
 def _normalize_text(value: str) -> str:
     lowered = value.lower()
     return " ".join("".join(ch if ch.isalnum() or ch.isspace() else " " for ch in lowered).split())
@@ -1620,52 +2089,55 @@ def _model_answer_or_reject_item_question(
         history_lines.append(f"{idx}. Tutor: {answer}")
     history_text = "\n".join(history_lines) if history_lines else "(no previous conversation)"
 
-    question_model = str(getattr(settings, "OPENAI_QUESTION_MODEL", settings.OPENAI_MODEL)).strip() or settings.OPENAI_MODEL
+    question_model = _require_question_model()
 
-    parsed = call_openai_json(
-        """
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    parsed = _call_openai_json_logged(
+        label="model_answer_or_reject_item_question",
+        system_prompt=f"""
 Decide if a learner question is related to learning a specific item.
 If related, answer it. If not related, return a rejection code.
 
 Return strict JSON:
-{
+{{
   "related": true,
   "result_code": "RELATED_OK",
   "answer": "string",
   "reason": "string"
-}
+}}
 
 Rules:
 - If question is related to learning/using/understanding this item, set:
   related=true, result_code="RELATED_OK", and provide concise answer (3 to 6 short lines, A1-A2), reason="".
 - If question is NOT related to this item, set:
   related=false, result_code="UNRELATED_QUESTION", answer="", and provide a short reason.
-- Assume the learner's primary interest is the TARGET language usage/meaning.
+- Assume the learner's primary interest is {target_name} usage/meaning.
 - Do not reinterpret the question as source-language-focused unless the learner explicitly asks for source-language analysis.
 - Be permissive with typos, misspellings, partial matches, and paraphrases.
 - If the question could reasonably be about this item, treat it as related.
 - Questions about words/phrases in either study language can still be related to this item
   when asked in the communicative context of the item.
 - Do not assume language from spelling alone. A token may exist in both languages.
-- If the learner asks about a word "in {target language}" or within the item context, treat it as related.
+- If the learner asks about a word "in {target_name}" or within the item context, treat it as related.
 - Only mark unrelated when it is clearly about a different domain/topic.
 - Do not answer unrelated questions.
 - Use full conversation history for context and continuity.
-- Keep all explanations/comments focused on TARGET language usage (meaning, grammar, form, pronunciation, and context).
-- If examples or forms are included, they should describe TARGET language usage.
+- Keep all explanations/comments focused on {target_name} usage (meaning, grammar, form, pronunciation, and context).
+- If examples or forms are included, they should describe {target_name} usage.
 - Do not include source-language teaching/explanations.
-- The answer text itself must be written in SOURCE language (never in TARGET language).
-- Interpret every related question through TARGET language meaning/usage, even when the question text is in SOURCE language.
+- The answer text itself must be written in {source_name} (never in {target_name}).
+- Interpret every related question through {target_name} meaning/usage, even when the question text is in {source_name}.
 - Before returning, verify your answer satisfies the previous 5 rules exactly.
 - JSON only.
 """.strip(),
-        (
+        user_input=(
             f"Question: {question_text}\n"
-            f"Study pair: source={_language_display_name(source_language)}, target={_language_display_name(target_language)}\n"
-            f"Item being asked about: {item.german_text} ({_language_display_name(target_language)})"
-            f" / {item.spanish_text} ({_language_display_name(source_language)})\n"
-            f"Item source text ({_language_display_name(source_language)}): {item.spanish_text}\n"
-            f"Item target text ({_language_display_name(target_language)}): {item.german_text}\n"
+            f"Study pair: source={source_name}, target={target_name}\n"
+            f"Item being asked about: {item.german_text} ({target_name})"
+            f" / {item.spanish_text} ({source_name})\n"
+            f"Item source text ({source_name}): {item.spanish_text}\n"
+            f"Item target text ({target_name}): {item.german_text}\n"
             f"Item notes: {item.notes}\n"
             f"Item example: {item.example_sentence}\n"
             f"Conversation history (oldest to newest):\n{history_text}\n"
@@ -1745,19 +2217,7 @@ Rules:
             "reason": reason,
         }
 
-    # If the model classifier is unavailable, block only clearly unrelated questions.
-    if _looks_clearly_unrelated(normalized_question):
-        return {"related": False, "code": "UNRELATED_FALLBACK", "answer": "", "reason": "fallback clearly unrelated term"}
-    return {
-        "related": True,
-        "code": "RELATED_FALLBACK",
-        "answer": _fallback_item_question_answer(
-            item=item,
-            question_text=question_text,
-            source_language=source_language,
-        ),
-        "reason": "fallback allow",
-    }
+    raise RuntimeError("Question model request failed")
 
 
 def _fallback_item_question_answer(*, item: Item, question_text: str, source_language: str) -> str:
@@ -1769,20 +2229,20 @@ def _fallback_item_question_answer(*, item: Item, question_text: str, source_lan
             f"Example 1 ({target}): short everyday use.\n"
             f"Example 2 ({target}): polite conversational use."
         )
-        return _ensure_source_language_text(base, source_language=source_language)
+        return base
     if "grammar" in normalized_question or "gramatica" in normalized_question:
         base = (
             f"Grammar focus for {target} in the target language:\n"
             "Pay attention to article and word order.\n"
             "Keep one sentence pattern and replace one word at a time."
         )
-        return _ensure_source_language_text(base, source_language=source_language)
+        return base
     base = (
         f"Focus on how {target} is used in the target language.\n"
         "Practice pronunciation and one clean sentence pattern.\n"
         "Ask for target-language examples, grammar, or common mistakes."
     )
-    return _ensure_source_language_text(base, source_language=source_language)
+    return base
 
 
 def _serialize_question_exchange(exchange: ItemQuestionExchange) -> dict:
