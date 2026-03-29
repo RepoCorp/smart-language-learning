@@ -4,6 +4,7 @@ import json
 import math
 import logging
 import re
+from collections import deque
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
@@ -22,6 +23,7 @@ from ...serializers import ContentTopicSerializer
 from .core import ContentCandidate, call_openai_json, create_audio_file, create_phrase_if_missing, create_word_if_missing, item_exists
 
 logger = logging.getLogger(__name__)
+_RECENT_TOPIC_GOALS: deque[str] = deque(maxlen=30)
 
 
 def _call_openai_json_logged(
@@ -677,14 +679,17 @@ class ContentTopicConversationStartView(APIView):
         if goal_difficulty not in {"easy", "medium", "hard"}:
             return Response({"detail": "goal_difficulty must be easy, medium, or hard"}, status=status.HTTP_400_BAD_REQUEST)
 
-        start_payload = _generate_topic_conversation_start(
-            topic=topic,
-            notes=notes,
-            role_text=role_text,
-            goal_difficulty=goal_difficulty,
-            source_language=source_language,
-            target_language=target_language,
-        )
+        try:
+            start_payload = _generate_topic_conversation_start(
+                topic=topic,
+                notes=notes,
+                role_text=role_text,
+                goal_difficulty=goal_difficulty,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         opening_text = start_payload.get("opening_text", "")
         opening_translation_text = start_payload.get("opening_translation_text", "")
         goal_text = start_payload.get("goal_text", "")
@@ -733,7 +738,6 @@ class ContentTopicConversationTurnView(APIView):
             f"Conversation topic: {topic}\n"
             f"Temporary notes: {notes}\n"
             f"Learner role: {role_text}\n"
-            f"Conversation goal: {goal_text}\n"
         )
         try:
             analysis = _analyze_user_turn_with_question_model(
@@ -763,6 +767,7 @@ class ContentTopicConversationTurnView(APIView):
         assistant_translation_text = assistant_payload.get("source_translation", "")
         goal_achieved = bool(assistant_payload.get("goal_achieved", False))
         goal_achievement_message = str(assistant_payload.get("goal_achievement_message", "")).strip()
+        next_goal_suggestion = str(assistant_payload.get("next_goal_suggestion", "")).strip()
         assistant_audio_url = ""
         if assistant_text:
             assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
@@ -782,6 +787,7 @@ class ContentTopicConversationTurnView(APIView):
                 "assistant_audio_url": assistant_audio_url,
                 "goal_achieved": goal_achieved,
                 "goal_achievement_message": goal_achievement_message,
+                "next_goal_suggestion": next_goal_suggestion,
             }
         )
 
@@ -818,7 +824,6 @@ class ContentTopicConversationUserCorrectionView(APIView):
             f"Conversation topic: {topic}\n"
             f"Temporary notes: {notes}\n"
             f"Learner role: {role_text}\n"
-            f"Conversation goal: {goal_text}\n"
         )
         try:
             correction_payload = _generate_user_correction_with_question_model(
@@ -1488,9 +1493,14 @@ def _generate_topic_conversation_start(
 ) -> dict[str, str]:
     source_name = _language_display_name(source_language)
     target_name = _language_display_name(target_language)
-    parsed = _call_openai_json_logged(
-        label="generate_topic_conversation_start",
-        system_prompt=f"""
+    variation_seed = uuid4().hex[:8]
+
+    for attempt in range(3):
+        recent_goal_lines = list(_RECENT_TOPIC_GOALS)[-8:]
+        avoid_block = "\n".join(f"- {line}" for line in recent_goal_lines) if recent_goal_lines else "(none)"
+        parsed = _call_openai_json_logged(
+            label="generate_topic_conversation_start",
+            system_prompt=f"""
 Create a conversation setup for a language learner.
 
 Return strict JSON:
@@ -1504,6 +1514,8 @@ Rules:
 - goal_text must be in {source_name} and include exactly one concrete condition.
 - The condition must be specific and verifiable (clear done/not-done outcome).
 - Include one concrete target detail (for example a number, exact item, exact decision, or exact piece of information).
+- Keep variation style different each run using variation_seed.
+- This is for a learner practicing a new language in conversation.
 - Keep it achievable in one short conversation.
 - Avoid generic goals like "have a conversation about X".
 - Adapt challenge level to goal_difficulty:
@@ -1520,92 +1532,43 @@ Rules:
 - Never write opening_text from the learner role perspective.
 - If learner role is "customer", partner should sound like staff/seller/service person.
 - Do not use teacher or tutor voice.
+- Avoid repeating goals that are too similar to recently used goals.
 - JSON only.
 """.strip(),
-        user_input=(
-            f"Source language: {source_name}\n"
-            f"Target language: {target_name}\n"
-            f"Topic: {topic}\n"
-            f"Temporary notes: {notes}\n"
-            f"Learner role: {role_text}\n"
-            f"goal_difficulty: {goal_difficulty}\n"
-        ),
-        timeout_seconds=10,
-        temperature=0.6,
-        top_p=0.9,
-        presence_penalty=0.2,
-    )
-    if isinstance(parsed, dict):
+            user_input=(
+                f"Source language: {source_name}\n"
+                f"Target language: {target_name}\n"
+                f"Variation seed for this run: {variation_seed}-{attempt}\n"
+                f"Topic: {topic}\n"
+                f"Temporary notes: {notes}\n"
+                f"Learner role: {role_text}\n"
+                f"goal_difficulty: {goal_difficulty}\n"
+                f"Recently used goals to avoid similarity:\n{avoid_block}\n"
+            ),
+            timeout_seconds=10,
+            temperature=0.95,
+            top_p=1.0,
+            presence_penalty=0.6,
+        )
+        if not isinstance(parsed, dict):
+            continue
         goal_text = str(parsed.get("goal_text", "")).strip()
         opening_text = str(parsed.get("opening_text", "")).strip()
         opening_translation_text = str(parsed.get("opening_translation_text", "")).strip()
-        if goal_text and opening_text:
-            return {
-                "goal_text": goal_text[:600],
-                "opening_text": opening_text[:1200],
-                "opening_translation_text": opening_translation_text[:1200],
-                "goal_difficulty": goal_difficulty,
-            }
+        if not goal_text or not opening_text:
+            continue
 
-    fallback_opening_by_language = {
-        "german": f"Hi! Lass uns ueber {topic} sprechen. Was ist dir dabei wichtig?",
-        "spanish": f"Hola. Hablemos de {topic}. Que te parece mas importante?",
-        "english": f"Hi. Let's talk about {topic}. What's most important to you?",
-        "french": f"Salut. Parlons de {topic}. Qu'est-ce qui est le plus important pour toi ?",
-        "italian": f"Ciao. Parliamo di {topic}. Cosa e piu importante per te?",
-        "portuguese": f"Ola. Vamos falar sobre {topic}. O que e mais importante para voce?",
-    }
-    fallback_goal_prefix_by_language = {
-        "spanish": "Objetivo",
-        "english": "Goal",
-        "german": "Ziel",
-        "french": "Objectif",
-        "italian": "Obiettivo",
-        "portuguese": "Objetivo",
-    }
-    difficulty_goal_fragment_by_language: dict[str, dict[str, str]] = {
-        "spanish": {
-            "easy": f"confirmar un dato concreto sobre {topic}.",
-            "medium": f"obtener un precio exacto y una condicion clara para {topic}.",
-            "hard": f"cerrar dos condiciones concretas (precio y restriccion) sobre {topic}.",
-        },
-        "english": {
-            "easy": f"confirm one concrete detail about {topic}.",
-            "medium": f"get an exact price and one clear condition about {topic}.",
-            "hard": f"close two concrete conditions (price and one restriction) about {topic}.",
-        },
-        "german": {
-            "easy": f"ein konkretes Detail zu {topic} bestaetigen.",
-            "medium": f"einen genauen Preis und eine klare Bedingung zu {topic} erhalten.",
-            "hard": f"zwei konkrete Bedingungen (Preis und eine Einschraenkung) zu {topic} klaeren.",
-        },
-        "french": {
-            "easy": f"confirmer un detail concret sur {topic}.",
-            "medium": f"obtenir un prix exact et une condition claire sur {topic}.",
-            "hard": f"valider deux conditions concretes (prix et contrainte) sur {topic}.",
-        },
-        "italian": {
-            "easy": f"confermare un dettaglio concreto su {topic}.",
-            "medium": f"ottenere un prezzo esatto e una condizione chiara su {topic}.",
-            "hard": f"chiudere due condizioni concrete (prezzo e vincolo) su {topic}.",
-        },
-        "portuguese": {
-            "easy": f"confirmar um detalhe concreto sobre {topic}.",
-            "medium": f"obter um preco exato e uma condicao clara sobre {topic}.",
-            "hard": f"fechar duas condicoes concretas (preco e restricao) sobre {topic}.",
-        },
-    }
-    source_code = source_language if source_language in difficulty_goal_fragment_by_language else "english"
-    level = goal_difficulty if goal_difficulty in {"easy", "medium", "hard"} else "medium"
-    return {
-        "goal_text": f"{fallback_goal_prefix_by_language.get(source_code, 'Goal')}: {difficulty_goal_fragment_by_language[source_code][level]}",
-        "opening_text": fallback_opening_by_language.get(
-            target_language,
-            f"Hi. Let's talk about {topic}. What's most important to you?",
-        ),
-        "opening_translation_text": "",
-        "goal_difficulty": level,
-    }
+        if any(_goal_similarity_score(goal_text, prev_goal) >= 0.55 for prev_goal in _RECENT_TOPIC_GOALS):
+            continue
+
+        _RECENT_TOPIC_GOALS.append(goal_text[:600])
+        return {
+            "goal_text": goal_text[:600],
+            "opening_text": opening_text[:1200],
+            "opening_translation_text": opening_translation_text[:1200],
+            "goal_difficulty": goal_difficulty,
+        }
+    raise RuntimeError("Question model request failed")
 
 
 def _generate_mistake_explanation_with_question_model(
@@ -1711,6 +1674,116 @@ Rules:
     return explanation_candidate[:1200]
 
 
+def _translate_goal_text_to_english_with_question_model(*, goal_text: str, source_language: str) -> str:
+    goal_clean = str(goal_text).strip()
+    if not goal_clean:
+        return ""
+    if source_language == "english":
+        return goal_clean
+
+    source_name = _language_display_name(source_language)
+    question_model = _require_question_model()
+    parsed = _call_openai_json_logged(
+        label="translate_goal_to_english",
+        system_prompt=f"""
+Translate goal text to English.
+
+Return strict JSON:
+{{
+  "english_text": "string"
+}}
+
+Rules:
+- Input language is {source_name}.
+- Output must be English only.
+- Keep exact intent and concrete condition(s).
+- Keep concise, one line.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Input language: {source_name}\n"
+            f"Goal text: {goal_clean}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    english_text = str(parsed.get("english_text", "")).strip()
+    if not english_text:
+        raise RuntimeError("Question model request failed")
+    return english_text[:600]
+
+
+def _goal_similarity_score(a: str, b: str) -> float:
+    left = set(_normalize_text(a).split())
+    right = set(_normalize_text(b).split())
+    if not left or not right:
+        return 0.0
+    intersection = len(left & right)
+    union = len(left | right)
+    if union == 0:
+        return 0.0
+    return intersection / union
+
+
+def _generate_next_goal_suggestion_with_question_model(
+    *,
+    topic: str,
+    notes: str,
+    role_text: str,
+    current_goal_text: str,
+    latest_user_text: str,
+    source_language: str,
+    target_language: str,
+) -> str:
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    question_model = _require_question_model()
+    parsed = _call_openai_json_logged(
+        label="generate_next_goal_suggestion",
+        system_prompt=f"""
+Generate one next conversation goal for continued practice.
+
+Return strict JSON:
+{{
+  "next_goal_suggestion": "string"
+}}
+
+Rules:
+- Write next_goal_suggestion in {source_name}.
+- Keep one concise line with one concrete, verifiable condition.
+- It must be meaningfully different from current_goal_text (different target detail and action).
+- Keep same conversation context (topic/role), but increase or shift challenge.
+- Avoid repeating wording from current_goal_text.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Topic: {topic}\n"
+            f"Temporary notes: {notes}\n"
+            f"Learner role: {role_text}\n"
+            f"Current goal text: {current_goal_text}\n"
+            f"Latest learner message: {latest_user_text}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.3,
+        top_p=0.9,
+        presence_penalty=0.4,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    suggestion = str(parsed.get("next_goal_suggestion", "")).strip()
+    if not suggestion:
+        raise RuntimeError("Question model request failed")
+    return suggestion[:600]
+
+
 def _evaluate_goal_achievement_with_question_model(
     *,
     topic: str,
@@ -1721,10 +1794,14 @@ def _evaluate_goal_achievement_with_question_model(
     latest_user_text: str,
     source_language: str,
     target_language: str,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, str]:
     goal_clean = str(goal_text).strip()
     if not goal_clean:
-        return False, ""
+        return False, "", ""
+    goal_clean_english = _translate_goal_text_to_english_with_question_model(
+        goal_text=goal_clean,
+        source_language=source_language,
+    )
 
     history_lines: list[str] = []
     for row in history:
@@ -1744,14 +1821,17 @@ Evaluate if the learner has already achieved a conversation goal.
 Return strict JSON:
 {{
   "goal_achieved": false,
-  "goal_achievement_message": "string"
+  "goal_achievement_message": "string",
+  "next_goal_suggestion": "string"
 }}
 
 Rules:
-- Assess strictly against the explicit condition(s) in goal_text.
+- Assess strictly against the explicit condition(s) in goal_text_english.
 - Use full history plus latest learner message.
 - If condition is clearly met, set goal_achieved=true and write one short congratulatory message in {source_name}.
+- If condition is clearly met, also provide next_goal_suggestion in {source_name}: one concise concrete follow-up goal for continuing this same conversation.
 - If not clearly met yet, set goal_achieved=false and goal_achievement_message="".
+- If not clearly met yet, set next_goal_suggestion="".
 - Do not infer success without evidence in learner messages.
 - JSON only.
 """.strip(),
@@ -1761,7 +1841,7 @@ Rules:
             f"Topic: {topic}\n"
             f"Temporary notes: {notes}\n"
             f"Learner role: {role_text}\n"
-            f"Goal text: {goal_clean}\n"
+            f"Goal text (English): {goal_clean_english}\n"
             f"Recent conversation:\n{chr(10).join(history_lines[-14:])}\n"
             f"Latest learner message: {latest_user_text}\n"
         ),
@@ -1776,6 +1856,7 @@ Rules:
 
     achieved = bool(parsed.get("goal_achieved", False))
     message = str(parsed.get("goal_achievement_message", "")).strip()
+    next_goal_suggestion = str(parsed.get("next_goal_suggestion", "")).strip()
     if achieved and not message:
         fallback_message_by_language = {
             "spanish": "Excelente, ya cumpliste el objetivo.",
@@ -1786,9 +1867,35 @@ Rules:
             "portuguese": "Excelente, voce atingiu o objetivo.",
         }
         message = fallback_message_by_language.get(source_language, "Great job, you achieved the goal.")
+    if achieved and not next_goal_suggestion:
+        fallback_next_goal_by_language = {
+            "spanish": "Siguiente objetivo: confirma un detalle adicional concreto en esta misma situacion.",
+            "english": "Next goal: confirm one additional concrete detail in this same situation.",
+            "german": "Naechstes Ziel: Bestaetige ein weiteres konkretes Detail in dieser Situation.",
+            "french": "Prochain objectif: confirme un detail concret supplementaire dans cette meme situation.",
+            "italian": "Obiettivo successivo: conferma un ulteriore dettaglio concreto in questa stessa situazione.",
+            "portuguese": "Proximo objetivo: confirme um detalhe concreto adicional nesta mesma situacao.",
+        }
+        next_goal_suggestion = fallback_next_goal_by_language.get(
+            source_language,
+            "Next goal: confirm one additional concrete detail in this same situation.",
+        )
+    if achieved and _goal_similarity_score(next_goal_suggestion, goal_clean) >= 0.55:
+        try:
+            next_goal_suggestion = _generate_next_goal_suggestion_with_question_model(
+                topic=topic,
+                notes=notes,
+                role_text=role_text,
+                current_goal_text=goal_clean,
+                latest_user_text=latest_user_text,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError:
+            pass
     if not achieved:
-        return False, ""
-    return True, message[:600]
+        return False, "", ""
+    return True, message[:600], next_goal_suggestion[:600]
 
 
 def _generate_topic_conversation_reply(
@@ -1819,9 +1926,7 @@ You are a conversation partner in a live speaking practice.
 Return strict JSON:
 {{
   "reply_text": "string",
-  "source_translation": "string",
-  "goal_achieved": false,
-  "goal_achievement_message": "string"
+  "source_translation": "string"
 }}
 
 Rules:
@@ -1830,10 +1935,7 @@ Rules:
 - Keep natural peer-to-peer tone, like a regular conversation.
 - Do not act like teacher/tutor.
 - Keep reply concise: 1-3 short sentences.
-- Keep it aligned with topic, notes, and goal.
-- Evaluate whether the learner has achieved the conversation goal considering recent history and latest learner message.
-- If goal is achieved, set goal_achieved=true and provide goal_achievement_message in {source_name}, one short congratulatory line.
-- If goal is not achieved, set goal_achieved=false and goal_achievement_message="".
+- Keep it aligned with topic and notes.
 - Keep the interaction consistent with learner role when provided.
 - You are always the conversation partner, never the learner role.
 - If learner role is "customer", reply as staff/seller/service person.
@@ -1846,7 +1948,6 @@ Rules:
             f"Conversation topic: {topic}\n"
             f"Temporary notes: {notes}\n"
             f"Learner role: {role_text}\n"
-            f"Conversation goal: {goal_text}\n"
             f"Recent conversation:\n{chr(10).join(history_lines[-12:])}\n"
             f"Learner new message: {user_text}\n"
         ),
@@ -1858,9 +1959,7 @@ Rules:
     if isinstance(parsed, dict):
         reply_text = str(parsed.get("reply_text", "")).strip()
         source_translation = str(parsed.get("source_translation", "")).strip()
-        goal_achieved = bool(parsed.get("goal_achieved", False))
-        goal_achievement_message = str(parsed.get("goal_achievement_message", "")).strip()
-        evaluated_goal_achieved, evaluated_goal_message = _evaluate_goal_achievement_with_question_model(
+        evaluated_goal_achieved, evaluated_goal_message, evaluated_goal_next = _evaluate_goal_achievement_with_question_model(
             topic=topic,
             notes=notes,
             role_text=role_text,
@@ -1870,14 +1969,15 @@ Rules:
             source_language=source_language,
             target_language=target_language,
         )
-        goal_achieved = evaluated_goal_achieved
-        goal_achievement_message = evaluated_goal_message
+        if evaluated_goal_achieved and evaluated_goal_next:
+            evaluated_goal_message = f"{evaluated_goal_message} {evaluated_goal_next}".strip()
         if reply_text:
             return {
                 "reply_text": reply_text[:1200],
                 "source_translation": source_translation[:1200],
-                "goal_achieved": goal_achieved,
-                "goal_achievement_message": goal_achievement_message[:600],
+                "goal_achieved": evaluated_goal_achieved,
+                "goal_achievement_message": evaluated_goal_message[:600],
+                "next_goal_suggestion": evaluated_goal_next[:600],
             }
 
     return {
@@ -1885,6 +1985,7 @@ Rules:
         "source_translation": "",
         "goal_achieved": False,
         "goal_achievement_message": "",
+        "next_goal_suggestion": "",
     }
 
 

@@ -1,29 +1,20 @@
 # Todos
 
 Arreglar la generacion de frases para los ejercicios
-The first time you generate content it is always returning just one phrase
-Links to words from dialog turns and phrase pages
 Posibilidad de regenerar otras cosas, como las traducciones que a veces estan mal, especialmente en el ejercicio
-Que cuando esta viendo una frase y le da click a la palabra, se la muestre y le permita marcarla para empezar a testearla
-Si la palabra no esta que permita añadirla
-Que el test de un sentido y el otro no los haga seguido al menos la primera vez
 
 
 
 We will add a feature that will allow the user to ask for help when trying to communicate something. It will listen to the user request and respond by text, all  in the source language. Do not make this interaction part of the dialog. 
-First translate goal to english,
 
-
-
+Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
+Conversacion topic es requerido para poder empezar pero no se evidencia si se intenta impezar sin definirlo
 Frases de ejercicios, el repeat usa el audio que ya tiene generado 
 Palabras de ejercicios usa text to speech local
 el tema del casing en aleman. Solo mayusculas para sustantivos
-Usar Load Balancer 
 Ensayar otros modelos
 Seguridad de S3
 Arreglar allowed hosts de Django
-Hacer menu para moverse entre funciones en lugar de los links que hay ahora
-Aleman a español es seleccion multiple
 Repetir audio al final o ppio de los tests
 Make sure audio is in the same language as the text
 Revisar que si pueda guardar varias referencias a otros dialogos

@@ -144,6 +144,7 @@ export interface ContentItemConversationResponse {
   assistant_audio_url?: string;
   goal_achieved?: boolean;
   goal_achievement_message?: string;
+  next_goal_suggestion?: string;
 }
 
 export interface ContentTopicContextsResponse {

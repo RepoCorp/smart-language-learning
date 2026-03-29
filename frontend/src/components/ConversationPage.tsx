@@ -339,6 +339,9 @@ export default function ConversationPage(): JSX.Element {
         targetLanguage,
       );
       setConversationTurns((current) => [...current, response]);
+      if (response.goal_achieved && response.next_goal_suggestion) {
+        setConversationGoal(response.next_goal_suggestion);
+      }
       if (response.assistant_audio_url) {
         playAudioUrl(response.assistant_audio_url);
       }
