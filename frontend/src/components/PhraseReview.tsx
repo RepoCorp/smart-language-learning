@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useI18n } from "../i18n";
+import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 
@@ -17,6 +18,7 @@ const FEEDBACK_DELAY_MS = 2000;
 
 export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
+  const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
     spanish: "study.language.spanish",
@@ -28,12 +30,23 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
   };
   const [feedback, setFeedback] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
   const isSpanishToGerman = item.direction !== "de_to_es";
+  const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
+  const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
+
+  const playPromptAudio = (): void => {
+    if (!allowPromptAudio || !item.audio_url) {
+      return;
+    }
+    const audio = new Audio(item.audio_url);
+    void audio.play().catch(() => {});
+  };
 
   const choose = async (choice: string): Promise<void> => {
     if (isSubmitting) {
@@ -74,6 +87,20 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
     };
   }, [isSubmitting, item.options]);
 
+  useEffect(() => {
+    setShowPromptText(targetPromptMode === "text");
+  }, [targetPromptMode]);
+
+  useEffect(() => {
+    if (targetPromptMode !== "audio") {
+      return;
+    }
+    if (!allowPromptAudio) {
+      return;
+    }
+    playPromptAudio();
+  }, [targetPromptMode, item.id, allowPromptAudio]);
+
   const markAsWrongByChoice = async (): Promise<void> => {
     if (isSubmitting) {
       return;
@@ -90,7 +117,26 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
 
   return (
     <div>
-      <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
+      {targetPromptMode === "audio" && allowPromptAudio && (
+        <div className="prompt-visibility-controls">
+          <button type="button" className="secondary-button" onClick={() => setShowPromptText((value) => !value)}>
+            {showPromptText ? t("prompt.hideText") : t("prompt.showText")}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={playPromptAudio}
+            disabled={!allowPromptAudio || !item.audio_url}
+          >
+            {t("prompt.playAudio")}
+          </button>
+        </div>
+      )}
+      {hidePromptText ? (
+        <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
+      ) : (
+        <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
+      )}
       <div className="options">
         {item.options.map((option, idx) => (
           <button key={option} onClick={() => choose(option)} disabled={isSubmitting}>

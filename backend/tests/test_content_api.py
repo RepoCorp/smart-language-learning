@@ -1171,11 +1171,16 @@ def test_content_item_question_sends_full_conversation_context_to_model(monkeypa
         target_language="german",
     )
     call_user_payloads: list[str] = []
+    call_system_prompts: list[str] = []
+    call_kwargs: list[dict] = []
 
     def fake_call_openai_json(system_prompt, user_payload, **kwargs):
+        call_system_prompts.append(str(system_prompt))
         call_user_payloads.append(str(user_payload))
+        call_kwargs.append(dict(kwargs))
         return {"related": True, "result_code": "RELATED_OK", "answer": "Nutze es in kurzen Saetzen."}
 
+    monkeypatch.setattr(management_views.settings, "OPENAI_QUESTION_MODEL", "gpt-question-test")
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
 
     client = APIClient()
@@ -1196,6 +1201,9 @@ def test_content_item_question_sends_full_conversation_context_to_model(monkeypa
     assert "Conversation history (oldest to newest):" in call_user_payloads[1]
     assert "How can I use danke in a sentence?" in call_user_payloads[1]
     assert "Nutze es in kurzen Saetzen." in call_user_payloads[1]
+    assert "The answer text itself must be written in SOURCE language" in call_system_prompts[0]
+    assert "Interpret every related question through TARGET language meaning/usage" in call_system_prompts[0]
+    assert call_kwargs[0]["model"] == "gpt-question-test"
 
 
 @pytest.mark.django_db
@@ -1460,6 +1468,69 @@ def test_item_conversation_audio_returns_transcript_reply_and_audio(monkeypatch)
     assert payload["assistant_text"] == "Sehr gut. Wohin moechtest du mit dem Taxi fahren?"
     assert payload["assistant_translation_text"] == "Muy bien. A donde quieres ir en taxi?"
     assert payload["assistant_audio_url"] == "http://localhost:8000/media/audio/conversation-reply.mp3"
+
+
+@pytest.mark.django_db
+def test_item_conversation_uses_question_model_for_mistake_explanation(monkeypatch):
+    from learning.views import content as content_views
+    from learning.views.content import management as management_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="taxi",
+        german_text="das Taxi",
+        source_language="spanish",
+        target_language="german",
+    )
+    monkeypatch.setattr(
+        management_views,
+        "_openai_transcribe_audio_upload",
+        lambda *args, **kwargs: "Ich brauche Taxi.",
+    )
+    monkeypatch.setattr(management_views.settings, "OPENAI_QUESTION_MODEL", "gpt-question-test")
+
+    call_kwargs: list[dict] = []
+    call_system_prompts: list[str] = []
+
+    def fake_call_openai_json(system_prompt, user_payload, **kwargs):
+        call_system_prompts.append(str(system_prompt))
+        call_kwargs.append(dict(kwargs))
+        if "Write a short mistake explanation for a corrected learner sentence." in str(system_prompt):
+            return {"explanation": "Usa el articulo correcto en aleman y recuerda concordancia basica."}
+        return {
+            "reply_text": "Muy bien. A donde vas?",
+            "source_translation": "Muy bien. A donde vas?",
+            "user_source_translation": "Necesito un taxi.",
+            "corrected_user_text": "Ich brauche ein Taxi.",
+            "corrected_user_source_translation": "Necesito un taxi.",
+            "corrected_user_explanation": "Explicacion original.",
+        }
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": "http://localhost:8000/media/audio/conversation-reply.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/conversation?source_language=spanish&target_language=german",
+        {
+            "audio": SimpleUploadedFile("speech.webm", b"fake-audio-bytes", content_type="audio/webm"),
+            "history": "[]",
+        },
+        format="multipart",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["user_correction_explanation"] == "Usa el articulo correcto en aleman y recuerda concordancia basica."
+    assert any(kwargs.get("model") == "gpt-question-test" for kwargs in call_kwargs)
+    assert any(
+        "Write a short mistake explanation for a corrected learner sentence." in prompt
+        for prompt in call_system_prompts
+    )
 
 
 @pytest.mark.django_db

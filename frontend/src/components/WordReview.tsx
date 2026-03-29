@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useI18n } from "../i18n";
+import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 
@@ -17,6 +18,7 @@ const FEEDBACK_DELAY_MS = 1000;
 
 export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
+  const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
     spanish: "study.language.spanish",
@@ -33,10 +35,12 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const [clearedByHint, setClearedByHint] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
+  const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const isSpanishToGerman = item.direction !== "de_to_es";
   const useMultipleChoice = !isSpanishToGerman && item.options.length > 0;
+  const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
   const languageLabel = isSpanishToGerman
@@ -44,6 +48,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     : t(languageKeyByCode[sourceLanguage]);
 
   const hint = useMemo(() => hintLetter, [hintLetter]);
+  const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
 
   const hasExceededHintLimit = (value: string): boolean => {
     return value.length > 0 && hintedLetters > 1 && hintedLetters / value.length > 0.3;
@@ -105,6 +110,13 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     if (nextHintLetter) {
       setHintedLetters((value) => Math.max(value, prefixLen + 1));
     }
+  };
+
+  const handleHintButtonPress = (): void => {
+    showInputAwareHint();
+    window.setTimeout(() => {
+      inputRef.current?.focus({ preventScroll: true });
+    }, 0);
   };
 
   const check = async (): Promise<void> => {
@@ -179,11 +191,33 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     }
   };
 
+  const playPromptAudio = (): void => {
+    if (!allowPromptAudio || !item.audio_url) {
+      return;
+    }
+    const audio = new Audio(item.audio_url);
+    void audio.play().catch(() => {});
+  };
+
   useEffect(() => {
     if (!useMultipleChoice) {
       inputRef.current?.focus();
     }
   }, [useMultipleChoice]);
+
+  useEffect(() => {
+    setShowPromptText(targetPromptMode === "text");
+  }, [targetPromptMode]);
+
+  useEffect(() => {
+    if (targetPromptMode !== "audio") {
+      return;
+    }
+    if (!allowPromptAudio) {
+      return;
+    }
+    playPromptAudio();
+  }, [targetPromptMode, item.id, allowPromptAudio]);
 
   useEffect(() => {
     if (useMultipleChoice || !awaitingWrongAccept) {
@@ -230,7 +264,26 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   if (useMultipleChoice) {
     return (
       <div>
-        <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
+        {targetPromptMode === "audio" && allowPromptAudio && (
+          <div className="prompt-visibility-controls">
+            <button type="button" className="secondary-button" onClick={() => setShowPromptText((value) => !value)}>
+              {showPromptText ? t("prompt.hideText") : t("prompt.showText")}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={playPromptAudio}
+              disabled={!allowPromptAudio || !item.audio_url}
+            >
+              {t("prompt.playAudio")}
+            </button>
+          </div>
+        )}
+        {hidePromptText ? (
+          <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
+        ) : (
+          <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
+        )}
         <div className="options">
           {item.options.map((option, idx) => (
             <button key={option} onClick={() => void choose(option)} disabled={isSubmitting}>
@@ -245,7 +298,26 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
 
   return (
     <div>
-      <p className="prompt">{t("word.prompt", { language: languageLabel, text: promptText })}</p>
+      {targetPromptMode === "audio" && allowPromptAudio && (
+        <div className="prompt-visibility-controls">
+          <button type="button" className="secondary-button" onClick={() => setShowPromptText((value) => !value)}>
+            {showPromptText ? t("prompt.hideText") : t("prompt.showText")}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={playPromptAudio}
+            disabled={!allowPromptAudio || !item.audio_url}
+          >
+              {t("prompt.playAudio")}
+            </button>
+          </div>
+        )}
+      {hidePromptText ? (
+        <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
+      ) : (
+        <p className="prompt">{t("word.prompt", { language: languageLabel, text: promptText })}</p>
+      )}
       <input
         ref={inputRef}
         value={answer}
@@ -269,12 +341,24 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
         data-testid="word-input"
         disabled={isSubmitting || awaitingWrongAccept}
         autoFocus
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
       />
       <p className="hint">{hint ? t("word.hint", { letter: hint }) : "\u00a0"}</p>
       <div className="actions">
         {!awaitingWrongAccept && (
           <>
-            <button onClick={showInputAwareHint} disabled={isSubmitting}>{t("word.hintButton")}</button>
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onPointerDown={(event) => event.preventDefault()}
+              onTouchStart={(event) => event.preventDefault()}
+              onClick={handleHintButtonPress}
+              disabled={isSubmitting}
+            >
+              {t("word.hintButton")}
+            </button>
             <button onClick={check} disabled={isSubmitting || !answer.trim()}>{t("word.checkButton")}</button>
           </>
         )}

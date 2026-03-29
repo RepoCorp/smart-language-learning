@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { confirmContent, fetchContentTopicContexts, fetchContentTopics, previewContent } from "../api";
 import { useI18n } from "../i18n";
@@ -279,11 +278,6 @@ export default function ContentCreatePage(): JSX.Element {
     <main className="container" data-testid="content-create-page">
       <h1>{t("content.title")}</h1>
       <p>{t("content.description")}</p>
-      <p>
-        <Link to="/session">{t("content.backToSession")}</Link> |{" "}
-        <Link to="/content/manage">{t("content.manageLink")}</Link> |{" "}
-        <Link to="/conversation">{t("conversation.navLink")}</Link>
-      </p>
 
       <section className="card">
         <div className="content-form-section">

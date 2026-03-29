@@ -155,6 +155,7 @@ def call_openai_json(
     user_input: str,
     timeout_seconds: int = 10,
     *,
+    model: str | None = None,
     temperature: float = 0.2,
     top_p: float = 1.0,
     presence_penalty: float = 0.0,
@@ -165,7 +166,7 @@ def call_openai_json(
         return None
 
     body = {
-        "model": settings.OPENAI_MODEL,
+        "model": str(model or settings.OPENAI_MODEL).strip() or settings.OPENAI_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_input},

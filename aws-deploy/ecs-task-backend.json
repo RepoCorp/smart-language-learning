@@ -31,6 +31,8 @@
         { "name": "POSTGRES_PASSWORD", "value": "ks.cfNXh2T2ahGzpZif3" },
         { "name": "DJANGO_SECRET_KEY", "value": "notsosecretafterall" },
         { "name": "GUNICORN_TIMEOUT", "value": "120" },
+        { "name": "OPENAI_MODEL", "value": "gpt-4o-mini" },
+        { "name": "OPENAI_QUESTION_MODEL", "value": "gpt-4o-mini" },
         { "name": "OPENAI_REQUEST_TIMEOUT_SECONDS", "value": "30" },
         { "name": "OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", "value": "40" },
         { "name": "AUDIO_STORAGE_BACKEND", "value": "s3" },

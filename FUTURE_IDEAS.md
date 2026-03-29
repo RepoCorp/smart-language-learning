@@ -8,6 +8,7 @@ Que cuando esta viendo una frase y le da click a la palabra, se la muestre y le 
 Si la palabra no esta que permita añadirla
 Que el test de un sentido y el otro no los haga seguido al menos la primera vez
 
+el tema del casing en aleman. Solo mayusculas para sustantivos
 Usar Load Balancer 
 Ensayar otros modelos
 Seguridad de S3

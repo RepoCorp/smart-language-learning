@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { deleteContentItem, deleteContentTopic, fetchContentItemDetail, fetchContentItems, fetchContentTopics, regenerateContentItemAudio, setContentItemLearned } from "../api";
 import NewItem from "./NewItem";
@@ -284,11 +284,6 @@ export default function ContentManagePage(): JSX.Element {
   return (
     <main className="container">
       <h1>{t("manage.title")}</h1>
-      <p>
-        <Link to="/session">{t("manage.backToSession")}</Link> |{" "}
-        <Link to="/content/create">{t("manage.backToCreate")}</Link> |{" "}
-        <Link to="/conversation">{t("conversation.navLink")}</Link>
-      </p>
       <section className="card">
         <label htmlFor="manage-filter" className="prompt">{t("manage.filterLabel")}</label>
         <div className="actions">

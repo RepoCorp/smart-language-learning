@@ -1070,6 +1070,21 @@ Rules:
             str(parsed.get("corrected_user_explanation", "")).strip(),
             source_language=source_language,
         )
+        if corrected_user_text:
+            refined_explanation = _generate_mistake_explanation_with_question_model(
+                source_language=source_language,
+                target_language=target_language,
+                learner_text=user_text,
+                corrected_text=corrected_user_text,
+                corrected_source_translation=corrected_user_source_translation,
+                context_label=(
+                    f"Item source text: {item.spanish_text}\n"
+                    f"Item target text: {item.german_text}\n"
+                    f"Item notes: {item.notes}\n"
+                ),
+            )
+            if refined_explanation:
+                corrected_user_explanation = refined_explanation
         if reply_text:
             return {
                 "reply_text": reply_text[:1200],
@@ -1179,6 +1194,63 @@ Rules:
     }
 
 
+def _generate_mistake_explanation_with_question_model(
+    *,
+    source_language: str,
+    target_language: str,
+    learner_text: str,
+    corrected_text: str,
+    corrected_source_translation: str,
+    context_label: str,
+) -> str:
+    corrected_clean = str(corrected_text).strip()
+    learner_clean = str(learner_text).strip()
+    if not corrected_clean:
+        return ""
+
+    question_model = str(getattr(settings, "OPENAI_QUESTION_MODEL", settings.OPENAI_MODEL)).strip() or settings.OPENAI_MODEL
+    parsed = call_openai_json(
+        """
+Write a short mistake explanation for a corrected learner sentence.
+
+Return strict JSON:
+{
+  "explanation": "string"
+}
+
+Rules:
+- explanation must be in SOURCE language only.
+- Keep it concise: one short line.
+- Include:
+  1) what changed (original -> corrected),
+  2) why it is wrong in this context,
+  3) one short rule of thumb.
+- Focus on TARGET language usage only.
+- JSON only.
+""".strip(),
+        (
+            f"Source language: {_language_display_name(source_language)}\n"
+            f"Target language: {_language_display_name(target_language)}\n"
+            f"{context_label}"
+            f"Learner original text ({_language_display_name(target_language)}): {learner_clean}\n"
+            f"Corrected text ({_language_display_name(target_language)}): {corrected_clean}\n"
+            f"Corrected translation ({_language_display_name(source_language)}): {corrected_source_translation}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.1,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        return ""
+    explanation = _ensure_source_language_text(
+        str(parsed.get("explanation", "")).strip(),
+        source_language=source_language,
+    )
+    return explanation[:1200]
+
+
 def _generate_topic_conversation_reply(
     *,
     topic: str,
@@ -1268,6 +1340,22 @@ Rules:
             str(parsed.get("corrected_user_explanation", "")).strip(),
             source_language=source_language,
         )
+        if corrected_user_text:
+            refined_explanation = _generate_mistake_explanation_with_question_model(
+                source_language=source_language,
+                target_language=target_language,
+                learner_text=user_text,
+                corrected_text=corrected_user_text,
+                corrected_source_translation=corrected_user_source_translation,
+                context_label=(
+                    f"Conversation topic: {topic}\n"
+                    f"Temporary notes: {notes}\n"
+                    f"Learner role: {role_text}\n"
+                    f"Conversation goal: {goal_text}\n"
+                ),
+            )
+            if refined_explanation:
+                corrected_user_explanation = refined_explanation
         if reply_text:
             return {
                 "reply_text": reply_text[:1200],
@@ -1532,6 +1620,8 @@ def _model_answer_or_reject_item_question(
         history_lines.append(f"{idx}. Tutor: {answer}")
     history_text = "\n".join(history_lines) if history_lines else "(no previous conversation)"
 
+    question_model = str(getattr(settings, "OPENAI_QUESTION_MODEL", settings.OPENAI_MODEL)).strip() or settings.OPENAI_MODEL
+
     parsed = call_openai_json(
         """
 Decide if a learner question is related to learning a specific item.
@@ -1564,8 +1654,9 @@ Rules:
 - Keep all explanations/comments focused on TARGET language usage (meaning, grammar, form, pronunciation, and context).
 - If examples or forms are included, they should describe TARGET language usage.
 - Do not include source-language teaching/explanations.
-- The answer text itself must be written in SOURCE language.
-- Before returning, verify your answer satisfies the last 3 rules exactly.
+- The answer text itself must be written in SOURCE language (never in TARGET language).
+- Interpret every related question through TARGET language meaning/usage, even when the question text is in SOURCE language.
+- Before returning, verify your answer satisfies the previous 5 rules exactly.
 - JSON only.
 """.strip(),
         (
@@ -1580,6 +1671,7 @@ Rules:
             f"Conversation history (oldest to newest):\n{history_text}\n"
         ),
         timeout_seconds=8,
+        model=question_model,
         temperature=0.0,
         top_p=1.0,
         presence_penalty=0.0,

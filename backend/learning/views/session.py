@@ -211,9 +211,9 @@ def build_due_entries(*, user, now, limit: int, source_language: str, target_lan
         rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
 
     rows.sort(key=lambda row: (row[0], row[1], row[2]))
-    entries = [review_entry(item=row[3], direction=row[2], due_at=row[0]) for row in rows[:limit]]
+    entries = [review_entry(item=row[3], direction=row[2], due_at=row[0]) for row in rows]
     randomize_review_order(entries)
-    return entries
+    return entries[:limit]
 
 
 def build_new_entries(*, user, limit: int, source_language: str, target_language: str) -> list[SessionEntry]:

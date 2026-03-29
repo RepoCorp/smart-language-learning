@@ -188,7 +188,16 @@ export async function submitReview(itemId: number, correct: boolean, direction?:
   });
 
   if (!response.ok) {
-    throw new Error("Failed to submit answer");
+    let detail = "Failed to submit answer";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
   }
   notifyOverviewStatsUpdated();
 }
@@ -201,7 +210,16 @@ export async function markSeen(itemId: number): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to mark item as seen");
+    let detail = "Failed to mark item as seen";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
   }
   notifyOverviewStatsUpdated();
 }
@@ -377,7 +395,16 @@ export async function setContentItemLearned(
     body: JSON.stringify({ is_learned: isLearned }),
   });
   if (!response.ok) {
-    throw new Error("Failed to update item learned status");
+    let detail = "Failed to update item learned status";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
   }
   notifyOverviewStatsUpdated();
 }

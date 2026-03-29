@@ -37,6 +37,43 @@ def test_session_prioritizes_due_reviews_then_new_items():
 
 
 @pytest.mark.django_db
+def test_session_randomizes_full_due_pool_before_applying_size_limit(monkeypatch):
+    from learning.views import session as session_views
+
+    now = timezone.now()
+    early = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="uno",
+        german_text="eins",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now - timedelta(hours=3),
+    )
+    middle = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="dos",
+        german_text="zwei",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now - timedelta(hours=2),
+    )
+    late = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="tres",
+        german_text="drei",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now - timedelta(hours=1),
+    )
+
+    monkeypatch.setattr(session_views.random, "shuffle", lambda seq: seq.reverse())
+
+    client = APIClient()
+    response = client.get("/api/session", {"size": 2})
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()["items"]]
+    assert ids == [late.id, middle.id]
+    assert early.id not in ids
+
+
+@pytest.mark.django_db
 def test_session_duration_minutes_prioritizes_due_before_new():
     now = timezone.now()
 

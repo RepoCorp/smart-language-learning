@@ -31,6 +31,7 @@ services:
       POSTGRES_PORT: "5432"
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_QUESTION_MODEL: ${OPENAI_QUESTION_MODEL:-gpt-4o-mini}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8000}
       AWS_PROFILE: ${AWS_PROFILE:-default}
       AWS_SDK_LOAD_CONFIG: "1"

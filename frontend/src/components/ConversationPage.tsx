@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 
 import {
   fetchContentTopics,
@@ -9,6 +8,7 @@ import {
   startTopicConversation,
 } from "../api";
 import { useI18n } from "../i18n";
+import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { ContentItemConversationResponse } from "../types";
 
@@ -18,6 +18,7 @@ interface ConversationTurn extends ContentItemConversationResponse {}
 
 export default function ConversationPage(): JSX.Element {
   const { t } = useI18n();
+  const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
     spanish: "study.language.spanish",
@@ -41,8 +42,10 @@ export default function ConversationPage(): JSX.Element {
   const [activeRole, setActiveRole] = useState<string>("");
   const [conversationGoal, setConversationGoal] = useState<string>("");
   const [openingText, setOpeningText] = useState<string>("");
+  const [openingAudioUrl, setOpeningAudioUrl] = useState<string>("");
   const [openingTranslation, setOpeningTranslation] = useState<string>("");
   const [showOpeningTranslation, setShowOpeningTranslation] = useState<boolean>(false);
+  const [showTargetText, setShowTargetText] = useState<boolean>(targetPromptMode === "text");
 
   const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([]);
   const [conversationLoading, setConversationLoading] = useState<boolean>(false);
@@ -128,6 +131,49 @@ export default function ConversationPage(): JSX.Element {
   }, []);
 
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
+  const hideTargetText = targetPromptMode === "audio" && !showTargetText;
+
+  const scrollConversationToBottom = (): void => {
+    const historyElement = historyRef.current;
+    if (!historyElement) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      historyElement.scrollTo({ top: historyElement.scrollHeight, behavior: "smooth" });
+    });
+  };
+
+  const toggleOpeningTranslation = (): void => {
+    const nextVisible = !showOpeningTranslation;
+    setShowOpeningTranslation(nextVisible);
+    if (nextVisible) {
+      window.setTimeout(scrollConversationToBottom, 0);
+    }
+  };
+
+  const toggleUserTurnTranslation = (index: number): void => {
+    const nextVisible = !Boolean(conversationUserTranslationVisible[index]);
+    setConversationUserTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
+    if (nextVisible) {
+      window.setTimeout(scrollConversationToBottom, 0);
+    }
+  };
+
+  const toggleUserTurnCorrection = (index: number): void => {
+    const nextVisible = !Boolean(conversationCorrectionVisible[index]);
+    setConversationCorrectionVisible((current) => ({ ...current, [index]: nextVisible }));
+    if (nextVisible) {
+      window.setTimeout(scrollConversationToBottom, 0);
+    }
+  };
+
+  const toggleAssistantTurnTranslation = (index: number): void => {
+    const nextVisible = !Boolean(conversationTranslationVisible[index]);
+    setConversationTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
+    if (nextVisible) {
+      window.setTimeout(scrollConversationToBottom, 0);
+    }
+  };
 
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
 
@@ -142,6 +188,10 @@ export default function ConversationPage(): JSX.Element {
     const audio = new Audio(audioUrl);
     void audio.play().catch(() => {});
   };
+
+  useEffect(() => {
+    setShowTargetText(targetPromptMode === "text");
+  }, [targetPromptMode]);
 
   const startConversation = async (): Promise<void> => {
     setConversationError("");
@@ -164,6 +214,7 @@ export default function ConversationPage(): JSX.Element {
       setActiveRole(payload.role_text || role.trim());
       setConversationGoal(payload.goal_text || "");
       setOpeningText(payload.opening_text || "");
+      setOpeningAudioUrl(payload.opening_audio_url || "");
       setOpeningTranslation(payload.opening_translation_text || "");
       setShowOpeningTranslation(false);
       setConversationTurns([]);
@@ -303,6 +354,7 @@ export default function ConversationPage(): JSX.Element {
     setPendingWordAdd(null);
     setPendingSentenceAdd(null);
     setOpeningText("");
+    setOpeningAudioUrl("");
     setOpeningTranslation("");
     setShowOpeningTranslation(false);
 
@@ -502,10 +554,6 @@ export default function ConversationPage(): JSX.Element {
     <main className="container" data-testid="conversation-page">
       <h1>{t("conversation.title")}</h1>
       <p>{t("conversation.description")}</p>
-      <p>
-        <Link to="/session">{t("content.backToSession")}</Link> | <Link to="/content/create">{t("session.createContent")}</Link> |{" "}
-        <Link to="/content/manage">{t("content.manageLink")}</Link>
-      </p>
 
       <section className="card">
         <div className="content-form-section">
@@ -576,6 +624,15 @@ export default function ConversationPage(): JSX.Element {
               {activeRole && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {activeRole}</p>}
               <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {conversationGoal}</p>
               <div className="actions">
+                {targetPromptMode === "audio" && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => setShowTargetText((value) => !value)}
+                  >
+                    {showTargetText ? t("prompt.hideText") : t("prompt.showText")}
+                  </button>
+                )}
                 <button type="button" className="secondary-button" onClick={restartConversation} disabled={conversationLoading}>
                   {t("conversation.restart")}
                 </button>
@@ -586,26 +643,37 @@ export default function ConversationPage(): JSX.Element {
               {openingText && (
                 <div className="item-chat-entry item-chat-message item-chat-assistant">
                   <p className="item-chat-bubble">
-                    {renderTargetLineWithWordLinks({
-                      baseKey: "opening",
-                      sourceText: openingTranslation,
-                      targetText: openingText,
-                    })}
+                    {hideTargetText
+                      ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
+                      : renderTargetLineWithWordLinks({
+                        baseKey: "opening",
+                        sourceText: openingTranslation,
+                        targetText: openingText,
+                      })}
                   </p>
-                  {openingTranslation && (
-                    <>
+                  {openingTranslation && showOpeningTranslation && (
+                    <p className="item-conversation-translation"><strong>{sourceLanguageLabel}:</strong> {openingTranslation}</p>
+                  )}
+                  <div className="turn-action-row turn-action-row-assistant">
+                    {openingAudioUrl && (
+                      <button
+                        type="button"
+                        className="turn-audio-button"
+                        onClick={() => playAudioUrl(openingAudioUrl)}
+                      >
+                        {t("newItem.playTurnAudio")}
+                      </button>
+                    )}
+                    {openingTranslation && (
                       <button
                         type="button"
                         className="item-conversation-translation-toggle"
-                        onClick={() => setShowOpeningTranslation((value) => !value)}
+                        onClick={toggleOpeningTranslation}
                       >
                         {showOpeningTranslation ? t("newItem.conversationHideTranslation") : t("newItem.conversationShowTranslation")}
                       </button>
-                      {showOpeningTranslation && (
-                        <p className="item-conversation-translation"><strong>{sourceLanguageLabel}:</strong> {openingTranslation}</p>
-                      )}
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -618,103 +686,130 @@ export default function ConversationPage(): JSX.Element {
                   <div className="item-chat-message item-chat-user">
                     <p className="item-chat-meta">{t("newItem.conversationLabelYou")}</p>
                     <p className="item-chat-bubble">{turn.user_text}</p>
-                    <button
-                      type="button"
-                      className="item-conversation-correction-toggle"
-                      onClick={() =>
-                        setConversationUserTranslationVisible((current) => ({ ...current, [index]: !current[index] }))
-                      }
-                    >
-                      {conversationUserTranslationVisible[index]
-                        ? t("newItem.conversationHideUserTranslation")
-                        : t("newItem.conversationShowUserTranslation")}
-                    </button>
                     {conversationUserTranslationVisible[index] && (
                       <p className="item-conversation-correction item-conversation-correction-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
                     )}
-                    {hasTurnCorrection(turn) && (
-                      <>
-                        <button
-                          type="button"
-                          className="item-conversation-correction-toggle"
-                          onClick={() =>
-                            setConversationCorrectionVisible((current) => ({ ...current, [index]: !current[index] }))
-                          }
-                        >
-                          {conversationCorrectionVisible[index]
-                            ? t("newItem.conversationHideCorrection")
-                            : t("newItem.conversationShowCorrection")}
-                        </button>
-                        {conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
-                          <p className="item-conversation-correction">
-                            <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
-                          </p>
-                        )}
-                        {conversationCorrectionVisible[index] && !!turn.user_corrected_translation_text && (
-                          <p className="item-conversation-correction item-conversation-correction-translation">
-                            <strong>{sourceLanguageLabel}:</strong> {turn.user_corrected_translation_text}
-                          </p>
-                        )}
-                        {conversationCorrectionVisible[index] && !!turn.user_correction_explanation && (
-                          <p className="item-conversation-correction item-conversation-correction-explanation">
-                            <strong>{t("newItem.conversationCorrectionExplanationLabel")}</strong> {turn.user_correction_explanation}
-                          </p>
-                        )}
-                        {conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
-                          <>
+                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
+                      <p className="item-conversation-correction">
+                        <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
+                      </p>
+                    )}
+                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_translation_text && (
+                      <p className="item-conversation-correction item-conversation-correction-translation">
+                        <strong>{sourceLanguageLabel}:</strong> {turn.user_corrected_translation_text}
+                      </p>
+                    )}
+                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_correction_explanation && (
+                      <p className="item-conversation-correction item-conversation-correction-explanation">
+                        <strong>{t("newItem.conversationCorrectionExplanationLabel")}</strong> {turn.user_correction_explanation}
+                      </p>
+                    )}
+                    <div className="turn-action-row turn-action-row-user">
+                      <button
+                        type="button"
+                        className="item-conversation-correction-toggle"
+                        onClick={() => toggleUserTurnTranslation(index)}
+                      >
+                        {conversationUserTranslationVisible[index]
+                          ? t("newItem.conversationHideUserTranslation")
+                          : t("newItem.conversationShowUserTranslation")}
+                      </button>
+                      {hasTurnCorrection(turn) && (
+                        <>
+                          <button
+                            type="button"
+                            className="item-conversation-correction-toggle"
+                            onClick={() => toggleUserTurnCorrection(index)}
+                          >
+                            {conversationCorrectionVisible[index]
+                              ? t("newItem.conversationHideCorrection")
+                              : t("newItem.conversationShowCorrection")}
+                          </button>
+                          {conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
                             <button
                               type="button"
                               className="item-conversation-correction-toggle"
                               onClick={() => void requestAddSentenceFromConversation(
                                 `conversation-corrected-${index}`,
-                                turn.user_corrected_translation_text || "",
+                                turn.user_corrected_translation_text || turn.user_translation_text || "",
                                 turn.user_corrected_text,
                               )}
                             >
                               {t("newItem.sentenceAddButton")}
                             </button>
-                            {(sentenceActionStatus[`conversation-corrected-${index}`] || "idle") !== "idle" && (
-                              <span className="turn-token-status">
-                                {sentenceActionStatus[`conversation-corrected-${index}`] === "saving" && `(${t("newItem.sentenceAddSaving")})`}
-                                {sentenceActionStatus[`conversation-corrected-${index}`] === "added" && `(${t("newItem.sentenceAddAdded")})`}
-                                {sentenceActionStatus[`conversation-corrected-${index}`] === "exists" && `(${t("newItem.sentenceAddExists")})`}
-                                {sentenceActionStatus[`conversation-corrected-${index}`] === "error" && `(${t("newItem.sentenceAddError")})`}
-                                {sentenceActionStatus[`conversation-corrected-${index}`] === "missing_source" && `(${t("newItem.sentenceAddMissingSource")})`}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </>
-                    )}
+                          )}
+                          {(sentenceActionStatus[`conversation-corrected-${index}`] || "idle") !== "idle" && (
+                            <span className="turn-token-status">
+                              {sentenceActionStatus[`conversation-corrected-${index}`] === "saving" && `(${t("newItem.sentenceAddSaving")})`}
+                              {sentenceActionStatus[`conversation-corrected-${index}`] === "added" && `(${t("newItem.sentenceAddAdded")})`}
+                              {sentenceActionStatus[`conversation-corrected-${index}`] === "exists" && `(${t("newItem.sentenceAddExists")})`}
+                              {sentenceActionStatus[`conversation-corrected-${index}`] === "error" && `(${t("newItem.sentenceAddError")})`}
+                              {sentenceActionStatus[`conversation-corrected-${index}`] === "missing_source" && `(${t("newItem.sentenceAddMissingSource")})`}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="item-chat-message item-chat-assistant">
                     <p className="item-chat-meta">{t("newItem.conversationLabelTutor")}</p>
                     <p className="item-chat-bubble">
-                      {renderTargetLineWithWordLinks({
-                        baseKey: `assistant-${index}`,
-                        sourceText: turn.assistant_translation_text || "",
-                        targetText: turn.assistant_text,
-                      })}
+                      {hideTargetText
+                        ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
+                        : renderTargetLineWithWordLinks({
+                          baseKey: `assistant-${index}`,
+                          sourceText: turn.assistant_translation_text || "",
+                          targetText: turn.assistant_text,
+                        })}
                     </p>
-                    <button
-                      type="button"
-                      className="item-conversation-translation-toggle"
-                      onClick={() =>
-                        setConversationTranslationVisible((current) => ({ ...current, [index]: !current[index] }))
-                      }
-                    >
-                      {conversationTranslationVisible[index]
-                        ? t("newItem.conversationHideTranslation")
-                        : t("newItem.conversationShowTranslation")}
-                    </button>
                     {conversationTranslationVisible[index] && (
                       <p className="item-conversation-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
                     )}
+                    <div className="turn-action-row turn-action-row-assistant">
+                      {turn.assistant_audio_url && (
+                        <button
+                          type="button"
+                          className="turn-audio-button"
+                          onClick={() => playAudioUrl(turn.assistant_audio_url)}
+                        >
+                          {t("newItem.playTurnAudio")}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="item-conversation-translation-toggle"
+                        onClick={() => toggleAssistantTurnTranslation(index)}
+                      >
+                        {conversationTranslationVisible[index]
+                          ? t("newItem.conversationHideTranslation")
+                          : t("newItem.conversationShowTranslation")}
+                      </button>
+                      <button
+                        type="button"
+                        className="item-conversation-translation-toggle"
+                        onClick={() => void requestAddSentenceFromConversation(
+                          `conversation-assistant-${index}`,
+                          turn.assistant_translation_text || "",
+                          turn.assistant_text,
+                        )}
+                      >
+                        {t("newItem.sentenceAddButton")}
+                      </button>
+                      {(sentenceActionStatus[`conversation-assistant-${index}`] || "idle") !== "idle" && (
+                        <span className="turn-token-status">
+                          {sentenceActionStatus[`conversation-assistant-${index}`] === "saving" && `(${t("newItem.sentenceAddSaving")})`}
+                          {sentenceActionStatus[`conversation-assistant-${index}`] === "added" && `(${t("newItem.sentenceAddAdded")})`}
+                          {sentenceActionStatus[`conversation-assistant-${index}`] === "exists" && `(${t("newItem.sentenceAddExists")})`}
+                          {sentenceActionStatus[`conversation-assistant-${index}`] === "error" && `(${t("newItem.sentenceAddError")})`}
+                          {sentenceActionStatus[`conversation-assistant-${index}`] === "missing_source" && `(${t("newItem.sentenceAddMissingSource")})`}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
