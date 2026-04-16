@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { confirmContent, fetchContentTopicContexts, fetchContentTopics, previewContent } from "../api";
+import { confirmContent, fetchContentTopicContexts, fetchContentTopics, previewContent, quickAddWordFromDialog } from "../api";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentPreviewResponse } from "../types";
@@ -14,18 +14,28 @@ export default function ContentCreatePage(): JSX.Element {
   const [customTopic, setCustomTopic] = useState<string>("");
   const [selectedContext, setSelectedContext] = useState<string>("");
   const [customContext, setCustomContext] = useState<string>("");
+  const [conversationDetails, setConversationDetails] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [preview, setPreview] = useState<ContentPreviewResponse | null>(null);
-  const [selectedPhrases, setSelectedPhrases] = useState<Record<string, boolean>>({});
-  const [selectedWords, setSelectedWords] = useState<Record<string, boolean>>({});
-  const [createDialogAudio, setCreateDialogAudio] = useState<boolean>(false);
   const [result, setResult] = useState<string>("");
   const [dialogAudioUrl, setDialogAudioUrl] = useState<string>("");
-  const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string }>>([]);
+  const [savedDialogId, setSavedDialogId] = useState<number | null>(null);
+  const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>>([]);
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [previousContexts, setPreviousContexts] = useState<string[]>([]);
+  const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
+  const [pendingWordAdd, setPendingWordAdd] = useState<{
+    key: string;
+    source: string;
+    target: string;
+    sourceLine: string;
+    targetLine: string;
+    clickedTargetToken: string;
+    turnIndex: number;
+  } | null>(null);
+  const [addingWord, setAddingWord] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -42,13 +52,14 @@ export default function ContentCreatePage(): JSX.Element {
         setPreviousContexts([]);
         setSelectedContext("");
         setCustomContext("");
+        setConversationDetails("");
         setPreview(null);
-        setSelectedPhrases({});
-        setSelectedWords({});
-        setCreateDialogAudio(false);
         setResult("");
         setDialogAudioUrl("");
         setSavedDialogTurns([]);
+        setSavedDialogId(null);
+        setWordActionStatus({});
+        setPendingWordAdd(null);
         setError("");
       } catch {
         if (active) {
@@ -58,13 +69,14 @@ export default function ContentCreatePage(): JSX.Element {
           setPreviousContexts([]);
           setSelectedContext("");
           setCustomContext("");
+          setConversationDetails("");
           setPreview(null);
-          setSelectedPhrases({});
-          setSelectedWords({});
-          setCreateDialogAudio(false);
           setResult("");
           setDialogAudioUrl("");
           setSavedDialogTurns([]);
+          setSavedDialogId(null);
+          setWordActionStatus({});
+          setPendingWordAdd(null);
           setError("");
         }
       }
@@ -110,42 +122,35 @@ export default function ContentCreatePage(): JSX.Element {
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
   const shouldCreateNewContext = selectedContext === CREATE_NEW_OPTION;
 
+  const resolvedTopic = (shouldCreateNewTopic ? customTopic : selectedTopic).trim();
+  const resolvedContext = (shouldCreateNewContext ? customContext : selectedContext).trim();
+
+  const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
+  const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
+  const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
+    speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
+
   const onGeneratePreview = async (): Promise<void> => {
     setError("");
     setResult("");
     setDialogAudioUrl("");
     setSavedDialogTurns([]);
+    setSavedDialogId(null);
+    setWordActionStatus({});
+    setPendingWordAdd(null);
     setPreview(null);
-    setSelectedPhrases({});
-    setSelectedWords({});
-    setCreateDialogAudio(false);
 
-    const topicFromInput = shouldCreateNewTopic ? customTopic.trim() : selectedTopic.trim();
-    if (!topicFromInput) {
+    if (!resolvedTopic) {
       setError(previousTopics.length ? t("content.error.selectOrEnterTopic") : t("content.error.enterTopic"));
       return;
     }
-
-    const contextFromInput = shouldCreateNewContext ? customContext.trim() : selectedContext.trim();
-
     setLoading(true);
     try {
-      const data = await previewContent(topicFromInput, contextFromInput, sourceLanguage, targetLanguage);
+      const details = conversationDetails.trim();
+      const data = await previewContent(resolvedTopic, resolvedContext, details, sourceLanguage, targetLanguage);
       setPreview(data);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
-      const initialPhraseSelection: Record<string, boolean> = {};
-      for (const phrase of data.phrases) {
-        const key = phrase.selection_key || `${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}`;
-        initialPhraseSelection[key] = !phrase.exists;
-      }
-      setSelectedPhrases(initialPhraseSelection);
-      const initialWordSelection: Record<string, boolean> = {};
-      for (const word of data.words) {
-        const key = word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`;
-        initialWordSelection[key] = !word.exists;
-      }
-      setSelectedWords(initialWordSelection);
     } catch {
       setError(t("content.error.generatePreview"));
     } finally {
@@ -153,7 +158,7 @@ export default function ContentCreatePage(): JSX.Element {
     }
   };
 
-  const onConfirmSave = async (): Promise<void> => {
+  const onAcceptDialog = async (): Promise<void> => {
     if (!preview) {
       return;
     }
@@ -161,56 +166,19 @@ export default function ContentCreatePage(): JSX.Element {
     setSaving(true);
     setError("");
     try {
-      const phrasesToSave = preview.phrases
-        .filter((phrase) => {
-          const key = phrase.selection_key || `${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}`;
-          return !phrase.exists && selectedPhrases[key];
-        })
-        .map((phrase) => phrase.selection_key || `${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}`);
-      const wordsToSave = preview.words
-        .filter((word) => {
-          const key = word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`;
-          return !word.exists && selectedWords[key];
-        })
-        .map((word) => word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`);
       const response = await confirmContent(
         preview.topic,
-        phrasesToSave,
-        wordsToSave,
+        preview.dialog_turns,
         preview.context || "",
         preview.source_language || sourceLanguage,
         preview.target_language || targetLanguage,
-        createDialogAudio,
-        preview.phrases.map((phrase) => ({
-          spanish_text: phrase.spanish_text,
-          german_text: phrase.german_text,
-          notes: phrase.notes || "",
-        })),
-        preview.words.map((word) => ({
-          spanish_text: word.spanish_text,
-          german_text: word.german_text,
-          notes: word.notes || "",
-        })),
+        true,
       );
-      const phraseMessage = response.created_phrases_count
-        ? t("content.result.phrasesCreated", { count: response.created_phrases_count })
-        : t("content.result.phrasesExisted");
-      if (!wordsToSave.length) {
-        setResult(t("content.result.savedNoWords", { phraseMessage }));
-      } else {
-        setResult(t("content.result.savedWithWords", { count: response.created_words_count, phraseMessage }));
-      }
+      setResult(t("content.result.dialogAccepted"));
       setDialogAudioUrl(response.dialog_audio_url || "");
       setSavedDialogTurns(response.saved_dialog_turns || []);
-      setSelectedTopic("");
-      setCustomTopic("");
-      setSelectedContext("");
-      setCustomContext("");
-      setPreviousContexts([]);
+      setSavedDialogId(response.saved_dialog_id || null);
       setPreview(null);
-      setSelectedPhrases({});
-      setSelectedWords({});
-      setCreateDialogAudio(false);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
@@ -220,58 +188,121 @@ export default function ContentCreatePage(): JSX.Element {
     }
   };
 
-  const toggleWordSelection = (wordKey: string): void => {
-    setSelectedWords((current) => ({
-      ...current,
-      [wordKey]: !current[wordKey],
-    }));
-  };
+  const requestAddWordFromDialogToken = async (
+    key: string,
+    targetTokenRaw: string,
+    turnIndex: number,
+    sourceLine: string,
+    targetLine: string,
+  ): Promise<void> => {
+    const targetToken = cleanToken(targetTokenRaw);
+    if (!targetToken || !savedDialogId) {
+      return;
+    }
 
-  const togglePhraseSelection = (phraseKey: string): void => {
-    setSelectedPhrases((current) => ({
-      ...current,
-      [phraseKey]: !current[phraseKey],
-    }));
-  };
-
-  const unselectAllPhrases = (): void => {
-    setSelectedPhrases((current) => {
-      const next: Record<string, boolean> = {};
-      for (const key of Object.keys(current)) {
-        next[key] = false;
+    setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
+    try {
+      const check = await quickAddWordFromDialog(
+        targetToken,
+        targetToken,
+        sourceLanguage,
+        targetLanguage,
+        savedDialogId,
+        turnIndex,
+        true,
+        sourceLine,
+        targetLine,
+        targetToken,
+      );
+      if (check.exists) {
+        setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
+        return;
       }
-      return next;
-    });
+      setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
+      setPendingWordAdd({
+        key,
+        source: check.source_text || targetToken,
+        target: check.target_text || targetToken,
+        sourceLine,
+        targetLine,
+        clickedTargetToken: targetToken,
+        turnIndex,
+      });
+    } catch {
+      setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+    }
   };
 
-  const selectAllPhrases = (): void => {
-    setSelectedPhrases((current) => {
-      const next: Record<string, boolean> = {};
-      for (const key of Object.keys(current)) {
-        next[key] = true;
-      }
-      return next;
-    });
+  const confirmAddWordFromDialog = async (): Promise<void> => {
+    if (!pendingWordAdd || !savedDialogId || addingWord) {
+      return;
+    }
+
+    const { key, source, target, sourceLine, targetLine, clickedTargetToken, turnIndex } = pendingWordAdd;
+    setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
+    setAddingWord(true);
+    try {
+      const resultPayload = await quickAddWordFromDialog(
+        source,
+        target,
+        sourceLanguage,
+        targetLanguage,
+        savedDialogId,
+        turnIndex,
+        false,
+        sourceLine,
+        targetLine,
+        clickedTargetToken,
+      );
+      setWordActionStatus((current) => ({ ...current, [key]: resultPayload.created ? "added" : "exists" }));
+    } catch {
+      setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+    } finally {
+      setAddingWord(false);
+      setPendingWordAdd(null);
+    }
   };
 
-  const unselectAllWords = (): void => {
-    setSelectedWords((current) => {
-      const next: Record<string, boolean> = {};
-      for (const key of Object.keys(current)) {
-        next[key] = false;
-      }
-      return next;
-    });
-  };
+  const renderTargetLineWithWordLinks = (targetText: string, sourceText: string, turnIndex: number): JSX.Element => {
+    const tokens = lineTokens(targetText);
+    if (!tokens.length) {
+      return <>{targetText}</>;
+    }
 
-  const selectAllWords = (): void => {
-    setSelectedWords((current) => {
-      const next: Record<string, boolean> = {};
-      for (const key of Object.keys(current)) {
-        next[key] = true;
-      }
-      return next;
-    });
+    return (
+      <>
+        {tokens.map((token, tokenIndex) => {
+          const normalized = cleanToken(token);
+          if (!normalized) {
+            return (
+              <span key={`saved-${turnIndex}-punct-${tokenIndex}`} className="turn-token-wrap">
+                {token}
+                {tokenIndex < tokens.length - 1 ? " " : ""}
+              </span>
+            );
+          }
+          const statusKey = `saved-${turnIndex}-target-${tokenIndex}`;
+          const status = wordActionStatus[statusKey] || "idle";
+          return (
+            <span key={statusKey} className="turn-token-wrap">
+              <button
+                type="button"
+                className="turn-token-button"
+                onClick={() => void requestAddWordFromDialogToken(statusKey, token, turnIndex, sourceText, targetText)}
+                disabled={status === "saving" || !savedDialogId}
+              >
+                {token}
+              </button>
+              {tokenIndex < tokens.length - 1 ? " " : ""}
+              {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
+              {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
+              {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
+              {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
+            </span>
+          );
+        })}
+      </>
+    );
   };
 
   return (
@@ -335,8 +366,19 @@ export default function ContentCreatePage(): JSX.Element {
             />
           )}
         </div>
+        <div className="content-form-section">
+          <label htmlFor="conversation-details-input" className="prompt">{t("content.details.label")}</label>
+          <input
+            id="conversation-details-input"
+            value={conversationDetails}
+            onChange={(e) => setConversationDetails(e.target.value)}
+            placeholder={t("content.details.placeholder")}
+            disabled={loading || saving}
+          />
+          <p className="hint">{t("content.details.hint")}</p>
+        </div>
         <div className="actions">
-          <button onClick={() => void onGeneratePreview()} disabled={loading || saving}>
+          <button onClick={() => void onGeneratePreview()} disabled={loading || saving || !resolvedTopic}>
             {loading ? t("content.generating") : t("content.generate")}
           </button>
         </div>
@@ -344,152 +386,89 @@ export default function ContentCreatePage(): JSX.Element {
 
       {error && <p className="error">{error}</p>}
       {result && <p>{result}</p>}
-      {(savedDialogTurns.length > 0 || dialogAudioUrl) && (
-        <section className="card">
-          <p><strong>{t("content.result.dialogTitle")}</strong></p>
-          {savedDialogTurns.length > 0 && (
-            <ul className="conversation-preview-list">
-              {savedDialogTurns.map((turn, index) => (
-                <li
-                  key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
-                  className={`conversation-turn ${index % 2 === 0 ? "speaker-a" : "speaker-b"}`}
-                >
-                  <p className="conversation-speaker">{index % 2 === 0 ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                  <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
-                  <p className="conversation-line">{turn.source_text}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-          {dialogAudioUrl && (
-            <>
-              <p><strong>{t("content.result.dialogAudio")}</strong></p>
-              <audio controls src={dialogAudioUrl} preload="none" />
-              <p>
-                <a href={dialogAudioUrl} target="_blank" rel="noreferrer">
-                  {dialogAudioUrl}
-                </a>
-              </p>
-            </>
-          )}
-        </section>
-      )}
 
       {preview && (
         <section className="card">
           <h2>{t("content.preview.title")}</h2>
-          <p><strong>{t("content.preview.phrases")}</strong></p>
-          <div className="actions">
-            <button onClick={selectAllPhrases} disabled={saving}>
-              {t("content.preview.selectAllPhrases")}
-            </button>
-            <button onClick={unselectAllPhrases} disabled={saving}>
-              {t("content.preview.unselectAllPhrases")}
-            </button>
-          </div>
           <ul className="conversation-preview-list">
-            {preview.phrases.map((phrase, index) => {
-              const phraseKey = phrase.selection_key || `${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}`;
+            {preview.dialog_turns.map((turn, index) => {
+              const speaker = speakerForTurn(turn.speaker, index);
               return (
                 <li
-                  key={`${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}|||${index}`}
-                  className={`conversation-turn ${index % 2 === 0 ? "speaker-a" : "speaker-b"}`}
+                  key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
+                  className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
                 >
-                  <p className="conversation-speaker">{index % 2 === 0 ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                  <p className="conversation-line conversation-line-translation">{phrase.german_text}</p>
-                  <p className="conversation-line">{phrase.spanish_text}</p>
-                  {phrase.exists ? (
-                    <p className="conversation-status">{t("content.preview.exists")}</p>
-                  ) : (
-                    <label className="conversation-status">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(selectedPhrases[phraseKey])}
-                        onChange={() => togglePhraseSelection(phraseKey)}
-                        disabled={saving}
-                      />{" "}
-                      {t("content.preview.new")}
-                    </label>
-                  )}
+                  <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
+                  <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
+                  <p className="conversation-line">{turn.source_text}</p>
                 </li>
               );
             })}
           </ul>
-
-          {(() => {
-            const selectedNewWordsCount = preview.words.filter(
-              (word) => {
-                const key = word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`;
-                return !word.exists && selectedWords[key];
-              },
-            ).length;
-            const selectedNewPhrasesCount = preview.phrases.filter((phrase) => {
-              const key = phrase.selection_key || `${phrase.spanish_text.toLowerCase()}|||${phrase.german_text.toLowerCase()}`;
-              return !phrase.exists && selectedPhrases[key];
-            }).length;
-            const newItemsToSave = selectedNewPhrasesCount + selectedNewWordsCount;
-            return (
-              <p><strong>{t("content.preview.newItems")}</strong> {newItemsToSave}</p>
-            );
-          })()}
-
-          <p><strong>{t("content.preview.words")}</strong></p>
           <div className="actions">
-            <button onClick={selectAllWords} disabled={saving}>
-              {t("content.preview.selectAllWords")}
+            <button onClick={() => void onAcceptDialog()} disabled={saving || loading}>
+              {saving ? t("content.saving") : t("content.preview.acceptDialog")}
             </button>
-            <button onClick={unselectAllWords} disabled={saving}>
-              {t("content.preview.unselectAllWords")}
-            </button>
-          </div>
-          <ul className="word-preview-list">
-            {preview.words.map((word) => (
-              <li
-                key={word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`}
-                className="word-preview-item"
-              >
-                {word.exists ? (
-                  <>
-                    {word.spanish_text} - {word.german_text} ({t("content.preview.exists")})
-                  </>
-                ) : (
-                  <label className="word-preview-label">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(
-                        selectedWords[word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`],
-                      )}
-                      onChange={() =>
-                        toggleWordSelection(word.selection_key || `${word.spanish_text.toLowerCase()}|||${word.german_text.toLowerCase()}`)
-                      }
-                      disabled={saving}
-                    />
-                    {word.spanish_text} - {word.german_text} ({t("content.preview.new")})
-                  </label>
-                )}
-              </li>
-            ))}
-          </ul>
-          <div className="actions">
-            <label className="content-audio-option">
-              <input
-                type="checkbox"
-                checked={createDialogAudio}
-                onChange={(e) => setCreateDialogAudio(e.target.checked)}
-                disabled={saving}
-              />
-              {t("content.createDialogAudio")}
-            </label>
-          </div>
-          <div className="actions">
-            <button onClick={() => void onConfirmSave()} disabled={saving}>
-              {saving ? t("content.saving") : t("content.save")}
-            </button>
-            <button onClick={() => setPreview(null)} disabled={saving}>
-              {t("content.cancel")}
+            <button onClick={() => setPreview(null)} disabled={saving || loading}>
+              {t("content.preview.discardDialog")}
             </button>
           </div>
         </section>
+      )}
+
+      {(savedDialogTurns.length > 0 || dialogAudioUrl) && (
+        <section className="card">
+          <p><strong>{t("content.result.dialogTitle")}</strong></p>
+          <p className="hint">{t("content.result.dialogWordHint")}</p>
+          {dialogAudioUrl && (
+            <>
+              <p><strong>{t("content.result.dialogAudio")}</strong></p>
+              <audio controls src={dialogAudioUrl} preload="none" />
+            </>
+          )}
+          {savedDialogTurns.length > 0 && (
+            <ul className="conversation-preview-list">
+              {savedDialogTurns.map((turn, index) => {
+                const speaker = speakerForTurn(turn.speaker, index);
+                return (
+                  <li
+                    key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
+                    className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
+                  >
+                    <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
+                    <p className="conversation-line conversation-line-translation">
+                      {renderTargetLineWithWordLinks(turn.target_text, turn.source_text, index)}
+                    </p>
+                    <p className="conversation-line">{turn.source_text}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {pendingWordAdd && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal add-word-modal">
+            <p className="add-word-modal-title">
+              <strong>{t("newItem.wordAddTitle")}</strong>
+            </p>
+            <p className="add-word-modal-word">{pendingWordAdd.target}</p>
+            <p className="add-word-modal-meaning">
+              {t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}
+            </p>
+            <p className="hint">{t("newItem.wordAddPrompt")}</p>
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>
+                {t("newItem.wordAddCancel")}
+              </button>
+              <button type="button" onClick={() => void confirmAddWordFromDialog()} disabled={addingWord}>
+                {addingWord ? t("newItem.wordAddSaving") : t("newItem.wordAddConfirmButton")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {saving && (

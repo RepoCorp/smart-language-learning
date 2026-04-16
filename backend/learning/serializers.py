@@ -41,6 +41,11 @@ class ContentTopicSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
     )
+    conversation_details = serializers.CharField(
+        max_length=600,
+        required=False,
+        allow_blank=True,
+    )
     source_language = serializers.ChoiceField(
         choices=STUDY_LANGUAGE_CHOICES,
         required=False,
@@ -61,25 +66,10 @@ class ContentTopicSerializer(serializers.Serializer):
 class ContentConfirmSerializer(ContentTopicSerializer):
     create_dialog_audio = serializers.BooleanField(
         required=False,
-        default=False,
+        default=True,
     )
-    selected_phrases = serializers.ListField(
-        child=serializers.CharField(max_length=600),
-        required=False,
-        allow_empty=True,
-    )
-    selected_words = serializers.ListField(
-        child=serializers.CharField(max_length=600),
-        required=False,
-        allow_empty=True,
-    )
-    preview_phrases = serializers.ListField(
+    dialog_turns = serializers.ListField(
         child=serializers.DictField(),
-        required=False,
-        allow_empty=True,
-    )
-    preview_words = serializers.ListField(
-        child=serializers.DictField(),
-        required=False,
+        required=True,
         allow_empty=True,
     )

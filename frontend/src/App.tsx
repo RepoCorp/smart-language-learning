@@ -6,6 +6,7 @@ import ConfigurationsPage from "./components/ConfigurationsPage";
 import ContentCreatePage from "./components/ContentCreatePage";
 import ContentManagePage from "./components/ContentManagePage";
 import ConversationPage from "./components/ConversationPage";
+import DialogsPage from "./components/DialogsPage";
 import OverviewStatsBar from "./components/OverviewStatsBar";
 import SessionPage from "./components/SessionPage";
 
@@ -93,6 +94,7 @@ export default function App(): JSX.Element {
     { path: "/session", label: "Session" },
     { path: "/content/create", label: "Create content" },
     { path: "/content/manage", label: "Manage content" },
+    { path: "/dialogs", label: "Dialogs" },
     { path: "/conversation", label: "Conversation" },
     { path: "/configurations", label: "Configurations" },
   ];
@@ -199,6 +201,7 @@ export default function App(): JSX.Element {
             <Route path="/session" element={<SessionPage />} />
             <Route path="/content/create" element={<ContentCreatePage />} />
             <Route path="/content/manage" element={<ContentManagePage />} />
+            <Route path="/dialogs" element={<DialogsPage />} />
             <Route path="/conversation" element={<ConversationPage />} />
             <Route path="/configurations" element={<ConfigurationsPage canCreateUsers={Boolean(authUser?.is_superuser)} />} />
             <Route path="*" element={<Navigate to="/session" replace />} />

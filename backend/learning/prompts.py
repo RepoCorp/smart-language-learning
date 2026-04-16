@@ -4,7 +4,7 @@ Generate beginner-friendly learning content for a topic.
 Return strict JSON with this exact shape:
 {
   "conversation": [
-    {"source_text": "string", "target_text": "string", "notes": "string"}
+    {"speaker": "a", "source_text": "string", "target_text": "string", "notes": "string"}
   ]
 }
 
@@ -16,10 +16,13 @@ Rules:
 - Keep grammar beginner-level (A1-A2) but vary tone and intent based on the provided style seed.
 - Keep each phrase short and beginner level (A1-A2).
 - Use spoken dialogue lines only (no narration, no stage directions, no bullet-like fragments).
+- `speaker` must be either `"a"` or `"b"` on every turn.
+- Keep speaker attribution coherent with the scenario. Consecutive turns by the same speaker are allowed when natural (for example, one person asks a two-part question).
 - `source_text` and `target_text` must be equivalent in meaning according to the requested language mapping.
 - Keep a clear back-and-forth between the two speakers.
 - Keep the whole dialogue within a single realistic interaction scope on the topic (no scene changes, no unrelated subtopics).
 - Avoid weird jumps in topic, unnatural wording, or textbook/meta language.
+- Prefer common, practical situations and vocabulary; vary examples without becoming quirky or overly imaginative.
 - Avoid overused starters like "Hola, ¿cómo estás?" unless the topic/context is explicitly about greetings or reuniting.
 - Do not reuse the same key verb or key noun in consecutive turns unless required by the scenario.
 - Include relevant study notes only when useful; otherwise use an empty string.
@@ -71,45 +74,51 @@ Rules:
 """.strip()
 
 
-WORD_EXERCISES_PROMPT = """
-Generate exercise phrases for one vocabulary item.
+WORD_EXERCISES_FIRST_SECTION_PROMPT = """
+Generate the first section of exercise phrases for one vocabulary item.
 
 Return strict JSON with this exact shape:
 {
-  "first_section": [
-    {"source_text": "string", "target_text": "string"},
-    {"source_text": "string", "target_text": "string"}
-  ],
-  "second_section": [
+  "phrases": [
     {"source_text": "string", "target_text": "string"},
     {"source_text": "string", "target_text": "string"}
   ]
 }
 
-Rules for first_section (word-type patterns):
-- If word type is verb:
-  1) "Ich will …"
-  2) "Ich kann …"
-- If word type is abstract noun:
-  1) "Ich brauche …"
-  2) "Ich habe …"
-- If word type is thing:
-  1) "Ich esse …"
-  2) "Ich trinke …"
-- For any other type:
-  1) "Ich verliere …"
-  2) "Ich finde …"
-
-Rules for second_section:
-- Use two different grammatical classes.
-- For German target language:
-  - First phrase should illustrate nominative usage.
-  - Second phrase should illustrate accusative usage.
-- Keep phrases beginner-level and short.
-
-General:
+Rules:
+- Return exactly 2 phrases.
+- Keep both phrases very short (max 4 words), practical, and beginner-friendly (A1-A2).
+- Besides the target word, use only very basic high-frequency words.
+- Respect word type and grammar (verb/noun/adjective/etc.).
+- Ensure tense, number (singular/plural), and word order are correct.
+- The target word must appear in each target_text line exactly as presented in the input (no inflection, no article/case/ending change).
 - Keep source_text and target_text equivalent in meaning.
-- Use the exact language mapping provided by the user input.
-- Return exactly 2 phrases per section.
+- Use the language mapping provided by the user input.
+- Return JSON only, no markdown and no extra text.
+""".strip()
+
+
+WORD_EXERCISES_SECOND_SECTION_PROMPT = """
+Generate the second section of exercise phrases for one vocabulary item.
+
+Return strict JSON with this exact shape:
+{
+  "phrases": [
+    {"source_text": "string", "target_text": "string"},
+    {"source_text": "string", "target_text": "string"}
+  ]
+}
+
+Rules:
+- Return exactly 2 phrases.
+- Keep both phrases very short (max 4 words), practical, and beginner-friendly (A1-A2).
+- Besides the target word, use only very basic high-frequency words.
+- Phrase 1: use the target word in one grammatical function (for example, noun as direct subject).
+- Phrase 2: use the same target word in a different grammatical function than phrase 1.
+- Respect word type and grammar (verb/noun/adjective/etc.).
+- Ensure tense, number (singular/plural), and word order are correct.
+- The target word must appear in each target_text line (possibly inflected when grammar requires it).
+- Keep source_text and target_text equivalent in meaning.
+- Use the language mapping provided by the user input.
 - Return JSON only, no markdown and no extra text.
 """.strip()

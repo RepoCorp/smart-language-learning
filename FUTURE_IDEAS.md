@@ -1,12 +1,24 @@
 # Todos
 
+Que en la conversacion siempre empiece el usuario, puede ser solo un saludo
+Que pueda seleccionar varias palabras para agregar al diccionario, no solo click en individuales si no que pueda seleccionar expresiones completas
+Revisar por que a veces el click para añadir palabras traduce la palabra del lado
+Que al generar contenido pueda darse una lista de palabras para usar y/o pedir que primero las genere segun instrucciones
 Arreglar la generacion de frases para los ejercicios
 Posibilidad de regenerar otras cosas, como las traducciones que a veces estan mal, especialmente en el ejercicio
 
 
+Cuando esta testeando o estudiando poder marcar un elemento como equivocado, ya sea en audio, texto, traduccion, ejercicio... Re crearlo
+Lo de la cantidad de hints sigue fallando e incluso con una, y creo que incluso cuando una es menos del 30% esta marcandoloa como fallido
+Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
-We will add a feature that will allow the user to ask for help when trying to communicate something. It will listen to the user request and respond by text, all  in the source language. Do not make this interaction part of the dialog. 
+Que al frente de los seleccion multiple uno pueda abrir la ventana del item 
+Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
+No reconoce cuando cumplio el objetivo en la conversacion 
 
+
+Eliminar silencios antes del audio de las frases. Algunas frases lo tienen.
+Cuidado con los articulos, incluirlos siempre en las palabras para idiomas que manejan generos
 Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
 Conversacion topic es requerido para poder empezar pero no se evidencia si se intenta impezar sin definirlo
 Frases de ejercicios, el repeat usa el audio que ya tiene generado 
@@ -17,7 +29,6 @@ Seguridad de S3
 Arreglar allowed hosts de Django
 Repetir audio al final o ppio de los tests
 Make sure audio is in the same language as the text
-Revisar que si pueda guardar varias referencias a otros dialogos
 Failed to delete item
 When adding a new word from the conversation the translation is wrong 
 Mejorar velocidad de respuesta de la conversacion 

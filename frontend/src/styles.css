@@ -313,6 +313,10 @@ body {
   gap: 8px;
 }
 
+.options button {
+  min-height: 44px;
+}
+
 button {
   border: none;
   border-radius: 8px;
@@ -422,10 +426,14 @@ textarea {
 
 .conversation-line {
   margin: 0;
+  color: #627d98;
+  font-size: 14px;
 }
 
 .conversation-line-translation {
-  color: #243b53;
+  color: #102a43;
+  font-size: 16px;
+  font-weight: 700;
   margin-top: 2px;
 }
 
@@ -478,6 +486,29 @@ textarea {
   text-align: center;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   border: 1px solid #c9d9ee;
+}
+
+.conversation-help-modal {
+  width: min(560px, 92vw);
+  text-align: left;
+  max-height: min(78vh, 680px);
+  overflow-y: auto;
+  padding-right: 12px;
+}
+
+.conversation-help-modal h3,
+.conversation-help-modal .hint,
+.conversation-help-modal .error,
+.conversation-help-modal .item-conversation-listening {
+  margin-left: 12px;
+}
+
+.conversation-help-modal .item-conversation-correction {
+  display: block;
+  margin: 10px 12px 0 12px;
+  font-size: 16px;
+  line-height: 1.45;
+  text-align: left;
 }
 
 .add-word-modal-title {
@@ -707,6 +738,7 @@ textarea {
   border-radius: 12px;
   max-width: min(90%, 720px);
   white-space: pre-wrap;
+  text-align: left;
 }
 
 .item-chat-user .item-chat-bubble {
@@ -872,6 +904,13 @@ textarea {
 .questions-modal {
   width: min(760px, 95vw);
   overflow: hidden;
+}
+
+.questions-modal .item-chat-thread,
+.questions-modal .item-chat-entry,
+.questions-modal .item-chat-message,
+.questions-modal .item-chat-bubble {
+  text-align: left;
 }
 
 .conversation-modal {
@@ -1140,6 +1179,16 @@ textarea {
 
   .exercise-section-grid {
     grid-template-columns: 1fr;
+  }
+
+  .options {
+    gap: 12px;
+  }
+
+  .options button {
+    min-height: 52px;
+    padding: 14px 16px;
+    line-height: 1.3;
   }
 }
 

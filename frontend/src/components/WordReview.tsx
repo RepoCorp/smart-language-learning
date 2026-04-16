@@ -9,6 +9,11 @@ function normalize(value: string): string {
   return value.trim();
 }
 
+function countLetters(value: string): number {
+  const matches = value.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g);
+  return matches ? matches.length : 0;
+}
+
 interface WordReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
@@ -51,7 +56,8 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
 
   const hasExceededHintLimit = (value: string): boolean => {
-    return value.length > 0 && hintedLetters > 1 && hintedLetters / value.length > 0.3;
+    const totalLetters = countLetters(value);
+    return totalLetters > 0 && hintedLetters > 1 && hintedLetters / totalLetters > 0.3;
   };
 
   const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
@@ -108,7 +114,8 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     const nextHintLetter = expectedAnswer.charAt(prefixLen);
     setHintLetter(nextHintLetter);
     if (nextHintLetter) {
-      setHintedLetters((value) => Math.max(value, prefixLen + 1));
+      const revealedLetters = countLetters(expectedAnswer.slice(0, prefixLen + 1));
+      setHintedLetters((value) => Math.max(value, revealedLetters));
     }
   };
 

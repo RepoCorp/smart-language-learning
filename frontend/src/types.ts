@@ -34,6 +34,7 @@ export interface SessionItem {
     turns: Array<{
       source_text: string;
       target_text: string;
+      speaker?: "a" | "b";
       phrase_audio_url?: string;
     }>;
     matched_turns: Array<{
@@ -74,26 +75,39 @@ export interface ContentPreviewResponse {
   context?: string;
   source_language?: StudyLanguageCode;
   target_language?: StudyLanguageCode;
-  phrases: ContentCandidate[];
-  words: ContentCandidate[];
-  new_items_count: number;
+  dialog_turns: Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>;
 }
 
 export interface ContentConfirmResponse {
   topic: string;
   source_language?: StudyLanguageCode;
   target_language?: StudyLanguageCode;
-  created_phrase: boolean;
-  created_phrases_count?: number;
-  created_words_count: number;
-  created_words: string[];
   saved_dialog_id?: number;
-  saved_dialog_turns?: Array<{ source_text: string; target_text: string }>;
+  saved_dialog_turns?: Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>;
   dialog_audio_url?: string;
+  created_sentence_count?: number;
+  existing_sentence_count?: number;
 }
 
 export interface ContentTopicsResponse {
   topics: string[];
+}
+
+export interface ContentDialogRecord {
+  dialog_id: number;
+  topic: string;
+  context: string;
+  audio_url: string;
+  created_at: string;
+  turns: Array<{
+    source_text: string;
+    target_text: string;
+    speaker?: "a" | "b";
+  }>;
+}
+
+export interface ContentDialogsResponse {
+  dialogs: ContentDialogRecord[];
 }
 
 export interface ContentItemRecord {
@@ -160,6 +174,13 @@ export interface TopicConversationStartResponse {
   opening_text?: string;
   opening_translation_text?: string;
   opening_audio_url?: string;
+}
+
+export interface TopicConversationHelpResponse {
+  request_kind?: "coach" | "say";
+  request_text: string;
+  help_text: string;
+  target_text?: string;
 }
 
 export interface OverviewStatsResponse {

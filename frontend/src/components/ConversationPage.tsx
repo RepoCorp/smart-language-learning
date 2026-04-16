@@ -7,6 +7,7 @@ import {
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
   sendTopicConversationAudio,
+  sendTopicConversationHelpRequest,
   startTopicConversation,
 } from "../api";
 import { useI18n } from "../i18n";
@@ -18,6 +19,12 @@ const CREATE_NEW_OPTION = "__create_new__";
 
 interface ConversationTurn extends ContentItemConversationResponse {}
 type GoalDifficulty = "easy" | "medium" | "hard";
+type ConversationHelpEntry = {
+  request_kind?: "coach" | "say";
+  request_text: string;
+  help_text: string;
+  target_text?: string;
+};
 
 export default function ConversationPage(): JSX.Element {
   const { t } = useI18n();
@@ -57,6 +64,12 @@ export default function ConversationPage(): JSX.Element {
   const [conversationError, setConversationError] = useState<string>("");
   const [conversationRecording, setConversationRecording] = useState<boolean>(false);
   const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
+  const [helpOpen, setHelpOpen] = useState<boolean>(false);
+  const [helpLoading, setHelpLoading] = useState<boolean>(false);
+  const [helpError, setHelpError] = useState<string>("");
+  const [helpInput, setHelpInput] = useState<string>("");
+  const [helpSayInput, setHelpSayInput] = useState<string>("");
+  const [helpHistory, setHelpHistory] = useState<ConversationHelpEntry[]>([]);
   const [conversationTranslationVisible, setConversationTranslationVisible] = useState<Record<number, boolean>>({});
   const [conversationCorrectionVisible, setConversationCorrectionVisible] = useState<Record<number, boolean>>({});
   const [conversationUserTranslationVisible, setConversationUserTranslationVisible] = useState<Record<number, boolean>>({});
@@ -85,6 +98,7 @@ export default function ConversationPage(): JSX.Element {
   const shouldSubmitRef = useRef<boolean>(false);
   const timerRef = useRef<number | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
+  const helpModalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -122,6 +136,17 @@ export default function ConversationPage(): JSX.Element {
   }, [conversationTurns, conversationLoading, conversationRecording]);
 
   useEffect(() => {
+    if (!helpOpen) {
+      return;
+    }
+    const helpElement = helpModalRef.current;
+    if (!helpElement) {
+      return;
+    }
+    helpElement.scrollTo({ top: helpElement.scrollHeight, behavior: "smooth" });
+  }, [helpOpen, helpHistory, helpLoading]);
+
+  useEffect(() => {
     return () => {
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
         shouldSubmitRef.current = false;
@@ -139,6 +164,7 @@ export default function ConversationPage(): JSX.Element {
   }, []);
 
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
+  const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
   const goalDifficultyLabelByCode: Record<GoalDifficulty, Parameters<typeof t>[0]> = {
     easy: "conversation.goalDifficultyEasy",
     medium: "conversation.goalDifficultyMedium",
@@ -259,6 +285,90 @@ export default function ConversationPage(): JSX.Element {
     setShowTargetText(targetPromptMode === "text");
   }, [targetPromptMode]);
 
+  const submitHelpRequest = async (): Promise<void> => {
+    const requestText = helpInput.trim();
+    if (!requestText) {
+      setHelpError(t("conversation.helpRequestRequired"));
+      return;
+    }
+    setHelpLoading(true);
+    setHelpError("");
+    try {
+      const response = await sendTopicConversationHelpRequest(
+        activeTopic,
+        activeNotes,
+        activeRole,
+        requestText,
+        conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
+        "coach",
+        sourceLanguage,
+        targetLanguage,
+      );
+      setHelpHistory((current) => [
+        ...current,
+        {
+          request_kind: response.request_kind || "coach",
+          request_text: response.request_text || "",
+          help_text: response.help_text || "",
+          target_text: response.target_text || "",
+        },
+      ]);
+      setHelpInput("");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      setHelpError(detail || t("newItem.questionsError"));
+    } finally {
+      setHelpLoading(false);
+    }
+  };
+
+  const submitSayHelpRequest = async (): Promise<void> => {
+    const requestText = helpSayInput.trim();
+    if (!requestText) {
+      setHelpError(t("conversation.helpSayRequestRequired"));
+      return;
+    }
+    setHelpLoading(true);
+    setHelpError("");
+    try {
+      const response = await sendTopicConversationHelpRequest(
+        activeTopic,
+        activeNotes,
+        activeRole,
+        requestText,
+        conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
+        "say",
+        sourceLanguage,
+        targetLanguage,
+      );
+      setHelpHistory((current) => [
+        ...current,
+        {
+          request_kind: response.request_kind || "say",
+          request_text: response.request_text || "",
+          help_text: response.help_text || "",
+          target_text: response.target_text || "",
+        },
+      ]);
+      setHelpSayInput("");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      setHelpError(detail || t("newItem.questionsError"));
+    } finally {
+      setHelpLoading(false);
+    }
+  };
+
+  const openHelpModal = (): void => {
+    setHelpError("");
+    setHelpOpen(true);
+  };
+
+  const closeHelpModal = (): void => {
+    setHelpError("");
+    setHelpOpen(false);
+  };
+
   const startConversation = async (): Promise<void> => {
     setConversationError("");
     if (!resolvedTopic) {
@@ -366,7 +476,19 @@ export default function ConversationPage(): JSX.Element {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const recorder = new MediaRecorder(stream);
+      const recorderOptions: MediaRecorderOptions = {};
+      const preferredMimeTypes = [
+        "audio/webm;codecs=opus",
+        "audio/mp4",
+        "audio/webm",
+      ];
+      for (const mimeType of preferredMimeTypes) {
+        if (typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(mimeType)) {
+          recorderOptions.mimeType = mimeType;
+          break;
+        }
+      }
+      const recorder = new MediaRecorder(stream, recorderOptions);
       recorderRef.current = recorder;
       chunksRef.current = [];
       shouldSubmitRef.current = true;
@@ -417,6 +539,10 @@ export default function ConversationPage(): JSX.Element {
   const restartConversation = (): void => {
     stopRecording(false);
     setConversationError("");
+    setHelpError("");
+    setHelpInput("");
+    setHelpOpen(false);
+    setHelpHistory([]);
     setStarted(false);
     setConversationTurns([]);
     setConversationTranslationVisible({});
@@ -752,6 +878,14 @@ export default function ConversationPage(): JSX.Element {
                 <button type="button" className="secondary-button" onClick={restartConversation} disabled={conversationLoading}>
                   {t("conversation.restart")}
                 </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={openHelpModal}
+                  disabled={conversationLoading || helpLoading}
+                >
+                  {t("conversation.helpOpen")}
+                </button>
               </div>
             </div>
 
@@ -949,7 +1083,7 @@ export default function ConversationPage(): JSX.Element {
 
             <div className="actions">
               {!conversationRecording && (
-                <button type="button" onClick={() => void startRecording()} disabled={conversationLoading}>
+                <button type="button" onClick={() => void startRecording()} disabled={conversationLoading || helpLoading}>
                   {t("newItem.conversationStartRecording")}
                 </button>
               )}
@@ -1006,6 +1140,69 @@ export default function ConversationPage(): JSX.Element {
               </button>
               <button type="button" onClick={() => void confirmAddSentenceFromConversation()}>
                 {t("newItem.sentenceAddConfirmButton")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {helpOpen && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div ref={helpModalRef} className="blocking-modal conversation-help-modal">
+            <h3>{t("conversation.helpTitle")}</h3>
+            <p className="hint">{t("conversation.helpDescription")}</p>
+            <textarea
+              className="conversation-notes-input"
+              value={helpInput}
+              onChange={(event) => setHelpInput(event.target.value)}
+              placeholder={t("conversation.helpInputPlaceholder")}
+              rows={3}
+              disabled={helpLoading}
+            />
+            <input
+              value={helpSayInput}
+              onChange={(event) => setHelpSayInput(event.target.value)}
+              placeholder={t("conversation.helpSayInputPlaceholder")}
+              disabled={helpLoading}
+            />
+            {helpHistory.map((entry, index) => (
+              <div key={`help-entry-${index}`}>
+                {entry.request_text && (
+                  <p className="item-conversation-correction">
+                    <strong>{t("conversation.helpYouSaid")}</strong> {entry.request_text}
+                  </p>
+                )}
+                {entry.target_text && (
+                  <p className="item-conversation-correction">
+                    <strong>{t("conversation.helpSayResponseLabel", { language: targetLanguageLabel })}</strong> {entry.target_text}
+                  </p>
+                )}
+                {entry.help_text && (
+                  <p className="item-conversation-correction">
+                    <strong>{t("conversation.helpResponseLabel")}</strong> {entry.help_text}
+                  </p>
+                )}
+              </div>
+            ))}
+            {helpError && <p className="error">{helpError}</p>}
+            {helpLoading && <p className="hint">{t("conversation.helpProcessing")}</p>}
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={closeHelpModal} disabled={helpLoading}>
+                {t("content.cancel")}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void submitSayHelpRequest()}
+                disabled={helpLoading || conversationLoading || !helpSayInput.trim()}
+              >
+                {t("conversation.helpSaySend")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitHelpRequest()}
+                disabled={helpLoading || conversationLoading || !helpInput.trim()}
+              >
+                {t("conversation.helpSend")}
               </button>
             </div>
           </div>

@@ -1,5 +1,4 @@
 import pytest
-from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from learning.models import ConversationFingerprint, DialogTurn, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
@@ -1036,6 +1035,49 @@ def test_content_confirm_generates_dialog_audio_when_requested(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_confirm_saves_dialog_turns_as_phrase_items(monkeypatch):
+    from learning.views.content import persistence as content_persistence
+
+    monkeypatch.setattr(
+        content_persistence,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": "",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/confirm",
+        {
+            "topic": "shopping",
+            "dialog_turns": [
+                {"source_text": "Busco arroz integral.", "target_text": "Ich suche Vollkornreis."},
+                {"source_text": "Esta en el pasillo dos.", "target_text": "Er ist in Gang zwei."},
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created_sentence_count"] == 2
+    assert payload["existing_sentence_count"] == 0
+
+    assert Item.objects.filter(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Busco arroz integral.",
+        german_text="Ich suche Vollkornreis.",
+        source_language="spanish",
+        target_language="german",
+    ).exists()
+    assert Item.objects.filter(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Esta en el pasillo dos.",
+        german_text="Er ist in Gang zwei.",
+        source_language="spanish",
+        target_language="german",
+    ).exists()
+
+
+@pytest.mark.django_db
 def test_content_words_endpoint_filters_and_returns_related_dialogs():
     word = Item.objects.create(
         item_type=Item.ItemType.WORD,
@@ -1414,159 +1456,6 @@ def test_quick_add_word_dialog_resolution_sanitizes_target_language_source(monke
 
 
 @pytest.mark.django_db
-def test_item_conversation_audio_returns_transcript_reply_and_audio(monkeypatch):
-    from learning.views import content as content_views
-    from learning.views.content import management as management_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="taxi",
-        german_text="das Taxi",
-        source_language="spanish",
-        target_language="german",
-    )
-    monkeypatch.setattr(
-        management_views,
-        "_openai_transcribe_audio_upload",
-        lambda *args, **kwargs: "Ich brauche ein Taxi.",
-    )
-    monkeypatch.setattr(
-        management_views,
-        "call_openai_json",
-        lambda system_prompt, *args, **kwargs: (
-            {"is_grammatically_correct": False, "makes_sense_in_context": True, "needs_correction": True}
-            if "Evaluate one learner message in context." in str(system_prompt)
-            else {
-                "reply_text": "Sehr gut. Wohin moechtest du mit dem Taxi fahren?",
-                "source_translation": "Muy bien. A donde quieres ir en taxi?",
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        content_views,
-        "create_audio_file",
-        lambda text, prefix, target_language="german": "http://localhost:8000/media/audio/conversation-reply.mp3",
-    )
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/conversation?source_language=spanish&target_language=german",
-        {
-            "audio": SimpleUploadedFile("speech.webm", b"fake-audio-bytes", content_type="audio/webm"),
-            "history": "[]",
-        },
-        format="multipart",
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["user_text"] == "Ich brauche ein Taxi."
-    assert payload["user_translation_text"] == ""
-    assert payload["user_corrected_text"] == ""
-    assert payload["user_corrected_translation_text"] == ""
-    assert payload["user_correction_explanation"] == ""
-    assert payload["user_is_grammatically_correct"] is False
-    assert payload["user_makes_sense_in_context"] is True
-    assert payload["user_needs_correction"] is True
-    assert payload["assistant_text"] == "Sehr gut. Wohin moechtest du mit dem Taxi fahren?"
-    assert payload["assistant_translation_text"] == "Muy bien. A donde quieres ir en taxi?"
-    assert payload["assistant_audio_url"] == "http://localhost:8000/media/audio/conversation-reply.mp3"
-
-
-@pytest.mark.django_db
-def test_item_user_correction_endpoint_returns_correction_payload(monkeypatch):
-    from learning.views.content import management as management_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="taxi",
-        german_text="das Taxi",
-        source_language="spanish",
-        target_language="german",
-    )
-    monkeypatch.setattr(management_views.settings, "OPENAI_QUESTION_MODEL", "gpt-question-test")
-
-    def fake_call_openai_json(system_prompt, user_payload, **kwargs):
-        if "Correct one learner message and explain the correction." in str(system_prompt):
-            return {
-                "corrected_user_text": "Ich brauche ein Taxi.",
-                "corrected_user_source_translation": "Necesito un taxi.",
-                "corrected_user_explanation": "Usa articulo antes de Taxi en este contexto.",
-            }
-        return {}
-
-    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/conversation/user-correction?source_language=spanish&target_language=german",
-        {
-            "user_text": "Ich brauche Taxi.",
-            "history": "[]",
-        },
-        format="json",
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["user_corrected_text"] == "Ich brauche ein Taxi."
-    assert payload["user_corrected_translation_text"] == "Necesito un taxi."
-    assert payload["user_correction_explanation"] == "Usa articulo antes de Taxi en este contexto."
-
-
-@pytest.mark.django_db
-def test_item_user_translation_endpoint_returns_literal_translation(monkeypatch):
-    from learning.views.content import management as management_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="taxi",
-        german_text="das Taxi",
-        source_language="spanish",
-        target_language="german",
-    )
-    monkeypatch.setattr(
-        management_views,
-        "call_openai_json",
-        lambda *args, **kwargs: {"translation": "Yo necesitar taxi."},
-    )
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/conversation/user-translation?source_language=spanish&target_language=german",
-        {
-            "user_text": "Ich brauche Taxi.",
-        },
-        format="json",
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["user_translation_text"] == "Yo necesitar taxi."
-
-
-@pytest.mark.django_db
-def test_item_conversation_audio_requires_audio_file():
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="taxi",
-        german_text="das Taxi",
-        source_language="spanish",
-        target_language="german",
-    )
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/conversation?source_language=spanish&target_language=german",
-        {"history": "[]"},
-        format="multipart",
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "audio file is required"
-
-
-@pytest.mark.django_db
 def test_quick_add_phrase_creates_item(monkeypatch):
     from learning.views import content as content_views
 
@@ -1616,3 +1505,81 @@ def test_quick_add_phrase_returns_existing():
     assert payload["created"] is False
     assert payload["exists"] is True
     assert payload["id"] == existing.id
+
+
+@pytest.mark.django_db
+def test_content_dialogs_endpoint_returns_saved_dialogs_for_language_pair():
+    dialog_match = SavedDialog.objects.create(
+        topic="travel",
+        context="airport",
+        source_language="spanish",
+        target_language="german",
+        audio_url="http://localhost:8000/media/audio/dialog-1.wav",
+    )
+    DialogTurn.objects.create(dialog=dialog_match, turn_index=0, source_text="Hola", target_text="Hallo")
+    DialogTurn.objects.create(dialog=dialog_match, turn_index=1, source_text="Adios", target_text="Tschuss")
+
+    SavedDialog.objects.create(
+        topic="ignore",
+        context="office",
+        source_language="english",
+        target_language="german",
+        audio_url="http://localhost:8000/media/audio/dialog-2.wav",
+    )
+
+    client = APIClient()
+    response = client.get("/api/content/dialogs?source_language=spanish&target_language=german")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["dialogs"]) == 1
+    first_dialog = payload["dialogs"][0]
+    assert first_dialog["dialog_id"] == dialog_match.id
+    assert first_dialog["topic"] == "travel"
+    assert first_dialog["context"] == "airport"
+    assert first_dialog["audio_url"] == "http://localhost:8000/media/audio/dialog-1.wav"
+    assert len(first_dialog["turns"]) == 2
+    assert first_dialog["turns"][0]["source_text"] == "Hola"
+    assert first_dialog["turns"][0]["target_text"] == "Hallo"
+
+
+@pytest.mark.django_db
+def test_content_item_exercises_endpoint_generates_and_saves_exercises(monkeypatch):
+    from learning.views.content import management_items_listing as listing_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="mesa",
+        german_text="der Tisch",
+        source_language="spanish",
+        target_language="german",
+    )
+
+    monkeypatch.setattr(
+        listing_views,
+        "generate_word_exercise_phrases_with_chatgpt",
+        lambda *args, **kwargs: {
+            "first_section": [
+                {"source_text": "La mesa es grande.", "target_text": "Der Tisch ist groß."},
+                {"source_text": "Limpio la mesa.", "target_text": "Ich putze den Tisch."},
+            ],
+            "second_section": [
+                {"source_text": "Ponlo en la mesa.", "target_text": "Leg es auf den Tisch."},
+                {"source_text": "La mesa está lista.", "target_text": "Der Tisch ist bereit."},
+            ],
+        },
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/exercises?source_language=spanish&target_language=german",
+        format="json",
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["exercise_phrases"]["first_section"]) == 2
+    assert len(payload["exercise_phrases"]["second_section"]) == 2
+
+    item.refresh_from_db()
+    assert len((item.exercise_phrases or {}).get("first_section", [])) == 2
+    assert len((item.exercise_phrases or {}).get("second_section", [])) == 2

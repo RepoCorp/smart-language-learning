@@ -486,7 +486,8 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
             continue
         source_text = str(turn.get("source_text", "")).strip()
         target_text = str(turn.get("target_text", "")).strip()
-        normalized_turns.append({"source_text": source_text, "target_text": target_text})
+        speaker = _normalize_dialog_speaker(turn.get("speaker", ""), len(normalized_turns))
+        normalized_turns.append({"source_text": source_text, "target_text": target_text, "speaker": speaker})
         if source_text and target_text:
             key_pairs.add((source_text.lower(), target_text.lower()))
 
@@ -509,6 +510,7 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
         {
             "source_text": turn["source_text"],
             "target_text": turn["target_text"],
+            "speaker": turn["speaker"],
             "phrase_audio_url": phrase_audio_by_key.get(
                 (turn["source_text"].lower(), turn["target_text"].lower()),
                 "",
@@ -516,3 +518,12 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
         }
         for turn in normalized_turns
     ]
+
+
+def _normalize_dialog_speaker(value, index: int) -> str:
+    raw = str(value or "").strip().lower()
+    if raw in {"a", "speaker_a", "person_a", "1", "first"}:
+        return "a"
+    if raw in {"b", "speaker_b", "person_b", "2", "second"}:
+        return "b"
+    return "a" if index % 2 == 0 else "b"

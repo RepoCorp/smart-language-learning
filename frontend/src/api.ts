@@ -1,5 +1,6 @@
 import type {
   ContentConfirmResponse,
+  ContentDialogsResponse,
   ContentItemsResponse,
   ContentItemDetailResponse,
   ContentItemConversationResponse,
@@ -7,6 +8,7 @@ import type {
   ContentPreviewResponse,
   ContentTopicContextsResponse,
   TopicConversationStartResponse,
+  TopicConversationHelpResponse,
   ContentTopicsResponse,
   OverviewStatsResponse,
   ReviewDirection,
@@ -227,6 +229,7 @@ export async function markSeen(itemId: number): Promise<void> {
 export async function previewContent(
   topic: string,
   context = "",
+  conversationDetails = "",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentPreviewResponse> {
@@ -236,6 +239,7 @@ export async function previewContent(
     body: JSON.stringify({
       topic,
       context,
+      conversation_details: conversationDetails,
       source_language: sourceLanguage,
       target_language: targetLanguage,
     }),
@@ -248,14 +252,11 @@ export async function previewContent(
 
 export async function confirmContent(
   topic: string,
-  selectedPhrases: string[],
-  selectedWords: string[],
+  dialogTurns: Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>,
   context = "",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
-  createDialogAudio = false,
-  previewPhrases: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
-  previewWords: Array<{ spanish_text: string; german_text: string; notes?: string }> = [],
+  createDialogAudio = true,
 ): Promise<ContentConfirmResponse> {
   const response = await apiFetch(`${API_BASE}/content/confirm`, {
     method: "POST",
@@ -266,10 +267,7 @@ export async function confirmContent(
       source_language: sourceLanguage,
       target_language: targetLanguage,
       create_dialog_audio: createDialogAudio,
-      selected_phrases: selectedPhrases,
-      selected_words: selectedWords,
-      preview_phrases: previewPhrases,
-      preview_words: previewWords,
+      dialog_turns: dialogTurns,
     }),
   });
   if (!response.ok) {
@@ -309,6 +307,21 @@ export async function fetchContentItems(
   return (await response.json()) as ContentItemsResponse;
 }
 
+export async function fetchContentDialogs(
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentDialogsResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/dialogs?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to load saved dialogs");
+  }
+  return (await response.json()) as ContentDialogsResponse;
+}
+
 export async function fetchContentTopicContexts(
   topic: string,
   sourceLanguage: StudyLanguageCode = "spanish",
@@ -340,6 +353,24 @@ export async function fetchContentItemDetail(
     throw new Error("Failed to load content item detail");
   }
   return (await response.json()) as ContentItemDetailResponse;
+}
+
+export async function generateContentItemExercises(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{ exercise_phrases?: { first_section?: Array<{ source_text: string; target_text: string }>; second_section?: Array<{ source_text: string; target_text: string }> } }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/exercises?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to generate word exercises");
+  }
+  return (await response.json()) as { exercise_phrases?: { first_section?: Array<{ source_text: string; target_text: string }>; second_section?: Array<{ source_text: string; target_text: string }> } };
 }
 
 export async function deleteContentItem(
@@ -439,91 +470,6 @@ export async function askContentItemQuestion(
   return (await response.json()) as ContentItemQuestionResponse;
 }
 
-export async function sendContentItemConversationAudio(
-  itemId: number,
-  audioBlob: Blob,
-  history: Array<{ user_text: string; assistant_text: string }>,
-  sourceLanguage: StudyLanguageCode = "spanish",
-  targetLanguage: StudyLanguageCode = "german",
-): Promise<ContentItemConversationResponse> {
-  const params = new URLSearchParams({
-    source_language: sourceLanguage,
-    target_language: targetLanguage,
-  });
-  const formData = new FormData();
-  formData.append("audio", audioBlob, "speech.webm");
-  formData.append("history", JSON.stringify(history));
-
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/conversation?${params.toString()}`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!response.ok) {
-    let detail = "Failed to process conversation audio";
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
-        detail = payload.detail;
-      }
-    } catch {
-      // Keep generic detail when error body is not JSON.
-    }
-    throw new Error(detail);
-  }
-  return (await response.json()) as ContentItemConversationResponse;
-}
-
-export async function fetchContentItemUserLiteralTranslation(
-  itemId: number,
-  userText: string,
-  sourceLanguage: StudyLanguageCode = "spanish",
-  targetLanguage: StudyLanguageCode = "german",
-): Promise<{ user_translation_text: string }> {
-  const params = new URLSearchParams({
-    source_language: sourceLanguage,
-    target_language: targetLanguage,
-  });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/conversation/user-translation?${params.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_text: userText }),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to translate user message");
-  }
-  return (await response.json()) as { user_translation_text: string };
-}
-
-export async function fetchContentItemUserCorrection(
-  itemId: number,
-  userText: string,
-  history: Array<{ user_text: string; assistant_text: string }>,
-  sourceLanguage: StudyLanguageCode = "spanish",
-  targetLanguage: StudyLanguageCode = "german",
-): Promise<{
-  user_corrected_text: string;
-  user_corrected_translation_text: string;
-  user_correction_explanation: string;
-}> {
-  const params = new URLSearchParams({
-    source_language: sourceLanguage,
-    target_language: targetLanguage,
-  });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/conversation/user-correction?${params.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_text: userText, history }),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to generate correction");
-  }
-  return (await response.json()) as {
-    user_corrected_text: string;
-    user_corrected_translation_text: string;
-    user_correction_explanation: string;
-  };
-}
-
 export async function startTopicConversation(
   topic: string,
   notes: string,
@@ -571,7 +517,18 @@ export async function sendTopicConversationAudio(
     target_language: targetLanguage,
   });
   const formData = new FormData();
-  formData.append("audio", audioBlob, "speech.webm");
+  const audioType = (audioBlob.type || "").toLowerCase();
+  let audioFilename = "speech.webm";
+  if (audioType.includes("mp4") || audioType.includes("m4a")) {
+    audioFilename = "speech.m4a";
+  } else if (audioType.includes("wav")) {
+    audioFilename = "speech.wav";
+  } else if (audioType.includes("mpeg") || audioType.includes("mp3")) {
+    audioFilename = "speech.mp3";
+  } else if (audioType.includes("ogg")) {
+    audioFilename = "speech.ogg";
+  }
+  formData.append("audio", audioBlob, audioFilename);
   formData.append("history", JSON.stringify(history));
   formData.append("topic", topic);
   formData.append("notes", notes);
@@ -595,6 +552,47 @@ export async function sendTopicConversationAudio(
     throw new Error(detail);
   }
   return (await response.json()) as ContentItemConversationResponse;
+}
+
+export async function sendTopicConversationHelpRequest(
+  topic: string,
+  notes: string,
+  roleText: string,
+  requestText: string,
+  history: Array<{ user_text: string; assistant_text: string }>,
+  requestKind: "coach" | "say" = "coach",
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<TopicConversationHelpResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/conversation/help?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      topic,
+      notes,
+      role_text: roleText,
+      request_text: requestText,
+      request_kind: requestKind,
+      history,
+    }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to process help request";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as TopicConversationHelpResponse;
 }
 
 export async function fetchTopicConversationUserLiteralTranslation(

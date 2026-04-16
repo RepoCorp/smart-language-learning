@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import math
 import logging
+import random
 import re
-from collections import deque
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
@@ -20,10 +20,36 @@ from rest_framework.views import APIView
 from ...auth import apply_user_scope, get_request_user
 from ...models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
 from ...serializers import ContentTopicSerializer
-from .core import ContentCandidate, call_openai_json, create_audio_file, create_phrase_if_missing, create_word_if_missing, item_exists
+from .core import (
+    ContentCandidate,
+    call_openai_json,
+    create_audio_file,
+    create_phrase_if_missing,
+    create_word_if_missing,
+    item_exists,
+    normalize_word_pair_for_item_save,
+)
 
 logger = logging.getLogger(__name__)
-_RECENT_TOPIC_GOALS: deque[str] = deque(maxlen=30)
+SPANISH_ARTICLES = {"el", "la", "los", "las", "un", "una", "unos", "unas"}
+GERMAN_ARTICLES = {"der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines"}
+
+GOAL_LABELS_BY_LANGUAGE: dict[str, tuple[str, str]] = {
+    "spanish": ("Objetivo", "Se cumple cuando"),
+    "english": ("Goal", "Done when"),
+    "german": ("Ziel", "Erreicht wenn"),
+    "french": ("Objectif", "Reussi quand"),
+    "italian": ("Obiettivo", "Completato quando"),
+    "portuguese": ("Objetivo", "Concluido quando"),
+}
+GOAL_DONE_WHEN_FALLBACK_BY_LANGUAGE: dict[str, str] = {
+    "spanish": "lo confirmas claramente durante la conversacion",
+    "english": "you clearly confirm it during the conversation",
+    "german": "du es im Gespraech klar bestaetigst",
+    "french": "tu le confirmes clairement pendant la conversation",
+    "italian": "lo confermi chiaramente durante la conversazione",
+    "portuguese": "voce confirma isso claramente durante a conversa",
+}
 
 
 def _call_openai_json_logged(
@@ -68,783 +94,6 @@ def _normalized_pair(request: Request) -> tuple[str, str]:
     source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
     target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
     return source_language, target_language
-
-
-class ContentItemsView(APIView):
-    def get(self, request: Request) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        now = timezone.now()
-        rows = list(
-            apply_user_scope(Item.objects, user).filter(source_language=source_language, target_language=target_language)
-            .order_by("-created_at", "-id")[:200]
-        )
-        items = [
-            {
-                "id": item.id,
-                "item_type": item.item_type,
-                "spanish_text": item.spanish_text,
-                "german_text": item.german_text,
-                "created_at": item.created_at,
-                "next_review_days": _next_review_days(item, now),
-                "audio_url": item.audio_url,
-                "is_learned": item.is_learned,
-            }
-            for item in rows
-        ]
-        return Response({"items": items})
-
-
-class ContentWordsView(APIView):
-    def get(self, request: Request) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        query = (request.query_params.get("q", "") or "").strip()
-
-        words_queryset = apply_user_scope(Item.objects, user).filter(
-            item_type=Item.ItemType.WORD,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        if query:
-            words_queryset = words_queryset.filter(
-                Q(spanish_text__icontains=query) | Q(german_text__icontains=query)
-            )
-
-        words = list(
-            words_queryset.order_by("-created_at", "-id").values(
-                "id",
-                "item_type",
-                "spanish_text",
-                "german_text",
-                "example_sentence",
-                "notes",
-                "audio_url",
-                "created_at",
-            )[:1000]
-        )
-        item_ids = [word["id"] for word in words]
-        related_dialogs_map = _related_dialogs_by_item_ids(item_ids, user=user)
-        for word in words:
-            word["related_dialogs"] = related_dialogs_map.get(word["id"], [])
-        return Response({"words": words})
-
-
-class ContentItemDetailView(APIView):
-    def get(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        item = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).first()
-        if not item:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
-        return Response(
-            {
-                "id": item.id,
-                "item_type": item.item_type,
-                "spanish_text": item.spanish_text,
-                "german_text": item.german_text,
-                "example_sentence": item.example_sentence,
-                "notes": item.notes,
-                "audio_url": item.audio_url,
-                "exercise_phrases": item.exercise_phrases or {},
-                "created_at": item.created_at,
-                "related_dialogs": related_dialogs_map.get(item.id, []),
-                "item_questions": _item_question_history(item),
-            }
-        )
-
-    def post(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        item = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).first()
-        if not item:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        if item.item_type == Item.ItemType.WORD:
-            phrase_part = item.example_sentence.strip()
-            audio_text = f"{item.german_text}. {phrase_part}".strip() if phrase_part else item.german_text
-            audio_prefix = "word"
-        else:
-            audio_text = item.german_text
-            audio_prefix = "phrase"
-
-        audio_url = create_audio_file(audio_text, audio_prefix, target_language=target_language)
-        if not audio_url:
-            return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        item.audio_url = audio_url
-        item.save(update_fields=["audio_url", "updated_at"])
-        return Response({"audio_url": audio_url})
-
-    def delete(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        deleted, _ = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).delete()
-        if deleted == 0:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ContentItemMarkLearnedView(APIView):
-    def post(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        is_learned_raw = request.data.get("is_learned", True)
-        if isinstance(is_learned_raw, str):
-            is_learned = is_learned_raw.strip().lower() in {"1", "true", "yes", "on"}
-        else:
-            is_learned = bool(is_learned_raw)
-        updated = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).update(is_learned=is_learned)
-        if updated == 0:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response({"ok": True, "is_learned": is_learned})
-
-
-class ContentItemQuestionView(APIView):
-    def post(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        item = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).first()
-        if not item:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        question_text = str(request.data.get("question_text", "")).strip()
-        logger.info(
-            "content.item_question.received item_id=%s source_lang=%s target_lang=%s question=%r",
-            item_id,
-            source_language,
-            target_language,
-            question_text[:255],
-        )
-        if not question_text:
-            logger.info("content.item_question.rejected item_id=%s code=EMPTY_QUESTION", item_id)
-            return Response({"detail": "question_text is required"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(question_text) > 255:
-            logger.info("content.item_question.rejected item_id=%s code=QUESTION_TOO_LONG len=%s", item_id, len(question_text))
-            return Response({"detail": "question_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            decision = _model_answer_or_reject_item_question(
-                item=item,
-                question_text=question_text,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        if not decision["related"]:
-            logger.info(
-                "content.item_question.rejected item_id=%s code=%s reason=%r question=%r",
-                item_id,
-                decision["code"],
-                decision.get("reason", ""),
-                question_text[:255],
-            )
-            return Response(
-                {
-                    "detail": "Question must be related to learning this specific item.",
-                    "code": decision["code"],
-                    "reason": decision.get("reason", ""),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        answer_text = decision["answer"]
-        logger.info(
-            "content.item_question.accepted item_id=%s code=%s answer_len=%s",
-            item_id,
-            decision["code"],
-            len(answer_text),
-        )
-        exchange = ItemQuestionExchange.objects.create(
-            item=item,
-            source_language=source_language,
-            target_language=target_language,
-            question_type=ItemQuestionExchange.QuestionType.CUSTOM_RELATED,
-            question_text=question_text,
-            answer_text=answer_text,
-        )
-        conversation = _item_question_history(item)
-        return Response(
-            {
-                "exchange": _serialize_question_exchange(exchange),
-                "conversation": conversation,
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class ContentWordQuickAddView(APIView):
-    def post(self, request: Request) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        source_text = str(request.data.get("source_text", "")).strip()
-        target_text = str(request.data.get("target_text", "")).strip()
-        source_line = str(request.data.get("source_line", "")).strip()
-        target_line = str(request.data.get("target_line", "")).strip()
-        clicked_target_token = str(request.data.get("clicked_target_token", "")).strip()
-        notes = str(request.data.get("notes", "")).strip()
-        dialog_id_raw = request.data.get("dialog_id")
-        turn_index_raw = request.data.get("turn_index")
-        check_only_raw = request.data.get("check_only", False)
-        if isinstance(check_only_raw, str):
-            check_only = check_only_raw.strip().lower() in {"1", "true", "yes", "on"}
-        else:
-            check_only = bool(check_only_raw)
-
-        if not source_text or not target_text:
-            return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        source_text, target_text = _resolve_dialog_click_word_pair(
-            user=user,
-            source_text=source_text,
-            target_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-            dialog_id_raw=dialog_id_raw,
-            turn_index_raw=turn_index_raw,
-            source_line=source_line,
-            target_line=target_line,
-            clicked_target_token=clicked_target_token,
-        )
-
-        exists = item_exists(
-            user=user,
-            item_type="word",
-            spanish_text=source_text,
-            german_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        if exists:
-            existing = (
-                apply_user_scope(Item.objects, user).filter(
-                    item_type=Item.ItemType.WORD,
-                    source_language=source_language,
-                    target_language=target_language,
-                    spanish_text__iexact=source_text,
-                    german_text__iexact=target_text,
-                )
-                .order_by("-id")
-                .first()
-            )
-            if check_only:
-                return Response(
-                    {
-                        "created": False,
-                        "exists": True,
-                        "id": existing.id if existing else None,
-                        "source_text": source_text,
-                        "target_text": target_text,
-                    }
-                )
-            if existing:
-                _link_word_to_dialog_turn(
-                    user=user,
-                    item=existing,
-                    dialog_id_raw=dialog_id_raw,
-                    turn_index_raw=turn_index_raw,
-                )
-            return Response(
-                {
-                    "created": False,
-                    "exists": True,
-                    "id": existing.id if existing else None,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-
-        if check_only:
-            return Response(
-                {
-                    "created": False,
-                    "exists": False,
-                    "id": None,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-
-        candidate = ContentCandidate(
-            spanish_text=source_text,
-            german_text=target_text,
-            exists=False,
-            notes=notes,
-        )
-        created = create_word_if_missing(
-            user=user,
-            candidate=candidate,
-            topic="dialog-click",
-            source_language=source_language,
-            target_language=target_language,
-        )
-        if created is None:
-            return Response(
-                {
-                    "created": False,
-                    "exists": True,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-
-        _link_word_to_dialog_turn(
-            user=user,
-            item=created,
-            dialog_id_raw=dialog_id_raw,
-            turn_index_raw=turn_index_raw,
-        )
-        return Response(
-            {
-                "created": True,
-                "exists": False,
-                "id": created.id,
-                "source_text": created.spanish_text,
-                "target_text": created.german_text,
-                "audio_url": created.audio_url,
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class ContentPhraseQuickAddView(APIView):
-    def post(self, request: Request) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        source_text = str(request.data.get("source_text", "")).strip()
-        target_text = str(request.data.get("target_text", "")).strip()
-        notes = str(request.data.get("notes", "")).strip()
-        check_only_raw = request.data.get("check_only", False)
-        if isinstance(check_only_raw, str):
-            check_only = check_only_raw.strip().lower() in {"1", "true", "yes", "on"}
-        else:
-            check_only = bool(check_only_raw)
-
-        if not source_text or not target_text:
-            return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        exists = item_exists(
-            user=user,
-            item_type=Item.ItemType.PHRASE,
-            spanish_text=source_text,
-            german_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        if exists:
-            existing = (
-                apply_user_scope(Item.objects, user).filter(
-                    item_type=Item.ItemType.PHRASE,
-                    source_language=source_language,
-                    target_language=target_language,
-                    spanish_text__iexact=source_text,
-                    german_text__iexact=target_text,
-                )
-                .order_by("-id")
-                .first()
-            )
-            return Response(
-                {
-                    "created": False,
-                    "exists": True,
-                    "id": existing.id if existing else None,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-
-        if check_only:
-            return Response(
-                {
-                    "created": False,
-                    "exists": False,
-                    "id": None,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-
-        candidate = ContentCandidate(
-            spanish_text=source_text,
-            german_text=target_text,
-            exists=False,
-            notes=notes,
-        )
-        created = create_phrase_if_missing(
-            user=user,
-            candidate=candidate,
-            topic="conversation-click",
-            source_language=source_language,
-            target_language=target_language,
-        )
-        if created is None:
-            return Response(
-                {
-                    "created": False,
-                    "exists": True,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-        return Response(
-            {
-                "created": True,
-                "exists": False,
-                "id": created.id,
-                "source_text": created.spanish_text,
-                "target_text": created.german_text,
-                "audio_url": created.audio_url,
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class ContentItemConversationView(APIView):
-    def post(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        item = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).first()
-        if not item:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        audio_file = request.FILES.get("audio")
-        if audio_file is None:
-            return Response({"detail": "audio file is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        history = _parse_item_conversation_history(request.data.get("history"))
-        user_text = _openai_transcribe_audio_upload(audio_file, target_language=target_language)
-        if not user_text:
-            return Response({"detail": "Could not transcribe audio"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        context_label = (
-            f"Item source text: {item.spanish_text}\n"
-            f"Item target text: {item.german_text}\n"
-            f"Item notes: {item.notes}\n"
-        )
-        try:
-            analysis = _analyze_user_turn_with_question_model(
-                user_text=user_text,
-                history=history,
-                source_language=source_language,
-                target_language=target_language,
-                context_label=context_label,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        assistant_payload = _generate_item_conversation_reply(
-            item=item,
-            user_text=user_text,
-            history=history,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        assistant_text = assistant_payload["reply_text"]
-        assistant_translation_text = assistant_payload.get("source_translation", "")
-        assistant_audio_url = ""
-        if assistant_text:
-            assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
-
-        return Response(
-            {
-                "user_text": user_text,
-                "user_translation_text": "",
-                "user_corrected_text": "",
-                "user_corrected_translation_text": "",
-                "user_correction_explanation": "",
-                "user_is_grammatically_correct": bool(analysis.get("is_grammatically_correct", False)),
-                "user_makes_sense_in_context": bool(analysis.get("makes_sense_in_context", False)),
-                "user_needs_correction": bool(analysis.get("needs_correction", True)),
-                "assistant_text": assistant_text,
-                "assistant_translation_text": assistant_translation_text,
-                "assistant_audio_url": assistant_audio_url,
-                "goal_achieved": False,
-                "goal_achievement_message": "",
-            }
-        )
-
-
-class ContentItemConversationUserTranslationView(APIView):
-    def post(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        item = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).first()
-        if not item:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        user_text = str(request.data.get("user_text", "")).strip()
-        if not user_text:
-            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user_translation_text = _literal_translate_user_text_with_question_model(
-                user_text=user_text,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        return Response({"user_translation_text": user_translation_text})
-
-
-class ContentItemConversationUserCorrectionView(APIView):
-    def post(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        item = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).first()
-        if not item:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        user_text = str(request.data.get("user_text", "")).strip()
-        if not user_text:
-            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
-        history = _parse_item_conversation_history(request.data.get("history"))
-
-        context_label = (
-            f"Item source text: {item.spanish_text}\n"
-            f"Item target text: {item.german_text}\n"
-            f"Item notes: {item.notes}\n"
-        )
-        try:
-            correction_payload = _generate_user_correction_with_question_model(
-                user_text=user_text,
-                history=history,
-                source_language=source_language,
-                target_language=target_language,
-                context_label=context_label,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        explanation = str(correction_payload.get("corrected_user_explanation", "")).strip()
-        if not explanation:
-            explanation = "Explanation not available"
-        return Response(
-            {
-                "user_corrected_text": str(correction_payload.get("corrected_user_text", "")).strip(),
-                "user_corrected_translation_text": str(correction_payload.get("corrected_user_source_translation", "")).strip(),
-                "user_correction_explanation": explanation,
-            }
-        )
-
-
-class ContentTopicConversationStartView(APIView):
-    def post(self, request: Request) -> Response:
-        source_language, target_language = _normalized_pair(request)
-        topic = str(request.data.get("topic", "")).strip()
-        notes = str(request.data.get("notes", "")).strip()
-        role_text = str(request.data.get("role_text", "")).strip()
-        goal_difficulty = str(request.data.get("goal_difficulty", "medium")).strip().lower() or "medium"
-        if not topic:
-            return Response({"detail": "topic is required"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(topic) > 120:
-            return Response({"detail": "topic is too long"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(notes) > 1000:
-            return Response({"detail": "notes is too long"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(role_text) > 240:
-            return Response({"detail": "role_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
-        if goal_difficulty not in {"easy", "medium", "hard"}:
-            return Response({"detail": "goal_difficulty must be easy, medium, or hard"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            start_payload = _generate_topic_conversation_start(
-                topic=topic,
-                notes=notes,
-                role_text=role_text,
-                goal_difficulty=goal_difficulty,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        opening_text = start_payload.get("opening_text", "")
-        opening_translation_text = start_payload.get("opening_translation_text", "")
-        goal_text = start_payload.get("goal_text", "")
-        selected_goal_difficulty = start_payload.get("goal_difficulty", goal_difficulty)
-        opening_audio_url = ""
-        if opening_text:
-            opening_audio_url = create_audio_file(opening_text, "conversation", target_language=target_language)
-
-        return Response(
-            {
-                "topic": topic,
-                "notes": notes,
-                "role_text": role_text,
-                "goal_difficulty": selected_goal_difficulty,
-                "goal_text": goal_text,
-                "opening_text": opening_text,
-                "opening_translation_text": opening_translation_text,
-                "opening_audio_url": opening_audio_url,
-            }
-        )
-
-
-class ContentTopicConversationTurnView(APIView):
-    def post(self, request: Request) -> Response:
-        source_language, target_language = _normalized_pair(request)
-        topic = str(request.data.get("topic", "")).strip()
-        notes = str(request.data.get("notes", "")).strip()
-        role_text = str(request.data.get("role_text", "")).strip()
-        goal_text = str(request.data.get("goal_text", "")).strip()
-        if not topic:
-            return Response({"detail": "topic is required"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(topic) > 120:
-            return Response({"detail": "topic is too long"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(role_text) > 240:
-            return Response({"detail": "role_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
-
-        audio_file = request.FILES.get("audio")
-        if audio_file is None:
-            return Response({"detail": "audio file is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        history = _parse_item_conversation_history(request.data.get("history"))
-        user_text = _openai_transcribe_audio_upload(audio_file, target_language=target_language)
-        if not user_text:
-            return Response({"detail": "Could not transcribe audio"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        context_label = (
-            f"Conversation topic: {topic}\n"
-            f"Temporary notes: {notes}\n"
-            f"Learner role: {role_text}\n"
-        )
-        try:
-            analysis = _analyze_user_turn_with_question_model(
-                user_text=user_text,
-                history=history,
-                source_language=source_language,
-                target_language=target_language,
-                context_label=context_label,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        try:
-            assistant_payload = _generate_topic_conversation_reply(
-                topic=topic,
-                notes=notes,
-                role_text=role_text,
-                goal_text=goal_text,
-                user_text=user_text,
-                history=history,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        assistant_text = assistant_payload["reply_text"]
-        assistant_translation_text = assistant_payload.get("source_translation", "")
-        goal_achieved = bool(assistant_payload.get("goal_achieved", False))
-        goal_achievement_message = str(assistant_payload.get("goal_achievement_message", "")).strip()
-        next_goal_suggestion = str(assistant_payload.get("next_goal_suggestion", "")).strip()
-        assistant_audio_url = ""
-        if assistant_text:
-            assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
-
-        return Response(
-            {
-                "user_text": user_text,
-                "user_translation_text": "",
-                "user_corrected_text": "",
-                "user_corrected_translation_text": "",
-                "user_correction_explanation": "",
-                "user_is_grammatically_correct": bool(analysis.get("is_grammatically_correct", False)),
-                "user_makes_sense_in_context": bool(analysis.get("makes_sense_in_context", False)),
-                "user_needs_correction": bool(analysis.get("needs_correction", True)),
-                "assistant_text": assistant_text,
-                "assistant_translation_text": assistant_translation_text,
-                "assistant_audio_url": assistant_audio_url,
-                "goal_achieved": goal_achieved,
-                "goal_achievement_message": goal_achievement_message,
-                "next_goal_suggestion": next_goal_suggestion,
-            }
-        )
-
-
-class ContentTopicConversationUserTranslationView(APIView):
-    def post(self, request: Request) -> Response:
-        source_language, target_language = _normalized_pair(request)
-        user_text = str(request.data.get("user_text", "")).strip()
-        if not user_text:
-            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            user_translation_text = _literal_translate_user_text_with_question_model(
-                user_text=user_text,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        return Response({"user_translation_text": user_translation_text})
-
-
-class ContentTopicConversationUserCorrectionView(APIView):
-    def post(self, request: Request) -> Response:
-        source_language, target_language = _normalized_pair(request)
-        topic = str(request.data.get("topic", "")).strip()
-        notes = str(request.data.get("notes", "")).strip()
-        role_text = str(request.data.get("role_text", "")).strip()
-        goal_text = str(request.data.get("goal_text", "")).strip()
-        user_text = str(request.data.get("user_text", "")).strip()
-        if not user_text:
-            return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
-        history = _parse_item_conversation_history(request.data.get("history"))
-        context_label = (
-            f"Conversation topic: {topic}\n"
-            f"Temporary notes: {notes}\n"
-            f"Learner role: {role_text}\n"
-        )
-        try:
-            correction_payload = _generate_user_correction_with_question_model(
-                user_text=user_text,
-                history=history,
-                source_language=source_language,
-                target_language=target_language,
-                context_label=context_label,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        explanation = str(correction_payload.get("corrected_user_explanation", "")).strip()
-        if not explanation:
-            explanation = "Explanation not available"
-        return Response(
-            {
-                "user_corrected_text": str(correction_payload.get("corrected_user_text", "")).strip(),
-                "user_corrected_translation_text": str(correction_payload.get("corrected_user_source_translation", "")).strip(),
-                "user_correction_explanation": explanation,
-            }
-        )
 
 
 def _resolve_dialog_click_word_pair(
@@ -913,9 +162,10 @@ Return strict JSON:
 }
 
 Rules:
-- Keep target_text equal to the clicked target token, except trim punctuation/spacing.
+- Keep target_text aligned to the clicked token meaning.
 - source_text must be the best source-language translation in THIS turn context.
-- Prefer dictionary-style compact form (1-3 words).
+- For nouns, include article in Spanish/German outputs whenever applicable.
+- Use context to disambiguate meaning, but return a clean translation unit of the word itself (no extra explanation).
 - If uncertain, keep the clicked source_text.
 - JSON only.
 """.strip(),
@@ -983,9 +233,11 @@ Return strict JSON:
 }
 
 Rules:
-- target_text must be the clicked target token (trim punctuation only).
+- target_text must align to the clicked token meaning.
+- If the clicked token is a noun and Spanish/German article is available from context, include it.
 - source_text must be the best source-language translation for that clicked token in this sentence context.
-- Keep source_text short (1-3 words) when possible.
+- For nouns, include article in Spanish/German outputs whenever applicable.
+- Use context to disambiguate meaning, but return a clean translation unit (no extra explanation).
 - If uncertain, keep provided source_text.
 - JSON only.
 """.strip(),
@@ -1040,9 +292,23 @@ def _sanitize_resolved_dialog_click_pair(
     target_tokens = _line_tokens(target_line)
     target_token_set = {_normalize_word_token(token) for token in target_tokens}
 
-    resolved_target = _clean_edge_punctuation(target_text) or _clean_edge_punctuation(clicked_target_token) or _clean_edge_punctuation(fallback_target_text)
+    fallback_target = _best_target_token_fallback(
+        target_tokens=target_tokens,
+        clicked_target_token=clicked_target_token or target_text or fallback_target_text,
+    )
+    resolved_target = (
+        _clean_edge_punctuation(target_text)
+        or _clean_edge_punctuation(clicked_target_token)
+        or _clean_edge_punctuation(fallback_target)
+        or _clean_edge_punctuation(fallback_target_text)
+    )
     if not resolved_target:
         resolved_target = fallback_target_text
+    if " " not in resolved_target and fallback_target:
+        fallback_target_norm = _normalize_word_token(fallback_target)
+        resolved_target_norm_simple = _normalize_word_token(resolved_target)
+        if fallback_target_norm.endswith(f" {resolved_target_norm_simple}") or fallback_target_norm == resolved_target_norm_simple:
+            resolved_target = fallback_target
 
     resolved_source = _clean_edge_punctuation(source_text) or _clean_edge_punctuation(fallback_source_text)
     resolved_source_norm = _normalize_word_token(resolved_source)
@@ -1064,7 +330,6 @@ def _sanitize_resolved_dialog_click_pair(
             or (resolved_source_norm in target_token_set and resolved_source_norm not in source_token_set)
         )
     )
-
     if not resolved_source_norm:
         if provided_source_is_from_source_line:
             resolved_source = fallback_source_text
@@ -1093,6 +358,8 @@ def _clean_edge_punctuation(value: str) -> str:
     return re.sub(r"^[^\wÀ-ÖØ-öø-ÿ]+|[^\wÀ-ÖØ-öø-ÿ]+$", "", value or "", flags=re.UNICODE).strip()
 
 
+
+
 def _best_source_token_fallback(
     *,
     source_tokens: list[str],
@@ -1111,15 +378,43 @@ def _best_source_token_fallback(
                 break
 
     if target_index < 0:
-        return source_tokens[-1]
+        return _token_with_optional_article(source_tokens, len(source_tokens) - 1)
     if len(target_tokens) <= 1 or len(source_tokens) <= 1:
         mapped_index = min(target_index, len(source_tokens) - 1)
-        return source_tokens[mapped_index]
+        return _token_with_optional_article(source_tokens, mapped_index)
 
     ratio = target_index / (len(target_tokens) - 1)
     mapped_index = round(ratio * (len(source_tokens) - 1))
     mapped_index = max(0, min(mapped_index, len(source_tokens) - 1))
-    return source_tokens[mapped_index]
+    return _token_with_optional_article(source_tokens, mapped_index)
+
+
+def _best_target_token_fallback(
+    *,
+    target_tokens: list[str],
+    clicked_target_token: str,
+) -> str:
+    if not target_tokens:
+        return ""
+    clicked_norm = _normalize_word_token(clicked_target_token)
+    if not clicked_norm:
+        return _token_with_optional_article(target_tokens, len(target_tokens) - 1)
+    for index, token in enumerate(target_tokens):
+        if _normalize_word_token(token) == clicked_norm:
+            return _token_with_optional_article(target_tokens, index)
+    return _token_with_optional_article(target_tokens, len(target_tokens) - 1)
+
+
+def _token_with_optional_article(tokens: list[str], index: int) -> str:
+    if index < 0 or index >= len(tokens):
+        return ""
+    token = tokens[index]
+    if index == 0:
+        return token
+    previous = tokens[index - 1].lower()
+    if previous in SPANISH_ARTICLES.union(GERMAN_ARTICLES):
+        return f"{tokens[index - 1]} {token}"
+    return token
 
 
 def _parse_item_conversation_history(raw_value) -> list[dict[str, str]]:
@@ -1162,8 +457,27 @@ def _openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> s
         return ""
 
     model_name = str(getattr(settings, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")).strip() or "gpt-4o-mini-transcribe"
-    filename = str(getattr(uploaded_file, "name", "")).strip() or f"speech-{uuid4().hex[:8]}.webm"
     content_type = str(getattr(uploaded_file, "content_type", "")).strip() or "application/octet-stream"
+    content_type_main = content_type.split(";", 1)[0].strip().lower()
+    extension_by_content_type = {
+        "audio/webm": ".webm",
+        "audio/mp4": ".m4a",
+        "audio/x-m4a": ".m4a",
+        "audio/m4a": ".m4a",
+        "audio/wav": ".wav",
+        "audio/x-wav": ".wav",
+        "audio/mpeg": ".mp3",
+        "audio/mp3": ".mp3",
+        "audio/ogg": ".ogg",
+    }
+    extension = extension_by_content_type.get(content_type_main, ".webm")
+    raw_filename = str(getattr(uploaded_file, "name", "")).strip()
+    if raw_filename:
+        filename = raw_filename
+        if "." not in filename:
+            filename = f"{filename}{extension}"
+    else:
+        filename = f"speech-{uuid4().hex[:8]}{extension}"
     language_hint = {
         "spanish": "es",
         "english": "en",
@@ -1371,11 +685,10 @@ Rules:
 - learner message is in {target_name}.
 - corrected_user_text must be the corrected version in {target_name}.
 - corrected_user_source_translation must be a natural translation in {source_name}.
-- corrected_user_explanation must be in {source_name}, and must explain:
-  1) what changed ("<original>" -> "<corrected>" in {target_name}),
-  2) why,
-  3) one short rule.
-- If message is already correct, return corrected_user_text exactly equal to original and explanation="".
+- corrected_user_explanation must be in {source_name} only.
+- Keep corrected_user_explanation very short and practical:
+  1) one brief reason,
+  2) one final tip.
 - JSON only.
 """.strip(),
         user_input=(
@@ -1494,10 +807,10 @@ def _generate_topic_conversation_start(
     source_name = _language_display_name(source_language)
     target_name = _language_display_name(target_language)
     variation_seed = uuid4().hex[:8]
+    rng = random.SystemRandom()
+    goal_label, done_when_label = GOAL_LABELS_BY_LANGUAGE.get(source_language, ("Goal", "Done when"))
 
     for attempt in range(3):
-        recent_goal_lines = list(_RECENT_TOPIC_GOALS)[-8:]
-        avoid_block = "\n".join(f"- {line}" for line in recent_goal_lines) if recent_goal_lines else "(none)"
         parsed = _call_openai_json_logged(
             label="generate_topic_conversation_start",
             system_prompt=f"""
@@ -1505,26 +818,32 @@ Create a conversation setup for a language learner.
 
 Return strict JSON:
 {{
-  "goal_text": "string",
-  "opening_text": "string",
-  "opening_translation_text": "string"
+  "goal_candidates": [
+    {{
+      "goal_objective": "string",
+      "goal_success_condition": "string",
+      "opening_text": "string",
+      "opening_translation_text": "string"
+    }}
+  ]
 }}
 
 Rules:
-- goal_text must be in {source_name} and include exactly one concrete condition.
-- The condition must be specific and verifiable (clear done/not-done outcome).
+- Return exactly 4 candidates in goal_candidates.
+- goal_objective must be in {source_name} and describe what the learner must actively achieve in this conversation.
+- goal_success_condition must be in {source_name} and define a specific verifiable done/not-done outcome.
 - Include one concrete target detail (for example a number, exact item, exact decision, or exact piece of information).
 - Keep variation style different each run using variation_seed.
 - This is for a learner practicing a new language in conversation.
 - Keep it achievable in one short conversation.
-- Avoid generic goals like "have a conversation about X".
+- Avoid generic goals like "have a conversation about X" or plain topic phrases.
 - Adapt challenge level to goal_difficulty:
   - easy: very simple, one clear concrete detail, minimal cognitive load.
   - medium: balanced challenge with one clear concrete detail and mild constraint.
   - hard: more demanding but still achievable in one short conversation, with a tighter or multi-part concrete condition.
 - opening_text must be in {target_name} and sound like a normal person starting a conversation.
 - opening_translation_text must be a {source_name} translation of opening_text.
-- Keep goal_text to one concise line.
+- Keep goal_objective and goal_success_condition concise, one short line each.
 - Keep opening_text to 1-2 short sentences and end with a simple question.
 - Match the topic and notes context.
 - If learner role is provided, tailor both goal and opening to that role.
@@ -1532,7 +851,7 @@ Rules:
 - Never write opening_text from the learner role perspective.
 - If learner role is "customer", partner should sound like staff/seller/service person.
 - Do not use teacher or tutor voice.
-- Avoid repeating goals that are too similar to recently used goals.
+- Make the 4 candidates meaningfully different from each other.
 - JSON only.
 """.strip(),
             user_input=(
@@ -1543,7 +862,6 @@ Rules:
                 f"Temporary notes: {notes}\n"
                 f"Learner role: {role_text}\n"
                 f"goal_difficulty: {goal_difficulty}\n"
-                f"Recently used goals to avoid similarity:\n{avoid_block}\n"
             ),
             timeout_seconds=10,
             temperature=0.95,
@@ -1552,20 +870,54 @@ Rules:
         )
         if not isinstance(parsed, dict):
             continue
-        goal_text = str(parsed.get("goal_text", "")).strip()
-        opening_text = str(parsed.get("opening_text", "")).strip()
-        opening_translation_text = str(parsed.get("opening_translation_text", "")).strip()
-        if not goal_text or not opening_text:
+        raw_candidates = parsed.get("goal_candidates")
+        normalized_candidates: list[dict[str, str]] = []
+        if isinstance(raw_candidates, list):
+            for raw_candidate in raw_candidates:
+                if not isinstance(raw_candidate, dict):
+                    continue
+                objective_text = str(raw_candidate.get("goal_objective", "")).strip()
+                success_condition = str(raw_candidate.get("goal_success_condition", "")).strip()
+                opening_text = str(raw_candidate.get("opening_text", "")).strip()
+                opening_translation_text = str(raw_candidate.get("opening_translation_text", "")).strip()
+                if not objective_text or not success_condition or not opening_text:
+                    continue
+                goal_text = f"{goal_label}: {objective_text}. {done_when_label}: {success_condition}."
+                normalized_candidates.append(
+                    {
+                        "goal_text": goal_text[:600],
+                        "opening_text": opening_text[:1200],
+                        "opening_translation_text": opening_translation_text[:1200],
+                    }
+                )
+
+        # Backward compatibility if the model still returns the previous single-goal shape.
+        if not normalized_candidates:
+            goal_text = str(parsed.get("goal_text", "")).strip()
+            opening_text = str(parsed.get("opening_text", "")).strip()
+            opening_translation_text = str(parsed.get("opening_translation_text", "")).strip()
+            if goal_text and opening_text:
+                done_when_fallback = GOAL_DONE_WHEN_FALLBACK_BY_LANGUAGE.get(
+                    source_language,
+                    "you clearly confirm it during the conversation",
+                )
+                normalized_candidates.append(
+                    {
+                        "goal_text": f"{goal_label}: {goal_text}. {done_when_label}: {done_when_fallback}."[:600],
+                        "opening_text": opening_text[:1200],
+                        "opening_translation_text": opening_translation_text[:1200],
+                    }
+                )
+
+        if not normalized_candidates:
             continue
 
-        if any(_goal_similarity_score(goal_text, prev_goal) >= 0.55 for prev_goal in _RECENT_TOPIC_GOALS):
-            continue
-
-        _RECENT_TOPIC_GOALS.append(goal_text[:600])
+        rng.shuffle(normalized_candidates)
+        candidate = normalized_candidates[0]
         return {
-            "goal_text": goal_text[:600],
-            "opening_text": opening_text[:1200],
-            "opening_translation_text": opening_translation_text[:1200],
+            "goal_text": candidate["goal_text"],
+            "opening_text": candidate["opening_text"],
+            "opening_translation_text": candidate["opening_translation_text"],
             "goal_difficulty": goal_difficulty,
         }
     raise RuntimeError("Question model request failed")
@@ -1600,17 +952,14 @@ Return strict JSON:
 
 Rules:
 - explanation must be in {source_name} only.
-- Keep it concise: one short line, max 220 chars.
+- Keep it concise: max 2 short lines, max 220 chars total.
+- Do not repeat or quote the original/corrected {target_name} text.
 - Include:
-  1) what changed (exact original -> corrected in {target_name}),
-  2) why the original is wrong in this context ({source_name}),
-  3) one short rule of thumb.
+  1) one brief reason for the correction,
+  2) one final tip/rule of thumb.
 - The explanation must be about the learner's {target_name} message.
-- Include original and corrected {target_name} text as quoted snippets exactly as provided.
-- Apart from those quoted {target_name} snippets, all other words must be in {source_name}.
 - Focus on {target_name} usage only.
 - Always return a non-empty explanation when corrected text is provided.
-- Never translate or rewrite the quoted {target_name} snippets.
 - If uncertain about grammar details, still provide a brief generic rule in {source_name}.
 - JSON only.
 """.strip(),
@@ -1621,7 +970,7 @@ Rules:
             f"Learner original text ({target_name}): {learner_clean}\n"
             f"Corrected text ({target_name}): {corrected_clean}\n"
             f"Corrected translation ({source_name}): {corrected_source_translation}\n"
-            f"Output format guidance: \"<original>\" -> \"<corrected>\"; <why in {source_name}>; <rule in {source_name}>\n"
+            f"Output format guidance: <brief reason in {source_name}>; <final tip in {source_name}>\n"
         ),
         timeout_seconds=8,
         model=question_model,
@@ -1646,9 +995,9 @@ Return strict JSON:
 
 Rules:
 - Write in {source_name} only.
-- Refer to learner {target_name} text as: "<original>" -> "<corrected>".
-- Explain briefly why and give one short rule.
-- One short line only.
+- Do not quote or repeat learner/corrected {target_name} text.
+- Explain briefly why and give one short final tip.
+- Max 2 short lines.
 - Always return a non-empty text value.
 - JSON only.
 """.strip(),
@@ -1716,18 +1065,6 @@ Rules:
     if not english_text:
         raise RuntimeError("Question model request failed")
     return english_text[:600]
-
-
-def _goal_similarity_score(a: str, b: str) -> float:
-    left = set(_normalize_text(a).split())
-    right = set(_normalize_text(b).split())
-    if not left or not right:
-        return 0.0
-    intersection = len(left & right)
-    union = len(left | right)
-    if union == 0:
-        return 0.0
-    return intersection / union
 
 
 def _generate_next_goal_suggestion_with_question_model(
@@ -1880,19 +1217,6 @@ Rules:
             source_language,
             "Next goal: confirm one additional concrete detail in this same situation.",
         )
-    if achieved and _goal_similarity_score(next_goal_suggestion, goal_clean) >= 0.55:
-        try:
-            next_goal_suggestion = _generate_next_goal_suggestion_with_question_model(
-                topic=topic,
-                notes=notes,
-                role_text=role_text,
-                current_goal_text=goal_clean,
-                latest_user_text=latest_user_text,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError:
-            pass
     if not achieved:
         return False, "", ""
     return True, message[:600], next_goal_suggestion[:600]
@@ -1903,7 +1227,6 @@ def _generate_topic_conversation_reply(
     topic: str,
     notes: str,
     role_text: str,
-    goal_text: str,
     user_text: str,
     history: list[dict[str, str]],
     source_language: str,
@@ -1959,34 +1282,150 @@ Rules:
     if isinstance(parsed, dict):
         reply_text = str(parsed.get("reply_text", "")).strip()
         source_translation = str(parsed.get("source_translation", "")).strip()
-        evaluated_goal_achieved, evaluated_goal_message, evaluated_goal_next = _evaluate_goal_achievement_with_question_model(
-            topic=topic,
-            notes=notes,
-            role_text=role_text,
-            goal_text=goal_text,
-            history=history,
-            latest_user_text=user_text,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        if evaluated_goal_achieved and evaluated_goal_next:
-            evaluated_goal_message = f"{evaluated_goal_message} {evaluated_goal_next}".strip()
         if reply_text:
             return {
                 "reply_text": reply_text[:1200],
                 "source_translation": source_translation[:1200],
-                "goal_achieved": evaluated_goal_achieved,
-                "goal_achievement_message": evaluated_goal_message[:600],
-                "next_goal_suggestion": evaluated_goal_next[:600],
             }
 
     return {
         "reply_text": "",
         "source_translation": "",
-        "goal_achieved": False,
-        "goal_achievement_message": "",
-        "next_goal_suggestion": "",
     }
+
+
+def _generate_conversation_help_with_question_model(
+    *,
+    topic: str,
+    notes: str,
+    role_text: str,
+    user_help_request_text: str,
+    history: list[dict[str, str]],
+    source_language: str,
+    target_language: str,
+) -> str:
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    question_model = _require_question_model()
+
+    history_lines: list[str] = []
+    for row in history:
+        if row.get("user_text"):
+            history_lines.append(f"Learner: {row['user_text']}")
+        if row.get("assistant_text"):
+            history_lines.append(f"Partner: {row['assistant_text']}")
+
+    parsed = _call_openai_json_logged(
+        label="generate_topic_conversation_help",
+        system_prompt=f"""
+You are a communication coach helping a language learner during a live conversation.
+
+Return strict JSON:
+{{
+  "help_text": "string"
+}}
+
+Rules:
+- Write help_text in {source_name} only.
+- Do not answer in {target_name}.
+- Treat the learner request as communication help about {target_name}.
+- Even when the request is phrased in {source_name}, keep the explanation topic focused on {target_name} usage.
+- Give actionable coaching for what the learner can try to communicate next.
+- Keep it very concise: 1 to 3 short lines total.
+- Prefer compact phrasing over full explanations.
+- Avoid introductions, hedging, and repetition.
+- Focus on helping with meaning and communication strategy in the ongoing conversation context.
+- Do not switch to general source-language lessons.
+- Do not treat this as a regular conversation turn.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Topic: {topic}\n"
+            f"Temporary notes: {notes}\n"
+            f"Learner role: {role_text}\n"
+            f"Recent conversation:\n{chr(10).join(history_lines[-10:])}\n"
+            f"Learner help request ({source_name}): {user_help_request_text}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.15,
+        top_p=0.95,
+        presence_penalty=0.1,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    help_text = str(parsed.get("help_text", "")).strip()
+    if not help_text:
+        raise RuntimeError("Question model request failed")
+    return help_text[:1600]
+
+
+def _generate_target_phrase_help_with_question_model(
+    *,
+    topic: str,
+    notes: str,
+    role_text: str,
+    user_help_request_text: str,
+    history: list[dict[str, str]],
+    source_language: str,
+    target_language: str,
+) -> tuple[str, str]:
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    question_model = _require_question_model()
+
+    history_lines: list[str] = []
+    for row in history:
+        if row.get("user_text"):
+            history_lines.append(f"Learner: {row['user_text']}")
+        if row.get("assistant_text"):
+            history_lines.append(f"Partner: {row['assistant_text']}")
+
+    parsed = _call_openai_json_logged(
+        label="generate_topic_conversation_target_phrase_help",
+        system_prompt=f"""
+You help a language learner quickly say a word or phrase in a live conversation.
+
+Return strict JSON:
+{{
+  "target_text": "string",
+  "help_text": "string"
+}}
+
+Rules:
+- Write target_text in {target_name} only.
+- target_text must match the learner intent as a natural short expression for this context.
+- Keep target_text concise: usually 1 phrase or 1 short sentence.
+- Write help_text in {source_name} only.
+- Keep help_text very short (max 1 line), optional usage nuance if needed.
+- Prefer practical, common wording over creative or rare wording.
+- Do not add markdown, numbering, or quotes.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Topic: {topic}\n"
+            f"Temporary notes: {notes}\n"
+            f"Learner role: {role_text}\n"
+            f"Recent conversation:\n{chr(10).join(history_lines[-10:])}\n"
+            f"Learner request ({source_name}): {user_help_request_text}\n"
+        ),
+        timeout_seconds=8,
+        model=question_model,
+        temperature=0.2,
+        top_p=0.95,
+        presence_penalty=0.1,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    target_text = str(parsed.get("target_text", "")).strip()
+    help_text = str(parsed.get("help_text", "")).strip()
+    if not target_text:
+        raise RuntimeError("Question model request failed")
+    return target_text[:500], help_text[:600]
 
 
 def _link_word_to_dialog_turn(*, user, item: Item, dialog_id_raw, turn_index_raw) -> None:
@@ -2011,25 +1450,6 @@ def _link_word_to_dialog_turn(*, user, item: Item, dialog_id_raw, turn_index_raw
         side=ItemDialogOccurrence.Side.TARGET,
         defaults={"match_score": 1.0},
     )
-
-
-class ContentTopicDeleteView(APIView):
-    def delete(self, request: Request) -> Response:
-        user = get_request_user(request)
-        serializer = ContentTopicSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        topic = serializer.validated_data["topic"].strip()
-        source_language = serializer.validated_data.get("source_language", "spanish")
-        target_language = serializer.validated_data.get("target_language", "german")
-
-        deleted, _ = apply_user_scope(SavedTopic.objects, user).filter(
-            topic=topic,
-            source_language=source_language,
-            target_language=target_language,
-        ).delete()
-        if deleted == 0:
-            return Response({"detail": "Topic not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def _related_dialogs_by_item_ids(item_ids: list[int], *, user, per_item_limit: int = 8) -> dict[int, list[dict]]:
@@ -2088,7 +1508,8 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
             continue
         source_text = str(turn.get("source_text", "")).strip()
         target_text = str(turn.get("target_text", "")).strip()
-        normalized_turns.append({"source_text": source_text, "target_text": target_text})
+        speaker = _normalize_dialog_speaker(turn.get("speaker", ""), len(normalized_turns))
+        normalized_turns.append({"source_text": source_text, "target_text": target_text, "speaker": speaker})
         if source_text and target_text:
             key_pairs.add((source_text.lower(), target_text.lower()))
 
@@ -2111,6 +1532,7 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
         {
             "source_text": turn["source_text"],
             "target_text": turn["target_text"],
+            "speaker": turn["speaker"],
             "phrase_audio_url": phrase_audio_by_key.get(
                 (turn["source_text"].lower(), turn["target_text"].lower()),
                 "",
@@ -2118,6 +1540,15 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
         }
         for turn in normalized_turns
     ]
+
+
+def _normalize_dialog_speaker(value, index: int) -> str:
+    raw = str(value or "").strip().lower()
+    if raw in {"a", "speaker_a", "person_a", "1", "first"}:
+        return "a"
+    if raw in {"b", "speaker_b", "person_b", "2", "second"}:
+        return "b"
+    return "a" if index % 2 == 0 else "b"
 
 
 def _language_display_name(language_code: str) -> str:
@@ -2213,8 +1644,9 @@ Rules:
   related=true, result_code="RELATED_OK", and provide concise answer (3 to 6 short lines, A1-A2), reason="".
 - If question is NOT related to this item, set:
   related=false, result_code="UNRELATED_QUESTION", answer="", and provide a short reason.
-- Assume the learner's primary interest is {target_name} usage/meaning.
-- Do not reinterpret the question as source-language-focused unless the learner explicitly asks for source-language analysis.
+- Treat the question intent as about {target_name} by default.
+- Even when question text is in {source_name}, interpret it as a request about {target_name} usage.
+- Do not reinterpret the question as source-language learning content.
 - Be permissive with typos, misspellings, partial matches, and paraphrases.
 - If the question could reasonably be about this item, treat it as related.
 - Questions about words/phrases in either study language can still be related to this item
@@ -2226,9 +1658,11 @@ Rules:
 - Use full conversation history for context and continuity.
 - Keep all explanations/comments focused on {target_name} usage (meaning, grammar, form, pronunciation, and context).
 - If examples or forms are included, they should describe {target_name} usage.
-- Do not include source-language teaching/explanations.
+- Do not include source-language teaching/explanations as the main topic.
 - The answer text itself must be written in {source_name} (never in {target_name}).
 - Interpret every related question through {target_name} meaning/usage, even when the question text is in {source_name}.
+- Hard constraint: answer content topic must be {target_name}; answer language must be {source_name}.
+- If a draft answer drifts to source-language-focused teaching, rewrite it before returning.
 - Before returning, verify your answer satisfies the previous 5 rules exactly.
 - JSON only.
 """.strip(),
@@ -2361,3 +1795,21 @@ def _item_question_history(item: Item) -> list[dict]:
         item.question_exchanges.order_by("-created_at", "-id")[:120]
     )
     return [_serialize_question_exchange(row) for row in rows]
+
+from .management_items import (
+    ContentItemDetailView,
+    ContentItemMarkLearnedView,
+    ContentItemQuestionView,
+    ContentItemsView,
+    ContentPhraseQuickAddView,
+    ContentWordQuickAddView,
+    ContentWordsView,
+)
+from .management_topic_admin import ContentTopicDeleteView
+from .management_topic_conversation import (
+    ContentTopicConversationHelpView,
+    ContentTopicConversationStartView,
+    ContentTopicConversationTurnView,
+    ContentTopicConversationUserCorrectionView,
+    ContentTopicConversationUserTranslationView,
+)

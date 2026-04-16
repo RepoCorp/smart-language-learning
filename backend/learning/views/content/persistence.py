@@ -28,10 +28,43 @@ OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE = {
     "italian": "echo",
     "portuguese": "fable",
 }
+SPANISH_NOUN_ARTICLES = {"el", "la", "los", "las"}
+GERMAN_NOUN_ARTICLES = {"der", "die", "das", "den", "dem", "des"}
+GERMAN_TO_SPANISH_ARTICLE = {
+    "der": "el",
+    "die": "la",
+    "das": "el",
+    "den": "el",
+    "dem": "el",
+    "des": "el",
+}
+SPANISH_TO_GERMAN_ARTICLE = {
+    "el": "der",
+    "la": "die",
+    "los": "die",
+    "las": "die",
+}
+OPENAI_TTS_LANGUAGE_LABEL_BY_STUDY_LANGUAGE = {
+    "spanish": "Spanish",
+    "english": "English",
+    "german": "German",
+    "french": "French",
+    "italian": "Italian",
+    "portuguese": "Portuguese",
+}
 OPENAI_TTS_VOICES = ("alloy", "echo", "fable", "onyx", "nova", "shimmer")
 OPENAI_TTS_SAMPLE_RATE = 24000
 OPENAI_TTS_DEFAULT_SPEED = 1.25
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
+
+
+def _tts_language_instruction(target_language: str) -> str:
+    language_label = OPENAI_TTS_LANGUAGE_LABEL_BY_STUDY_LANGUAGE.get(target_language, target_language.capitalize())
+    return (
+        f"Speak naturally in {language_label}. "
+        "Pronounce the text strictly as written in that language. "
+        "Do not translate, switch language, or reinterpret words as another language."
+    )
 
 
 def _build_local_audio_url(filename: str) -> str:
@@ -165,6 +198,57 @@ def item_exists(
     ).exists()
 
 
+def normalize_word_pair_for_item_save(
+    *,
+    spanish_text: str,
+    german_text: str,
+    source_language: str,
+    target_language: str,
+) -> tuple[str, str]:
+    source_text_norm = " ".join((spanish_text or "").split()).strip()
+    target_text_norm = " ".join((german_text or "").split()).strip()
+
+    def has_article(value: str, language: str) -> bool:
+        parts = value.split()
+        if not parts:
+            return False
+        first = parts[0].lower()
+        if language == "spanish":
+            return first in SPANISH_NOUN_ARTICLES
+        if language == "german":
+            return first in GERMAN_NOUN_ARTICLES
+        return False
+
+    def first_article(value: str) -> str:
+        parts = value.split()
+        return parts[0].lower() if parts else ""
+
+    source_has_article = has_article(source_text_norm, source_language)
+    target_has_article = has_article(target_text_norm, target_language)
+
+    if source_language == "spanish" and not source_has_article and target_language == "german" and target_has_article and source_text_norm:
+        mapped = GERMAN_TO_SPANISH_ARTICLE.get(first_article(target_text_norm), "el")
+        source_text_norm = f"{mapped} {source_text_norm}"
+        source_has_article = True
+
+    if target_language == "spanish" and not target_has_article and source_language == "german" and source_has_article and target_text_norm:
+        mapped = GERMAN_TO_SPANISH_ARTICLE.get(first_article(source_text_norm), "el")
+        target_text_norm = f"{mapped} {target_text_norm}"
+        target_has_article = True
+
+    if source_language == "german" and not source_has_article and target_language == "spanish" and target_has_article and source_text_norm:
+        mapped = SPANISH_TO_GERMAN_ARTICLE.get(first_article(target_text_norm), "der")
+        source_text_norm = f"{mapped} {source_text_norm}"
+        source_has_article = True
+
+    if target_language == "german" and not target_has_article and source_language == "spanish" and source_has_article and target_text_norm:
+        mapped = SPANISH_TO_GERMAN_ARTICLE.get(first_article(source_text_norm), "der")
+        target_text_norm = f"{mapped} {target_text_norm}"
+        target_has_article = True
+
+    return source_text_norm, target_text_norm
+
+
 def serialize_candidate(candidate: ContentCandidate) -> dict:
     return {
         "spanish_text": candidate.spanish_text,
@@ -239,18 +323,24 @@ def create_word_if_missing(
     target_language: str = "german",
     exercise_phrases: dict | None = None,
 ) -> Item | None:
-    if item_exists(
-        user=user,
-        item_type=Item.ItemType.WORD,
+    normalized_spanish, normalized_german = normalize_word_pair_for_item_save(
         spanish_text=candidate.spanish_text,
         german_text=candidate.german_text,
         source_language=source_language,
         target_language=target_language,
+    )
+    if item_exists(
+        user=user,
+        item_type=Item.ItemType.WORD,
+        spanish_text=normalized_spanish,
+        german_text=normalized_german,
+        source_language=source_language,
+        target_language=target_language,
     ):
-        logger.info("content.create.word.skipped_exists topic=%s spanish=%s", topic, candidate.spanish_text)
+        logger.info("content.create.word.skipped_exists topic=%s spanish=%s", topic, normalized_spanish)
         return None
     phrase_german = candidate.source_phrase_german.strip()
-    audio_text = f"{candidate.german_text}. {phrase_german}" if phrase_german else candidate.german_text
+    audio_text = f"{normalized_german}. {phrase_german}" if phrase_german else normalized_german
     try:
         audio_url = create_audio_file(audio_text, "word", target_language=target_language)
     except TypeError:
@@ -259,8 +349,8 @@ def create_word_if_missing(
     item = Item.objects.create(
         user=user,
         item_type=Item.ItemType.WORD,
-        spanish_text=candidate.spanish_text,
-        german_text=candidate.german_text,
+        spanish_text=normalized_spanish,
+        german_text=normalized_german,
         source_language=source_language,
         target_language=target_language,
         notes=candidate.notes,
@@ -294,6 +384,7 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german") -
         voice=voice,
         speed=float(getattr(settings, "OPENAI_TTS_ITEM_SPEED", OPENAI_TTS_ITEM_DEFAULT_SPEED)),
         response_format="mp3",
+        instructions=_tts_language_instruction(target_language),
     )
     if not audio_bytes:
         logger.warning("content.audio.failed prefix=%s filename=%s target_language=%s", prefix, filename, target_language)
@@ -318,6 +409,7 @@ def _openai_tts_audio(
     voice: str,
     speed: float,
     response_format: str,
+    instructions: str = "",
 ) -> bytes | None:
     api_key = settings.OPENAI_API_KEY
     if not api_key:
@@ -330,6 +422,8 @@ def _openai_tts_audio(
         "speed": speed,
         "response_format": response_format,
     }
+    if instructions.strip():
+        body["instructions"] = instructions.strip()
     request = UrlRequest(
         "https://api.openai.com/v1/audio/speech",
         data=json.dumps(body).encode("utf-8"),
