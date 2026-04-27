@@ -13,8 +13,11 @@ export default function DialogsPage(): JSX.Element {
   const [error, setError] = useState<string>("");
   const [playingAll, setPlayingAll] = useState<boolean>(false);
   const [playingDialogId, setPlayingDialogId] = useState<number | null>(null);
+  const [expandedDialogId, setExpandedDialogId] = useState<number | null>(null);
   const playbackRunRef = useRef<number>(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
+    speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
 
   const stopCurrentPlayback = (): void => {
     playbackRunRef.current += 1;
@@ -32,6 +35,7 @@ export default function DialogsPage(): JSX.Element {
     const load = async (): Promise<void> => {
       setLoading(true);
       setError("");
+      setExpandedDialogId(null);
       stopCurrentPlayback();
       try {
         const payload = await fetchContentDialogs(sourceLanguage, targetLanguage);
@@ -125,26 +129,57 @@ export default function DialogsPage(): JSX.Element {
       {!loading && !error && dialogs.length === 0 && <p className="hint">{t("dialogs.empty")}</p>}
       {!loading && dialogs.length > 0 && (
         <section className="card">
-          <ul className="conversation-preview-list">
+          <ul className="manage-list">
             {dialogs.map((dialog) => (
-              <li key={dialog.dialog_id} className="manage-row manage-item-row">
-                <div className="manage-item-main">
-                  <div className="manage-item-text">
-                    <strong>{dialog.topic}</strong>
-                    {dialog.context ? (
-                      <span className="manage-item-meta">{dialog.context}</span>
-                    ) : (
-                      <span className="manage-item-meta">{t("dialogs.noContext")}</span>
-                    )}
-                    {playingAll && playingDialogId === dialog.dialog_id && (
-                      <span className="manage-item-meta">{t("dialogs.nowPlaying")}</span>
-                    )}
-                  </div>
-                </div>
+              <li key={dialog.dialog_id} className="related-dialog-card">
+                <p>
+                  <strong>{dialog.topic}</strong>
+                </p>
+                <p>
+                  <strong>{t("newItem.dialogContext")}:</strong> {dialog.context || t("dialogs.noContext")}
+                </p>
+                {playingAll && playingDialogId === dialog.dialog_id && (
+                  <p className="manage-item-meta">{t("dialogs.nowPlaying")}</p>
+                )}
                 {dialog.audio_url ? (
                   <audio controls src={dialog.audio_url} preload="none" />
                 ) : (
                   <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
+                )}
+                {!!dialog.turns?.length && (
+                  <>
+                    <div className="actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => setExpandedDialogId((current) => (current === dialog.dialog_id ? null : dialog.dialog_id))}
+                      >
+                        {expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
+                      </button>
+                    </div>
+                    {expandedDialogId === dialog.dialog_id && (
+                      <>
+                        <p><strong>{t("newItem.dialogTurns")}:</strong></p>
+                        <ul className="conversation-preview-list">
+                          {dialog.turns.map((turn, index) => {
+                            const speaker = speakerForTurn(turn.speaker, index);
+                            return (
+                              <li
+                                key={`${dialog.dialog_id}-turn-${index}`}
+                                className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
+                              >
+                                <p className="conversation-speaker">
+                                  {speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}
+                                </p>
+                                <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
+                                <p className="conversation-line">{turn.source_text}</p>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </>
+                    )}
+                  </>
                 )}
               </li>
             ))}

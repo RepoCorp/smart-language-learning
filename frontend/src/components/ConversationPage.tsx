@@ -171,6 +171,7 @@ export default function ConversationPage(): JSX.Element {
     hard: "conversation.goalDifficultyHard",
   };
   const hideTargetText = targetPromptMode === "audio" && !showTargetText;
+  const hideSourceText = targetPromptMode === "audio" && !showTargetText;
 
   const scrollConversationToBottom = (): void => {
     const historyElement = historyRef.current;
@@ -901,7 +902,7 @@ export default function ConversationPage(): JSX.Element {
                         targetText: openingText,
                       })}
                   </p>
-                  {openingTranslation && showOpeningTranslation && (
+                  {openingTranslation && showOpeningTranslation && !hideSourceText && (
                     <p className="item-conversation-translation"><strong>{sourceLanguageLabel}:</strong> {openingTranslation}</p>
                   )}
                   <div className="turn-action-row turn-action-row-assistant">
@@ -914,7 +915,7 @@ export default function ConversationPage(): JSX.Element {
                         {t("newItem.playTurnAudio")}
                       </button>
                     )}
-                    {openingTranslation && (
+                    {openingTranslation && !hideSourceText && (
                       <button
                         type="button"
                         className="item-conversation-translation-toggle"
@@ -936,17 +937,17 @@ export default function ConversationPage(): JSX.Element {
                   <div className="item-chat-message item-chat-user">
                     <p className="item-chat-meta">{t("newItem.conversationLabelYou")}</p>
                     <p className="item-chat-bubble">{turn.user_text}</p>
-                    {conversationUserTranslationVisible[index] && (
+                    {conversationUserTranslationVisible[index] && !hideSourceText && (
                       <p className="item-conversation-correction item-conversation-correction-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
                     )}
-                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
+                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_text && !hideTargetText && (
                       <p className="item-conversation-correction">
                         <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
                       </p>
                     )}
-                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_translation_text && (
+                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_translation_text && !hideSourceText && (
                       <p className="item-conversation-correction item-conversation-correction-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.user_corrected_translation_text}
                       </p>
@@ -957,16 +958,18 @@ export default function ConversationPage(): JSX.Element {
                       </p>
                     )}
                     <div className="turn-action-row turn-action-row-user">
-                      <button
-                        type="button"
-                        className="item-conversation-correction-toggle"
-                        onClick={() => void toggleUserTurnTranslation(index)}
-                        disabled={conversationUserTranslationLoading[index]}
-                      >
-                        {conversationUserTranslationVisible[index]
-                          ? t("newItem.conversationHideUserTranslation")
-                          : t("newItem.conversationShowUserTranslation")}
-                      </button>
+                      {!hideSourceText && (
+                        <button
+                          type="button"
+                          className="item-conversation-correction-toggle"
+                          onClick={() => void toggleUserTurnTranslation(index)}
+                          disabled={conversationUserTranslationLoading[index]}
+                        >
+                          {conversationUserTranslationVisible[index]
+                            ? t("newItem.conversationHideUserTranslation")
+                            : t("newItem.conversationShowUserTranslation")}
+                        </button>
+                      )}
                       {hasTurnCorrection(turn) && (
                         <>
                           <button
@@ -1017,7 +1020,7 @@ export default function ConversationPage(): JSX.Element {
                           targetText: turn.assistant_text,
                         })}
                     </p>
-                    {conversationTranslationVisible[index] && (
+                    {conversationTranslationVisible[index] && !hideSourceText && (
                       <p className="item-conversation-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text || t("newItem.conversationNoTranslation")}
                       </p>
@@ -1037,15 +1040,17 @@ export default function ConversationPage(): JSX.Element {
                           {t("newItem.playTurnAudio")}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="item-conversation-translation-toggle"
-                        onClick={() => toggleAssistantTurnTranslation(index)}
-                      >
-                        {conversationTranslationVisible[index]
-                          ? t("newItem.conversationHideTranslation")
-                          : t("newItem.conversationShowTranslation")}
-                      </button>
+                      {!hideSourceText && (
+                        <button
+                          type="button"
+                          className="item-conversation-translation-toggle"
+                          onClick={() => toggleAssistantTurnTranslation(index)}
+                        >
+                          {conversationTranslationVisible[index]
+                            ? t("newItem.conversationHideTranslation")
+                            : t("newItem.conversationShowTranslation")}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="item-conversation-translation-toggle"

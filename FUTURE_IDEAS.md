@@ -16,7 +16,11 @@ Que al frente de los seleccion multiple uno pueda abrir la ventana del item
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
 No reconoce cuando cumplio el objetivo en la conversacion 
 
-
+Que uno pueda editar las palabras 
+Que la conversacion tenga un boton para terminar y ahi la presenta corregida y la guarda para dejar agregar las palabras  
+Si permitor no agregar turnos de un dialogo. Que si los guarde pero algo asi como marcados como aprendidos
+Para las palabras seleccionadas no esta guardando el dialogo. Tambien mirar que guardar cuando son agregadas desde una conversacion
+Que palabras o frases que tenga dificultad si le ponga a escribirlas y de pronto lo de la musica
 Eliminar silencios antes del audio de las frases. Algunas frases lo tienen.
 Cuidado con los articulos, incluirlos siempre en las palabras para idiomas que manejan generos
 Por que los goals son siempre tan similares? Siempre me pregunta por manzanas

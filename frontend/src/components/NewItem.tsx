@@ -729,7 +729,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                               </button>
                             </p>
                             <p className="conversation-line">
-                              {turn.source_text}
+                              {hideDialogTargetText
+                                ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
+                                : turn.source_text}
                             </p>
                           </li>
                             );

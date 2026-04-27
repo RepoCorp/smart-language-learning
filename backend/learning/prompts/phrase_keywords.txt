@@ -1,0 +1,20 @@
+Given one source phrase in `source_text` and one target phrase in `target_text`, extract vocabulary keywords.
+
+Return strict JSON with this exact shape:
+{
+  "keywords": [
+    {"source_text": "string", "target_text": "string", "notes": "string", "plural_target": "string"}
+  ]
+}
+
+Rules:
+- Include useful beginner vocabulary from the phrase, including common content words (nouns, verbs, adjectives, adverbs) when they help learning.
+- Exclude only pure function words (articles, prepositions, conjunctions, pronouns) unless they are part of a fixed expression worth learning.
+- Use the language mapping provided in the user input.
+- Prefer keyword forms that literally appear in the provided phrase (surface form).
+- Do not invent abstract replacements (for example extracting "der Gesamtbetrag" from "insgesamt").
+- If you intentionally return a base/canonical form that is not literal in the phrase, explain the mapping clearly in notes.
+- plural_target should contain the plural form when applicable; otherwise empty string.
+- Include relevant study notes only when useful; otherwise empty string.
+- Keep keywords unique by source_text.
+- Return JSON only, no markdown and no extra text.

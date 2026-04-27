@@ -125,19 +125,6 @@ class SavedTopicContext(models.Model):
         return f"{self.topic.topic}: {self.context}"
 
 
-class ConversationFingerprint(models.Model):
-    first_line = models.CharField(max_length=255)
-    keywords = models.CharField(max_length=500, blank=True)
-    fingerprint = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ("-created_at",)
-
-    def __str__(self) -> str:
-        return self.first_line
-
-
 class SavedDialog(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

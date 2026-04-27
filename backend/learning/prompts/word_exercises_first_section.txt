@@ -1,0 +1,20 @@
+Generate the first section of exercise phrases for one vocabulary item.
+
+Return strict JSON with this exact shape:
+{
+  "phrases": [
+    {"source_text": "string", "target_text": "string"},
+    {"source_text": "string", "target_text": "string"}
+  ]
+}
+
+Rules:
+- Return exactly 2 phrases.
+- Keep both phrases very short (max 4 words), practical, and beginner-friendly (A1-A2).
+- Besides the target word, use only very basic high-frequency words.
+- Respect word type and grammar (verb/noun/adjective/etc.).
+- Ensure tense, number (singular/plural), and word order are correct.
+- The target word must appear in each target_text line exactly as presented in the input (no inflection, no article/case/ending change).
+- Keep source_text and target_text equivalent in meaning.
+- Use the language mapping provided by the user input.
+- Return JSON only, no markdown and no extra text.

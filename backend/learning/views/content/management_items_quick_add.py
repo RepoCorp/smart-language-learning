@@ -79,6 +79,13 @@ class ContentWordQuickAddView(APIView):
                 .order_by("-id")
                 .first()
             )
+            if existing:
+                _link_word_to_dialog_turn(
+                    user=user,
+                    item=existing,
+                    dialog_id_raw=dialog_id_raw,
+                    turn_index_raw=turn_index_raw,
+                )
             if check_only:
                 return Response(
                     {
@@ -88,13 +95,6 @@ class ContentWordQuickAddView(APIView):
                         "source_text": source_text,
                         "target_text": target_text,
                     }
-                )
-            if existing:
-                _link_word_to_dialog_turn(
-                    user=user,
-                    item=existing,
-                    dialog_id_raw=dialog_id_raw,
-                    turn_index_raw=turn_index_raw,
                 )
             return Response(
                 {

@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import ConversationFingerprint, DialogTurn, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
+from learning.models import DialogTurn, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
 
 
 @pytest.mark.django_db
@@ -650,12 +650,6 @@ def test_content_preview_skips_keywords_not_present_in_phrase(monkeypatch):
 def test_generate_conversation_retries_after_validation_failure(monkeypatch):
     from learning.views.content import generation
 
-    ConversationFingerprint.objects.create(
-        first_line="hola como estas",
-        keywords="hola,estas",
-        fingerprint="hola como estas || hola estas",
-    )
-
     calls = []
 
     def fake_call_openai_json(system_prompt, user_input, timeout_seconds=10, **kwargs):
@@ -696,9 +690,7 @@ def test_generate_conversation_retries_after_validation_failure(monkeypatch):
     assert "Topic: shopping" in calls[0][0]
     assert "Context: at a bakery" in calls[0][0]
     assert "Situation detail: at a bakery" in calls[0][0]
-    assert "hola como estas | hola estas" in calls[0][0]
     assert "Retry instruction: more variation, same topic and level" in calls[1][0]
-    assert ConversationFingerprint.objects.count() == 2
 
 
 @pytest.mark.django_db
@@ -1278,6 +1270,7 @@ def test_content_item_question_rejects_unrelated_questions(monkeypatch):
 @pytest.mark.django_db
 def test_quick_add_word_uses_contextual_translation_for_existing_item(monkeypatch):
     from learning.views.content import management as management_views
+    from learning.models import ItemDialogOccurrence
 
     existing = Item.objects.create(
         item_type=Item.ItemType.WORD,
@@ -1325,6 +1318,12 @@ def test_quick_add_word_uses_contextual_translation_for_existing_item(monkeypatc
     assert payload["id"] == existing.id
     assert payload["source_text"] == "vuelta"
     assert payload["target_text"] == "Runde"
+    assert ItemDialogOccurrence.objects.filter(
+        item=existing,
+        dialog=dialog,
+        turn_index=0,
+        side=ItemDialogOccurrence.Side.TARGET,
+    ).exists()
 
 
 @pytest.mark.django_db
