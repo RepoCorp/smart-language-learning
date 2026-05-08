@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { shouldAutoplayPrompt } from "../audioAutoplayGuard";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -36,7 +37,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const [answer, setAnswer] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
   const [hintLetter, setHintLetter] = useState<string>("");
-  const [hintedLetters, setHintedLetters] = useState<number>(0);
+  const [hintStepsUsed, setHintStepsUsed] = useState<number>(0);
   const [clearedByHint, setClearedByHint] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
@@ -57,7 +58,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
 
   const hasExceededHintLimit = (value: string): boolean => {
     const totalLetters = countLetters(value);
-    return totalLetters > 0 && hintedLetters > 1 && hintedLetters / totalLetters > 0.3;
+    return totalLetters > 0 && hintStepsUsed > 1 && hintStepsUsed / totalLetters > 0.3;
   };
 
   const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
@@ -82,6 +83,13 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     }
     const correct = normalize(choice) === normalize(expectedAnswer);
     await submitWithFeedback(correct, correct ? t("word.feedback.correct") : t("word.feedback.incorrect", { answer: expectedAnswer }));
+  };
+
+  const markAsWrongByChoice = async (): Promise<void> => {
+    if (!useMultipleChoice || isSubmitting) {
+      return;
+    }
+    await submitWithFeedback(false, t("word.feedback.markedWrong", { answer: expectedAnswer }));
   };
 
   const showInputAwareHint = (): void => {
@@ -112,10 +120,10 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     }
 
     const nextHintLetter = expectedAnswer.charAt(prefixLen);
+    const isNewHintStep = Boolean(nextHintLetter) && nextHintLetter !== hintLetter;
     setHintLetter(nextHintLetter);
-    if (nextHintLetter) {
-      const revealedLetters = countLetters(expectedAnswer.slice(0, prefixLen + 1));
-      setHintedLetters((value) => Math.max(value, revealedLetters));
+    if (isNewHintStep) {
+      setHintStepsUsed((value) => value + 1);
     }
   };
 
@@ -223,8 +231,12 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     if (!allowPromptAudio) {
       return;
     }
+    const autoplayKey = `word:${item.id}:${item.audio_url || ""}:${targetPromptMode}`;
+    if (!shouldAutoplayPrompt(autoplayKey)) {
+      return;
+    }
     playPromptAudio();
-  }, [targetPromptMode, item.id, allowPromptAudio]);
+  }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio]);
 
   useEffect(() => {
     if (useMultipleChoice || !awaitingWrongAccept) {
@@ -297,6 +309,11 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
               {idx + 1}. {option}
             </button>
           ))}
+        </div>
+        <div className="actions">
+          <button onClick={() => void markAsWrongByChoice()} disabled={isSubmitting}>
+            {t("word.markFailed")}
+          </button>
         </div>
         {feedback && <p>{feedback}</p>}
       </div>

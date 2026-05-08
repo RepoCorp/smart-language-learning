@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { shouldAutoplayPrompt } from "../audioAutoplayGuard";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -98,8 +99,12 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
     if (!allowPromptAudio) {
       return;
     }
+    const autoplayKey = `phrase:${item.id}:${item.audio_url || ""}:${targetPromptMode}`;
+    if (!shouldAutoplayPrompt(autoplayKey)) {
+      return;
+    }
     playPromptAudio();
-  }, [targetPromptMode, item.id, allowPromptAudio]);
+  }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio]);
 
   const markAsWrongByChoice = async (): Promise<void> => {
     if (isSubmitting) {

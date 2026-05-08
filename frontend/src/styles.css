@@ -285,6 +285,10 @@ body {
   margin-top: 12px;
 }
 
+.session-header-actions {
+  margin-bottom: 12px;
+}
+
 .item-actions-toolbar {
   flex-wrap: wrap;
 }

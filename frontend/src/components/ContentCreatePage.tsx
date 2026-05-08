@@ -23,6 +23,7 @@ export default function ContentCreatePage(): JSX.Element {
   const [dialogAudioUrl, setDialogAudioUrl] = useState<string>("");
   const [savedDialogId, setSavedDialogId] = useState<number | null>(null);
   const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>>([]);
+  const [selectedPreviewTurnIndexes, setSelectedPreviewTurnIndexes] = useState<number[]>([]);
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [previousContexts, setPreviousContexts] = useState<string[]>([]);
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
@@ -58,6 +59,7 @@ export default function ContentCreatePage(): JSX.Element {
         setDialogAudioUrl("");
         setSavedDialogTurns([]);
         setSavedDialogId(null);
+        setSelectedPreviewTurnIndexes([]);
         setWordActionStatus({});
         setPendingWordAdd(null);
         setError("");
@@ -75,6 +77,7 @@ export default function ContentCreatePage(): JSX.Element {
           setDialogAudioUrl("");
           setSavedDialogTurns([]);
           setSavedDialogId(null);
+          setSelectedPreviewTurnIndexes([]);
           setWordActionStatus({});
           setPendingWordAdd(null);
           setError("");
@@ -136,6 +139,7 @@ export default function ContentCreatePage(): JSX.Element {
     setDialogAudioUrl("");
     setSavedDialogTurns([]);
     setSavedDialogId(null);
+    setSelectedPreviewTurnIndexes([]);
     setWordActionStatus({});
     setPendingWordAdd(null);
     setPreview(null);
@@ -149,6 +153,7 @@ export default function ContentCreatePage(): JSX.Element {
       const details = conversationDetails.trim();
       const data = await previewContent(resolvedTopic, resolvedContext, details, sourceLanguage, targetLanguage);
       setPreview(data);
+      setSelectedPreviewTurnIndexes([]);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
@@ -173,12 +178,14 @@ export default function ContentCreatePage(): JSX.Element {
         preview.source_language || sourceLanguage,
         preview.target_language || targetLanguage,
         true,
+        selectedPreviewTurnIndexes,
       );
       setResult(t("content.result.dialogAccepted"));
       setDialogAudioUrl(response.dialog_audio_url || "");
       setSavedDialogTurns(response.saved_dialog_turns || []);
       setSavedDialogId(response.saved_dialog_id || null);
       setPreview(null);
+      setSelectedPreviewTurnIndexes([]);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
@@ -390,14 +397,50 @@ export default function ContentCreatePage(): JSX.Element {
       {preview && (
         <section className="card">
           <h2>{t("content.preview.title")}</h2>
+          <div className="actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setSelectedPreviewTurnIndexes(preview.dialog_turns.map((_, index) => index))}
+              disabled={saving || loading}
+            >
+              {t("content.preview.selectAllPhrases")}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setSelectedPreviewTurnIndexes([])}
+              disabled={saving || loading}
+            >
+              {t("content.preview.unselectAllPhrases")}
+            </button>
+          </div>
           <ul className="conversation-preview-list">
             {preview.dialog_turns.map((turn, index) => {
               const speaker = speakerForTurn(turn.speaker, index);
+              const selected = selectedPreviewTurnIndexes.includes(index);
               return (
                 <li
                   key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
                   className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
                 >
+                  <label className="word-preview-label">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(event) => {
+                        const shouldSelect = event.target.checked;
+                        setSelectedPreviewTurnIndexes((current) => {
+                          if (shouldSelect) {
+                            return current.includes(index) ? current : [...current, index].sort((a, b) => a - b);
+                          }
+                          return current.filter((value) => value !== index);
+                        });
+                      }}
+                      disabled={saving || loading}
+                    />
+                    <span>{t("content.preview.savePhrase")}</span>
+                  </label>
                   <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
                   <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
                   <p className="conversation-line">{turn.source_text}</p>
@@ -409,7 +452,13 @@ export default function ContentCreatePage(): JSX.Element {
             <button onClick={() => void onAcceptDialog()} disabled={saving || loading}>
               {saving ? t("content.saving") : t("content.preview.acceptDialog")}
             </button>
-            <button onClick={() => setPreview(null)} disabled={saving || loading}>
+            <button
+              onClick={() => {
+                setPreview(null);
+                setSelectedPreviewTurnIndexes([]);
+              }}
+              disabled={saving || loading}
+            >
               {t("content.preview.discardDialog")}
             </button>
           </div>

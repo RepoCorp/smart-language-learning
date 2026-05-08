@@ -93,14 +93,25 @@ class ContentConfirmView(APIView):
             target_language=target_language,
         )
         dialog_turns_raw = serializer.validated_data.get("dialog_turns", [])
+        selected_turn_indexes_raw = serializer.validated_data.get("selected_turn_indexes")
         create_dialog_audio = serializer.validated_data.get("create_dialog_audio", False)
         dialog_turns = _dialog_turns_for_save(dialog_turns_raw)
         if not dialog_turns:
             return Response({"detail": "dialog_turns are required"}, status=400)
+        all_turn_indexes = set(range(len(dialog_turns)))
+        selected_turn_indexes = (
+            all_turn_indexes
+            if selected_turn_indexes_raw is None
+            else {index for index in selected_turn_indexes_raw if index in all_turn_indexes}
+        )
+        selected_turns = [
+            turn for index, turn in enumerate(dialog_turns) if index in selected_turn_indexes
+        ]
         logger.info(
-            "content.confirm.started topic=%s turns=%d create_dialog_audio=%s",
+            "content.confirm.started topic=%s turns=%d selected_turns=%d create_dialog_audio=%s",
             topic,
             len(dialog_turns),
+            len(selected_turns),
             create_dialog_audio,
         )
         dialog_audio_url = ""
@@ -119,7 +130,7 @@ class ContentConfirmView(APIView):
         created_turns = save_dialog_turns(saved_dialog, dialog_turns)
         created_sentence_count = 0
         existing_sentence_count = 0
-        for turn in dialog_turns:
+        for turn in selected_turns:
             source_text = turn.get("source_text", "").strip()
             target_text = turn.get("target_text", "").strip()
             if not source_text or not target_text:
@@ -144,7 +155,7 @@ class ContentConfirmView(APIView):
         phrase_occurrences = save_phrase_dialog_occurrences(
             user=user,
             dialog=saved_dialog,
-            turns=created_turns,
+            turns=[turn for turn in created_turns if turn.turn_index in selected_turn_indexes],
             source_language=source_language,
             target_language=target_language,
         )

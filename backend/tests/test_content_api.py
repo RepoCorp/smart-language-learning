@@ -1070,6 +1070,50 @@ def test_content_confirm_saves_dialog_turns_as_phrase_items(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_confirm_creates_phrase_items_only_for_selected_turn_indexes(monkeypatch):
+    from learning.views.content import persistence as content_persistence
+
+    monkeypatch.setattr(
+        content_persistence,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": "",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/confirm",
+        {
+            "topic": "shopping",
+            "dialog_turns": [
+                {"source_text": "Busco arroz integral.", "target_text": "Ich suche Vollkornreis."},
+                {"source_text": "Esta en el pasillo dos.", "target_text": "Er ist in Gang zwei."},
+            ],
+            "selected_turn_indexes": [1],
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created_sentence_count"] == 1
+    assert payload["existing_sentence_count"] == 0
+
+    assert Item.objects.filter(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Busco arroz integral.",
+        german_text="Ich suche Vollkornreis.",
+        source_language="spanish",
+        target_language="german",
+    ).exists() is False
+    assert Item.objects.filter(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Esta en el pasillo dos.",
+        german_text="Er ist in Gang zwei.",
+        source_language="spanish",
+        target_language="german",
+    ).exists()
+
+
+@pytest.mark.django_db
 def test_content_words_endpoint_filters_and_returns_related_dialogs():
     word = Item.objects.create(
         item_type=Item.ItemType.WORD,

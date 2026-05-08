@@ -73,3 +73,8 @@ class ContentConfirmSerializer(ContentTopicSerializer):
         required=True,
         allow_empty=True,
     )
+    selected_turn_indexes = serializers.ListField(
+        child=serializers.IntegerField(min_value=0),
+        required=False,
+        allow_empty=True,
+    )

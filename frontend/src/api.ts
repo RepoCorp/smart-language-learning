@@ -257,6 +257,7 @@ export async function confirmContent(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   createDialogAudio = true,
+  selectedTurnIndexes?: number[],
 ): Promise<ContentConfirmResponse> {
   const response = await apiFetch(`${API_BASE}/content/confirm`, {
     method: "POST",
@@ -268,6 +269,7 @@ export async function confirmContent(
       target_language: targetLanguage,
       create_dialog_audio: createDialogAudio,
       dialog_turns: dialogTurns,
+      selected_turn_indexes: selectedTurnIndexes,
     }),
   });
   if (!response.ok) {

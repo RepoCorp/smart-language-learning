@@ -37,6 +37,7 @@ export default function SessionPage(): JSX.Element {
   const [showIncorrectReviewItem, setShowIncorrectReviewItem] = useState<boolean>(false);
   const [showExtendPrompt, setShowExtendPrompt] = useState<boolean>(false);
   const [hasHydratedState, setHasHydratedState] = useState<boolean>(false);
+  const [restoredSnapshotHasItems, setRestoredSnapshotHasItems] = useState<boolean>(false);
 
   const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
     setLoading(true);
@@ -54,6 +55,8 @@ export default function SessionPage(): JSX.Element {
   }, [t, sourceLanguage, targetLanguage]);
 
   useEffect(() => {
+    setHasHydratedState(false);
+    setRestoredSnapshotHasItems(false);
     const raw = window.sessionStorage.getItem(sessionStorageKey);
     if (!raw) {
       setHasHydratedState(true);
@@ -66,8 +69,10 @@ export default function SessionPage(): JSX.Element {
       setSessionEndsAtMs(typeof parsed.sessionEndsAtMs === "number" ? parsed.sessionEndsAtMs : null);
       setRemainingSeconds(typeof parsed.remainingSeconds === "number" ? parsed.remainingSeconds : 0);
       setSessionOutcome(parsed.sessionOutcome === "time_up" || parsed.sessionOutcome === "completed" ? parsed.sessionOutcome : null);
+      const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
+      setItems(parsedItems);
+      setRestoredSnapshotHasItems(parsedItems.length > 0);
       setIndex(typeof parsed.index === "number" ? parsed.index : 0);
-      setItems(Array.isArray(parsed.items) ? parsed.items : []);
       setShowIncorrectReviewItem(Boolean(parsed.showIncorrectReviewItem));
       setShowExtendPrompt(Boolean(parsed.showExtendPrompt));
     } catch {
@@ -115,11 +120,14 @@ export default function SessionPage(): JSX.Element {
     if (!hasHydratedState || sessionDurationMinutes === null) {
       return;
     }
+    if (restoredSnapshotHasItems) {
+      return;
+    }
     if (items.length > 0) {
       return;
     }
     void loadSession(sessionDurationMinutes);
-  }, [hasHydratedState, loadSession, sessionDurationMinutes, items.length]);
+  }, [hasHydratedState, restoredSnapshotHasItems, loadSession, sessionDurationMinutes, items.length]);
 
   useEffect(() => {
     if (sessionEndsAtMs === null || sessionOutcome !== null || showExtendPrompt) {
@@ -140,6 +148,9 @@ export default function SessionPage(): JSX.Element {
   }, [sessionEndsAtMs, sessionOutcome, showExtendPrompt]);
 
   useEffect(() => {
+    if (!hasHydratedState) {
+      return;
+    }
     if (!items.length) {
       setIndex(0);
       return;
@@ -147,7 +158,7 @@ export default function SessionPage(): JSX.Element {
     if (index >= items.length) {
       setIndex(items.length - 1);
     }
-  }, [index, items.length]);
+  }, [hasHydratedState, index, items.length]);
 
   const current = items[index];
 
@@ -275,6 +286,7 @@ export default function SessionPage(): JSX.Element {
     setError("");
     setSessionOutcome(null);
     setShowExtendPrompt(false);
+    setRestoredSnapshotHasItems(false);
     setRemainingSeconds(parsed * 60);
     setSessionEndsAtMs(Date.now() + parsed * 60 * 1000);
     setSessionDurationMinutes(parsed);
@@ -291,6 +303,7 @@ export default function SessionPage(): JSX.Element {
     setError("");
     setShowIncorrectReviewItem(false);
     setWaitingNext(false);
+    setRestoredSnapshotHasItems(false);
   };
 
   const minutes = Math.floor(remainingSeconds / 60);
@@ -420,6 +433,11 @@ export default function SessionPage(): JSX.Element {
           {t("session.itemProgress", { current: index + 1, total: items.length })}
         </p>
         <p data-testid="session-countdown">{t("session.timeRemaining", { time: formattedRemaining })}</p>
+        <div className="actions session-header-actions">
+          <button className="secondary-button" onClick={resetToSessionStart}>
+            {t("session.restart")}
+          </button>
+        </div>
         <section className="card">
           {showIncorrectReviewItem ? (
             <NewItem key={`incorrect-${current.id}`} item={current} onContinue={continueAfterIncorrectReview} />

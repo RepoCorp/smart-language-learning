@@ -77,6 +77,77 @@ describe("SessionPage", () => {
     await waitFor(() => expect(markSeen).toHaveBeenCalledWith(9));
   });
 
+  it("restores active session state from sessionStorage without restarting", async () => {
+    window.sessionStorage.setItem(
+      "active_session_spanish_german",
+      JSON.stringify({
+        durationInput: "10",
+        sessionDurationMinutes: 10,
+        sessionEndsAtMs: Date.now() + 5 * 60 * 1000,
+        remainingSeconds: 300,
+        sessionOutcome: null,
+        index: 1,
+        items: [
+          {
+            id: 21,
+            mode: "review",
+            item_type: "word",
+            spanish_text: "hola",
+            german_text: "hallo",
+            direction: "es_to_de",
+            options: [],
+          },
+          {
+            id: 22,
+            mode: "review",
+            item_type: "word",
+            spanish_text: "gracias",
+            german_text: "danke",
+            direction: "es_to_de",
+            options: [],
+          },
+        ],
+        showIncorrectReviewItem: false,
+        showExtendPrompt: false,
+      }),
+    );
+
+    render(
+      <BrowserRouter>
+        <SessionPage />
+      </BrowserRouter>
+    );
+
+    expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
+    expect(fetchSession).not.toHaveBeenCalled();
+  });
+
+  it("fetches content again after restarting the session", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 41,
+          mode: "new",
+          item_type: "word",
+          spanish_text: "hola",
+          german_text: "hallo",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+    expect(await screen.findByText("New word")).toBeInTheDocument();
+    expect(fetchSession).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Restart session" }));
+    expect(await screen.findByTestId("session-start-form")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    expect(await screen.findByText("New word")).toBeInTheDocument();
+    expect(fetchSession).toHaveBeenCalledTimes(2);
+  });
+
   it("allows hint in word review", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
@@ -204,6 +275,33 @@ describe("SessionPage", () => {
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "danke");
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(15, true, "es_to_de"));
+  });
+
+  it("does not mark wrong when only one hint is used after typing most letters", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 115,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "gracias",
+          german_text: "danke",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    const input = await screen.findByTestId("word-input");
+    await userEvent.type(input, "dank");
+    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    expect(screen.getByText("Hint: e")).toBeInTheDocument();
+
+    await userEvent.type(input, "e");
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(115, true, "es_to_de"));
+    expect(screen.queryByText(/too many hints were used/i)).not.toBeInTheDocument();
   });
 
   it("supports keyboard shortcuts: Ctrl+Enter hints, Enter submits", async () => {
@@ -342,6 +440,29 @@ describe("SessionPage", () => {
     expect(await screen.findByText(/Select the correct Spanish translation: haus/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /casa/i }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(12, true, "de_to_es"));
+  });
+
+  it("allows marking word as wrong by choice in german to spanish direction", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 112,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "casa",
+          german_text: "haus",
+          direction: "de_to_es",
+          options: ["casa", "perro", "gato", "gracias"],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/Select the correct Spanish translation: haus/);
+    await userEvent.click(screen.getByRole("button", { name: "I recognized it, mark wrong" }));
+    expect(screen.getByText(/Marked as incorrect by choice/)).toBeInTheDocument();
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(112, false, "de_to_es"));
   });
 
   it("treats word answers as case-sensitive", async () => {
