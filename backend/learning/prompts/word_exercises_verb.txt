@@ -1,0 +1,23 @@
+Generate verb exercise phrases for one vocabulary item.
+
+Return strict JSON with this exact shape:
+{
+  "phrases": [
+    {"label": "infinitive", "source_text": "string", "target_text": "string"},
+    {"label": "present", "source_text": "string", "target_text": "string"},
+    {"label": "question", "source_text": "string", "target_text": "string"},
+    {"label": "command", "source_text": "string", "target_text": "string"}
+  ]
+}
+
+Rules:
+- Return exactly 4 phrases, one for each listed label, in the listed order.
+- Keep every phrase short (max 6 words), practical, and beginner-friendly (A1-A2).
+- The infinitive phrase should use a simple modal or desire pattern.
+- The present phrase should use a natural present-tense form.
+- The question phrase should be a short useful question.
+- The command phrase should be a natural imperative only if grammar allows it; otherwise use another simple present-tense phrase with label "command".
+- Besides the target verb, use only very basic high-frequency words.
+- Keep source_text and target_text equivalent in meaning.
+- Use the language mapping provided by the user input.
+- Return JSON only, no markdown and no extra text.

@@ -39,8 +39,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
   const [exerciseError, setExerciseError] = useState<string>("");
   const [showQuestionsModal, setShowQuestionsModal] = useState<boolean>(false);
-  const [selectedExerciseSection, setSelectedExerciseSection] = useState<"fixed" | "basic">("fixed");
-  const [exerciseAudioMode, setExerciseAudioMode] = useState<"once" | "repeat">("once");
+  const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>([]);
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
   const [exerciseRunning, setExerciseRunning] = useState<boolean>(false);
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
@@ -431,37 +430,87 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     );
   };
 
-  const sanitizeExerciseEntries = (entries?: Array<{ source_text?: string; target_text?: string }>): Array<{ source: string; target: string }> => {
+  const sanitizeExerciseEntries = (entries?: Array<{ label?: string; source_text?: string; target_text?: string }>): Array<{ label: string; source: string; target: string }> => {
     if (!entries || !entries.length) {
       return [];
     }
     return entries
       .map((entry) => ({
+        label: String(entry.label || "").trim(),
         source: String(entry.source_text || "").trim(),
         target: String(entry.target_text || "").trim(),
       }))
       .filter((entry) => entry.source && entry.target)
-      .slice(0, 2);
+      .slice(0, 12);
   };
 
-  const savedFirstSection = sanitizeExerciseEntries(exercisePhrases?.first_section);
-  const savedSecondSection = sanitizeExerciseEntries(exercisePhrases?.second_section);
-
-  const fixedExerciseEntries = savedFirstSection;
-  const basicExerciseEntries = savedSecondSection;
+  const exerciseEntryKey = (entry: { label?: string; source: string; target: string }): string => `${entry.label || ""}|||${entry.source}|||${entry.target}`;
+  const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
+  const legacyExerciseEntries = [
+    ...sanitizeExerciseEntries(exercisePhrases?.first_section),
+    ...sanitizeExerciseEntries(exercisePhrases?.second_section),
+  ];
+  const generatedWordExerciseEntries = savedExerciseEntries.length ? savedExerciseEntries : legacyExerciseEntries;
+  const wordExerciseEntries = item.item_type === "word"
+    ? [
+        {
+          label: "word",
+          source: item.spanish_text,
+          target: item.german_text,
+        },
+        ...generatedWordExerciseEntries,
+      ]
+    : generatedWordExerciseEntries;
 
   const selectedExerciseEntries = item.item_type === "phrase"
     ? [{ source: item.spanish_text, target: item.german_text }]
-    : (selectedExerciseSection === "fixed" ? fixedExerciseEntries : basicExerciseEntries);
+    : wordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
   const orderedItemQuestions = [...itemQuestions].sort((left, right) => left.id - right.id);
+
+  const randomExerciseEntryKeys = (count: number): string[] => {
+    const keys = wordExerciseEntries.map(exerciseEntryKey);
+    if (keys.length <= count) {
+      return keys;
+    }
+    return [...keys].sort(() => Math.random() - 0.5).slice(0, count);
+  };
+
+  useEffect(() => {
+    if (!showExerciseModal || item.item_type !== "word") {
+      setSelectedExerciseKeys([]);
+      return;
+    }
+    setSelectedExerciseKeys(randomExerciseEntryKeys(2));
+  }, [showExerciseModal, item.id, item.item_type, exercisePhrases]);
+
+  const toggleExerciseEntry = (entry: { label?: string; source: string; target: string }): void => {
+    const key = exerciseEntryKey(entry);
+    setSelectedExerciseKeys((current) => (
+      current.includes(key)
+        ? current.filter((selectedKey) => selectedKey !== key)
+        : [...current, key]
+    ));
+  };
+
+  const selectAllExerciseEntries = (): void => {
+    setSelectedExerciseKeys(wordExerciseEntries.map(exerciseEntryKey));
+  };
+
+  const selectRandomExerciseEntries = (): void => {
+    setSelectedExerciseKeys(randomExerciseEntryKeys(2));
+  };
+
+  const unselectAllExerciseEntries = (): void => {
+    setSelectedExerciseKeys([]);
+  };
 
   const openExerciseModal = async (): Promise<void> => {
     if (showExerciseModal) {
       return;
     }
     setExerciseError("");
-    if (item.item_type === "word" && item.id > 0 && (savedFirstSection.length < 2 || savedSecondSection.length < 2)) {
+    if (item.item_type === "word" && item.id > 0 && wordExerciseEntries.length === 0) {
       setLoadingExercises(true);
       try {
         const payload = await generateContentItemExercises(item.id, sourceLanguage, targetLanguage);
@@ -557,7 +606,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           portuguese: "pt-PT",
         };
         utterance.lang = speechLangByCode[targetLanguage] || "de-DE";
-        utterance.rate = 1;
+        utterance.rate = 0.75;
         utterance.onend = () => resolve();
         utterance.onerror = () => resolve();
         window.speechSynthesis.speak(utterance);
@@ -586,11 +635,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     const playOnce = phraseExerciseAudioSources.length
       ? () => playAudioSourcesOnce(phraseExerciseAudioSources, runId)
       : () => speakLinesOnce(exerciseLines, runId);
-
-    if (exerciseAudioMode === "once") {
-      void playOnce();
-      return;
-    }
 
     const loop = (): void => {
       if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
@@ -767,42 +811,57 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             {loadingExercises && <p className="hint">{t("newItem.exercisesGenerating")}</p>}
             {exerciseError && <p className="error">{exerciseError}</p>}
             {item.item_type === "word" && (
-              <div className="exercise-section-grid">
-                <button
-                  type="button"
-                  className={`exercise-section-card ${selectedExerciseSection === "fixed" ? "exercise-section-card-selected" : ""}`}
-                  onClick={() => setSelectedExerciseSection("fixed")}
-                  disabled={exerciseRunning}
-                >
-                  <strong>{t("newItem.exercisesFixedTitle")}</strong>
-                  <ul>
-                    {fixedExerciseEntries.map((entry) => (
-                      <li key={`fixed-${entry.target}`}>{entry.target}</li>
-                    ))}
-                  </ul>
-                  <div className="exercise-translation-group">
-                    {sourceLanguageLabel}: {fixedExerciseEntries.map((entry) => entry.source).join(" ")}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  className={`exercise-section-card ${selectedExerciseSection === "basic" ? "exercise-section-card-selected" : ""}`}
-                  onClick={() => setSelectedExerciseSection("basic")}
-                  disabled={exerciseRunning}
-                >
-                  <strong>{t("newItem.exercisesBasicTitle")}</strong>
-                  <ul>
-                    {basicExerciseEntries.map((entry) => (
-                      <li key={`basic-${entry.target}`}>{entry.target}</li>
-                    ))}
-                  </ul>
-                  <div className="exercise-translation-group">
-                    {sourceLanguageLabel}: {basicExerciseEntries.map((entry) => entry.source).join(" ")}
-                  </div>
-                </button>
-              </div>
+              <>
+                <div className="exercise-selection-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={selectAllExerciseEntries}
+                    disabled={exerciseRunning || wordExerciseEntries.length === 0}
+                  >
+                    {t("newItem.exercisesSelectAll")}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={selectRandomExerciseEntries}
+                    disabled={exerciseRunning || wordExerciseEntries.length === 0}
+                  >
+                    {t("newItem.exercisesRandomSelection")}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={unselectAllExerciseEntries}
+                    disabled={exerciseRunning || selectedExerciseKeys.length === 0}
+                  >
+                    {t("newItem.exercisesUnselectAll")}
+                  </button>
+                </div>
+                <div className="exercise-phrase-list">
+                  {wordExerciseEntries.map((entry) => {
+                    const key = exerciseEntryKey(entry);
+                    const checked = selectedExerciseKeys.includes(key);
+                    return (
+                      <label className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`} key={key}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleExerciseEntry(entry)}
+                          disabled={exerciseRunning}
+                        />
+                        <span>
+                          <strong>{entry.target}</strong>
+                          <small>{entry.source}</small>
+                          {entry.label && <em className="exercise-phrase-label">{entry.label}</em>}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
             )}
-            {item.item_type === "word" && fixedExerciseEntries.length < 2 && basicExerciseEntries.length < 2 && (
+            {item.item_type === "word" && wordExerciseEntries.length === 0 && (
               <p className="hint">{t("newItem.exercisesUnavailable")}</p>
             )}
             {item.item_type === "phrase" && (
@@ -818,30 +877,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 </div>
               </div>
             )}
-
-            <div className="exercise-audio-mode">
-              <span>{t("newItem.exercisesAudioMode")}</span>
-              <label className={`exercise-radio-option ${exerciseAudioMode === "once" ? "exercise-radio-option-selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="exercise-audio-mode"
-                  checked={exerciseAudioMode === "once"}
-                  onChange={() => setExerciseAudioMode("once")}
-                  disabled={exerciseRunning}
-                />
-                <span>{t("newItem.exercisesAudioOnce")}</span>
-              </label>
-              <label className={`exercise-radio-option ${exerciseAudioMode === "repeat" ? "exercise-radio-option-selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="exercise-audio-mode"
-                  checked={exerciseAudioMode === "repeat"}
-                  onChange={() => setExerciseAudioMode("repeat")}
-                  disabled={exerciseRunning}
-                />
-                <span>{t("newItem.exercisesAudioRepeat")}</span>
-              </label>
-            </div>
 
             <p className="exercise-timer">
               <strong>{t("newItem.exercisesTimeLeft", { seconds: exerciseSecondsLeft })}</strong>

@@ -9,5 +9,9 @@ def _load(name: str) -> str:
 
 CONVERSATION_GENERATION_PROMPT = _load("conversation_generation.txt")
 PHRASE_KEYWORDS_PROMPT = _load("phrase_keywords.txt")
-WORD_EXERCISES_FIRST_SECTION_PROMPT = _load("word_exercises_first_section.txt")
-WORD_EXERCISES_SECOND_SECTION_PROMPT = _load("word_exercises_second_section.txt")
+WORD_EXERCISES_ADJECTIVE_PROMPT = _load("word_exercises_adjective.txt")
+WORD_EXERCISES_ADVERB_PROMPT = _load("word_exercises_adverb.txt")
+WORD_EXERCISES_EXPRESSION_PROMPT = _load("word_exercises_expression.txt")
+WORD_EXERCISES_NOUN_PROMPT = _load("word_exercises_noun.txt")
+WORD_EXERCISES_OTHER_PROMPT = _load("word_exercises_other.txt")
+WORD_EXERCISES_VERB_PROMPT = _load("word_exercises_verb.txt")

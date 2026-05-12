@@ -140,6 +140,7 @@ def generate_word_exercise_phrases_with_chatgpt(
     spanish_word: str,
     german_word: str,
     notes: str = "",
+    word_type: str = "",
     source_language: str = "spanish",
     target_language: str = "german",
 ) -> dict:
@@ -147,6 +148,7 @@ def generate_word_exercise_phrases_with_chatgpt(
         spanish_word,
         german_word,
         notes=notes,
+        word_type=word_type,
         source_language=source_language,
         target_language=target_language,
         call_openai_json_fn=call_openai_json,

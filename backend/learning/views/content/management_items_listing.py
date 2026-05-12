@@ -176,21 +176,25 @@ def _sanitize_exercise_entries(value) -> list[dict[str, str]]:
             continue
         source_text = str(entry.get("source_text", "")).strip()
         target_text = str(entry.get("target_text", "")).strip()
+        label = str(entry.get("label", "")).strip()
         if not source_text or not target_text:
             continue
-        entries.append({"source_text": source_text, "target_text": target_text})
-        if len(entries) >= 2:
+        entries.append({"label": label, "source_text": source_text, "target_text": target_text})
+        if len(entries) >= 12:
             break
     return entries
 
 
 def _sanitize_exercise_payload(payload) -> dict:
     if not isinstance(payload, dict):
-        return {"first_section": [], "second_section": []}
-    return {
-        "first_section": _sanitize_exercise_entries(payload.get("first_section")),
-        "second_section": _sanitize_exercise_entries(payload.get("second_section")),
-    }
+        return {"phrases": []}
+    phrases = _sanitize_exercise_entries(payload.get("phrases"))
+    if not phrases:
+        phrases = [
+            *_sanitize_exercise_entries(payload.get("first_section")),
+            *_sanitize_exercise_entries(payload.get("second_section")),
+        ]
+    return {"phrases": phrases[:12]}
 
 
 class ContentItemExercisesView(APIView):
@@ -211,11 +215,12 @@ class ContentItemExercisesView(APIView):
             item.spanish_text,
             item.german_text,
             notes=item.notes or "",
+            word_type=item.word_type or "",
             source_language=source_language,
             target_language=target_language,
         )
         cleaned = _sanitize_exercise_payload(generated)
-        if len(cleaned["first_section"]) < 2 or len(cleaned["second_section"]) < 2:
+        if not cleaned["phrases"]:
             return Response({"detail": "Exercise generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         item.exercise_phrases = cleaned

@@ -4,11 +4,13 @@ export type ReviewDirection = "es_to_de" | "de_to_es";
 export type StudyLanguageCode = "spanish" | "english" | "german" | "french" | "italian" | "portuguese";
 
 export interface ExercisePhrase {
+  label?: string;
   source_text: string;
   target_text: string;
 }
 
 export interface ItemExercisePhrases {
+  phrases?: ExercisePhrase[];
   first_section?: ExercisePhrase[];
   second_section?: ExercisePhrase[];
 }

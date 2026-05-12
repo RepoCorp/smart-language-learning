@@ -10,6 +10,7 @@ import type {
   TopicConversationStartResponse,
   TopicConversationHelpResponse,
   ContentTopicsResponse,
+  ItemExercisePhrases,
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
@@ -361,7 +362,7 @@ export async function generateContentItemExercises(
   itemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
-): Promise<{ exercise_phrases?: { first_section?: Array<{ source_text: string; target_text: string }>; second_section?: Array<{ source_text: string; target_text: string }> } }> {
+): Promise<{ exercise_phrases?: ItemExercisePhrases }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
@@ -372,7 +373,7 @@ export async function generateContentItemExercises(
   if (!response.ok) {
     throw new Error("Failed to generate word exercises");
   }
-  return (await response.json()) as { exercise_phrases?: { first_section?: Array<{ source_text: string; target_text: string }>; second_section?: Array<{ source_text: string; target_text: string }> } };
+  return (await response.json()) as { exercise_phrases?: ItemExercisePhrases };
 }
 
 export async function deleteContentItem(

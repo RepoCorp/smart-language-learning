@@ -1,0 +1,21 @@
+Generate expression exercise phrases for one vocabulary item.
+
+Return strict JSON with this exact shape:
+{
+  "phrases": [
+    {"label": "meaning", "source_text": "string", "target_text": "string"},
+    {"label": "question", "source_text": "string", "target_text": "string"},
+    {"label": "reply", "source_text": "string", "target_text": "string"},
+    {"label": "variation", "source_text": "string", "target_text": "string"}
+  ]
+}
+
+Rules:
+- Return exactly 4 phrases, one for each listed label, in the listed order.
+- Keep every phrase short (max 6 words), practical, and beginner-friendly (A1-A2).
+- Keep the expression intact unless a natural minor change is required.
+- The question and reply phrases should sound useful in a real conversation.
+- Besides the target expression, use only very basic high-frequency words.
+- Keep source_text and target_text equivalent in meaning.
+- Use the language mapping provided by the user input.
+- Return JSON only, no markdown and no extra text.

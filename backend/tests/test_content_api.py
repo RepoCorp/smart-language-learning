@@ -320,11 +320,9 @@ def test_content_confirm_saves_generated_exercise_phrases_for_word(monkeypatch):
         content_views,
         "generate_word_exercise_phrases_with_chatgpt",
         lambda spanish_word, german_word, **kwargs: {
-            "first_section": [
+            "phrases": [
                 {"source_text": "Yo quiero leer.", "target_text": "Ich will lesen."},
                 {"source_text": "Yo puedo leer.", "target_text": "Ich kann lesen."},
-            ],
-            "second_section": [
                 {"source_text": "La lectura esta aqui.", "target_text": "Das Lesen ist hier."},
                 {"source_text": "Yo veo la lectura.", "target_text": "Ich sehe das Lesen."},
             ],
@@ -345,8 +343,8 @@ def test_content_confirm_saves_generated_exercise_phrases_for_word(monkeypatch):
     assert response.status_code == 200
 
     created_word = Item.objects.get(item_type=Item.ItemType.WORD, spanish_text="leer", german_text="lesen")
-    assert created_word.exercise_phrases["first_section"][0]["target_text"] == "Ich will lesen."
-    assert created_word.exercise_phrases["second_section"][1]["target_text"] == "Ich sehe das Lesen."
+    assert created_word.exercise_phrases["phrases"][0]["target_text"] == "Ich will lesen."
+    assert created_word.exercise_phrases["phrases"][3]["target_text"] == "Ich sehe das Lesen."
 
 
 @pytest.mark.django_db
@@ -1650,23 +1648,30 @@ def test_content_item_exercises_endpoint_generates_and_saves_exercises(monkeypat
         item_type=Item.ItemType.WORD,
         spanish_text="mesa",
         german_text="der Tisch",
+        word_type="noun",
         source_language="spanish",
         target_language="german",
     )
+    captured_kwargs = {}
+
+    def fake_generate(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return {
+            "phrases": [
+                {"label": "singular", "source_text": "La mesa es grande.", "target_text": "Der Tisch ist groß."},
+                {"label": "plural", "source_text": "Las mesas estan aqui.", "target_text": "Tische sind hier."},
+                {"label": "nominative", "source_text": "La mesa esta lista.", "target_text": "Der Tisch ist bereit."},
+                {"label": "dative", "source_text": "Esta en la mesa.", "target_text": "Es ist am Tisch."},
+                {"label": "accusative", "source_text": "Veo la mesa.", "target_text": "Ich sehe den Tisch."},
+                {"label": "definite", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+                {"label": "indefinite", "source_text": "Tengo una mesa.", "target_text": "Ich habe einen Tisch."},
+            ],
+        }
 
     monkeypatch.setattr(
         listing_views,
         "generate_word_exercise_phrases_with_chatgpt",
-        lambda *args, **kwargs: {
-            "first_section": [
-                {"source_text": "La mesa es grande.", "target_text": "Der Tisch ist groß."},
-                {"source_text": "Limpio la mesa.", "target_text": "Ich putze den Tisch."},
-            ],
-            "second_section": [
-                {"source_text": "Ponlo en la mesa.", "target_text": "Leg es auf den Tisch."},
-                {"source_text": "La mesa está lista.", "target_text": "Der Tisch ist bereit."},
-            ],
-        },
+        fake_generate,
     )
 
     client = APIClient()
@@ -1676,9 +1681,40 @@ def test_content_item_exercises_endpoint_generates_and_saves_exercises(monkeypat
     )
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["exercise_phrases"]["first_section"]) == 2
-    assert len(payload["exercise_phrases"]["second_section"]) == 2
+    assert len(payload["exercise_phrases"]["phrases"]) == 7
+    assert payload["exercise_phrases"]["phrases"][0]["label"] == "singular"
+    assert captured_kwargs["word_type"] == "noun"
 
     item.refresh_from_db()
-    assert len((item.exercise_phrases or {}).get("first_section", [])) == 2
-    assert len((item.exercise_phrases or {}).get("second_section", [])) == 2
+    assert len((item.exercise_phrases or {}).get("phrases", [])) == 7
+    assert (item.exercise_phrases or {}).get("phrases", [])[6]["label"] == "indefinite"
+
+
+def test_word_exercise_generation_uses_prompt_for_word_type():
+    from learning.views.content import generation_words
+
+    captured_prompts = []
+
+    def fake_call_openai_json(prompt, user_input, **kwargs):
+        captured_prompts.append(prompt)
+        return {
+            "phrases": [
+                {"label": "singular", "source_text": "La mesa.", "target_text": "Der Tisch."},
+            ],
+        }
+
+    generation_words.generate_word_exercise_phrases_with_chatgpt(
+        "la mesa",
+        "der Tisch",
+        word_type="noun",
+        call_openai_json_fn=fake_call_openai_json,
+    )
+    generation_words.generate_word_exercise_phrases_with_chatgpt(
+        "algo",
+        "etwas",
+        word_type="",
+        call_openai_json_fn=fake_call_openai_json,
+    )
+
+    assert "Generate noun exercise phrases" in captured_prompts[0]
+    assert "Generate exercise phrases for one vocabulary item" in captured_prompts[1]
