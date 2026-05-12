@@ -24,6 +24,28 @@ STUDY_LANGUAGE_LABELS = {
 }
 MAX_EXERCISE_WORDS_PER_PHRASE = 6
 MAX_EXERCISE_PHRASES = 12
+VOCAB_ENTRY_ARTICLES = {
+    "der",
+    "die",
+    "das",
+    "den",
+    "dem",
+    "des",
+    "ein",
+    "eine",
+    "einen",
+    "einem",
+    "einer",
+    "eines",
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+}
 WORD_EXERCISE_PROMPTS_BY_TYPE = {
     "noun": WORD_EXERCISES_NOUN_PROMPT,
     "verb": WORD_EXERCISES_VERB_PROMPT,
@@ -42,7 +64,23 @@ def _word_count(value: str) -> int:
     return len([token for token in value.split() if token.strip()])
 
 
-def _clean_exercise_section(value) -> list[dict[str, str]]:
+def _normalize_exercise_text(value: str) -> str:
+    normalized = re.sub(r"[^\w\s]", " ", value.lower(), flags=re.UNICODE)
+    return " ".join(normalized.split())
+
+
+def _is_bare_vocabulary_entry(text: str, base_word: str) -> bool:
+    normalized = _normalize_exercise_text(text)
+    normalized_base = _normalize_exercise_text(base_word)
+    if not normalized:
+        return False
+    if normalized_base and normalized == normalized_base:
+        return True
+    parts = normalized.split()
+    return len(parts) <= 2 and parts[0] in VOCAB_ENTRY_ARTICLES
+
+
+def _clean_exercise_section(value, *, source_word: str = "", target_word: str = "") -> list[dict[str, str]]:
     if not isinstance(value, list):
         return []
     result: list[dict[str, str]] = []
@@ -53,6 +91,8 @@ def _clean_exercise_section(value) -> list[dict[str, str]]:
         target_text = str(entry.get("target_text", "")).strip()
         label = str(entry.get("label", "")).strip()
         if not source_text or not target_text:
+            continue
+        if _is_bare_vocabulary_entry(source_text, source_word) or _is_bare_vocabulary_entry(target_text, target_word):
             continue
         if _word_count(source_text) > MAX_EXERCISE_WORDS_PER_PHRASE or _word_count(target_text) > MAX_EXERCISE_WORDS_PER_PHRASE:
             continue
@@ -84,6 +124,8 @@ def _generate_exercise_phrases(
     *,
     prompt: str,
     user_input: str,
+    source_word: str,
+    target_word: str,
     call_openai_json_fn,
 ) -> list[dict[str, str]]:
     parsed = call_openai_json_fn(
@@ -96,7 +138,7 @@ def _generate_exercise_phrases(
     )
     if parsed is None or not isinstance(parsed, dict):
         return []
-    return _clean_exercise_section(parsed.get("phrases"))
+    return _clean_exercise_section(parsed.get("phrases"), source_word=source_word, target_word=target_word)
 
 
 def _exercise_prompt_for_word_type(word_type: str) -> str:
@@ -135,6 +177,8 @@ def generate_word_exercise_phrases_with_chatgpt(
     phrases = _generate_exercise_phrases(
         prompt=_exercise_prompt_for_word_type(word_type),
         user_input=user_input,
+        source_word=spanish_word,
+        target_word=german_word,
         call_openai_json_fn=call_openai_json_fn,
     )
 

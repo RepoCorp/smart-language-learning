@@ -1718,3 +1718,27 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
 
     assert "Generate noun exercise phrases" in captured_prompts[0]
     assert "Generate exercise phrases for one vocabulary item" in captured_prompts[1]
+
+
+def test_word_exercise_generation_drops_bare_vocabulary_entries():
+    from learning.views.content import generation_words
+
+    def fake_call_openai_json(prompt, user_input, **kwargs):
+        return {
+            "phrases": [
+                {"label": "word", "source_text": "la mesa", "target_text": "der Tisch"},
+                {"label": "plural", "source_text": "las mesas", "target_text": "die Tische"},
+                {"label": "nominative", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+            ],
+        }
+
+    payload = generation_words.generate_word_exercise_phrases_with_chatgpt(
+        "la mesa",
+        "der Tisch",
+        word_type="noun",
+        call_openai_json_fn=fake_call_openai_json,
+    )
+
+    assert payload["phrases"] == [
+        {"label": "nominative", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+    ]

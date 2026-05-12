@@ -1,8 +1,9 @@
 # Todos
 
 Que en la conversacion siempre empiece el usuario, puede ser solo un saludo
+
 Que pueda seleccionar varias palabras para agregar al diccionario, no solo click en individuales si no que pueda seleccionar expresiones completas
-Revisar por que a veces el click para añadir palabras traduce la palabra del lado
+
 Que al generar contenido pueda darse una lista de palabras para usar y/o pedir que primero las genere segun instrucciones
 Arreglar la generacion de frases para los ejercicios
 Posibilidad de regenerar otras cosas, como las traducciones que a veces estan mal, especialmente en el ejercicio
@@ -12,8 +13,7 @@ Cuando esta testeando o estudiando poder marcar un elemento como equivocado, ya 
 Lo de la cantidad de hints sigue fallando e incluso con una, y creo que incluso cuando una es menos del 30% esta marcandoloa como fallido
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
-Pilas con palabras que pueden ser masculino o femenino, cuando busca la palabra base que si diferencie las dos
-Que al frente de los seleccion multiple uno pueda abrir la ventana del item 
+Pilas con palabras que pueden ser masculino o femenino, cuando busca la palabra base que si diferencie las dos (el doctor, la doctora)
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
 No reconoce cuando cumplio el objetivo en la conversacion 
 
