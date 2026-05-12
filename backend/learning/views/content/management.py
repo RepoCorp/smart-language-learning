@@ -28,6 +28,7 @@ from .core import (
     create_word_if_missing,
     item_exists,
     normalize_word_pair_for_item_save,
+    normalize_word_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,47 +110,14 @@ def _resolve_dialog_click_word_pair(
     target_line: str = "",
     clicked_target_token: str = "",
 ) -> tuple[str, str]:
-    try:
-        dialog_id = int(dialog_id_raw)
-        turn_index = int(turn_index_raw)
-    except (TypeError, ValueError):
-        return _resolve_word_pair_from_inline_context(
-            source_text=source_text,
-            target_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-            source_line=source_line,
-            target_line=target_line,
-            clicked_target_token=clicked_target_token,
-        )
-
+    dialog_id = int(dialog_id_raw)
+    turn_index = int(turn_index_raw)
     dialog = apply_user_scope(SavedDialog.objects, user).filter(
         id=dialog_id,
         source_language=source_language,
         target_language=target_language,
     ).first()
-    if not dialog:
-        return _resolve_word_pair_from_inline_context(
-            source_text=source_text,
-            target_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-            source_line=source_line,
-            target_line=target_line,
-            clicked_target_token=clicked_target_token,
-        )
     turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
-    if not turn:
-        return _resolve_word_pair_from_inline_context(
-            source_text=source_text,
-            target_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-            source_line=source_line,
-            target_line=target_line,
-            clicked_target_token=clicked_target_token,
-        )
-
     parsed = _call_openai_json_logged(
         label="resolve_dialog_click_word_pair",
         system_prompt="""
@@ -164,9 +132,8 @@ Return strict JSON:
 Rules:
 - Keep target_text aligned to the clicked token meaning.
 - source_text must be the best source-language translation in THIS turn context.
-- For nouns, include article in Spanish/German outputs whenever applicable.
+- For nouns, include article in both source and target language outputs whenever applicable.
 - Use context to disambiguate meaning, but return a clean translation unit of the word itself (no extra explanation).
-- If uncertain, keep the clicked source_text.
 - JSON only.
 """.strip(),
         user_input=(
@@ -174,9 +141,7 @@ Rules:
             f"Target language: {_language_display_name(target_language)}\n"
             f"Dialog topic: {dialog.topic}\n"
             f"Dialog context: {dialog.context}\n"
-            f"Full source line: {turn.source_text}\n"
             f"Full target line: {turn.target_text}\n"
-            f"Clicked source token: {source_text}\n"
             f"Clicked target token: {target_text}\n"
         ),
         timeout_seconds=6,
@@ -184,166 +149,9 @@ Rules:
         top_p=1.0,
         presence_penalty=0.0,
     )
-    if not isinstance(parsed, dict):
-        return _resolve_word_pair_from_inline_context(
-            source_text=source_text,
-            target_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-            source_line=source_line,
-            target_line=target_line,
-            clicked_target_token=clicked_target_token,
-        )
-
     resolved_source = str(parsed.get("source_text", source_text)).strip()
     resolved_target = str(parsed.get("target_text", target_text)).strip()
-    return _sanitize_resolved_dialog_click_pair(
-        source_text=resolved_source or source_text,
-        target_text=resolved_target or target_text,
-        fallback_source_text=source_text,
-        fallback_target_text=target_text,
-        source_line=turn.source_text,
-        target_line=turn.target_text,
-        clicked_target_token=clicked_target_token or target_text,
-    )
-
-
-def _resolve_word_pair_from_inline_context(
-    *,
-    source_text: str,
-    target_text: str,
-    source_language: str,
-    target_language: str,
-    source_line: str,
-    target_line: str,
-    clicked_target_token: str,
-) -> tuple[str, str]:
-    if not source_line or not target_line or not clicked_target_token:
-        return source_text, target_text
-
-    parsed = _call_openai_json_logged(
-        label="resolve_word_pair_from_inline_context",
-        system_prompt="""
-Resolve a clicked word translation from inline parallel sentence context.
-
-Return strict JSON:
-{
-  "source_text": "string",
-  "target_text": "string"
-}
-
-Rules:
-- target_text must align to the clicked token meaning.
-- If the clicked token is a noun and Spanish/German article is available from context, include it.
-- source_text must be the best source-language translation for that clicked token in this sentence context.
-- For nouns, include article in Spanish/German outputs whenever applicable.
-- Use context to disambiguate meaning, but return a clean translation unit (no extra explanation).
-- If uncertain, keep provided source_text.
-- JSON only.
-""".strip(),
-        user_input=(
-            f"Source language: {_language_display_name(source_language)}\n"
-            f"Target language: {_language_display_name(target_language)}\n"
-            f"Full source line: {source_line}\n"
-            f"Full target line: {target_line}\n"
-            f"Clicked target token: {clicked_target_token}\n"
-            f"Provided source token: {source_text}\n"
-        ),
-        timeout_seconds=6,
-        temperature=0.0,
-        top_p=1.0,
-        presence_penalty=0.0,
-    )
-    if not isinstance(parsed, dict):
-        return _sanitize_resolved_dialog_click_pair(
-            source_text=source_text,
-            target_text=target_text,
-            fallback_source_text=source_text,
-            fallback_target_text=target_text,
-            source_line=source_line,
-            target_line=target_line,
-            clicked_target_token=clicked_target_token or target_text,
-        )
-    resolved_source = str(parsed.get("source_text", source_text)).strip()
-    resolved_target = str(parsed.get("target_text", clicked_target_token or target_text)).strip()
-    return _sanitize_resolved_dialog_click_pair(
-        source_text=resolved_source or source_text,
-        target_text=resolved_target or target_text,
-        fallback_source_text=source_text,
-        fallback_target_text=target_text,
-        source_line=source_line,
-        target_line=target_line,
-        clicked_target_token=clicked_target_token or target_text,
-    )
-
-
-def _sanitize_resolved_dialog_click_pair(
-    *,
-    source_text: str,
-    target_text: str,
-    fallback_source_text: str,
-    fallback_target_text: str,
-    source_line: str,
-    target_line: str,
-    clicked_target_token: str,
-) -> tuple[str, str]:
-    source_tokens = _line_tokens(source_line)
-    source_token_set = {_normalize_word_token(token) for token in source_tokens}
-    target_tokens = _line_tokens(target_line)
-    target_token_set = {_normalize_word_token(token) for token in target_tokens}
-
-    fallback_target = _best_target_token_fallback(
-        target_tokens=target_tokens,
-        clicked_target_token=clicked_target_token or target_text or fallback_target_text,
-    )
-    resolved_target = (
-        _clean_edge_punctuation(target_text)
-        or _clean_edge_punctuation(clicked_target_token)
-        or _clean_edge_punctuation(fallback_target)
-        or _clean_edge_punctuation(fallback_target_text)
-    )
-    if not resolved_target:
-        resolved_target = fallback_target_text
-    if " " not in resolved_target and fallback_target:
-        fallback_target_norm = _normalize_word_token(fallback_target)
-        resolved_target_norm_simple = _normalize_word_token(resolved_target)
-        if fallback_target_norm.endswith(f" {resolved_target_norm_simple}") or fallback_target_norm == resolved_target_norm_simple:
-            resolved_target = fallback_target
-
-    resolved_source = _clean_edge_punctuation(source_text) or _clean_edge_punctuation(fallback_source_text)
-    resolved_source_norm = _normalize_word_token(resolved_source)
-    resolved_target_norm = _normalize_word_token(resolved_target)
-
-    fallback_source = _best_source_token_fallback(
-        source_tokens=source_tokens,
-        target_tokens=target_tokens,
-        clicked_target_token=clicked_target_token or resolved_target,
-    )
-    fallback_source_norm = _normalize_word_token(fallback_source)
-
-    provided_source_norm = _normalize_word_token(fallback_source_text)
-    provided_source_is_from_source_line = provided_source_norm and provided_source_norm in source_token_set
-    source_looks_like_target_language = bool(
-        resolved_source_norm
-        and (
-            resolved_source_norm == resolved_target_norm
-            or (resolved_source_norm in target_token_set and resolved_source_norm not in source_token_set)
-        )
-    )
-    if not resolved_source_norm:
-        if provided_source_is_from_source_line:
-            resolved_source = fallback_source_text
-        elif fallback_source_norm:
-            resolved_source = fallback_source
-        else:
-            resolved_source = fallback_source_text
-    elif source_looks_like_target_language:
-        if fallback_source_norm:
-            resolved_source = fallback_source
-        elif provided_source_is_from_source_line:
-            resolved_source = fallback_source_text
-
-    return resolved_source[:120], resolved_target[:120]
+    return resolved_source, resolved_target
 
 
 def _line_tokens(value: str) -> list[str]:
@@ -356,65 +164,6 @@ def _normalize_word_token(value: str) -> str:
 
 def _clean_edge_punctuation(value: str) -> str:
     return re.sub(r"^[^\wÀ-ÖØ-öø-ÿ]+|[^\wÀ-ÖØ-öø-ÿ]+$", "", value or "", flags=re.UNICODE).strip()
-
-
-
-
-def _best_source_token_fallback(
-    *,
-    source_tokens: list[str],
-    target_tokens: list[str],
-    clicked_target_token: str,
-) -> str:
-    if not source_tokens:
-        return ""
-
-    clicked_norm = _normalize_word_token(clicked_target_token)
-    target_index = -1
-    if clicked_norm:
-        for index, token in enumerate(target_tokens):
-            if _normalize_word_token(token) == clicked_norm:
-                target_index = index
-                break
-
-    if target_index < 0:
-        return _token_with_optional_article(source_tokens, len(source_tokens) - 1)
-    if len(target_tokens) <= 1 or len(source_tokens) <= 1:
-        mapped_index = min(target_index, len(source_tokens) - 1)
-        return _token_with_optional_article(source_tokens, mapped_index)
-
-    ratio = target_index / (len(target_tokens) - 1)
-    mapped_index = round(ratio * (len(source_tokens) - 1))
-    mapped_index = max(0, min(mapped_index, len(source_tokens) - 1))
-    return _token_with_optional_article(source_tokens, mapped_index)
-
-
-def _best_target_token_fallback(
-    *,
-    target_tokens: list[str],
-    clicked_target_token: str,
-) -> str:
-    if not target_tokens:
-        return ""
-    clicked_norm = _normalize_word_token(clicked_target_token)
-    if not clicked_norm:
-        return _token_with_optional_article(target_tokens, len(target_tokens) - 1)
-    for index, token in enumerate(target_tokens):
-        if _normalize_word_token(token) == clicked_norm:
-            return _token_with_optional_article(target_tokens, index)
-    return _token_with_optional_article(target_tokens, len(target_tokens) - 1)
-
-
-def _token_with_optional_article(tokens: list[str], index: int) -> str:
-    if index < 0 or index >= len(tokens):
-        return ""
-    token = tokens[index]
-    if index == 0:
-        return token
-    previous = tokens[index - 1].lower()
-    if previous in SPANISH_ARTICLES.union(GERMAN_ARTICLES):
-        return f"{tokens[index - 1]} {token}"
-    return token
 
 
 def _parse_item_conversation_history(raw_value) -> list[dict[str, str]]:
@@ -1450,6 +1199,74 @@ def _link_word_to_dialog_turn(*, user, item: Item, dialog_id_raw, turn_index_raw
         side=ItemDialogOccurrence.Side.TARGET,
         defaults={"match_score": 1.0},
     )
+
+
+def _basic_word_metadata(
+    *,
+    source_text: str,
+    target_text: str,
+    source_language: str,
+    target_language: str,
+    source_line: str = "",
+    target_line: str = "",
+) -> tuple[str, str, str]:
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    parsed = _call_openai_json_logged(
+        label="basic_word_metadata",
+        system_prompt=f"""
+You normalize vocabulary for a language-learning app.
+
+Return strict JSON:
+{{
+  "source_text": "string",
+  "target_text": "string",
+  "word_type": "noun|verb|adjective|adverb|expression|other"
+}}
+
+Rules:
+- Identify the word type of the vocabulary item.
+- Return basic/canonical dictionary forms in both languages.
+- For nouns, use singular forms and include the corresponding article where the language naturally studies nouns with articles.
+- For verbs, use the infinitive.
+- For adjectives and adverbs, use the uninflected base form.
+- Keep fixed multi-word expressions only when the clicked item is genuinely an expression.
+- Use context only to resolve meaning and morphology. Do not return a whole sentence.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Source text: {source_text}\n"
+            f"Target text: {target_text}\n"
+            f"Source sentence context: {source_line}\n"
+            f"Target sentence context: {target_line}\n"
+        ),
+        timeout_seconds=8,
+        temperature=0.1,
+        top_p=0.95,
+    )
+    if not isinstance(parsed, dict):
+        return source_text, target_text, _guess_word_type(source_text, target_text, source_language, target_language)
+
+    normalized_source = str(parsed.get("source_text", "")).strip() or source_text
+    normalized_target = str(parsed.get("target_text", "")).strip() or target_text
+    word_type = normalize_word_type(str(parsed.get("word_type", "")))
+    if not word_type:
+        word_type = _guess_word_type(normalized_source, normalized_target, source_language, target_language)
+    return normalized_source[:255], normalized_target[:255], word_type
+
+
+def _guess_word_type(source_text: str, target_text: str, source_language: str, target_language: str) -> str:
+    source_first = source_text.strip().split(" ", 1)[0].lower() if source_text.strip() else ""
+    target_first = target_text.strip().split(" ", 1)[0].lower() if target_text.strip() else ""
+    if source_first in SPANISH_ARTICLES or target_first in GERMAN_ARTICLES:
+        return "noun"
+    if target_language == "german" and target_text.strip().lower().endswith(("en", "ern")):
+        return "verb"
+    if source_language == "spanish" and source_text.strip().lower().endswith(("ar", "er", "ir")):
+        return "verb"
+    return ""
 
 
 def _related_dialogs_by_item_ids(item_ids: list[int], *, user, per_item_limit: int = 8) -> dict[int, list[dict]]:

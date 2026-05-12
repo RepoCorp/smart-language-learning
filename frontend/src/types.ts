@@ -20,11 +20,16 @@ export interface SessionItem {
   german_text: string;
   example_sentence?: string;
   notes?: string;
+  word_type?: string;
   audio_url?: string;
   exercise_phrases?: ItemExercisePhrases;
   mode: SessionMode;
   direction?: ReviewDirection | null;
   options: string[];
+  option_items?: Array<{
+    id: number;
+    text: string;
+  }>;
   related_dialogs?: Array<{
     dialog_id: number;
     topic: string;
@@ -67,6 +72,7 @@ export interface ContentCandidate {
   german_text: string;
   exists: boolean;
   notes?: string;
+  word_type?: string;
   selection_key?: string;
 }
 
@@ -118,6 +124,7 @@ export interface ContentItemRecord {
   created_at: string;
   next_review_days?: number | null;
   audio_url?: string;
+  word_type?: string;
   is_learned?: boolean;
 }
 
@@ -132,6 +139,7 @@ export interface ContentItemDetailResponse {
   german_text: string;
   example_sentence?: string;
   notes?: string;
+  word_type?: string;
   audio_url?: string;
   created_at: string;
   exercise_phrases?: ItemExercisePhrases;

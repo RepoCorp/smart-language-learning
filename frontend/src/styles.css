@@ -321,6 +321,17 @@ body {
   min-height: 44px;
 }
 
+.option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.option-open-button {
+  white-space: nowrap;
+}
+
 button {
   border: none;
   border-radius: 8px;
@@ -1187,6 +1198,10 @@ textarea {
 
   .options {
     gap: 12px;
+  }
+
+  .option-row {
+    grid-template-columns: 1fr;
   }
 
   .options button {

@@ -7,6 +7,7 @@ from .management import (
     Request,
     Response,
     _link_word_to_dialog_turn,
+    _basic_word_metadata,
     _normalized_pair,
     normalize_word_pair_for_item_save,
     _resolve_dialog_click_word_pair,
@@ -52,6 +53,14 @@ class ContentWordQuickAddView(APIView):
             target_line=target_line,
             clicked_target_token=clicked_target_token,
         )
+        source_text, target_text, word_type = _basic_word_metadata(
+            source_text=source_text,
+            target_text=target_text,
+            source_language=source_language,
+            target_language=target_language,
+            source_line=source_line,
+            target_line=target_line,
+        )
         source_text, target_text = normalize_word_pair_for_item_save(
             spanish_text=source_text,
             german_text=target_text,
@@ -86,6 +95,9 @@ class ContentWordQuickAddView(APIView):
                     dialog_id_raw=dialog_id_raw,
                     turn_index_raw=turn_index_raw,
                 )
+                if not check_only and word_type and not existing.word_type:
+                    existing.word_type = word_type
+                    existing.save(update_fields=["word_type", "updated_at"])
             if check_only:
                 return Response(
                     {
@@ -94,6 +106,7 @@ class ContentWordQuickAddView(APIView):
                         "id": existing.id if existing else None,
                         "source_text": source_text,
                         "target_text": target_text,
+                        "word_type": existing.word_type if existing else word_type,
                     }
                 )
             return Response(
@@ -103,6 +116,7 @@ class ContentWordQuickAddView(APIView):
                     "id": existing.id if existing else None,
                     "source_text": source_text,
                     "target_text": target_text,
+                    "word_type": existing.word_type if existing else word_type,
                 }
             )
 
@@ -114,6 +128,7 @@ class ContentWordQuickAddView(APIView):
                     "id": None,
                     "source_text": source_text,
                     "target_text": target_text,
+                    "word_type": word_type,
                 }
             )
 
@@ -122,6 +137,7 @@ class ContentWordQuickAddView(APIView):
             german_text=target_text,
             exists=False,
             notes=notes,
+            word_type=word_type,
         )
         created = create_word_if_missing(
             user=user,
@@ -137,6 +153,7 @@ class ContentWordQuickAddView(APIView):
                     "exists": True,
                     "source_text": source_text,
                     "target_text": target_text,
+                    "word_type": word_type,
                 }
             )
 
@@ -153,6 +170,7 @@ class ContentWordQuickAddView(APIView):
                 "id": created.id,
                 "source_text": created.spanish_text,
                 "target_text": created.german_text,
+                "word_type": created.word_type,
                 "audio_url": created.audio_url,
             },
             status=status.HTTP_201_CREATED,

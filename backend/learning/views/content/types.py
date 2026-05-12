@@ -10,6 +10,7 @@ class ContentCandidate:
     exists: bool
     notes: str = ""
     source_phrase_german: str = ""
+    word_type: str = ""
 
 
 @dataclass(frozen=True)

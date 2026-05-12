@@ -13,11 +13,12 @@ function normalize(value: string): string {
 interface PhraseReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
+  onOpenOptionItem?: (itemId: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 2000;
 
-export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
+export default function PhraseReview({ item, onAnswered, onOpenOptionItem }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -143,11 +144,27 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
         <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
       )}
       <div className="options">
-        {item.options.map((option, idx) => (
-          <button key={option} onClick={() => choose(option)} disabled={isSubmitting}>
-            {idx + 1}. {option}
-          </button>
-        ))}
+        {item.options.map((option, idx) => {
+          const optionItem = item.option_items?.[idx];
+          const optionItemId = optionItem?.text === option ? optionItem.id : undefined;
+          return (
+            <div className="option-row" key={option}>
+              <button onClick={() => choose(option)} disabled={isSubmitting}>
+                {idx + 1}. {option}
+              </button>
+              {optionItemId !== undefined && onOpenOptionItem ? (
+                <button
+                  type="button"
+                  className="secondary-button option-open-button"
+                  onClick={() => onOpenOptionItem(optionItemId)}
+                  aria-label={`${t("words.openItem")}: ${option}`}
+                >
+                  {t("words.openItem")}
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
       <div className="actions">
         <button onClick={() => void markAsWrongByChoice()} disabled={isSubmitting}>

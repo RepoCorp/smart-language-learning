@@ -25,35 +25,6 @@ def _language_label(code: str) -> str:
     return STUDY_LANGUAGE_LABELS.get(code, code.capitalize())
 
 
-def _fallback_word_exercise_phrases(
-    spanish_word: str,
-    german_word: str,
-    target_language: str,
-) -> dict:
-    source = spanish_word.strip()
-    target = german_word.strip()
-    if target_language == "german":
-        first_section = [
-            {"source_text": f"Yo uso {source}.", "target_text": f"Ich nutze {target}."},
-            {"source_text": f"Aquí está {source}.", "target_text": f"Hier ist {target}."},
-        ]
-        second_section = [
-            {"source_text": f"Yo veo {source}.", "target_text": f"Ich sehe {target}."},
-            {"source_text": f"{source.capitalize()} está aquí.", "target_text": f"{target} ist da."},
-        ]
-        return {"first_section": first_section, "second_section": second_section}
-
-    first_section = [
-        {"source_text": f"Yo uso {source}.", "target_text": f"I use {target}."},
-        {"source_text": f"Aquí está {source}.", "target_text": f"Here is {target}."},
-    ]
-    second_section = [
-        {"source_text": f"Yo veo {source}.", "target_text": f"I see {target}."},
-        {"source_text": f"{source.capitalize()} está aquí.", "target_text": f"{target} is here."},
-    ]
-    return {"first_section": first_section, "second_section": second_section}
-
-
 def _word_count(value: str) -> int:
     return len([token for token in value.split() if token.strip()])
 
@@ -149,13 +120,6 @@ def generate_word_exercise_phrases_with_chatgpt(
         call_openai_json_fn=call_openai_json_fn,
     )
 
-    fallback = _fallback_word_exercise_phrases(spanish_word, german_word, target_language)
-    first_section = [entry for entry in first_section if _contains_exact_target_form(entry["target_text"], german_word)]
-    if len(first_section) < 2:
-        first_section = fallback["first_section"]
-    if len(second_section) < 2:
-        second_section = fallback["second_section"]
-
     return {"first_section": first_section, "second_section": second_section}
 
 
@@ -168,7 +132,7 @@ def generate_keywords_for_phrase_with_chatgpt(
     call_openai_json_fn,
 ) -> list[dict[str, str]] | None:
     article_requirement = (
-        "For german_text, include article and singular form (e.g., 'der Park')."
+        "For german_text nouns, include article and singular form (e.g., 'der Park')."
         if target_language == "german"
         else "Do not force articles in german_text unless natural for the selected target language."
     )
@@ -197,6 +161,7 @@ def generate_keywords_for_phrase_with_chatgpt(
             continue
         spanish_word = str(keyword.get("source_text", keyword.get("spanish_text", ""))).strip()
         german_word = str(keyword.get("target_text", keyword.get("german_text", ""))).strip()
+        word_type = str(keyword.get("word_type", "")).strip().lower()
         keyword_notes = str(keyword.get("notes", "")).strip()
         plural_german = str(keyword.get("plural_target", keyword.get("plural_german", ""))).strip()
         if not spanish_word or not german_word:
@@ -205,6 +170,7 @@ def generate_keywords_for_phrase_with_chatgpt(
             {
                 "spanish_text": spanish_word,
                 "german_text": german_word,
+                "word_type": word_type,
                 "notes": keyword_notes,
                 "plural_german": plural_german,
             }

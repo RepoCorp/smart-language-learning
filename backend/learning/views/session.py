@@ -329,11 +329,12 @@ def entry_key(entry: SessionEntry) -> tuple[int, str | None]:
 
 
 def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
-    options_map = build_review_options(entries, user=user)
+    option_items_map = build_review_options(entries, user=user)
     related_dialogs_map = build_related_dialogs_map(entries, user=user)
     payload: list[dict] = []
 
     for entry in entries:
+        option_items = option_items_map.get(entry_key(entry), [])
         payload.append(
             {
                 "id": entry.item.id,
@@ -342,11 +343,13 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "german_text": entry.item.german_text,
                 "example_sentence": entry.item.example_sentence,
                 "notes": entry.item.notes,
+                "word_type": entry.item.word_type,
                 "audio_url": entry.item.audio_url,
                 "exercise_phrases": entry.item.exercise_phrases or {},
                 "mode": entry.mode,
                 "direction": entry.direction,
-                "options": options_map.get(entry_key(entry), []),
+                "options": [option["text"] for option in option_items],
+                "option_items": option_items,
                 "related_dialogs": related_dialogs_map.get(entry.item.id, []),
             }
         )
@@ -354,7 +357,7 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
     return payload
 
 
-def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int, str | None], list[str]]:
+def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int, str | None], list[dict]]:
     review_entries_with_options = [
         entry
         for entry in entries
@@ -371,9 +374,9 @@ def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int
         return {}
 
     pair_set = {(entry.item.source_language, entry.item.target_language) for entry in review_entries_with_options}
-    all_phrase_answers_es_to_de_by_pair: dict[tuple[str, str], list[str]] = {}
-    all_phrase_answers_de_to_es_by_pair: dict[tuple[str, str], list[str]] = {}
-    all_word_answers_de_to_es_by_pair: dict[tuple[str, str], list[str]] = {}
+    all_phrase_answers_es_to_de_by_pair: dict[tuple[str, str], list[tuple[int, str]]] = {}
+    all_phrase_answers_de_to_es_by_pair: dict[tuple[str, str], list[tuple[int, str]]] = {}
+    all_word_answers_de_to_es_by_pair: dict[tuple[str, str], list[tuple[int, str]]] = {}
     for source_language, target_language in pair_set:
         all_phrase_answers_es_to_de_by_pair[(source_language, target_language)] = list(
             apply_user_scope(Item.objects, user).filter(
@@ -381,7 +384,7 @@ def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int
                 is_learned=False,
                 source_language=source_language,
                 target_language=target_language,
-            ).values_list("german_text", flat=True)
+            ).values_list("id", "german_text")
         )
         all_phrase_answers_de_to_es_by_pair[(source_language, target_language)] = list(
             apply_user_scope(Item.objects, user).filter(
@@ -389,7 +392,7 @@ def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int
                 is_learned=False,
                 source_language=source_language,
                 target_language=target_language,
-            ).values_list("spanish_text", flat=True)
+            ).values_list("id", "spanish_text")
         )
         all_word_answers_de_to_es_by_pair[(source_language, target_language)] = list(
             apply_user_scope(Item.objects, user).filter(
@@ -397,9 +400,9 @@ def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int
                 is_learned=False,
                 source_language=source_language,
                 target_language=target_language,
-            ).values_list("spanish_text", flat=True)
+            ).values_list("id", "spanish_text")
         )
-    options_map: dict[tuple[int, str | None], list[str]] = {}
+    options_map: dict[tuple[int, str | None], list[dict]] = {}
 
     for entry in review_entries_with_options:
         item = entry.item
@@ -422,11 +425,19 @@ def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int
     return options_map
 
 
-def build_choices(correct_answer: str, source_answers: list[str]) -> list[str]:
-    unique_answers = list(dict.fromkeys(source_answers))
-    distractors = [answer for answer in unique_answers if answer != correct_answer]
+def build_choices(correct_answer: str, source_answers: list[tuple[int, str]]) -> list[dict]:
+    unique_answers_by_text = {answer: item_id for item_id, answer in source_answers}
+    distractors = [answer for answer in unique_answers_by_text if answer != correct_answer]
     random.shuffle(distractors)
-    choices = distractors[:3] + [correct_answer]
+    choice_texts = distractors[:3] + [correct_answer]
+    choices = [
+        {
+            "id": unique_answers_by_text[answer],
+            "text": answer,
+        }
+        for answer in choice_texts
+        if answer in unique_answers_by_text
+    ]
     random.shuffle(choices)
     return choices
 

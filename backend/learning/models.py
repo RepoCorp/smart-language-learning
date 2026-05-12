@@ -36,6 +36,7 @@ class Item(models.Model):
     target_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="german")
     example_sentence = models.TextField(blank=True)
     notes = models.TextField(blank=True)
+    word_type = models.CharField(max_length=30, blank=True)
     audio_url = models.URLField(blank=True)
     exercise_phrases = models.JSONField(default=dict, blank=True)
     is_learned = models.BooleanField(default=False)

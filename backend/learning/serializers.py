@@ -12,6 +12,7 @@ class SessionItemSerializer(serializers.Serializer):
     german_text = serializers.CharField()
     example_sentence = serializers.CharField(allow_blank=True, required=False)
     notes = serializers.CharField(allow_blank=True, required=False)
+    word_type = serializers.CharField(allow_blank=True, required=False)
     audio_url = serializers.CharField(allow_blank=True, required=False)
     exercise_phrases = serializers.DictField(required=False)
     mode = serializers.ChoiceField(choices=["new", "review"])
@@ -21,6 +22,7 @@ class SessionItemSerializer(serializers.Serializer):
         required=False,
     )
     options = serializers.ListField(child=serializers.CharField(), required=False)
+    option_items = serializers.ListField(child=serializers.DictField(), required=False)
     related_dialogs = serializers.ListField(child=serializers.DictField(), required=False)
 
 

@@ -3,7 +3,7 @@ Given one source phrase in `source_text` and one target phrase in `target_text`,
 Return strict JSON with this exact shape:
 {
   "keywords": [
-    {"source_text": "string", "target_text": "string", "notes": "string", "plural_target": "string"}
+    {"source_text": "string", "target_text": "string", "word_type": "string", "notes": "string", "plural_target": "string"}
   ]
 }
 
@@ -11,7 +11,11 @@ Rules:
 - Include useful beginner vocabulary from the phrase, including common content words (nouns, verbs, adjectives, adverbs) when they help learning.
 - Exclude only pure function words (articles, prepositions, conjunctions, pronouns) unless they are part of a fixed expression worth learning.
 - Use the language mapping provided in the user input.
-- Prefer keyword forms that literally appear in the provided phrase (surface form).
+- Return the basic/canonical dictionary form of each keyword, not the inflected surface form.
+- For nouns, return singular forms and include the corresponding article when the language uses gendered articles for study (for example "el parque", "die Ecke").
+- For verbs, return the infinitive.
+- For adjectives and adverbs, return the uninflected base form.
+- word_type must be one of: noun, verb, adjective, adverb, expression, other.
 - Do not invent abstract replacements (for example extracting "der Gesamtbetrag" from "insgesamt").
 - If you intentionally return a base/canonical form that is not literal in the phrase, explain the mapping clearly in notes.
 - plural_target should contain the plural form when applicable; otherwise empty string.

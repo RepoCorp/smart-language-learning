@@ -156,6 +156,8 @@ def test_phrase_review_contains_correct_option():
     options = item["options"]
     assert item["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
     assert phrase.german_text in options
+    option_item = next(option for option in item["option_items"] if option["text"] == phrase.german_text)
+    assert option_item["id"] == phrase.id
 
 
 @pytest.mark.django_db
@@ -180,6 +182,8 @@ def test_word_review_de_to_es_contains_multiple_choice_options():
     assert item["id"] == word.id
     assert item["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
     assert word.spanish_text in item["options"]
+    option_item = next(option for option in item["option_items"] if option["text"] == word.spanish_text)
+    assert option_item["id"] == word.id
     assert len(item["options"]) >= 2
 
 

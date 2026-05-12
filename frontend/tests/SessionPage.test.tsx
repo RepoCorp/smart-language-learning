@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { vi } from "vitest";
@@ -6,13 +6,14 @@ import { vi } from "vitest";
 import SessionPage from "../src/components/SessionPage";
 
 vi.mock("../src/api", () => ({
+  fetchContentItemDetail: vi.fn(),
   fetchSession: vi.fn(),
   markSeen: vi.fn().mockResolvedValue(undefined),
   setContentItemLearned: vi.fn().mockResolvedValue(undefined),
   submitReview: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { fetchSession, markSeen, submitReview } from "../src/api";
+import { fetchContentItemDetail, fetchSession, markSeen, submitReview } from "../src/api";
 
 async function renderSessionPageAndStart(): Promise<void> {
   render(
@@ -29,6 +30,7 @@ async function renderSessionPageAndStart(): Promise<void> {
 describe("SessionPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   it("renders new item details", async () => {
@@ -559,6 +561,51 @@ describe("SessionPage", () => {
     expect(await screen.findByRole("button", { name: "1. No entiendo" })).toBeInTheDocument();
     await userEvent.keyboard("1");
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(32, true, "de_to_es"));
+  });
+
+  it("opens a phrase option item in a closable modal without leaving the session", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 32,
+          mode: "review",
+          item_type: "phrase",
+          spanish_text: "No entiendo",
+          german_text: "Ich verstehe nicht",
+          direction: "de_to_es",
+          options: ["No entiendo", "Hola", "Gracias", "Adios"],
+          option_items: [
+            { id: 32, text: "No entiendo" },
+            { id: 33, text: "Hola" },
+            { id: 34, text: "Gracias" },
+            { id: 35, text: "Adios" },
+          ],
+        },
+      ],
+    });
+    vi.mocked(fetchContentItemDetail).mockResolvedValue({
+      id: 33,
+      item_type: "phrase",
+      spanish_text: "Hola",
+      german_text: "Hallo",
+      created_at: "2026-05-08T10:00:00Z",
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/Select the correct Spanish translation: Ich verstehe nicht/);
+    await userEvent.click(screen.getByRole("button", { name: "Open item: Hola" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText("Hola")).toBeInTheDocument();
+    expect(within(dialog).getByText("Hallo")).toBeInTheDocument();
+    expect(screen.getByTestId("session-page")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText(/Select the correct Spanish translation: Ich verstehe nicht/)).toBeInTheDocument();
+    expect(submitReview).not.toHaveBeenCalled();
   });
 
   it("allows marking phrase as wrong by choice", async () => {

@@ -204,16 +204,7 @@ def generate_content_with_chatgpt(
     spanish_text = first["spanish_text"]
     german_text = first["german_text"]
     notes = first.get("notes", "")
-    keywords = (
-        generate_keywords_for_phrase_with_chatgpt(
-            spanish_text,
-            german_text,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        or []
-    )
-    return spanish_text, german_text, notes, keywords
+    return spanish_text, german_text, notes, []
 
 
 def extract_json_from_text(content: str) -> dict:

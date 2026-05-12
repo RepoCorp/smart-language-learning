@@ -56,6 +56,12 @@ OPENAI_TTS_VOICES = ("alloy", "echo", "fable", "onyx", "nova", "shimmer")
 OPENAI_TTS_SAMPLE_RATE = 24000
 OPENAI_TTS_DEFAULT_SPEED = 1.25
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
+WORD_TYPE_CHOICES = {"noun", "verb", "adjective", "adverb", "expression", "other"}
+
+
+def normalize_word_type(value: str) -> str:
+    word_type = " ".join((value or "").split()).strip().lower()
+    return word_type if word_type in WORD_TYPE_CHOICES else ""
 
 
 def _tts_language_instruction(target_language: str) -> str:
@@ -254,6 +260,7 @@ def serialize_candidate(candidate: ContentCandidate) -> dict:
         "spanish_text": candidate.spanish_text,
         "german_text": candidate.german_text,
         "exists": candidate.exists,
+        "word_type": candidate.word_type,
         "notes": candidate.notes,
         "selection_key": word_selection_id(candidate),
     }
@@ -354,6 +361,7 @@ def create_word_if_missing(
         source_language=source_language,
         target_language=target_language,
         notes=candidate.notes,
+        word_type=normalize_word_type(candidate.word_type),
         example_sentence=phrase_german,
         audio_url=audio_url,
         exercise_phrases=exercise_phrases or {},

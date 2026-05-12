@@ -12,6 +12,7 @@ Cuando esta testeando o estudiando poder marcar un elemento como equivocado, ya 
 Lo de la cantidad de hints sigue fallando e incluso con una, y creo que incluso cuando una es menos del 30% esta marcandoloa como fallido
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
+Pilas con palabras que pueden ser masculino o femenino, cuando busca la palabra base que si diferencie las dos
 Que al frente de los seleccion multiple uno pueda abrir la ventana del item 
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
 No reconoce cuando cumplio el objetivo en la conversacion 

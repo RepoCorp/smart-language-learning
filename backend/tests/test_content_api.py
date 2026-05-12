@@ -101,6 +101,32 @@ def test_content_confirm_creates_only_missing_items(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_create_word_if_missing_saves_word_type(monkeypatch):
+    from learning.views.content import persistence
+    from learning.views.content.types import ContentCandidate
+
+    monkeypatch.setattr(
+        persistence,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    word = persistence.create_word_if_missing(
+        user=None,
+        candidate=ContentCandidate(
+            spanish_text="leer",
+            german_text="lesen",
+            exists=False,
+            word_type="verb",
+        ),
+        topic="verbs",
+    )
+
+    assert word is not None
+    assert word.word_type == "verb"
+
+
+@pytest.mark.django_db
 def test_content_confirm_only_creates_selected_words(monkeypatch):
     from learning.views import content as content_views
 
@@ -1424,6 +1450,36 @@ def test_quick_add_word_creates_item_with_contextual_translation(monkeypatch):
         source_language="spanish",
         target_language="german",
     ).exists()
+
+
+@pytest.mark.django_db
+def test_quick_add_word_saves_basic_form_and_word_type(monkeypatch):
+    from learning.views import content as content_views
+    from learning.views.content import management as management_views
+
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        if "You normalize vocabulary" in system_prompt:
+            return {"source_text": "el libro", "target_text": "das Buch", "word_type": "noun"}
+        return {"source_text": "libros", "target_text": "Buecher"}
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {"source_text": "libros", "target_text": "Buecher"},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["word_type"] == "noun"
+    word = Item.objects.get(item_type=Item.ItemType.WORD, spanish_text="el libro", german_text="das Buch")
+    assert word.word_type == "noun"
 
 
 @pytest.mark.django_db

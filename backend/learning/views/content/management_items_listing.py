@@ -66,6 +66,7 @@ class ContentWordsView(APIView):
                 "german_text",
                 "example_sentence",
                 "notes",
+                "word_type",
                 "audio_url",
                 "created_at",
             )[:1000]
@@ -98,6 +99,7 @@ class ContentItemDetailView(APIView):
                 "german_text": item.german_text,
                 "example_sentence": item.example_sentence,
                 "notes": item.notes,
+                "word_type": item.word_type,
                 "audio_url": item.audio_url,
                 "exercise_phrases": item.exercise_phrases or {},
                 "created_at": item.created_at,

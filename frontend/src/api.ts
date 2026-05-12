@@ -668,7 +668,7 @@ export async function quickAddWordFromDialog(
   sourceLine = "",
   targetLine = "",
   clickedTargetToken = "",
-): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string }> {
+): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string; word_type?: string }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
@@ -698,6 +698,7 @@ export async function quickAddWordFromDialog(
     id?: number | null;
     source_text?: string;
     target_text?: string;
+    word_type?: string;
   };
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import { fetchSession, markSeen, setContentItemLearned, submitReview } from "../api";
+import { fetchContentItemDetail, fetchSession, markSeen, setContentItemLearned, submitReview } from "../api";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
@@ -38,6 +38,9 @@ export default function SessionPage(): JSX.Element {
   const [showExtendPrompt, setShowExtendPrompt] = useState<boolean>(false);
   const [hasHydratedState, setHasHydratedState] = useState<boolean>(false);
   const [restoredSnapshotHasItems, setRestoredSnapshotHasItems] = useState<boolean>(false);
+  const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
+  const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
+  const [openedItemError, setOpenedItemError] = useState<string>("");
 
   const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
     setLoading(true);
@@ -257,6 +260,40 @@ export default function SessionPage(): JSX.Element {
     advance();
   };
 
+  const openItemModal = async (itemId: number): Promise<void> => {
+    setLoadingOpenedItem(true);
+    setOpenedItem(null);
+    setOpenedItemError("");
+    try {
+      const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
+      setOpenedItem({
+        id: detail.id,
+        item_type: detail.item_type,
+        spanish_text: detail.spanish_text,
+        german_text: detail.german_text,
+        example_sentence: detail.example_sentence || "",
+        notes: detail.notes || "",
+        audio_url: detail.audio_url || "",
+        exercise_phrases: detail.exercise_phrases || {},
+        mode: "new",
+        direction: null,
+        options: [],
+        related_dialogs: detail.related_dialogs || [],
+        item_questions: detail.item_questions || [],
+      });
+    } catch {
+      setOpenedItemError(t("manage.error.load"));
+    } finally {
+      setLoadingOpenedItem(false);
+    }
+  };
+
+  const closeItemModal = (): void => {
+    setOpenedItem(null);
+    setLoadingOpenedItem(false);
+    setOpenedItemError("");
+  };
+
   const continueAfterIncorrectReview = async (): Promise<void> => {
     if (sessionOutcome !== null || showExtendPrompt) {
       return;
@@ -335,6 +372,26 @@ export default function SessionPage(): JSX.Element {
           </button>
         </div>
       </section>
+    </div>
+  ) : null;
+  const openedItemModal = (loadingOpenedItem || openedItem || openedItemError) ? (
+    <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+      <div className="blocking-modal related-dialogs-modal">
+        {loadingOpenedItem && <p>{t("session.loading")}</p>}
+        {!loadingOpenedItem && openedItemError && (
+          <>
+            <p className="error">{openedItemError}</p>
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={closeItemModal}>
+                {t("words.close")}
+              </button>
+            </div>
+          </>
+        )}
+        {!loadingOpenedItem && openedItem && (
+          <NewItem item={openedItem} readOnly onClose={closeItemModal} />
+        )}
+      </div>
     </div>
   ) : null;
 
@@ -448,9 +505,9 @@ export default function SessionPage(): JSX.Element {
               onContinue={registerSeenItem}
             />
           ) : current.item_type === "word" ? (
-            <WordReview key={current.id} item={current} onAnswered={register} />
+            <WordReview key={current.id} item={current} onAnswered={register} onOpenOptionItem={(itemId) => void openItemModal(itemId)} />
           ) : (
-            <PhraseReview key={current.id} item={current} onAnswered={register} />
+            <PhraseReview key={current.id} item={current} onAnswered={register} onOpenOptionItem={(itemId) => void openItemModal(itemId)} />
           )}
         </section>
         {waitingNext && <p>{t("session.movingNext")}</p>}
@@ -460,6 +517,7 @@ export default function SessionPage(): JSX.Element {
           </button>
         </div>
       </main>
+      {openedItemModal}
       {extendPromptOverlay}
     </>
   );
