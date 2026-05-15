@@ -18,6 +18,8 @@ from .management import (
 )
 from .core import generate_word_exercise_phrases_with_chatgpt
 
+MAX_EXERCISE_PHRASES = 30
+
 
 class ContentItemsView(APIView):
     def get(self, request: Request) -> Response:
@@ -180,7 +182,7 @@ def _sanitize_exercise_entries(value) -> list[dict[str, str]]:
         if not source_text or not target_text:
             continue
         entries.append({"label": label, "source_text": source_text, "target_text": target_text})
-        if len(entries) >= 12:
+        if len(entries) >= MAX_EXERCISE_PHRASES:
             break
     return entries
 
@@ -194,7 +196,11 @@ def _sanitize_exercise_payload(payload) -> dict:
             *_sanitize_exercise_entries(payload.get("first_section")),
             *_sanitize_exercise_entries(payload.get("second_section")),
         ]
-    return {"phrases": phrases[:12]}
+    cleaned = {"phrases": phrases[:MAX_EXERCISE_PHRASES]}
+    generation_mode = str(payload.get("generation_mode", "")).strip()
+    if generation_mode:
+        cleaned["generation_mode"] = generation_mode
+    return cleaned
 
 
 class ContentItemExercisesView(APIView):

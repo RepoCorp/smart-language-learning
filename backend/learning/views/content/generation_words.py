@@ -22,8 +22,9 @@ STUDY_LANGUAGE_LABELS = {
     "italian": "Italian",
     "portuguese": "Portuguese",
 }
-MAX_EXERCISE_WORDS_PER_PHRASE = 6
-MAX_EXERCISE_PHRASES = 12
+MAX_EXERCISE_WORDS_PER_PHRASE = 8
+MAX_EXERCISE_PHRASES = 30
+VERB_BY_TENSE_GENERATION_MODE = "verb_by_tense_v1"
 VOCAB_ENTRY_ARTICLES = {
     "der",
     "die",
@@ -54,6 +55,20 @@ WORD_EXERCISE_PROMPTS_BY_TYPE = {
     "expression": WORD_EXERCISES_EXPRESSION_PROMPT,
     "other": WORD_EXERCISES_OTHER_PROMPT,
 }
+VERB_PERSON_SPECS = [
+    ("1s", "1st person singular"),
+    ("2s", "2nd person singular"),
+    ("3s", "3rd person singular"),
+    ("1p", "1st person plural"),
+    ("2p", "2nd person plural"),
+    ("3p", "3rd person plural"),
+]
+VERB_TENSE_SPECS = [
+    ("present", "Present"),
+    ("perfect", "Perfect"),
+    ("simple-past", "Simple past"),
+    ("future", "Future"),
+]
 
 
 def _language_label(code: str) -> str:
@@ -141,6 +156,60 @@ def _generate_exercise_phrases(
     return _clean_exercise_section(parsed.get("phrases"), source_word=source_word, target_word=target_word)
 
 
+def _verb_tense_prompt(*, tense_key: str, tense_label: str) -> str:
+    phrase_shape = ",\n    ".join(
+        f'{{"label": "{tense_key}-{person_key}", "source_text": "string", "target_text": "string"}}'
+        for person_key, _person_label in VERB_PERSON_SPECS
+    )
+    person_list = "\n".join(f"- {tense_key}-{person_key}: {person_label}" for person_key, person_label in VERB_PERSON_SPECS)
+    return f"""
+Generate verb exercise phrases for one vocabulary item in one tense.
+
+Return strict JSON with this exact shape:
+{{
+  "phrases": [
+    {phrase_shape}
+  ]
+}}
+
+Rules:
+- Return exactly 6 phrases, one for each listed label, in the listed order.
+- Tense: {tense_label}.
+- Persons:
+{person_list}
+- First choose one short useful context for this tense, such as one time, place, object, manner, or reason.
+- Use that same context in all six phrases; only change the person and the verb conjugation.
+- Each target_text must include the correct {tense_label} conjugated form for its label.
+- Do not return only a subject/pronoun plus the verb, such as "ich gehe" or "wir lernen".
+- Use simple declarative phrases with a pronoun or natural subject, not questions or commands.
+- Keep every phrase short (max 7 words), practical, and beginner-friendly (A1-A2).
+- Besides the target verb, necessary auxiliaries, and the shared context, use only very basic high-frequency words.
+- Keep source_text and target_text equivalent in meaning.
+- Use the language mapping provided by the user input.
+- Return JSON only, no markdown and no extra text.
+""".strip()
+
+
+def _generate_verb_exercise_phrases_by_tense(
+    *,
+    user_input: str,
+    source_word: str,
+    target_word: str,
+    call_openai_json_fn,
+) -> list[dict[str, str]]:
+    phrases: list[dict[str, str]] = []
+    for tense_key, tense_label in VERB_TENSE_SPECS:
+        tense_phrases = _generate_exercise_phrases(
+            prompt=_verb_tense_prompt(tense_key=tense_key, tense_label=tense_label),
+            user_input=f"{user_input}\nRequested tense: {tense_label}\nUse labels prefixed with: {tense_key}-",
+            source_word=source_word,
+            target_word=target_word,
+            call_openai_json_fn=call_openai_json_fn,
+        )
+        phrases.extend(tense_phrases)
+    return phrases[:MAX_EXERCISE_PHRASES]
+
+
 def _exercise_prompt_for_word_type(word_type: str) -> str:
     normalized = (word_type or "").strip().lower()
     return WORD_EXERCISE_PROMPTS_BY_TYPE.get(normalized, WORD_EXERCISES_OTHER_PROMPT)
@@ -174,6 +243,15 @@ def generate_word_exercise_phrases_with_chatgpt(
         source_language=source_language,
         target_language=target_language,
     )
+    if (word_type or "").strip().lower() == "verb":
+        phrases = _generate_verb_exercise_phrases_by_tense(
+            user_input=user_input,
+            source_word=spanish_word,
+            target_word=german_word,
+            call_openai_json_fn=call_openai_json_fn,
+        )
+        return {"phrases": phrases, "generation_mode": VERB_BY_TENSE_GENERATION_MODE}
+
     phrases = _generate_exercise_phrases(
         prompt=_exercise_prompt_for_word_type(word_type),
         user_input=user_input,

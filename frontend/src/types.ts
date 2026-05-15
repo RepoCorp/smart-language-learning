@@ -13,6 +13,7 @@ export interface ItemExercisePhrases {
   phrases?: ExercisePhrase[];
   first_section?: ExercisePhrase[];
   second_section?: ExercisePhrase[];
+  generation_mode?: string;
 }
 
 export interface SessionItem {

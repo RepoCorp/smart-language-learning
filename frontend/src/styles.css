@@ -976,6 +976,10 @@ textarea {
   width: min(760px, 95vw);
 }
 
+.verb-exercise-modal {
+  width: min(1180px, 98vw);
+}
+
 .questions-modal {
   width: min(760px, 95vw);
   overflow: hidden;
@@ -1110,6 +1114,92 @@ textarea {
   border-color: #0b4fc4;
   box-shadow: 0 0 0 2px rgba(11, 79, 196, 0.14);
   background: #e1effe;
+}
+
+.verb-exercise-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.verb-word-row {
+  width: min(100%, 520px);
+}
+
+.verb-exercise-grid {
+  display: grid;
+  grid-template-columns: 40px repeat(4, minmax(132px, 1fr));
+  gap: 3px;
+  min-width: 590px;
+}
+
+.verb-exercise-cell {
+  border: 1px solid #bcccdc;
+  border-radius: 4px;
+  background: #f8fafc;
+  color: #102a43;
+  min-height: 44px;
+  padding: 5px 6px;
+  text-align: left;
+}
+
+.verb-exercise-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  background: #eef2f7;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.verb-exercise-person {
+  justify-content: center;
+}
+
+.verb-exercise-corner {
+  min-height: 34px;
+  background: transparent;
+  border-color: transparent;
+}
+
+.verb-exercise-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font: inherit;
+}
+
+button.verb-exercise-entry {
+  cursor: pointer;
+}
+
+button.verb-exercise-entry:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.verb-exercise-entry strong,
+.verb-exercise-entry small {
+  line-height: 1.12;
+}
+
+.verb-exercise-entry small {
+  color: #486581;
+  font-size: 11px;
+}
+
+.verb-exercise-entry strong {
+  font-size: 12px;
+}
+
+.verb-exercise-selected {
+  border-color: #0b4fc4;
+  background: #e1effe;
+  box-shadow: 0 0 0 1px rgba(11, 79, 196, 0.18);
 }
 
 .exercise-audio-mode {

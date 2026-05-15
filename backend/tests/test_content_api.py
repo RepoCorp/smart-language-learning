@@ -1720,6 +1720,44 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
     assert "Generate exercise phrases for one vocabulary item" in captured_prompts[1]
 
 
+def test_verb_exercise_generation_requests_each_tense_separately():
+    from learning.views.content import generation_words
+
+    captured_inputs = []
+
+    def fake_call_openai_json(prompt, user_input, **kwargs):
+        captured_inputs.append(user_input)
+        tense_key = user_input.split("Use labels prefixed with: ", 1)[1].split("-", 1)[0]
+        if "simple-past-" in user_input:
+            tense_key = "simple-past"
+        return {
+            "phrases": [
+                {"label": f"{tense_key}-1s", "source_text": "Yo trabajo en casa.", "target_text": "Ich arbeite zu Hause."},
+                {"label": f"{tense_key}-2s", "source_text": "Tu trabajas en casa.", "target_text": "Du arbeitest zu Hause."},
+                {"label": f"{tense_key}-3s", "source_text": "Ella trabaja en casa.", "target_text": "Sie arbeitet zu Hause."},
+                {"label": f"{tense_key}-1p", "source_text": "Nosotros trabajamos en casa.", "target_text": "Wir arbeiten zu Hause."},
+                {"label": f"{tense_key}-2p", "source_text": "Ustedes trabajan en casa.", "target_text": "Ihr arbeitet zu Hause."},
+                {"label": f"{tense_key}-3p", "source_text": "Ellos trabajan en casa.", "target_text": "Sie arbeiten zu Hause."},
+            ],
+        }
+
+    payload = generation_words.generate_word_exercise_phrases_with_chatgpt(
+        "trabajar",
+        "arbeiten",
+        word_type="verb",
+        call_openai_json_fn=fake_call_openai_json,
+    )
+
+    assert len(captured_inputs) == 4
+    assert "Requested tense: Present" in captured_inputs[0]
+    assert "Requested tense: Perfect" in captured_inputs[1]
+    assert "Requested tense: Simple past" in captured_inputs[2]
+    assert "Requested tense: Future" in captured_inputs[3]
+    assert len(payload["phrases"]) == 24
+    assert payload["phrases"][0]["label"] == "present-1s"
+    assert payload["phrases"][18]["label"] == "future-1s"
+
+
 def test_word_exercise_generation_drops_bare_vocabulary_entries():
     from learning.views.content import generation_words
 

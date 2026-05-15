@@ -406,7 +406,6 @@ export default function ConversationPage(): JSX.Element {
       setWordActionStatus({});
       setPendingWordAdd(null);
       setPendingSentenceAdd(null);
-      playAudioUrl(payload.opening_audio_url);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
       setConversationError(detail || t("newItem.questionsError"));

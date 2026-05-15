@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import {
   askContentItemQuestion,
@@ -17,6 +17,58 @@ interface NewItemProps {
   readOnly?: boolean;
   onClose?: () => void;
 }
+
+const MAX_EXERCISE_ENTRIES = 30;
+const VERB_BY_TENSE_GENERATION_MODE = "verb_by_tense_v1";
+const VERB_TENSES = [
+  { key: "present", label: "Present" },
+  { key: "perfect", label: "Perfect" },
+  { key: "simple-past", label: "Simple past" },
+  { key: "future", label: "Future" },
+] as const;
+const VERB_PERSONS = [
+  { key: "1s", label: "1s" },
+  { key: "2s", label: "2s" },
+  { key: "3s", label: "3s" },
+  { key: "1p", label: "1p" },
+  { key: "2p", label: "2p" },
+  { key: "3p", label: "3p" },
+] as const;
+type VerbTenseKey = typeof VERB_TENSES[number]["key"];
+type VerbPersonKey = typeof VERB_PERSONS[number]["key"];
+
+const parseVerbExerciseLabel = (label: string): { tense: VerbTenseKey; person: VerbPersonKey } | null => {
+  const normalized = label.trim().toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
+  const personAliases: Record<string, VerbPersonKey> = {
+    "1s": "1s",
+    "first-singular": "1s",
+    "1st-singular": "1s",
+    "2s": "2s",
+    "second-singular": "2s",
+    "2nd-singular": "2s",
+    "3s": "3s",
+    "third-singular": "3s",
+    "3rd-singular": "3s",
+    "1p": "1p",
+    "first-plural": "1p",
+    "1st-plural": "1p",
+    "2p": "2p",
+    "second-plural": "2p",
+    "2nd-plural": "2p",
+    "3p": "3p",
+    "third-plural": "3p",
+    "3rd-plural": "3p",
+  };
+  const match = normalized.match(/^(present|perfect|simple-past|future)-(.+)$/);
+  if (!match) {
+    return null;
+  }
+  const person = personAliases[match[2]];
+  if (!person) {
+    return null;
+  }
+  return { tense: match[1] as VerbTenseKey, person };
+};
 
 export default function NewItem({ item, onContinue, readOnly = false, onClose }: NewItemProps): JSX.Element {
   const { t } = useI18n();
@@ -441,7 +493,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         target: String(entry.target_text || "").trim(),
       }))
       .filter((entry) => entry.source && entry.target)
-      .slice(0, 12);
+      .slice(0, MAX_EXERCISE_ENTRIES);
   };
 
   const exerciseEntryKey = (entry: { label?: string; source: string; target: string }): string => `${entry.label || ""}|||${entry.source}|||${entry.target}`;
@@ -461,6 +513,20 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         ...generatedWordExerciseEntries,
       ]
     : generatedWordExerciseEntries;
+  const isVerbWord = item.item_type === "word" && String(item.word_type || "").trim().toLowerCase() === "verb";
+  const hasVerbExerciseGridEntries = generatedWordExerciseEntries.some((entry) => Boolean(parseVerbExerciseLabel(entry.label)));
+  const hasCurrentVerbExerciseGeneration = exercisePhrases?.generation_mode === VERB_BY_TENSE_GENERATION_MODE;
+  const isVerbExerciseGrid = item.item_type === "word"
+    && (isVerbWord || hasVerbExerciseGridEntries);
+  const wordOnlyExerciseEntry = item.item_type === "word"
+    ? wordExerciseEntries.find((entry) => entry.label === "word")
+    : undefined;
+  const verbExerciseGridEntries = generatedWordExerciseEntries
+    .map((entry) => ({ entry, parsed: parseVerbExerciseLabel(entry.label) }))
+    .filter((itemWithParsed): itemWithParsed is { entry: { label: string; source: string; target: string }; parsed: { tense: VerbTenseKey; person: VerbPersonKey } } => Boolean(itemWithParsed.parsed));
+  const verbExerciseGridEntryBySlot = new Map(
+    verbExerciseGridEntries.map(({ entry, parsed }) => [`${parsed.person}-${parsed.tense}`, entry]),
+  );
 
   const selectedExerciseEntries = item.item_type === "phrase"
     ? [{ source: item.spanish_text, target: item.german_text }]
@@ -476,9 +542,41 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return [...keys].sort(() => Math.random() - 0.5).slice(0, count);
   };
 
+  const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] => verbExerciseGridEntries
+    .filter(({ parsed }) => parsed.person === person)
+    .map(({ entry }) => exerciseEntryKey(entry));
+
+  const verbExerciseKeysForTense = (tense: VerbTenseKey): string[] => verbExerciseGridEntries
+    .filter(({ parsed }) => parsed.tense === tense)
+    .map(({ entry }) => exerciseEntryKey(entry));
+
+  const selectVerbExercisePerson = (person: VerbPersonKey): void => {
+    setSelectedExerciseKeys(verbExerciseKeysForPerson(person));
+  };
+
+  const selectVerbExerciseTense = (tense: VerbTenseKey): void => {
+    setSelectedExerciseKeys(verbExerciseKeysForTense(tense));
+  };
+
+  const selectRandomVerbExerciseGroup = (): void => {
+    const groups = [
+      ...VERB_PERSONS.map((person) => verbExerciseKeysForPerson(person.key)),
+      ...VERB_TENSES.map((tense) => verbExerciseKeysForTense(tense.key)),
+    ].filter((keys) => keys.length > 0);
+    if (!groups.length) {
+      setSelectedExerciseKeys([]);
+      return;
+    }
+    setSelectedExerciseKeys(groups[Math.floor(Math.random() * groups.length)]);
+  };
+
   useEffect(() => {
     if (!showExerciseModal || item.item_type !== "word") {
       setSelectedExerciseKeys([]);
+      return;
+    }
+    if (isVerbExerciseGrid) {
+      selectRandomVerbExerciseGroup();
       return;
     }
     setSelectedExerciseKeys(randomExerciseEntryKeys(2));
@@ -494,10 +592,18 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   };
 
   const selectAllExerciseEntries = (): void => {
+    if (isVerbExerciseGrid) {
+      setSelectedExerciseKeys(verbExerciseGridEntries.map(({ entry }) => exerciseEntryKey(entry)));
+      return;
+    }
     setSelectedExerciseKeys(wordExerciseEntries.map(exerciseEntryKey));
   };
 
   const selectRandomExerciseEntries = (): void => {
+    if (isVerbExerciseGrid) {
+      selectRandomVerbExerciseGroup();
+      return;
+    }
     setSelectedExerciseKeys(randomExerciseEntryKeys(2));
   };
 
@@ -510,7 +616,14 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     setExerciseError("");
-    if (item.item_type === "word" && item.id > 0 && wordExerciseEntries.length === 0) {
+    if (
+      item.item_type === "word"
+      && item.id > 0
+      && (
+        generatedWordExerciseEntries.length === 0
+        || (isVerbWord && (!hasVerbExerciseGridEntries || !hasCurrentVerbExerciseGeneration))
+      )
+    ) {
       setLoadingExercises(true);
       try {
         const payload = await generateContentItemExercises(item.id, sourceLanguage, targetLanguage);
@@ -803,7 +916,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       )}
       {showExerciseModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal related-dialogs-modal exercise-modal">
+          <div className={`blocking-modal related-dialogs-modal exercise-modal ${isVerbExerciseGrid ? "verb-exercise-modal" : ""}`}>
             <p>
               <strong>{t("newItem.exercisesTitle")}</strong>
             </p>
@@ -838,27 +951,106 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                     {t("newItem.exercisesUnselectAll")}
                   </button>
                 </div>
-                <div className="exercise-phrase-list">
-                  {wordExerciseEntries.map((entry) => {
-                    const key = exerciseEntryKey(entry);
-                    const checked = selectedExerciseKeys.includes(key);
-                    return (
-                      <label className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`} key={key}>
+                {isVerbExerciseGrid ? (
+                  <div className="verb-exercise-wrap">
+                    {wordOnlyExerciseEntry && (
+                      <label className={`exercise-phrase-row verb-word-row ${selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry)) ? "exercise-phrase-row-selected" : ""}`}>
                         <input
                           type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleExerciseEntry(entry)}
+                          checked={selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry))}
+                          onChange={() => toggleExerciseEntry(wordOnlyExerciseEntry)}
                           disabled={exerciseRunning}
                         />
                         <span>
-                          <strong>{entry.target}</strong>
-                          <small>{entry.source}</small>
-                          {entry.label && <em className="exercise-phrase-label">{entry.label}</em>}
+                          <strong>{wordOnlyExerciseEntry.target}</strong>
+                          <small>{wordOnlyExerciseEntry.source}</small>
+                          <em className="exercise-phrase-label">{wordOnlyExerciseEntry.label}</em>
                         </span>
                       </label>
-                    );
-                  })}
-                </div>
+                    )}
+                    <div className="verb-exercise-grid" role="table" aria-label={t("newItem.exercisesTitle")}>
+                      <div className="verb-exercise-cell verb-exercise-corner" role="columnheader" />
+                      {VERB_TENSES.map((tense) => {
+                        const keys = verbExerciseKeysForTense(tense.key);
+                        const selected = keys.length > 0 && keys.every((key) => selectedExerciseKeys.includes(key));
+                        return (
+                          <button
+                            key={tense.key}
+                            type="button"
+                            className={`verb-exercise-cell verb-exercise-header ${selected ? "verb-exercise-selected" : ""}`}
+                            onClick={() => selectVerbExerciseTense(tense.key)}
+                            disabled={exerciseRunning || keys.length === 0}
+                          >
+                            {tense.label}
+                          </button>
+                        );
+                      })}
+                      {VERB_PERSONS.map((person) => {
+                        const rowKeys = verbExerciseKeysForPerson(person.key);
+                        const rowSelected = rowKeys.length > 0 && rowKeys.every((key) => selectedExerciseKeys.includes(key));
+                        return (
+                          <Fragment key={person.key}>
+                            <button
+                              key={`${person.key}-row`}
+                              type="button"
+                              className={`verb-exercise-cell verb-exercise-header verb-exercise-person ${rowSelected ? "verb-exercise-selected" : ""}`}
+                              onClick={() => selectVerbExercisePerson(person.key)}
+                              disabled={exerciseRunning || rowKeys.length === 0}
+                            >
+                              {person.label}
+                            </button>
+                            {VERB_TENSES.map((tense) => {
+                              const entry = verbExerciseGridEntryBySlot.get(`${person.key}-${tense.key}`);
+                              const key = entry ? exerciseEntryKey(entry) : `${person.key}-${tense.key}`;
+                              const selected = entry ? selectedExerciseKeys.includes(key) : false;
+                              if (!entry) {
+                                return (
+                                  <div key={key} className="verb-exercise-cell verb-exercise-entry" role="cell">
+                                    <span className="manage-item-meta">-</span>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  className={`verb-exercise-cell verb-exercise-entry ${selected ? "verb-exercise-selected" : ""}`}
+                                  onClick={() => toggleExerciseEntry(entry)}
+                                  disabled={exerciseRunning}
+                                >
+                                  <strong>{entry.target}</strong>
+                                  <small>{entry.source}</small>
+                                </button>
+                              );
+                            })}
+                          </Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="exercise-phrase-list">
+                    {wordExerciseEntries.map((entry) => {
+                      const key = exerciseEntryKey(entry);
+                      const checked = selectedExerciseKeys.includes(key);
+                      return (
+                        <label className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`} key={key}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleExerciseEntry(entry)}
+                            disabled={exerciseRunning}
+                          />
+                          <span>
+                            <strong>{entry.target}</strong>
+                            <small>{entry.source}</small>
+                            {entry.label && <em className="exercise-phrase-label">{entry.label}</em>}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
             {item.item_type === "word" && wordExerciseEntries.length === 0 && (

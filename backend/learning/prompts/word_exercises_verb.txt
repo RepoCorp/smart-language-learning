@@ -3,21 +3,45 @@ Generate verb exercise phrases for one vocabulary item.
 Return strict JSON with this exact shape:
 {
   "phrases": [
-    {"label": "infinitive", "source_text": "string", "target_text": "string"},
-    {"label": "present", "source_text": "string", "target_text": "string"},
-    {"label": "question", "source_text": "string", "target_text": "string"},
-    {"label": "command", "source_text": "string", "target_text": "string"}
+    {"label": "present-1s", "source_text": "string", "target_text": "string"},
+    {"label": "present-2s", "source_text": "string", "target_text": "string"},
+    {"label": "present-3s", "source_text": "string", "target_text": "string"},
+    {"label": "present-1p", "source_text": "string", "target_text": "string"},
+    {"label": "present-2p", "source_text": "string", "target_text": "string"},
+    {"label": "present-3p", "source_text": "string", "target_text": "string"},
+    {"label": "perfect-1s", "source_text": "string", "target_text": "string"},
+    {"label": "perfect-2s", "source_text": "string", "target_text": "string"},
+    {"label": "perfect-3s", "source_text": "string", "target_text": "string"},
+    {"label": "perfect-1p", "source_text": "string", "target_text": "string"},
+    {"label": "perfect-2p", "source_text": "string", "target_text": "string"},
+    {"label": "perfect-3p", "source_text": "string", "target_text": "string"},
+    {"label": "simple-past-1s", "source_text": "string", "target_text": "string"},
+    {"label": "simple-past-2s", "source_text": "string", "target_text": "string"},
+    {"label": "simple-past-3s", "source_text": "string", "target_text": "string"},
+    {"label": "simple-past-1p", "source_text": "string", "target_text": "string"},
+    {"label": "simple-past-2p", "source_text": "string", "target_text": "string"},
+    {"label": "simple-past-3p", "source_text": "string", "target_text": "string"},
+    {"label": "future-1s", "source_text": "string", "target_text": "string"},
+    {"label": "future-2s", "source_text": "string", "target_text": "string"},
+    {"label": "future-3s", "source_text": "string", "target_text": "string"},
+    {"label": "future-1p", "source_text": "string", "target_text": "string"},
+    {"label": "future-2p", "source_text": "string", "target_text": "string"},
+    {"label": "future-3p", "source_text": "string", "target_text": "string"}
   ]
 }
 
 Rules:
-- Return exactly 4 phrases, one for each listed label, in the listed order.
-- Keep every phrase short (max 6 words), practical, and beginner-friendly (A1-A2).
-- The infinitive phrase should use a simple modal or desire pattern.
-- The present phrase should use a natural present-tense form.
-- The question phrase should be a short useful question.
-- The command phrase should be a natural imperative only if grammar allows it; otherwise use another simple present-tense phrase with label "command".
-- Besides the target verb, use only very basic high-frequency words.
+- Return exactly 24 phrases, one for each listed label, in the listed order.
+- Keep every phrase short (max 7 words), practical, and beginner-friendly (A1-A2).
+- Cover all grammatical persons for each tense: 1st singular, 2nd singular, 3rd singular, 1st plural, 2nd plural, 3rd plural.
+- Cover these tenses in this order: present, perfect, simple past, future.
+- Each target_text must include the correct conjugated form for its label and tense.
+- Use simple declarative phrases with a pronoun or natural subject, not questions or commands.
+- Do not return only a subject/pronoun plus the verb, such as "ich gehe" or "wir lernen".
+- For each tense, use the same small useful context for all six persons; only change the person and verb conjugation.
+- Use a different context for each tense column so present, perfect, simple past, and future are easy to compare.
+- The context can be a time, place, object, manner, or reason.
+- Besides the target verb, necessary auxiliaries, and the small context, use only very basic high-frequency words.
 - Keep source_text and target_text equivalent in meaning.
 - Use the language mapping provided by the user input.
 - Return JSON only, no markdown and no extra text.

@@ -570,9 +570,7 @@ Return strict JSON:
   "goal_candidates": [
     {{
       "goal_objective": "string",
-      "goal_success_condition": "string",
-      "opening_text": "string",
-      "opening_translation_text": "string"
+      "goal_success_condition": "string"
     }}
   ]
 }}
@@ -590,15 +588,10 @@ Rules:
   - easy: very simple, one clear concrete detail, minimal cognitive load.
   - medium: balanced challenge with one clear concrete detail and mild constraint.
   - hard: more demanding but still achievable in one short conversation, with a tighter or multi-part concrete condition.
-- opening_text must be in {target_name} and sound like a normal person starting a conversation.
-- opening_translation_text must be a {source_name} translation of opening_text.
 - Keep goal_objective and goal_success_condition concise, one short line each.
-- Keep opening_text to 1-2 short sentences and end with a simple question.
 - Match the topic and notes context.
-- If learner role is provided, tailor both goal and opening to that role.
-- opening_text must be spoken by the conversation partner, not by the learner.
-- Never write opening_text from the learner role perspective.
-- If learner role is "customer", partner should sound like staff/seller/service person.
+- If learner role is provided, tailor the goal to that role.
+- The learner will always start the conversation. Do not create an opening line for the partner.
 - Do not use teacher or tutor voice.
 - Make the 4 candidates meaningfully different from each other.
 - JSON only.
@@ -627,25 +620,19 @@ Rules:
                     continue
                 objective_text = str(raw_candidate.get("goal_objective", "")).strip()
                 success_condition = str(raw_candidate.get("goal_success_condition", "")).strip()
-                opening_text = str(raw_candidate.get("opening_text", "")).strip()
-                opening_translation_text = str(raw_candidate.get("opening_translation_text", "")).strip()
-                if not objective_text or not success_condition or not opening_text:
+                if not objective_text or not success_condition:
                     continue
                 goal_text = f"{goal_label}: {objective_text}. {done_when_label}: {success_condition}."
                 normalized_candidates.append(
                     {
                         "goal_text": goal_text[:600],
-                        "opening_text": opening_text[:1200],
-                        "opening_translation_text": opening_translation_text[:1200],
                     }
                 )
 
         # Backward compatibility if the model still returns the previous single-goal shape.
         if not normalized_candidates:
             goal_text = str(parsed.get("goal_text", "")).strip()
-            opening_text = str(parsed.get("opening_text", "")).strip()
-            opening_translation_text = str(parsed.get("opening_translation_text", "")).strip()
-            if goal_text and opening_text:
+            if goal_text:
                 done_when_fallback = GOAL_DONE_WHEN_FALLBACK_BY_LANGUAGE.get(
                     source_language,
                     "you clearly confirm it during the conversation",
@@ -653,8 +640,6 @@ Rules:
                 normalized_candidates.append(
                     {
                         "goal_text": f"{goal_label}: {goal_text}. {done_when_label}: {done_when_fallback}."[:600],
-                        "opening_text": opening_text[:1200],
-                        "opening_translation_text": opening_translation_text[:1200],
                     }
                 )
 
@@ -665,8 +650,8 @@ Rules:
         candidate = normalized_candidates[0]
         return {
             "goal_text": candidate["goal_text"],
-            "opening_text": candidate["opening_text"],
-            "opening_translation_text": candidate["opening_translation_text"],
+            "opening_text": "",
+            "opening_translation_text": "",
             "goal_difficulty": goal_difficulty,
         }
     raise RuntimeError("Question model request failed")
