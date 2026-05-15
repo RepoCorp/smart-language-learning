@@ -3,6 +3,7 @@ from .generation import (
     extract_json_from_text,
     generate_content_with_chatgpt,
     generate_conversation_with_chatgpt,
+    generate_funny_image_exercise_phrase_with_chatgpt,
     generate_keywords_for_phrase_with_chatgpt,
     generate_word_exercise_phrases_with_chatgpt,
 )
@@ -50,6 +51,7 @@ __all__ = [
     "extract_json_from_text",
     "generate_content_with_chatgpt",
     "generate_conversation_with_chatgpt",
+    "generate_funny_image_exercise_phrase_with_chatgpt",
     "generate_keywords_for_phrase_with_chatgpt",
     "generate_word_exercise_phrases_with_chatgpt",
     "german_word_has_article",

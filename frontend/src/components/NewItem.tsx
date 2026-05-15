@@ -4,6 +4,7 @@ import {
   askContentItemQuestion,
   fetchContentItemDetail,
   generateContentItemExercises,
+  generateContentItemFunnyImageExercise,
   quickAddWordFromDialog,
 } from "../api";
 import { useI18n } from "../i18n";
@@ -88,7 +89,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
+  const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
+  const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] = useState<boolean>(false);
   const [exerciseError, setExerciseError] = useState<string>("");
   const [showQuestionsModal, setShowQuestionsModal] = useState<boolean>(false);
   const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>([]);
@@ -115,6 +118,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const exerciseRunRef = useRef<number>(0);
   const exerciseRunningRef = useRef<boolean>(false);
   const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastFunnyImageVoiceRef = useRef<string>("");
   const questionsHistoryRef = useRef<HTMLDivElement | null>(null);
   const questionInputRef = useRef<HTMLInputElement | null>(null);
   const hideDialogTargetText = targetPromptMode === "audio" && !showDialogTargetText;
@@ -503,7 +507,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     ...sanitizeExerciseEntries(exercisePhrases?.second_section),
   ];
   const generatedWordExerciseEntries = savedExerciseEntries.length ? savedExerciseEntries : legacyExerciseEntries;
-  const wordExerciseEntries = item.item_type === "word"
+  const funnyImageExerciseEntry = exercisePhrases?.funny_image_phrase;
+  const funnyImageExerciseSelectionEntry = funnyImageExerciseEntry?.source_text && funnyImageExerciseEntry?.target_text
+    ? {
+        label: funnyImageExerciseEntry.label || "funny image",
+        source: funnyImageExerciseEntry.source_text,
+        target: funnyImageExerciseEntry.target_text,
+      }
+    : undefined;
+  const regularWordExerciseEntries = item.item_type === "word"
     ? [
         {
           label: "word",
@@ -513,6 +525,12 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         ...generatedWordExerciseEntries,
       ]
     : generatedWordExerciseEntries;
+  const wordExerciseEntries = item.item_type === "word"
+    ? [
+        ...regularWordExerciseEntries,
+        ...(funnyImageExerciseSelectionEntry ? [funnyImageExerciseSelectionEntry] : []),
+      ]
+    : regularWordExerciseEntries;
   const isVerbWord = item.item_type === "word" && String(item.word_type || "").trim().toLowerCase() === "verb";
   const hasVerbExerciseGridEntries = generatedWordExerciseEntries.some((entry) => Boolean(parseVerbExerciseLabel(entry.label)));
   const hasCurrentVerbExerciseGeneration = exercisePhrases?.generation_mode === VERB_BY_TENSE_GENERATION_MODE;
@@ -535,7 +553,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const orderedItemQuestions = [...itemQuestions].sort((left, right) => left.id - right.id);
 
   const randomExerciseEntryKeys = (count: number): string[] => {
-    const keys = wordExerciseEntries.map(exerciseEntryKey);
+    const keys = regularWordExerciseEntries.map(exerciseEntryKey);
     if (keys.length <= count) {
       return keys;
     }
@@ -580,7 +598,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     setSelectedExerciseKeys(randomExerciseEntryKeys(2));
-  }, [showExerciseModal, item.id, item.item_type, exercisePhrases]);
+  }, [showExerciseModal, item.id, item.item_type]);
 
   const toggleExerciseEntry = (entry: { label?: string; source: string; target: string }): void => {
     const key = exerciseEntryKey(entry);
@@ -596,7 +614,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       setSelectedExerciseKeys(verbExerciseGridEntries.map(({ entry }) => exerciseEntryKey(entry)));
       return;
     }
-    setSelectedExerciseKeys(wordExerciseEntries.map(exerciseEntryKey));
+    setSelectedExerciseKeys(regularWordExerciseEntries.map(exerciseEntryKey));
   };
 
   const selectRandomExerciseEntries = (): void => {
@@ -635,6 +653,22 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       }
     }
     setShowExerciseModal(true);
+  };
+
+  const generateFunnyImageExercise = async (): Promise<void> => {
+    if (generatingFunnyImageExercise || item.item_type !== "word" || item.id <= 0) {
+      return;
+    }
+    setExerciseError("");
+    setGeneratingFunnyImageExercise(true);
+    try {
+      const payload = await generateContentItemFunnyImageExercise(item.id, sourceLanguage, targetLanguage);
+      setExercisePhrases(payload.exercise_phrases || {});
+    } catch {
+      setExerciseError(t("newItem.exercisesFunnyImageError"));
+    } finally {
+      setGeneratingFunnyImageExercise(false);
+    }
   };
 
   const playExerciseDoneSound = (): void => {
@@ -699,6 +733,45 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     exerciseAudioRef.current = null;
   };
 
+  const speechLangByCode: Record<StudyLanguageCode, string> = {
+    spanish: "es-ES",
+    english: "en-US",
+    german: "de-DE",
+    french: "fr-FR",
+    italian: "it-IT",
+    portuguese: "pt-PT",
+  };
+
+  const playFunnyImageWordAudio = (): void => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !item.german_text.trim()) {
+      return;
+    }
+    if (exerciseRunningRef.current) {
+      stopExercise(false);
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(item.german_text);
+    const lang = speechLangByCode[targetLanguage] || "de-DE";
+    const langPrefix = lang.split("-")[0];
+    utterance.lang = lang;
+    utterance.rate = 0.9;
+
+    const matchingVoices = window.speechSynthesis
+      .getVoices()
+      .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
+    const selectableVoices = matchingVoices.length > 1
+      ? matchingVoices.filter((voice) => voice.voiceURI !== lastFunnyImageVoiceRef.current)
+      : matchingVoices;
+    const selectedVoice = selectableVoices[Math.floor(Math.random() * selectableVoices.length)];
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      lastFunnyImageVoiceRef.current = selectedVoice.voiceURI;
+    } else {
+      utterance.pitch = 0.85 + Math.random() * 0.35;
+    }
+    window.speechSynthesis.speak(utterance);
+  };
+
   const speakLinesOnce = async (lines: string[], runId: number): Promise<void> => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
@@ -710,14 +783,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       }
       await new Promise<void>((resolve) => {
         const utterance = new SpeechSynthesisUtterance(line);
-        const speechLangByCode: Record<StudyLanguageCode, string> = {
-          spanish: "es-ES",
-          english: "en-US",
-          german: "de-DE",
-          french: "fr-FR",
-          italian: "it-IT",
-          portuguese: "pt-PT",
-        };
         utterance.lang = speechLangByCode[targetLanguage] || "de-DE";
         utterance.rate = 0.75;
         utterance.onend = () => resolve();
@@ -765,6 +830,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
 
   const closeExerciseModal = (): void => {
     stopExercise();
+    setShowFunnyImageModal(false);
     setShowExerciseModal(false);
   };
 
@@ -950,7 +1016,42 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                   >
                     {t("newItem.exercisesUnselectAll")}
                   </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => void generateFunnyImageExercise()}
+                    disabled={generatingFunnyImageExercise || item.id <= 0}
+                  >
+                    {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                  </button>
                 </div>
+                {generatingFunnyImageExercise && (
+                  <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>
+                )}
+                {funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
+                  <div className="funny-image-phrase-row">
+                    <label className={`exercise-phrase-row ${selectedExerciseKeys.includes(exerciseEntryKey(funnyImageExerciseSelectionEntry)) ? "exercise-phrase-row-selected" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedExerciseKeys.includes(exerciseEntryKey(funnyImageExerciseSelectionEntry))}
+                        onChange={() => toggleExerciseEntry(funnyImageExerciseSelectionEntry)}
+                        disabled={exerciseRunning}
+                      />
+                      <span>
+                        <strong>{funnyImageExerciseSelectionEntry.target}</strong>
+                        <small>{funnyImageExerciseSelectionEntry.source}</small>
+                        <em className="exercise-phrase-label">{funnyImageExerciseSelectionEntry.label}</em>
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      className="secondary-button funny-image-open-button"
+                      onClick={() => setShowFunnyImageModal(true)}
+                    >
+                      {t("newItem.exercisesFunnyImageShow")}
+                    </button>
+                  </div>
+                )}
                 {isVerbExerciseGrid ? (
                   <div className="verb-exercise-wrap">
                     {wordOnlyExerciseEntry && (
@@ -1030,7 +1131,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                   </div>
                 ) : (
                   <div className="exercise-phrase-list">
-                    {wordExerciseEntries.map((entry) => {
+                    {regularWordExerciseEntries.map((entry) => {
                       const key = exerciseEntryKey(entry);
                       const checked = selectedExerciseKeys.includes(key);
                       return (
@@ -1086,6 +1187,25 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 </button>
               )}
               <button type="button" className="secondary-button" onClick={closeExerciseModal}>
+                {t("newItem.closeRelatedDialogs")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showFunnyImageModal && funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal funny-image-modal">
+            <button
+              type="button"
+              className="funny-image-large-button"
+              onClick={playFunnyImageWordAudio}
+              aria-label={t("newItem.exercisesFunnyImagePlayWord")}
+            >
+              <img src={funnyImageExerciseEntry.image_url} alt={funnyImageExerciseSelectionEntry.target} />
+            </button>
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={() => setShowFunnyImageModal(false)}>
                 {t("newItem.closeRelatedDialogs")}
               </button>
             </div>

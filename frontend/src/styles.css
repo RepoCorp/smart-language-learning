@@ -1116,6 +1116,48 @@ textarea {
   background: #e1effe;
 }
 
+.funny-image-phrase-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 10px;
+}
+
+.funny-image-phrase-row .exercise-phrase-row {
+  margin: 0;
+}
+
+.funny-image-open-button {
+  align-self: stretch;
+}
+
+.funny-image-modal {
+  max-width: min(760px, calc(100vw - 32px));
+}
+
+.funny-image-large-button {
+  width: 100%;
+  padding: 0;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.funny-image-large-button:focus-visible {
+  outline: 3px solid rgba(11, 79, 196, 0.35);
+  outline-offset: 2px;
+}
+
+.funny-image-large-button img {
+  display: block;
+  width: 100%;
+  max-height: min(70vh, 720px);
+  object-fit: contain;
+}
+
 .verb-exercise-wrap {
   display: flex;
   flex-direction: column;
@@ -1418,6 +1460,14 @@ button.verb-exercise-entry:disabled {
 
   .exercise-section-grid {
     grid-template-columns: 1fr;
+  }
+
+  .funny-image-phrase-row {
+    grid-template-columns: 1fr;
+  }
+
+  .funny-image-open-button {
+    width: 100%;
   }
 
   .options {

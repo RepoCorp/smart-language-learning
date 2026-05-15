@@ -135,6 +135,92 @@ def _exercise_generation_input(
     )
 
 
+def _funny_image_phrase_input(
+    *,
+    source_word: str,
+    target_word: str,
+    notes: str,
+    word_type: str,
+    source_language: str,
+    target_language: str,
+) -> str:
+    return (
+        f"Word source_text ({_language_label(source_language)}): {source_word}\n"
+        f"Word target_text ({_language_label(target_language)}): {target_word}\n"
+        f"Word type: {word_type or 'unknown'}\n"
+        f"Optional notes: {notes}\n"
+        f"Language mapping: source_text={_language_label(source_language)}, target_text={_language_label(target_language)}"
+    )
+
+
+def generate_funny_image_exercise_phrase_with_chatgpt(
+    source_word: str,
+    target_word: str,
+    notes: str = "",
+    word_type: str = "",
+    source_language: str = "spanish",
+    target_language: str = "german",
+    *,
+    call_openai_json_fn,
+) -> dict:
+    parsed = call_openai_json_fn(
+        """
+Generate one simple visual exercise phrase for a vocabulary item.
+
+Return strict JSON with this exact shape:
+{
+  "source_text": "string",
+  "target_text": "string"
+}
+
+Rules:
+- target_text must be in the target language and source_text must be its source-language translation.
+- Make target_text one simple beginner-friendly phrase or sentence.
+- target_text must be a real phrase or sentence with at least 3 words.
+- Never return only the vocabulary word, and never return only an article plus the word.
+- Use the target word in nominative form when grammar allows it.
+- For nouns, the target word should be the subject or predicate nominative, not dative or accusative.
+- The phrase must describe a concrete visible action, location, or state that can be drawn.
+- Prefer specific everyday scenes over abstract judgments.
+- Do not use generic filler phrases such as "is important", "is good", "is nice", "is useful", or their equivalents.
+- Do not use abstract adjectives unless they create a visible scene.
+- Do not make the phrase funny or surreal; keep it simple and literal.
+- Keep target_text short enough to fit inside an image, ideally 3-7 words.
+- Good phrase shapes: "The dog sleeps under the table", "The red cup is on the chair", "The child opens the window".
+- Return JSON only, no markdown and no extra text.
+""".strip(),
+        _funny_image_phrase_input(
+            source_word=source_word,
+            target_word=target_word,
+            notes=notes,
+            word_type=word_type,
+            source_language=source_language,
+            target_language=target_language,
+        ),
+        timeout_seconds=12,
+        temperature=0.75,
+        top_p=0.9,
+        presence_penalty=0.2,
+    )
+    if not isinstance(parsed, dict):
+        return {}
+    source_text = str(parsed.get("source_text", "")).strip()
+    target_text = str(parsed.get("target_text", "")).strip()
+    if not source_text or not target_text:
+        return {}
+    if _word_count(target_text) < 3 or _is_bare_vocabulary_entry(target_text, target_word):
+        logger.warning("content.generate.funny_image_phrase.bare_target target=%s word=%s", target_text, target_word)
+        return {}
+    if _word_count(source_text) < 3 or _is_bare_vocabulary_entry(source_text, source_word):
+        logger.warning("content.generate.funny_image_phrase.bare_source source=%s word=%s", source_text, source_word)
+        return {}
+    return {
+        "label": "funny image",
+        "source_text": source_text,
+        "target_text": target_text,
+    }
+
+
 def _generate_exercise_phrases(
     *,
     prompt: str,

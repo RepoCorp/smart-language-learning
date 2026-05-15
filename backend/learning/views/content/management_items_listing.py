@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+import base64
+import json
+import logging
+from pathlib import Path
+from uuid import uuid4
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest, urlopen
+
+from django.conf import settings
+
 from .management import (
     APIView,
     Item,
@@ -16,8 +26,9 @@ from .management import (
     status,
     timezone,
 )
-from .core import generate_word_exercise_phrases_with_chatgpt
+from .core import generate_funny_image_exercise_phrase_with_chatgpt, generate_word_exercise_phrases_with_chatgpt
 
+logger = logging.getLogger(__name__)
 MAX_EXERCISE_PHRASES = 30
 
 
@@ -203,6 +214,71 @@ def _sanitize_exercise_payload(payload) -> dict:
     return cleaned
 
 
+def _build_local_image_url(filename: str) -> str:
+    relative_url = f"{settings.MEDIA_URL.rstrip('/')}/exercise-images/{filename}"
+    return f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
+
+
+def _save_exercise_image(image_bytes: bytes) -> str:
+    if not image_bytes:
+        return ""
+    image_dir = Path(settings.MEDIA_ROOT) / "exercise-images"
+    image_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"exercise-image-{uuid4().hex}.png"
+    (image_dir / filename).write_bytes(image_bytes)
+    return _build_local_image_url(filename)
+
+
+def _download_image_url(image_url: str) -> bytes | None:
+    if not image_url:
+        return None
+    try:
+        with urlopen(image_url, timeout=int(getattr(settings, "OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS", 120))) as response:
+            return response.read()
+    except (HTTPError, URLError, TimeoutError):
+        return None
+
+
+def _generate_openai_image(prompt: str) -> bytes | None:
+    api_key = settings.OPENAI_API_KEY
+    if not api_key or not prompt.strip():
+        return None
+    body = {
+        "model": str(getattr(settings, "OPENAI_IMAGE_MODEL", "gpt-image-1")).strip() or "gpt-image-1",
+        "prompt": prompt,
+        "size": str(getattr(settings, "OPENAI_IMAGE_SIZE", "1024x1024")).strip() or "1024x1024",
+        "n": 1,
+    }
+    request = UrlRequest(
+        "https://api.openai.com/v1/images/generations",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=int(getattr(settings, "OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS", 120))) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        logger.warning("content.exercises.image_generation_failed error=%s", exc.__class__.__name__)
+        return None
+
+    try:
+        image_payload = payload["data"][0]
+    except (KeyError, IndexError, TypeError):
+        return None
+    b64_json = str(image_payload.get("b64_json", "")).strip() if isinstance(image_payload, dict) else ""
+    if b64_json:
+        try:
+            return base64.b64decode(b64_json)
+        except ValueError:
+            return None
+    image_url = str(image_payload.get("url", "")).strip() if isinstance(image_payload, dict) else ""
+    return _download_image_url(image_url)
+
+
 class ContentItemExercisesView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
         user = get_request_user(request)
@@ -232,3 +308,54 @@ class ContentItemExercisesView(APIView):
         item.exercise_phrases = cleaned
         item.save(update_fields=["exercise_phrases", "updated_at"])
         return Response({"exercise_phrases": cleaned})
+
+
+class ContentItemFunnyImageExerciseView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+        if item.item_type != Item.ItemType.WORD:
+            return Response({"detail": "Image exercises are only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
+
+        phrase = generate_funny_image_exercise_phrase_with_chatgpt(
+            item.spanish_text,
+            item.german_text,
+            notes=item.notes or "",
+            word_type=item.word_type or "",
+            source_language=source_language,
+            target_language=target_language,
+        )
+        if not phrase:
+            return Response({"detail": "Funny image phrase generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        target_text = str(phrase.get("target_text", "")).strip()
+        final_image_prompt = (
+            "Create a funny, playful, safe illustration of this simple language-learning phrase.\n"
+            f'Phrase: "{target_text}"\n'
+            "The scene should clearly correspond to the phrase, with a humorous visual implementation of the literal meaning.\n"
+            f'Visibly include the exact phrase text in the image: "{target_text}".'
+        ).strip()
+        image_bytes = _generate_openai_image(final_image_prompt)
+        image_url = _save_exercise_image(image_bytes or b"")
+        if not image_url:
+            return Response({"detail": "Funny image generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        funny_image_phrase = {
+            "label": "funny image",
+            "source_text": str(phrase.get("source_text", "")).strip(),
+            "target_text": target_text,
+            "image_url": image_url,
+            "image_prompt": final_image_prompt,
+        }
+        exercise_phrases = dict(item.exercise_phrases or {})
+        exercise_phrases["funny_image_phrase"] = funny_image_phrase
+        item.exercise_phrases = exercise_phrases
+        item.save(update_fields=["exercise_phrases", "updated_at"])
+        return Response({"exercise_phrases": exercise_phrases})

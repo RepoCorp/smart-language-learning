@@ -155,6 +155,25 @@ def generate_word_exercise_phrases_with_chatgpt(
     )
 
 
+def generate_funny_image_exercise_phrase_with_chatgpt(
+    source_word: str,
+    target_word: str,
+    notes: str = "",
+    word_type: str = "",
+    source_language: str = "spanish",
+    target_language: str = "german",
+) -> dict:
+    return _words.generate_funny_image_exercise_phrase_with_chatgpt(
+        source_word,
+        target_word,
+        notes=notes,
+        word_type=word_type,
+        source_language=source_language,
+        target_language=target_language,
+        call_openai_json_fn=call_openai_json,
+    )
+
+
 def generate_conversation_with_chatgpt(
     topic: str,
     context: str = "",

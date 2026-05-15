@@ -7,6 +7,8 @@ export interface ExercisePhrase {
   label?: string;
   source_text: string;
   target_text: string;
+  image_url?: string;
+  image_prompt?: string;
 }
 
 export interface ItemExercisePhrases {
@@ -14,6 +16,7 @@ export interface ItemExercisePhrases {
   first_section?: ExercisePhrase[];
   second_section?: ExercisePhrase[];
   generation_mode?: string;
+  funny_image_phrase?: ExercisePhrase;
 }
 
 export interface SessionItem {

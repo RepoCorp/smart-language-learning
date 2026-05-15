@@ -376,6 +376,24 @@ export async function generateContentItemExercises(
   return (await response.json()) as { exercise_phrases?: ItemExercisePhrases };
 }
 
+export async function generateContentItemFunnyImageExercise(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{ exercise_phrases?: ItemExercisePhrases }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/exercises/funny-image?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to generate funny image exercise");
+  }
+  return (await response.json()) as { exercise_phrases?: ItemExercisePhrases };
+}
+
 export async function deleteContentItem(
   itemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",

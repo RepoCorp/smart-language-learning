@@ -15,7 +15,7 @@ from .management import (
     ContentWordQuickAddView,
     ContentWordsView,
 )
-from .management_items import ContentItemExercisesView
+from .management_items import ContentItemExercisesView, ContentItemFunnyImageExerciseView
 from .management_dialogs_listing import ContentDialogsView
 from .topics import ContentTopicContextsView, ContentTopicsView, save_topic
 
@@ -23,6 +23,7 @@ __all__ = [
     "ContentConfirmView",
     "ContentItemDetailView",
     "ContentItemExercisesView",
+    "ContentItemFunnyImageExerciseView",
     "ContentDialogsView",
     "ContentItemMarkLearnedView",
     "ContentItemQuestionView",
