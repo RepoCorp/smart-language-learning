@@ -91,6 +91,11 @@ AWS_S3_AUDIO_BUCKET = os.getenv("AWS_S3_AUDIO_BUCKET", "").strip()
 AWS_S3_AUDIO_PREFIX = os.getenv("AWS_S3_AUDIO_PREFIX", "audio").strip().strip("/")
 AWS_S3_AUDIO_REGION = os.getenv("AWS_S3_AUDIO_REGION", os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", ""))).strip()
 AWS_S3_AUDIO_BASE_URL = os.getenv("AWS_S3_AUDIO_BASE_URL", "").strip().rstrip("/")
+IMAGE_STORAGE_BACKEND = os.getenv("IMAGE_STORAGE_BACKEND", AUDIO_STORAGE_BACKEND).strip().lower()
+AWS_S3_IMAGE_BUCKET = os.getenv("AWS_S3_IMAGE_BUCKET", AWS_S3_AUDIO_BUCKET).strip()
+AWS_S3_IMAGE_PREFIX = os.getenv("AWS_S3_IMAGE_PREFIX", "exercise-images").strip().strip("/")
+AWS_S3_IMAGE_REGION = os.getenv("AWS_S3_IMAGE_REGION", AWS_S3_AUDIO_REGION).strip()
+AWS_S3_IMAGE_BASE_URL = os.getenv("AWS_S3_IMAGE_BASE_URL", "").strip().rstrip("/")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
 LOGGING = {

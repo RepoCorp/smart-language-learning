@@ -5,7 +5,6 @@ Return strict JSON with this exact shape:
   "phrases": [
     {"label": "singular", "source_text": "string", "target_text": "string"},
     {"label": "plural", "source_text": "string", "target_text": "string"},
-    {"label": "nominative", "source_text": "string", "target_text": "string"},
     {"label": "dative", "source_text": "string", "target_text": "string"},
     {"label": "accusative", "source_text": "string", "target_text": "string"},
     {"label": "definite", "source_text": "string", "target_text": "string"},
@@ -14,11 +13,11 @@ Return strict JSON with this exact shape:
 }
 
 Rules:
-- Return exactly 7 phrases, one for each listed label, in the listed order.
+- Return exactly 6 phrases, one for each listed label, in the listed order.
 - Keep every phrase short (max 6 words), practical, and beginner-friendly (A1-A2).
 - Each target_text must clearly practice its label.
 - Never return only the noun by itself or only article + noun, such as "der Tisch" or "die Tische"; every item must be a real phrase with context.
-- Cover singular and plural forms.
+- Singular and plural forms should use the nominative case.
 - Cover nominative, dative, and accusative uses.
 - Cover definite and indefinite article forms.
 - For plural indefinite in German, use natural bare plural forms when there is no indefinite article.

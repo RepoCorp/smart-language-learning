@@ -974,10 +974,19 @@ textarea {
 
 .exercise-modal {
   width: min(760px, 95vw);
+  max-height: min(85vh, 760px);
+  overflow: hidden;
 }
 
 .verb-exercise-modal {
   width: min(1180px, 98vw);
+}
+
+.exercise-modal-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 4px 2px 0;
 }
 
 .questions-modal {

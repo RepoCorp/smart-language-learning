@@ -18,3 +18,9 @@ AWS_S3_AUDIO_PREFIX=audio
 AWS_S3_AUDIO_REGION=<AWS_REGION>
 # Optional; set if using CloudFront/custom domain, e.g. https://cdn.yourdomain.com
 AWS_S3_AUDIO_BASE_URL=
+# Optional; defaults to the audio S3 settings when omitted
+IMAGE_STORAGE_BACKEND=s3
+AWS_S3_IMAGE_BUCKET=<S3_BUCKET_NAME>
+AWS_S3_IMAGE_PREFIX=exercise-images
+AWS_S3_IMAGE_REGION=<AWS_REGION>
+AWS_S3_IMAGE_BASE_URL=

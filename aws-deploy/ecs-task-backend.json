@@ -38,7 +38,11 @@
         { "name": "AUDIO_STORAGE_BACKEND", "value": "s3" },
         { "name": "AWS_S3_AUDIO_BUCKET", "value": "<S3_BUCKET_NAME>" },
         { "name": "AWS_S3_AUDIO_PREFIX", "value": "audio" },
-        { "name": "AWS_S3_AUDIO_REGION", "value": "us-east-1" }
+        { "name": "AWS_S3_AUDIO_REGION", "value": "us-east-1" },
+        { "name": "IMAGE_STORAGE_BACKEND", "value": "s3" },
+        { "name": "AWS_S3_IMAGE_BUCKET", "value": "<S3_BUCKET_NAME>" },
+        { "name": "AWS_S3_IMAGE_PREFIX", "value": "exercise-images" },
+        { "name": "AWS_S3_IMAGE_REGION", "value": "us-east-1" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

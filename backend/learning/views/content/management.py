@@ -1200,22 +1200,51 @@ def _basic_word_metadata(
     parsed = _call_openai_json_logged(
         label="basic_word_metadata",
         system_prompt=f"""
-You normalize vocabulary for a language-learning app.
+Given a German phrase and a clicked word, return a normalized study entry.
+
+The goal is to avoid duplicate study items caused by conjugation, plural forms, or grammatical variations.
 
 Return strict JSON:
 {{
   "source_text": "string",
   "target_text": "string",
-  "word_type": "noun|verb|adjective|adverb|expression|other"
+  "word_type": "noun|verb|adjective|adverb|helper|expression|other"
 }}
 
 Rules:
-- Identify the word type of the vocabulary item.
-- Return basic/canonical dictionary forms in both languages.
-- For nouns, use singular forms and include the corresponding article where the language naturally studies nouns with articles.
-- For verbs, use the infinitive.
-- For adjectives and adverbs, use the uninflected base form.
-- Keep fixed multi-word expressions only when the clicked item is genuinely an expression.
+- Nouns:
+  - Return nominative singular with article.
+  - Example: "Hunden" → "der Hund"
+
+- Verbs:
+  - Return the infinitive.
+  - Example: "ging" → "gehen"
+
+- Helper words:
+  - Use type "helper" for modal verbs, auxiliary verbs, and grammar-helper forms.
+  - Normalize conjugations to a single study form.
+  - Examples:
+    - "kann" → "können"
+    - "werde" used for future tense → "werden"
+    - "würde" → "würde"
+    - "habe" used only to build perfect tense → "haben"
+
+- If a word can be both a normal verb and a helper, use the phrase context:
+  - "Ich werde Arzt." → "werden" with type "verb"
+  - "Ich werde gehen." → "werden" with type "helper"
+
+- Adjectives and adverbs:
+  - Return the base form when possible.
+
+- Expressions:
+  - Use type "expression" only for multi-word expressions or meanings that cannot be understood word-by-word.
+
+- Avoid creating separate entries for:
+  - conjugations
+  - plural/singular variants
+  - case variations
+  - grammatical helper forms of the same word
+
 - Use context only to resolve meaning and morphology. Do not return a whole sentence.
 - JSON only.
 """.strip(),

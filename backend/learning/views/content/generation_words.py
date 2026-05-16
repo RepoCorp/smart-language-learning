@@ -69,6 +69,16 @@ VERB_TENSE_SPECS = [
     ("simple-past", "Simple past"),
     ("future", "Future"),
 ]
+FUNNY_IMAGE_INSTRUCTIONS_BY_WORD_TYPE = {
+    "noun": (
+        "- The target word itself must be the grammatical subject of the sentence.\n"
+        "- The sentence should preferably begin with the target noun and its article."
+    ),
+    "verb": "- The target verb must describe the main visible action.",
+    "adjective": "- The target adjective must describe a clearly visible property.",
+    "preposition": "- The scene must make the spatial relationship visually obvious.",
+    "adverb": "- The adverb must visibly affect the action.",
+}
 
 
 def _language_label(code: str) -> str:
@@ -153,6 +163,40 @@ def _funny_image_phrase_input(
     )
 
 
+def _funny_image_prompt_for_word_type(word_type: str) -> str:
+    normalized = (word_type or "").strip().lower()
+    word_type_instructions = FUNNY_IMAGE_INSTRUCTIONS_BY_WORD_TYPE.get(normalized, "")
+    if word_type_instructions:
+        word_type_instructions = f"\n{word_type_instructions}"
+    return f"""
+Generate one simple visual exercise phrase for a vocabulary item.
+
+Return strict JSON with this exact shape:
+{{
+  "source_text": "string",
+  "target_text": "string"
+}}
+
+Rules:
+- target_text must be in the target language.
+- source_text must be the natural translation in the source language.
+- The phrase must center around the target word.
+- The target word must play the central visual role in the scene.{word_type_instructions}
+- Use very simple vocabulary and grammar.
+- The phrase must describe ONE concrete visual scene that can be illustrated instantly.
+- Prefer slightly unusual, playful, or emotionally distinctive scenes that improve memorability.
+- The scene should still feel plausible and easy to understand for a beginner.
+- Prefer a small funny scene over a neutral object-location sentence.
+- Avoid the most typical textbook examples.
+- Keep target_text short (3–7 words preferred).
+- Avoid abstract concepts, opinions, generic descriptions, or invisible actions.
+- Avoid filler phrases like “is good,” “is important,” etc.
+- Prefer strong visual nouns, colors, clothing, food, vehicles, animals, or locations.
+- The sentence should sound natural when repeated aloud many times.
+- Return JSON only, no markdown and no extra text.
+""".strip()
+
+
 def generate_funny_image_exercise_phrase_with_chatgpt(
     source_word: str,
     target_word: str,
@@ -164,31 +208,7 @@ def generate_funny_image_exercise_phrase_with_chatgpt(
     call_openai_json_fn,
 ) -> dict:
     parsed = call_openai_json_fn(
-        """
-Generate one simple visual exercise phrase for a vocabulary item.
-
-Return strict JSON with this exact shape:
-{
-  "source_text": "string",
-  "target_text": "string"
-}
-
-Rules:
-- target_text must be in the target language and source_text must be its source-language translation.
-- Make target_text one simple beginner-friendly phrase or sentence.
-- target_text must be a real phrase or sentence with at least 3 words.
-- Never return only the vocabulary word, and never return only an article plus the word.
-- Use the target word in nominative form when grammar allows it.
-- For nouns, the target word should be the subject or predicate nominative, not dative or accusative.
-- The phrase must describe a concrete visible action, location, or state that can be drawn.
-- Prefer specific everyday scenes over abstract judgments.
-- Do not use generic filler phrases such as "is important", "is good", "is nice", "is useful", or their equivalents.
-- Do not use abstract adjectives unless they create a visible scene.
-- Do not make the phrase funny or surreal; keep it simple and literal.
-- Keep target_text short enough to fit inside an image, ideally 3-7 words.
-- Good phrase shapes: "The dog sleeps under the table", "The red cup is on the chair", "The child opens the window".
-- Return JSON only, no markdown and no extra text.
-""".strip(),
+        _funny_image_prompt_for_word_type(word_type),
         _funny_image_phrase_input(
             source_word=source_word,
             target_word=target_word,
@@ -198,7 +218,7 @@ Rules:
             target_language=target_language,
         ),
         timeout_seconds=12,
-        temperature=0.75,
+        temperature=0.9,
         top_p=0.9,
         presence_penalty=0.2,
     )

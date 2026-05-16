@@ -987,189 +987,191 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               <strong>{t("newItem.exercisesTitle")}</strong>
             </p>
             <p className="hint">{t("newItem.exercisesDescription")}</p>
-            {loadingExercises && <p className="hint">{t("newItem.exercisesGenerating")}</p>}
-            {exerciseError && <p className="error">{exerciseError}</p>}
-            {item.item_type === "word" && (
-              <>
-                <div className="exercise-selection-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={selectAllExerciseEntries}
-                    disabled={exerciseRunning || wordExerciseEntries.length === 0}
-                  >
-                    {t("newItem.exercisesSelectAll")}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={selectRandomExerciseEntries}
-                    disabled={exerciseRunning || wordExerciseEntries.length === 0}
-                  >
-                    {t("newItem.exercisesRandomSelection")}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={unselectAllExerciseEntries}
-                    disabled={exerciseRunning || selectedExerciseKeys.length === 0}
-                  >
-                    {t("newItem.exercisesUnselectAll")}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => void generateFunnyImageExercise()}
-                    disabled={generatingFunnyImageExercise || item.id <= 0}
-                  >
-                    {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
-                  </button>
-                </div>
-                {generatingFunnyImageExercise && (
-                  <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>
-                )}
-                {funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
-                  <div className="funny-image-phrase-row">
-                    <label className={`exercise-phrase-row ${selectedExerciseKeys.includes(exerciseEntryKey(funnyImageExerciseSelectionEntry)) ? "exercise-phrase-row-selected" : ""}`}>
-                      <input
-                        type="checkbox"
-                        checked={selectedExerciseKeys.includes(exerciseEntryKey(funnyImageExerciseSelectionEntry))}
-                        onChange={() => toggleExerciseEntry(funnyImageExerciseSelectionEntry)}
-                        disabled={exerciseRunning}
-                      />
-                      <span>
-                        <strong>{funnyImageExerciseSelectionEntry.target}</strong>
-                        <small>{funnyImageExerciseSelectionEntry.source}</small>
-                        <em className="exercise-phrase-label">{funnyImageExerciseSelectionEntry.label}</em>
-                      </span>
-                    </label>
+            <div className="exercise-modal-scroll">
+              {loadingExercises && <p className="hint">{t("newItem.exercisesGenerating")}</p>}
+              {exerciseError && <p className="error">{exerciseError}</p>}
+              {item.item_type === "word" && (
+                <>
+                  <div className="exercise-selection-actions">
                     <button
                       type="button"
-                      className="secondary-button funny-image-open-button"
-                      onClick={() => setShowFunnyImageModal(true)}
+                      className="secondary-button"
+                      onClick={selectAllExerciseEntries}
+                      disabled={exerciseRunning || wordExerciseEntries.length === 0}
                     >
-                      {t("newItem.exercisesFunnyImageShow")}
+                      {t("newItem.exercisesSelectAll")}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={selectRandomExerciseEntries}
+                      disabled={exerciseRunning || wordExerciseEntries.length === 0}
+                    >
+                      {t("newItem.exercisesRandomSelection")}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={unselectAllExerciseEntries}
+                      disabled={exerciseRunning || selectedExerciseKeys.length === 0}
+                    >
+                      {t("newItem.exercisesUnselectAll")}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => void generateFunnyImageExercise()}
+                      disabled={generatingFunnyImageExercise || item.id <= 0}
+                    >
+                      {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
                     </button>
                   </div>
-                )}
-                {isVerbExerciseGrid ? (
-                  <div className="verb-exercise-wrap">
-                    {wordOnlyExerciseEntry && (
-                      <label className={`exercise-phrase-row verb-word-row ${selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry)) ? "exercise-phrase-row-selected" : ""}`}>
+                  {generatingFunnyImageExercise && (
+                    <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>
+                  )}
+                  {funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
+                    <div className="funny-image-phrase-row">
+                      <label className={`exercise-phrase-row ${selectedExerciseKeys.includes(exerciseEntryKey(funnyImageExerciseSelectionEntry)) ? "exercise-phrase-row-selected" : ""}`}>
                         <input
                           type="checkbox"
-                          checked={selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry))}
-                          onChange={() => toggleExerciseEntry(wordOnlyExerciseEntry)}
+                          checked={selectedExerciseKeys.includes(exerciseEntryKey(funnyImageExerciseSelectionEntry))}
+                          onChange={() => toggleExerciseEntry(funnyImageExerciseSelectionEntry)}
                           disabled={exerciseRunning}
                         />
                         <span>
-                          <strong>{wordOnlyExerciseEntry.target}</strong>
-                          <small>{wordOnlyExerciseEntry.source}</small>
-                          <em className="exercise-phrase-label">{wordOnlyExerciseEntry.label}</em>
+                          <strong>{funnyImageExerciseSelectionEntry.target}</strong>
+                          <small>{funnyImageExerciseSelectionEntry.source}</small>
+                          <em className="exercise-phrase-label">{funnyImageExerciseSelectionEntry.label}</em>
                         </span>
                       </label>
-                    )}
-                    <div className="verb-exercise-grid" role="table" aria-label={t("newItem.exercisesTitle")}>
-                      <div className="verb-exercise-cell verb-exercise-corner" role="columnheader" />
-                      {VERB_TENSES.map((tense) => {
-                        const keys = verbExerciseKeysForTense(tense.key);
-                        const selected = keys.length > 0 && keys.every((key) => selectedExerciseKeys.includes(key));
-                        return (
-                          <button
-                            key={tense.key}
-                            type="button"
-                            className={`verb-exercise-cell verb-exercise-header ${selected ? "verb-exercise-selected" : ""}`}
-                            onClick={() => selectVerbExerciseTense(tense.key)}
-                            disabled={exerciseRunning || keys.length === 0}
-                          >
-                            {tense.label}
-                          </button>
-                        );
-                      })}
-                      {VERB_PERSONS.map((person) => {
-                        const rowKeys = verbExerciseKeysForPerson(person.key);
-                        const rowSelected = rowKeys.length > 0 && rowKeys.every((key) => selectedExerciseKeys.includes(key));
-                        return (
-                          <Fragment key={person.key}>
-                            <button
-                              key={`${person.key}-row`}
-                              type="button"
-                              className={`verb-exercise-cell verb-exercise-header verb-exercise-person ${rowSelected ? "verb-exercise-selected" : ""}`}
-                              onClick={() => selectVerbExercisePerson(person.key)}
-                              disabled={exerciseRunning || rowKeys.length === 0}
-                            >
-                              {person.label}
-                            </button>
-                            {VERB_TENSES.map((tense) => {
-                              const entry = verbExerciseGridEntryBySlot.get(`${person.key}-${tense.key}`);
-                              const key = entry ? exerciseEntryKey(entry) : `${person.key}-${tense.key}`;
-                              const selected = entry ? selectedExerciseKeys.includes(key) : false;
-                              if (!entry) {
-                                return (
-                                  <div key={key} className="verb-exercise-cell verb-exercise-entry" role="cell">
-                                    <span className="manage-item-meta">-</span>
-                                  </div>
-                                );
-                              }
-                              return (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  className={`verb-exercise-cell verb-exercise-entry ${selected ? "verb-exercise-selected" : ""}`}
-                                  onClick={() => toggleExerciseEntry(entry)}
-                                  disabled={exerciseRunning}
-                                >
-                                  <strong>{entry.target}</strong>
-                                  <small>{entry.source}</small>
-                                </button>
-                              );
-                            })}
-                          </Fragment>
-                        );
-                      })}
+                      <button
+                        type="button"
+                        className="secondary-button funny-image-open-button"
+                        onClick={() => setShowFunnyImageModal(true)}
+                      >
+                        {t("newItem.exercisesFunnyImageShow")}
+                      </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="exercise-phrase-list">
-                    {regularWordExerciseEntries.map((entry) => {
-                      const key = exerciseEntryKey(entry);
-                      const checked = selectedExerciseKeys.includes(key);
-                      return (
-                        <label className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`} key={key}>
+                  )}
+                  {isVerbExerciseGrid ? (
+                    <div className="verb-exercise-wrap">
+                      {wordOnlyExerciseEntry && (
+                        <label className={`exercise-phrase-row verb-word-row ${selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry)) ? "exercise-phrase-row-selected" : ""}`}>
                           <input
                             type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleExerciseEntry(entry)}
+                            checked={selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry))}
+                            onChange={() => toggleExerciseEntry(wordOnlyExerciseEntry)}
                             disabled={exerciseRunning}
                           />
                           <span>
-                            <strong>{entry.target}</strong>
-                            <small>{entry.source}</small>
-                            {entry.label && <em className="exercise-phrase-label">{entry.label}</em>}
+                            <strong>{wordOnlyExerciseEntry.target}</strong>
+                            <small>{wordOnlyExerciseEntry.source}</small>
+                            <em className="exercise-phrase-label">{wordOnlyExerciseEntry.label}</em>
                           </span>
                         </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-            {item.item_type === "word" && wordExerciseEntries.length === 0 && (
-              <p className="hint">{t("newItem.exercisesUnavailable")}</p>
-            )}
-            {item.item_type === "phrase" && (
-              <div className="exercise-section-grid">
-                <div className="exercise-section-card exercise-section-card-selected">
-                  <strong>{t("newItem.exercisesPhraseTitle")}</strong>
-                  <ul>
-                    <li>{item.german_text}</li>
-                  </ul>
-                  <div className="exercise-translation-group">
-                    {sourceLanguageLabel}: {item.spanish_text}
+                      )}
+                      <div className="verb-exercise-grid" role="table" aria-label={t("newItem.exercisesTitle")}>
+                        <div className="verb-exercise-cell verb-exercise-corner" role="columnheader" />
+                        {VERB_TENSES.map((tense) => {
+                          const keys = verbExerciseKeysForTense(tense.key);
+                          const selected = keys.length > 0 && keys.every((key) => selectedExerciseKeys.includes(key));
+                          return (
+                            <button
+                              key={tense.key}
+                              type="button"
+                              className={`verb-exercise-cell verb-exercise-header ${selected ? "verb-exercise-selected" : ""}`}
+                              onClick={() => selectVerbExerciseTense(tense.key)}
+                              disabled={exerciseRunning || keys.length === 0}
+                            >
+                              {tense.label}
+                            </button>
+                          );
+                        })}
+                        {VERB_PERSONS.map((person) => {
+                          const rowKeys = verbExerciseKeysForPerson(person.key);
+                          const rowSelected = rowKeys.length > 0 && rowKeys.every((key) => selectedExerciseKeys.includes(key));
+                          return (
+                            <Fragment key={person.key}>
+                              <button
+                                key={`${person.key}-row`}
+                                type="button"
+                                className={`verb-exercise-cell verb-exercise-header verb-exercise-person ${rowSelected ? "verb-exercise-selected" : ""}`}
+                                onClick={() => selectVerbExercisePerson(person.key)}
+                                disabled={exerciseRunning || rowKeys.length === 0}
+                              >
+                                {person.label}
+                              </button>
+                              {VERB_TENSES.map((tense) => {
+                                const entry = verbExerciseGridEntryBySlot.get(`${person.key}-${tense.key}`);
+                                const key = entry ? exerciseEntryKey(entry) : `${person.key}-${tense.key}`;
+                                const selected = entry ? selectedExerciseKeys.includes(key) : false;
+                                if (!entry) {
+                                  return (
+                                    <div key={key} className="verb-exercise-cell verb-exercise-entry" role="cell">
+                                      <span className="manage-item-meta">-</span>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    className={`verb-exercise-cell verb-exercise-entry ${selected ? "verb-exercise-selected" : ""}`}
+                                    onClick={() => toggleExerciseEntry(entry)}
+                                    disabled={exerciseRunning}
+                                  >
+                                    <strong>{entry.target}</strong>
+                                    <small>{entry.source}</small>
+                                  </button>
+                                );
+                              })}
+                            </Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="exercise-phrase-list">
+                      {regularWordExerciseEntries.map((entry) => {
+                        const key = exerciseEntryKey(entry);
+                        const checked = selectedExerciseKeys.includes(key);
+                        return (
+                          <label className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`} key={key}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleExerciseEntry(entry)}
+                              disabled={exerciseRunning}
+                            />
+                            <span>
+                              <strong>{entry.target}</strong>
+                              <small>{entry.source}</small>
+                              {entry.label && <em className="exercise-phrase-label">{entry.label}</em>}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+              {item.item_type === "word" && wordExerciseEntries.length === 0 && (
+                <p className="hint">{t("newItem.exercisesUnavailable")}</p>
+              )}
+              {item.item_type === "phrase" && (
+                <div className="exercise-section-grid">
+                  <div className="exercise-section-card exercise-section-card-selected">
+                    <strong>{t("newItem.exercisesPhraseTitle")}</strong>
+                    <ul>
+                      <li>{item.german_text}</li>
+                    </ul>
+                    <div className="exercise-translation-group">
+                      {sourceLanguageLabel}: {item.spanish_text}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <p className="exercise-timer">
               <strong>{t("newItem.exercisesTimeLeft", { seconds: exerciseSecondsLeft })}</strong>

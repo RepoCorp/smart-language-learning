@@ -219,12 +219,80 @@ def _build_local_image_url(filename: str) -> str:
     return f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
 
 
+def _build_s3_image_url(key: str) -> str:
+    explicit_base_url = str(getattr(settings, "AWS_S3_IMAGE_BASE_URL", "")).strip().rstrip("/")
+    if explicit_base_url:
+        normalized_key = key.lstrip("/")
+        prefix = str(getattr(settings, "AWS_S3_IMAGE_PREFIX", "exercise-images")).strip().strip("/")
+        if prefix:
+            base_suffix = f"/{prefix.lower()}"
+            key_prefix = f"{prefix.lower()}/"
+            if explicit_base_url.lower().endswith(base_suffix) and normalized_key.lower().startswith(key_prefix):
+                normalized_key = normalized_key[len(prefix) + 1 :]
+        return f"{explicit_base_url}/{normalized_key}"
+
+    bucket = str(getattr(settings, "AWS_S3_IMAGE_BUCKET", "")).strip()
+    region = str(getattr(settings, "AWS_S3_IMAGE_REGION", "")).strip()
+    if region:
+        return f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
+    return f"https://{bucket}.s3.amazonaws.com/{key}"
+
+
 def _save_exercise_image(image_bytes: bytes) -> str:
     if not image_bytes:
         return ""
+    filename = f"exercise-image-{uuid4().hex}.png"
+    storage_backend = str(getattr(settings, "IMAGE_STORAGE_BACKEND", "local")).strip().lower()
+    if storage_backend == "s3":
+        bucket = str(getattr(settings, "AWS_S3_IMAGE_BUCKET", "")).strip()
+        if not bucket:
+            logger.warning("content.exercises.image_failed_s3 reason=missing_bucket filename=%s", filename)
+            return ""
+
+        prefix = str(getattr(settings, "AWS_S3_IMAGE_PREFIX", "exercise-images")).strip().strip("/")
+        key = f"{prefix}/{filename}" if prefix else filename
+
+        try:
+            import boto3
+        except Exception:
+            logger.warning("content.exercises.image_failed_s3 reason=missing_boto3 filename=%s", filename)
+            return ""
+
+        s3_client_kwargs: dict[str, str] = {}
+        region = str(getattr(settings, "AWS_S3_IMAGE_REGION", "")).strip()
+        if region:
+            s3_client_kwargs["region_name"] = region
+
+        logger.info(
+            "content.exercises.image_s3_upload_started filename=%s bucket=%s key=%s bytes=%d region=%s",
+            filename,
+            bucket,
+            key,
+            len(image_bytes),
+            region or "default",
+        )
+        try:
+            boto3.client("s3", **s3_client_kwargs).put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=image_bytes,
+                ContentType="image/png",
+            )
+        except Exception as exc:
+            logger.warning(
+                "content.exercises.image_failed_s3_upload filename=%s bucket=%s key=%s error=%s",
+                filename,
+                bucket,
+                key,
+                exc.__class__.__name__,
+            )
+            return ""
+
+        logger.info("content.exercises.image_s3_upload_succeeded filename=%s bucket=%s key=%s", filename, bucket, key)
+        return _build_s3_image_url(key)
+
     image_dir = Path(settings.MEDIA_ROOT) / "exercise-images"
     image_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"exercise-image-{uuid4().hex}.png"
     (image_dir / filename).write_bytes(image_bytes)
     return _build_local_image_url(filename)
 

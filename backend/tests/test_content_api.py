@@ -1720,6 +1720,50 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
     assert "Generate exercise phrases for one vocabulary item" in captured_prompts[1]
 
 
+def test_funny_image_generation_uses_prompt_for_word_type():
+    from learning.views.content import generation_words
+
+    captured_prompts = []
+    expected_instructions = {
+        "noun": [
+            "grammatical subject of the sentence",
+            "preferably begin with the target noun and its article",
+        ],
+        "verb": ["main visible action"],
+        "adjective": ["clearly visible property"],
+        "preposition": ["spatial relationship visually obvious"],
+        "adverb": ["visibly affect the action"],
+    }
+
+    def fake_call_openai_json(prompt, user_input, **kwargs):
+        captured_prompts.append(prompt)
+        return {
+            "source_text": "La mesa lleva un sombrero.",
+            "target_text": "Der Tisch tragt einen Hut.",
+        }
+
+    for word_type in expected_instructions:
+        generation_words.generate_funny_image_exercise_phrase_with_chatgpt(
+            "la mesa",
+            "der Tisch",
+            word_type=word_type,
+            call_openai_json_fn=fake_call_openai_json,
+        )
+    generation_words.generate_funny_image_exercise_phrase_with_chatgpt(
+        "algo",
+        "etwas",
+        word_type="",
+        call_openai_json_fn=fake_call_openai_json,
+    )
+
+    for index, snippets in enumerate(expected_instructions.values()):
+        for snippet in snippets:
+            assert snippet in captured_prompts[index]
+    for snippets in expected_instructions.values():
+        for snippet in snippets:
+            assert snippet not in captured_prompts[-1]
+
+
 def test_verb_exercise_generation_requests_each_tense_separately():
     from learning.views.content import generation_words
 

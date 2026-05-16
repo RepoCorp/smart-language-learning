@@ -13,6 +13,7 @@ Cuando esta testeando o estudiando poder marcar un elemento como equivocado, ya 
 Lo de la cantidad de hints sigue fallando e incluso con una, y creo que incluso cuando una es menos del 30% esta marcandoloa como fallido
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
+Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la traduce como devolveria cuando realmente es volverse / llegar a ser y solo es devolveria junto con la plabra zuruckgeben
 Pilas con palabras que pueden ser masculino o femenino, cuando busca la palabra base que si diferencie las dos (el doctor, la doctora)
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
 No reconoce cuando cumplio el objetivo en la conversacion 
