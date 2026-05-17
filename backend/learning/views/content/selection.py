@@ -33,13 +33,25 @@ def normalize_word_pair(spanish_word: str, german_word: str) -> tuple[str, str]:
     return normalize_word_key(spanish_word), normalize_word_key(german_word)
 
 
+def normalize_word_identity(spanish_word: str, german_word: str, word_type: str = "") -> tuple[str, str, str]:
+    spanish, german = normalize_word_pair(spanish_word, german_word)
+    return spanish, german, normalize_word_key(word_type)
+
+
 def word_selection_id(candidate: ContentCandidate) -> str:
-    spanish, german = normalize_word_pair(candidate.spanish_text, candidate.german_text)
-    return f"{spanish}|||{german}"
+    spanish, german, word_type = normalize_word_identity(
+        candidate.spanish_text,
+        candidate.german_text,
+        candidate.word_type,
+    )
+    return f"{spanish}|||{german}|||{word_type}"
 
 
 def is_word_selected(candidate: ContentCandidate, selected_values: set[str]) -> bool:
     if word_selection_id(candidate) in selected_values:
+        return True
+    spanish, german = normalize_word_pair(candidate.spanish_text, candidate.german_text)
+    if f"{spanish}|||{german}" in selected_values:
         return True
     # Backward compatibility with previous frontend payloads.
     return normalize_word_key(candidate.spanish_text) in selected_values

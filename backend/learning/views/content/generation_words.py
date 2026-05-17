@@ -8,6 +8,7 @@ from ...prompts import (
     WORD_EXERCISES_ADJECTIVE_PROMPT,
     WORD_EXERCISES_ADVERB_PROMPT,
     WORD_EXERCISES_EXPRESSION_PROMPT,
+    WORD_EXERCISES_HELPER_PROMPT,
     WORD_EXERCISES_NOUN_PROMPT,
     WORD_EXERCISES_OTHER_PROMPT,
     WORD_EXERCISES_VERB_PROMPT,
@@ -52,6 +53,7 @@ WORD_EXERCISE_PROMPTS_BY_TYPE = {
     "verb": WORD_EXERCISES_VERB_PROMPT,
     "adjective": WORD_EXERCISES_ADJECTIVE_PROMPT,
     "adverb": WORD_EXERCISES_ADVERB_PROMPT,
+    "helper": WORD_EXERCISES_HELPER_PROMPT,
     "expression": WORD_EXERCISES_EXPRESSION_PROMPT,
     "other": WORD_EXERCISES_OTHER_PROMPT,
 }
@@ -404,14 +406,14 @@ def generate_keywords_for_phrase_with_chatgpt(
     cleaned_keywords: list[dict[str, str]] = []
     for keyword in keywords:
         if not isinstance(keyword, dict):
-            continue
-        spanish_word = str(keyword.get("source_text", keyword.get("spanish_text", ""))).strip()
-        german_word = str(keyword.get("target_text", keyword.get("german_text", ""))).strip()
+            return None
+        spanish_word = str(keyword.get("source_text", "")).strip()
+        german_word = str(keyword.get("target_text", "")).strip()
         word_type = str(keyword.get("word_type", "")).strip().lower()
         keyword_notes = str(keyword.get("notes", "")).strip()
-        plural_german = str(keyword.get("plural_target", keyword.get("plural_german", ""))).strip()
-        if not spanish_word or not german_word:
-            continue
+        plural_german = str(keyword.get("plural_target", "")).strip()
+        if not spanish_word or not german_word or not word_type:
+            return None
         cleaned_keywords.append(
             {
                 "spanish_text": spanish_word,

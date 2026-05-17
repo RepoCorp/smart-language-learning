@@ -7,8 +7,8 @@ from .management import (
     Request,
     Response,
     _link_word_to_dialog_turn,
-    _basic_word_metadata,
     _normalized_pair,
+    _normalize_word_metadata,
     normalize_word_pair_for_item_save,
     _resolve_dialog_click_word_pair,
     apply_user_scope,
@@ -16,8 +16,99 @@ from .management import (
     create_word_if_missing,
     get_request_user,
     item_exists,
+    normalize_word_type,
     status,
 )
+
+
+def _without_first_word(value: str) -> str:
+    parts = value.split(maxsplit=1)
+    return parts[1].strip() if len(parts) == 2 else ""
+
+
+def _text_matches_with_missing_initial_word(existing_text: str, normalized_text: str) -> bool:
+    existing = " ".join((existing_text or "").split()).strip()
+    normalized = " ".join((normalized_text or "").split()).strip()
+    if existing.lower() == normalized.lower():
+        return True
+    normalized_without_first = _without_first_word(normalized)
+    return bool(normalized_without_first and existing.lower() == normalized_without_first.lower())
+
+
+def _find_existing_word_item(
+    *,
+    user,
+    source_language: str,
+    target_language: str,
+    source_text: str,
+    target_text: str,
+    word_type: str,
+) -> Item | None:
+    normalized_word_type = normalize_word_type(word_type)
+    existing = (
+        apply_user_scope(Item.objects, user).filter(
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+            spanish_text__iexact=source_text,
+            german_text__iexact=target_text,
+            word_type=normalized_word_type,
+        )
+        .order_by("-id")
+        .first()
+    )
+    if existing:
+        return existing
+
+    existing = (
+        apply_user_scope(Item.objects, user).filter(
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+            spanish_text__iexact=source_text,
+            german_text__iexact=target_text,
+            word_type="",
+        )
+        .order_by("-id")
+        .first()
+    )
+    if existing:
+        existing.word_type = normalized_word_type
+        existing.save(update_fields=["word_type", "updated_at"])
+        return existing
+
+    if normalized_word_type != "noun":
+        return None
+
+    matching_nouns = [
+        item
+        for item in apply_user_scope(Item.objects, user).filter(
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+            word_type__in=[normalized_word_type, ""],
+        )
+        if _text_matches_with_missing_initial_word(item.spanish_text, source_text)
+        and _text_matches_with_missing_initial_word(item.german_text, target_text)
+    ]
+    if len(matching_nouns) != 1:
+        return None
+
+    existing = matching_nouns[0]
+    update_fields = []
+    if existing.spanish_text != source_text:
+        existing.spanish_text = source_text
+        update_fields.append("spanish_text")
+    if existing.german_text != target_text:
+        existing.german_text = target_text
+        update_fields.append("german_text")
+    if existing.word_type != normalized_word_type:
+        existing.word_type = normalized_word_type
+        update_fields.append("word_type")
+    if update_fields:
+        update_fields.append("updated_at")
+        existing.save(update_fields=update_fields)
+    return existing
 
 
 class ContentWordQuickAddView(APIView):
@@ -41,26 +132,30 @@ class ContentWordQuickAddView(APIView):
         if not source_text or not target_text:
             return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        source_text, target_text = _resolve_dialog_click_word_pair(
-            user=user,
-            source_text=source_text,
-            target_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-            dialog_id_raw=dialog_id_raw,
-            turn_index_raw=turn_index_raw,
-            source_line=source_line,
-            target_line=target_line,
-            clicked_target_token=clicked_target_token,
-        )
-        source_text, target_text, word_type = _basic_word_metadata(
-            source_text=source_text,
-            target_text=target_text,
-            source_language=source_language,
-            target_language=target_language,
-            source_line=source_line,
-            target_line=target_line,
-        )
+        try:
+            source_text, target_text, word_type = _resolve_dialog_click_word_pair(
+                user=user,
+                source_text=source_text,
+                target_text=target_text,
+                source_language=source_language,
+                target_language=target_language,
+                dialog_id_raw=dialog_id_raw,
+                turn_index_raw=turn_index_raw,
+                source_line=source_line,
+                target_line=target_line,
+                clicked_target_token=clicked_target_token,
+            )
+            source_text, target_text, word_type = _normalize_word_metadata(
+                source_text=source_text,
+                target_text=target_text,
+                word_type=word_type,
+                source_language=source_language,
+                target_language=target_language,
+                source_line=source_line,
+                target_line=target_line,
+            )
+        except RuntimeError:
+            return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         source_text, target_text = normalize_word_pair_for_item_save(
             spanish_text=source_text,
             german_text=target_text,
@@ -68,26 +163,16 @@ class ContentWordQuickAddView(APIView):
             target_language=target_language,
         )
 
-        exists = item_exists(
+        existing = _find_existing_word_item(
             user=user,
-            item_type="word",
-            spanish_text=source_text,
-            german_text=target_text,
             source_language=source_language,
             target_language=target_language,
+            source_text=source_text,
+            target_text=target_text,
+            word_type=word_type,
         )
-        if exists:
-            existing = (
-                apply_user_scope(Item.objects, user).filter(
-                    item_type=Item.ItemType.WORD,
-                    source_language=source_language,
-                    target_language=target_language,
-                    spanish_text__iexact=source_text,
-                    german_text__iexact=target_text,
-                )
-                .order_by("-id")
-                .first()
-            )
+        if existing:
+            response_word_type = existing.word_type if existing.word_type else word_type
             if existing:
                 _link_word_to_dialog_turn(
                     user=user,
@@ -95,9 +180,6 @@ class ContentWordQuickAddView(APIView):
                     dialog_id_raw=dialog_id_raw,
                     turn_index_raw=turn_index_raw,
                 )
-                if not check_only and word_type and not existing.word_type:
-                    existing.word_type = word_type
-                    existing.save(update_fields=["word_type", "updated_at"])
             if check_only:
                 return Response(
                     {
@@ -106,17 +188,17 @@ class ContentWordQuickAddView(APIView):
                         "id": existing.id if existing else None,
                         "source_text": source_text,
                         "target_text": target_text,
-                        "word_type": existing.word_type if existing else word_type,
+                        "word_type": response_word_type,
                     }
                 )
             return Response(
                 {
                     "created": False,
                     "exists": True,
-                    "id": existing.id if existing else None,
+                    "id": existing.id,
                     "source_text": source_text,
                     "target_text": target_text,
-                    "word_type": existing.word_type if existing else word_type,
+                    "word_type": response_word_type,
                 }
             )
 
@@ -147,13 +229,31 @@ class ContentWordQuickAddView(APIView):
             target_language=target_language,
         )
         if created is None:
+            existing = _find_existing_word_item(
+                user=user,
+                source_language=source_language,
+                target_language=target_language,
+                source_text=source_text,
+                target_text=target_text,
+                word_type=word_type,
+            )
+            if existing:
+                _link_word_to_dialog_turn(
+                    user=user,
+                    item=existing,
+                    dialog_id_raw=dialog_id_raw,
+                    turn_index_raw=turn_index_raw,
+                )
+            else:
+                return Response({"detail": "Existing word lookup failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response(
                 {
                     "created": False,
                     "exists": True,
+                    "id": existing.id,
                     "source_text": source_text,
                     "target_text": target_text,
-                    "word_type": word_type,
+                    "word_type": existing.word_type,
                 }
             )
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { confirmContent, fetchContentTopicContexts, fetchContentTopics, previewContent, quickAddWordFromDialog } from "../api";
+import { confirmContent, fetchContentItemDetail, fetchContentTopicContexts, fetchContentTopics, previewContent, quickAddWordFromDialog } from "../api";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
-import type { ContentPreviewResponse } from "../types";
+import type { ContentPreviewResponse, SessionItem } from "../types";
+import NewItem from "./NewItem";
 
 const CREATE_NEW_OPTION = "__create_new__";
 
@@ -31,12 +32,15 @@ export default function ContentCreatePage(): JSX.Element {
     key: string;
     source: string;
     target: string;
+    wordType: string;
     sourceLine: string;
     targetLine: string;
     clickedTargetToken: string;
     turnIndex: number;
   } | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
+  const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
+  const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -222,14 +226,46 @@ export default function ContentCreatePage(): JSX.Element {
         targetToken,
       );
       if (check.exists) {
-        setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
+        if (!check.id) {
+          setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+          return;
+        }
+        setLoadingLinkedWord(true);
+        try {
+          const detail = await fetchContentItemDetail(check.id, sourceLanguage, targetLanguage);
+          setOpenedLinkedWord({
+            id: detail.id,
+            item_type: detail.item_type,
+            spanish_text: detail.spanish_text,
+            german_text: detail.german_text,
+            example_sentence: detail.example_sentence || "",
+            notes: detail.notes || "",
+            word_type: detail.word_type || check.word_type || "",
+            audio_url: detail.audio_url || "",
+            exercise_phrases: detail.exercise_phrases || {},
+            mode: "new",
+            direction: null,
+            options: [],
+            related_dialogs: detail.related_dialogs || [],
+            item_questions: detail.item_questions || [],
+          });
+          setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
+        } finally {
+          setLoadingLinkedWord(false);
+        }
         return;
       }
       setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
+      const resolvedWordType = String(check.word_type || "").trim();
+      if (!resolvedWordType) {
+        setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+        return;
+      }
       setPendingWordAdd({
         key,
         source: check.source_text || targetToken,
         target: check.target_text || targetToken,
+        wordType: resolvedWordType,
         sourceLine,
         targetLine,
         clickedTargetToken: targetToken,
@@ -507,6 +543,9 @@ export default function ContentCreatePage(): JSX.Element {
             <p className="add-word-modal-meaning">
               {t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}
             </p>
+            <p className="add-word-modal-type">
+              <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
+            </p>
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>
@@ -527,6 +566,14 @@ export default function ContentCreatePage(): JSX.Element {
           </div>
         </div>
       )}
+      {openedLinkedWord && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal words-item-modal">
+            <NewItem item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
+          </div>
+        </div>
+      )}
+      {loadingLinkedWord && <p className="hint">{t("session.loading")}</p>}
     </main>
   );
 }

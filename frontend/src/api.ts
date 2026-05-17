@@ -3,6 +3,7 @@ import type {
   ContentDialogsResponse,
   ContentItemsResponse,
   ContentItemDetailResponse,
+  ContentItemRefreshWordResponse,
   ContentItemConversationResponse,
   ContentItemQuestionResponse,
   ContentPreviewResponse,
@@ -394,6 +395,33 @@ export async function generateContentItemFunnyImageExercise(
   return (await response.json()) as { exercise_phrases?: ItemExercisePhrases };
 }
 
+export async function refreshContentItemWord(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemRefreshWordResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/refresh-word?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to refresh word";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemRefreshWordResponse;
+}
+
 export async function deleteContentItem(
   itemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
@@ -687,7 +715,7 @@ export async function quickAddWordFromDialog(
   sourceLine = "",
   targetLine = "",
   clickedTargetToken = "",
-): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string; word_type?: string }> {
+): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string; word_type?: string; audio_url?: string }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
@@ -718,6 +746,7 @@ export async function quickAddWordFromDialog(
     source_text?: string;
     target_text?: string;
     word_type?: string;
+    audio_url?: string;
   };
 }
 

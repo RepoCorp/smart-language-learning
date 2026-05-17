@@ -12,10 +12,12 @@ from django.conf import settings
 
 from .management import (
     APIView,
+    ContentCandidate,
     Item,
     Q,
     Request,
     Response,
+    _basic_word_metadata,
     _item_question_history,
     _next_review_days,
     _normalized_pair,
@@ -26,10 +28,20 @@ from .management import (
     status,
     timezone,
 )
-from .core import generate_funny_image_exercise_phrase_with_chatgpt, generate_word_exercise_phrases_with_chatgpt
+from ...models import DialogTurn, SavedDialog
+from .core import (
+    generate_funny_image_exercise_phrase_with_chatgpt,
+    generate_word_exercise_phrases_with_chatgpt,
+    normalize_word_type,
+    save_word_dialog_occurrences,
+)
 
 logger = logging.getLogger(__name__)
 MAX_EXERCISE_PHRASES = 30
+ARTICLES_BY_LANGUAGE = {
+    "spanish": {"el", "la", "los", "las", "un", "una", "unos", "unas"},
+    "german": {"der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines"},
+}
 
 
 class ContentItemsView(APIView):
@@ -178,6 +190,161 @@ class ContentItemMarkLearnedView(APIView):
         if updated == 0:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"ok": True, "is_learned": is_learned})
+
+
+class ContentItemRefreshWordView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+        if item.item_type != Item.ItemType.WORD:
+            return Response({"detail": "Refresh is only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
+
+        word_type_added = False
+        word_text_updated = False
+        normalized_word_type = normalize_word_type(item.word_type)
+        should_refresh_metadata = (
+            not normalized_word_type
+            or (
+                normalized_word_type == "noun"
+                and (
+                    not _text_has_article(item.spanish_text, source_language)
+                    or not _text_has_article(item.german_text, target_language)
+                )
+            )
+        )
+        if should_refresh_metadata:
+            try:
+                resolved_source, resolved_target, resolved_word_type = _basic_word_metadata(
+                    source_text=item.spanish_text,
+                    target_text=item.german_text,
+                    source_language=source_language,
+                    target_language=target_language,
+                    source_line="",
+                    target_line=item.example_sentence or "",
+                )
+            except RuntimeError:
+                return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            resolved_word_type = normalize_word_type(resolved_word_type)
+            if not resolved_word_type:
+                return Response({"detail": "Word metadata is incomplete"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            if normalized_word_type and resolved_word_type != normalized_word_type:
+                return Response({"detail": "Word metadata type mismatch"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            if resolved_word_type == "noun":
+                normalized_source = _normalize_spacing(resolved_source)
+                normalized_target = _normalize_spacing(resolved_target)
+                source_needs_article = not _text_has_article(item.spanish_text, source_language)
+                target_needs_article = not _text_has_article(item.german_text, target_language)
+                if source_needs_article and not _text_has_article(normalized_source, source_language):
+                    return Response({"detail": "Word metadata is missing source article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                if target_needs_article and not _text_has_article(normalized_target, target_language):
+                    return Response({"detail": "Word metadata is missing target article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                if (
+                    normalized_source
+                    and _text_has_article(normalized_source, source_language)
+                    and normalized_source != item.spanish_text
+                ):
+                    item.spanish_text = normalized_source
+                    word_text_updated = True
+                if (
+                    normalized_target
+                    and _text_has_article(normalized_target, target_language)
+                    and normalized_target != item.german_text
+                ):
+                    item.german_text = normalized_target
+                    word_text_updated = True
+            if not normalized_word_type:
+                item.word_type = resolved_word_type
+                word_type_added = True
+
+        generated = generate_word_exercise_phrases_with_chatgpt(
+            item.spanish_text,
+            item.german_text,
+            notes=item.notes or "",
+            word_type=item.word_type or "",
+            source_language=source_language,
+            target_language=target_language,
+        )
+        cleaned = _sanitize_exercise_payload(generated)
+        if not cleaned["phrases"]:
+            return Response({"detail": "Exercise generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        item.exercise_phrases = cleaned
+        update_fields = ["exercise_phrases", "updated_at"]
+        if word_type_added:
+            update_fields.append("word_type")
+        if word_text_updated:
+            update_fields.extend(["spanish_text", "german_text"])
+        item.save(update_fields=update_fields)
+
+        dialog_occurrences_created = _scan_all_dialogs_for_word(
+            user=user,
+            item=item,
+            source_language=source_language,
+            target_language=target_language,
+        )
+        related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
+        return Response(
+            {
+                "ok": True,
+                "spanish_text": item.spanish_text,
+                "german_text": item.german_text,
+                "word_type": item.word_type,
+                "word_type_added": word_type_added,
+                "word_text_updated": word_text_updated,
+                "exercise_phrases": cleaned,
+                "dialog_occurrences_created": dialog_occurrences_created,
+                "related_dialogs": related_dialogs_map.get(item.id, []),
+            }
+        )
+
+
+def _text_has_article(text: str, language: str) -> bool:
+    first = text.strip().split(" ", 1)[0].lower() if text.strip() else ""
+    return first in ARTICLES_BY_LANGUAGE.get(language, set())
+
+
+def _normalize_spacing(text: str) -> str:
+    return " ".join((text or "").split()).strip()
+
+
+def _scan_all_dialogs_for_word(
+    *,
+    user,
+    item: Item,
+    source_language: str,
+    target_language: str,
+) -> int:
+    candidate = ContentCandidate(
+        spanish_text=item.spanish_text,
+        german_text=item.german_text,
+        exists=True,
+        word_type=item.word_type or "",
+    )
+    created = 0
+    dialogs = apply_user_scope(SavedDialog.objects, user).filter(
+        source_language=source_language,
+        target_language=target_language,
+    )
+    for dialog in dialogs.order_by("id"):
+        turns = list(DialogTurn.objects.filter(dialog=dialog).order_by("turn_index", "id"))
+        if not turns:
+            continue
+        created += save_word_dialog_occurrences(
+            user=user,
+            dialog=dialog,
+            turns=turns,
+            word_candidates=[candidate],
+            source_language=source_language,
+            target_language=target_language,
+        )
+    return created
 
 
 def _sanitize_exercise_entries(value) -> list[dict[str, str]]:

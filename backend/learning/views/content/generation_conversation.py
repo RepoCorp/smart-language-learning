@@ -31,13 +31,13 @@ def _normalize_text(value: str) -> str:
     return " ".join(cleaned.split())
 
 
-def _normalize_speaker(value, default_index: int) -> str:
+def _normalize_speaker(value) -> str:
     raw = str(value or "").strip().lower()
     if raw in {"a", "speaker_a", "person_a", "1", "first"}:
         return "a"
     if raw in {"b", "speaker_b", "person_b", "2", "second"}:
         return "b"
-    return "a" if default_index % 2 == 0 else "b"
+    return ""
 
 
 def _language_label(code: str) -> str:
@@ -183,10 +183,10 @@ Rules:
         presence_penalty=0.2,
     )
     if not isinstance(parsed, dict):
-        return []
+        raise RuntimeError("Scenario generation failed")
     raw_scenarios = parsed.get("scenarios")
     if not isinstance(raw_scenarios, list):
-        return []
+        raise RuntimeError("Scenario generation failed")
     scenarios: list[str] = []
     seen: set[str] = set()
     for value in raw_scenarios:
@@ -200,6 +200,8 @@ Rules:
         scenarios.append(scenario[:260])
         if len(scenarios) >= 5:
             break
+    if len(scenarios) != 5:
+        raise RuntimeError("Scenario generation failed")
     return scenarios
 
 
@@ -215,19 +217,18 @@ def generate_conversation_with_chatgpt(
 ) -> list[dict[str, str]] | None:
     style_seed = choice_fn(STYLE_SEEDS)
     creativity_seed = uuid4().hex[:8]
-    scenario_pool = _generate_scenario_pool_with_chatgpt(
-        topic=topic,
-        context=context,
-        conversation_details=conversation_details,
-        source_language=source_language,
-        target_language=target_language,
-        call_openai_json_fn=call_openai_json_fn,
-    )
-    selected_scenario = (
-        choice_fn(scenario_pool)
-        if scenario_pool
-        else f"Create a practical, common scenario about {topic} ({context or 'general context'})."
-    )
+    try:
+        scenario_pool = _generate_scenario_pool_with_chatgpt(
+            topic=topic,
+            context=context,
+            conversation_details=conversation_details,
+            source_language=source_language,
+            target_language=target_language,
+            call_openai_json_fn=call_openai_json_fn,
+        )
+    except RuntimeError:
+        return None
+    selected_scenario = choice_fn(scenario_pool)
     logger.info(
         "content.generate.conversation.scenario_pool topic=%s details=%s selected=%s pool=%s",
         topic,
@@ -253,7 +254,7 @@ def generate_conversation_with_chatgpt(
         top_p=1.0,
         presence_penalty=0.2,
     )
-    if parsed is None:
+    if parsed is None or not isinstance(parsed, dict):
         return None
 
     conversation = parsed.get("conversation", [])
@@ -265,15 +266,12 @@ def generate_conversation_with_chatgpt(
     for index, phrase in enumerate(conversation):
         if not isinstance(phrase, dict):
             continue
-        source_text = str(phrase.get("source_text", phrase.get("spanish_text", ""))).strip()
-        target_text = str(phrase.get("target_text", phrase.get("german_text", ""))).strip()
+        source_text = str(phrase.get("source_text", "")).strip()
+        target_text = str(phrase.get("target_text", "")).strip()
         notes = str(phrase.get("notes", "")).strip()
-        speaker = _normalize_speaker(
-            phrase.get("speaker", phrase.get("speaker_role", phrase.get("person", ""))),
-            index,
-        )
-        if not source_text or not target_text:
-            continue
+        speaker = _normalize_speaker(phrase.get("speaker", ""))
+        if not source_text or not target_text or not speaker:
+            return None
         phrases.append(
             {
                 "spanish_text": source_text,

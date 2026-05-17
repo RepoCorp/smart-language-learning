@@ -1,7 +1,35 @@
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import DialogTurn, ExcludedWordSuggestion, Item, ItemQuestionExchange, SavedDialog, SavedTopic
+from learning.models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
+
+
+def test_basic_word_metadata_prompt_requires_noun_articles_in_both_languages(monkeypatch):
+    from learning.views.content import management as management_views
+
+    captured_prompts = []
+
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        captured_prompts.append(system_prompt)
+        if "return the clicked word's contextual translation and word type" in system_prompt:
+            return {"source_text": "recibo", "target_text": "Kassenbon", "word_type": "noun"}
+        if "Normalize a noun study entry" in system_prompt:
+            return {"source_text": "el recibo", "target_text": "der Kassenbon"}
+        return None
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+
+    source_text, target_text, word_type = management_views._basic_word_metadata(
+        source_text="recibo",
+        target_text="der Kassenbon",
+        source_language="spanish",
+        target_language="german",
+    )
+
+    assert (source_text, target_text, word_type) == ("el recibo", "der Kassenbon", "noun")
+    assert any("return the clicked word's contextual translation and word type" in prompt for prompt in captured_prompts)
+    assert any("Return singular with article in both source_text and target_text" in prompt for prompt in captured_prompts)
+    assert any("Use the correct article independently for each language" in prompt for prompt in captured_prompts)
 
 
 @pytest.mark.django_db
@@ -127,6 +155,72 @@ def test_create_word_if_missing_saves_word_type(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_create_word_if_missing_treats_word_type_as_identity(monkeypatch):
+    from learning.views.content import persistence
+    from learning.views.content.types import ContentCandidate
+
+    monkeypatch.setattr(
+        persistence,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    noun = persistence.create_word_if_missing(
+        user=None,
+        candidate=ContentCandidate(
+            spanish_text="la ayuda",
+            german_text="die Hilfe",
+            exists=False,
+            word_type="noun",
+        ),
+        topic="identity",
+    )
+    verb = persistence.create_word_if_missing(
+        user=None,
+        candidate=ContentCandidate(
+            spanish_text="la ayuda",
+            german_text="die Hilfe",
+            exists=False,
+            word_type="verb",
+        ),
+        topic="identity",
+    )
+    duplicate_noun = persistence.create_word_if_missing(
+        user=None,
+        candidate=ContentCandidate(
+            spanish_text="la ayuda",
+            german_text="die Hilfe",
+            exists=False,
+            word_type="noun",
+        ),
+        topic="identity",
+    )
+
+    assert noun is not None
+    assert verb is not None
+    assert duplicate_noun is None
+    assert Item.objects.filter(
+        item_type=Item.ItemType.WORD,
+        spanish_text="la ayuda",
+        german_text="die Hilfe",
+    ).count() == 2
+
+
+def test_word_selection_key_includes_word_type():
+    from learning.views.content.selection import word_selection_id
+    from learning.views.content.types import ContentCandidate
+
+    noun_key = word_selection_id(
+        ContentCandidate(spanish_text="la ayuda", german_text="die Hilfe", exists=False, word_type="noun")
+    )
+    verb_key = word_selection_id(
+        ContentCandidate(spanish_text="la ayuda", german_text="die Hilfe", exists=False, word_type="verb")
+    )
+
+    assert noun_key != verb_key
+
+
+@pytest.mark.django_db
 def test_content_confirm_only_creates_selected_words(monkeypatch):
     from learning.views import content as content_views
 
@@ -163,76 +257,6 @@ def test_content_confirm_only_creates_selected_words(monkeypatch):
     assert "avanzada" in created_words
     assert "aplicada" not in created_words
     assert Item.objects.filter(item_type=Item.ItemType.WORD, spanish_text="aplicada").exists() is False
-
-
-@pytest.mark.django_db
-def test_unchecked_words_are_excluded_from_future_suggestions(monkeypatch):
-    from learning.views import content as content_views
-
-    monkeypatch.setattr(
-        content_views,
-        "generate_content_with_chatgpt",
-        lambda topic: (
-            "Hoy estudio robotica aplicada avanzada.",
-            "Heute lerne ich angewandte fortgeschrittene Robotik.",
-            [
-                {"spanish_text": "robotica", "german_text": "die Robotik"},
-                {"spanish_text": "aplicada", "german_text": "die Anwendung"},
-                {"spanish_text": "avanzada", "german_text": "der Fortschritt"},
-            ],
-        ),
-    )
-
-    client = APIClient()
-    response = client.post(
-        "/api/content/confirm",
-        {"topic": "robotica aplicada avanzada", "selected_words": ["robotica", "avanzada"]},
-        format="json",
-    )
-    assert response.status_code == 200
-
-    assert ExcludedWordSuggestion.objects.filter(
-        spanish_text="aplicada",
-        german_text="die anwendung",
-    ).exists()
-
-    preview_response = client.post(
-        "/api/content/preview",
-        {"topic": "robotica aplicada avanzada"},
-        format="json",
-    )
-    assert preview_response.status_code == 200
-    words = preview_response.json()["words"]
-    preview_words = [word["spanish_text"].lower() for word in words]
-    assert "aplicada" not in preview_words
-
-
-@pytest.mark.django_db
-def test_exclusion_requires_spanish_and_german_match(monkeypatch):
-    from learning.views import content as content_views
-
-    ExcludedWordSuggestion.objects.create(spanish_text="banco", german_text="das bankinstitut")
-
-    monkeypatch.setattr(
-        content_views,
-        "generate_content_with_chatgpt",
-        lambda topic: (
-            "Hoy estudio en el banco del parque.",
-            "Heute lerne ich auf der Parkbank.",
-            [
-                {"spanish_text": "banco", "german_text": "die Parkbank"},
-                {"spanish_text": "parque", "german_text": "der Park"},
-            ],
-        ),
-    )
-
-    client = APIClient()
-    response = client.post("/api/content/preview", {"topic": "parque"}, format="json")
-
-    assert response.status_code == 200
-    words = response.json()["words"]
-    suggested_pairs = {(w["spanish_text"].lower(), w["german_text"].lower()) for w in words}
-    assert ("banco", "die parkbank") in suggested_pairs
 
 
 @pytest.mark.django_db
@@ -680,23 +704,22 @@ def test_generate_conversation_retries_after_validation_failure(monkeypatch):
         calls.append((user_input, kwargs))
         if len(calls) == 1:
             return {
-                "conversation": [
-                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
-                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
-                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
-                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
-                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
-                    {"spanish_text": "Hola, ¿cómo estás?", "german_text": "Hallo, wie geht es dir?", "notes": ""},
+                "scenarios": [
+                    "Comprar pan en una panaderia local.",
+                    "Pedir ayuda para encontrar una tienda.",
+                    "Preguntar el precio en una caja.",
+                    "Reservar una mesa sencilla.",
+                    "Comprar un billete de transporte.",
                 ]
             }
         return {
             "conversation": [
-                {"spanish_text": "Buenas, necesito pan.", "german_text": "Guten Tag, ich brauche Brot.", "notes": ""},
-                {"spanish_text": "Claro, aqui tiene uno.", "german_text": "Klar, hier haben Sie eins.", "notes": ""},
-                {"spanish_text": "Tambien quiero leche.", "german_text": "Ich moechte auch Milch.", "notes": ""},
-                {"spanish_text": "Perfecto, algo mas?", "german_text": "Perfekt, noch etwas?", "notes": ""},
-                {"spanish_text": "No, cuanto pago?", "german_text": "Nein, wie viel zahle ich?", "notes": ""},
-                {"spanish_text": "Son cinco euros.", "german_text": "Das sind fuenf Euro.", "notes": ""},
+                {"speaker": "a", "source_text": "Buenas, necesito pan.", "target_text": "Guten Tag, ich brauche Brot.", "notes": ""},
+                {"speaker": "b", "source_text": "Claro, aqui tiene uno.", "target_text": "Klar, hier haben Sie eins.", "notes": ""},
+                {"speaker": "a", "source_text": "Tambien quiero leche.", "target_text": "Ich moechte auch Milch.", "notes": ""},
+                {"speaker": "b", "source_text": "Perfecto, algo mas?", "target_text": "Perfekt, noch etwas?", "notes": ""},
+                {"speaker": "a", "source_text": "No, cuanto pago?", "target_text": "Nein, wie viel zahle ich?", "notes": ""},
+                {"speaker": "b", "source_text": "Son cinco euros.", "target_text": "Das sind fuenf Euro.", "notes": ""},
             ]
         }
 
@@ -707,14 +730,15 @@ def test_generate_conversation_retries_after_validation_failure(monkeypatch):
 
     assert phrases is not None
     assert len(calls) == 2
-    assert calls[0][1]["temperature"] == 0.9
-    assert calls[0][1]["top_p"] == 0.9
-    assert calls[0][1]["presence_penalty"] == 0.6
-    assert "Style seed: casual" in calls[0][0]
-    assert "Topic: shopping" in calls[0][0]
-    assert "Context: at a bakery" in calls[0][0]
-    assert "Situation detail: at a bakery" in calls[0][0]
-    assert "Retry instruction: more variation, same topic and level" in calls[1][0]
+    assert calls[0][1]["temperature"] == 0.8
+    assert calls[0][1]["top_p"] == 1.0
+    assert calls[0][1]["presence_penalty"] == 0.2
+    assert calls[1][1]["temperature"] == 0.75
+    assert "Style seed: casual" in calls[1][0]
+    assert "Topic: shopping" in calls[1][0]
+    assert "Context: at a bakery" in calls[1][0]
+    assert "Situation detail: at a bakery" in calls[1][0]
+    assert "Selected scenario: Comprar pan en una panaderia local." in calls[1][0]
 
 
 @pytest.mark.django_db
@@ -725,14 +749,24 @@ def test_generate_conversation_prompt_includes_context_and_situation_when_missin
 
     def fake_call_openai_json(system_prompt, user_input, timeout_seconds=10, **kwargs):
         captured["user_input"] = user_input
+        if "Create five distinct conversation scenarios" in system_prompt:
+            return {
+                "scenarios": [
+                    "Buscar un taxi cerca de una estacion.",
+                    "Comprar un billete en una maquina.",
+                    "Pedir indicaciones a una persona.",
+                    "Avisar que el tren llega tarde.",
+                    "Confirmar una direccion antes de salir.",
+                ]
+            }
         return {
             "conversation": [
-                {"spanish_text": "Busco un taxi.", "german_text": "Ich suche ein Taxi.", "notes": ""},
-                {"spanish_text": "Hay uno afuera.", "german_text": "Draußen ist eins.", "notes": ""},
-                {"spanish_text": "Gracias por la ayuda.", "german_text": "Danke fuer die Hilfe.", "notes": ""},
-                {"spanish_text": "Con gusto.", "german_text": "Gern geschehen.", "notes": ""},
-                {"spanish_text": "Hasta luego.", "german_text": "Bis spaeter.", "notes": ""},
-                {"spanish_text": "Buen viaje.", "german_text": "Gute Reise.", "notes": ""},
+                {"speaker": "a", "source_text": "Busco un taxi.", "target_text": "Ich suche ein Taxi.", "notes": ""},
+                {"speaker": "b", "source_text": "Hay uno afuera.", "target_text": "Draußen ist eins.", "notes": ""},
+                {"speaker": "a", "source_text": "Gracias por la ayuda.", "target_text": "Danke fuer die Hilfe.", "notes": ""},
+                {"speaker": "b", "source_text": "Con gusto.", "target_text": "Gern geschehen.", "notes": ""},
+                {"speaker": "a", "source_text": "Hasta luego.", "target_text": "Bis spaeter.", "notes": ""},
+                {"speaker": "b", "source_text": "Buen viaje.", "target_text": "Gute Reise.", "notes": ""},
             ]
         }
 
@@ -951,6 +985,189 @@ def test_content_item_mark_learned_endpoint_can_unmark_item():
 
     item.refresh_from_db()
     assert item.is_learned is False
+
+
+@pytest.mark.django_db
+def test_content_item_refresh_word_scans_dialogs_adds_type_and_regenerates_exercises(monkeypatch):
+    from learning.views.content import management_items_listing as listing_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="ayudar",
+        german_text="helfen",
+        source_language="spanish",
+        target_language="german",
+        word_type="",
+        exercise_phrases={},
+    )
+    first_dialog = SavedDialog.objects.create(
+        topic="help",
+        context="station",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Quiero ayudar.", "target_text": "Ich will helfen."}],
+    )
+    first_turn = DialogTurn.objects.create(
+        dialog=first_dialog,
+        turn_index=0,
+        source_text="Quiero ayudar.",
+        target_text="Ich will helfen.",
+    )
+    second_dialog = SavedDialog.objects.create(
+        topic="work",
+        context="office",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Puedo ayudar hoy.", "target_text": "Ich kann heute helfen."}],
+    )
+    DialogTurn.objects.create(
+        dialog=second_dialog,
+        turn_index=0,
+        source_text="Puedo ayudar hoy.",
+        target_text="Ich kann heute helfen.",
+    )
+    ItemDialogOccurrence.objects.create(
+        item=item,
+        dialog=first_dialog,
+        turn=first_turn,
+        turn_index=0,
+        side=ItemDialogOccurrence.Side.TARGET,
+        match_score=0.8,
+    )
+
+    monkeypatch.setattr(
+        listing_views,
+        "_basic_word_metadata",
+        lambda **kwargs: ("ayudar", "helfen", "verb"),
+    )
+    monkeypatch.setattr(
+        listing_views,
+        "generate_word_exercise_phrases_with_chatgpt",
+        lambda *args, **kwargs: {
+            "phrases": [
+                {"label": "present-1s", "source_text": "Yo ayudo.", "target_text": "Ich helfe."},
+            ],
+            "generation_mode": "verb_by_tense_v1",
+        },
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["word_type"] == "verb"
+    assert payload["word_type_added"] is True
+    assert payload["dialog_occurrences_created"] == 3
+    assert payload["exercise_phrases"]["phrases"][0]["target_text"] == "Ich helfe."
+    assert len(payload["related_dialogs"]) == 2
+
+    item.refresh_from_db()
+    assert item.word_type == "verb"
+    assert item.exercise_phrases["generation_mode"] == "verb_by_tense_v1"
+    assert ItemDialogOccurrence.objects.filter(item=item).count() == 4
+
+
+@pytest.mark.django_db
+def test_content_item_refresh_word_adds_missing_articles_for_noun(monkeypatch):
+    from learning.views.content import management_items_listing as listing_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="libro",
+        german_text="Buch",
+        source_language="spanish",
+        target_language="german",
+        word_type="noun",
+        exercise_phrases={},
+    )
+    captured_args = {}
+
+    monkeypatch.setattr(
+        listing_views,
+        "_basic_word_metadata",
+        lambda **kwargs: ("el libro", "das Buch", "noun"),
+    )
+
+    def fake_generate(spanish_word, german_word, **kwargs):
+        captured_args["spanish_word"] = spanish_word
+        captured_args["german_word"] = german_word
+        captured_args["word_type"] = kwargs.get("word_type")
+        return {
+            "phrases": [
+                {"label": "example", "source_text": "Leo el libro.", "target_text": "Ich lese das Buch."},
+            ],
+        }
+
+    monkeypatch.setattr(listing_views, "generate_word_exercise_phrases_with_chatgpt", fake_generate)
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["spanish_text"] == "el libro"
+    assert payload["german_text"] == "das Buch"
+    assert payload["word_type"] == "noun"
+    assert payload["word_text_updated"] is True
+    assert captured_args == {
+        "spanish_word": "el libro",
+        "german_word": "das Buch",
+        "word_type": "noun",
+    }
+
+    item.refresh_from_db()
+    assert item.spanish_text == "el libro"
+    assert item.german_text == "das Buch"
+
+
+@pytest.mark.django_db
+def test_content_item_refresh_word_fails_when_required_source_article_is_missing(monkeypatch):
+    from learning.views.content import management_items_listing as listing_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="grupo",
+        german_text="Gruppe",
+        source_language="spanish",
+        target_language="german",
+        word_type="noun",
+        exercise_phrases={},
+    )
+
+    monkeypatch.setattr(
+        listing_views,
+        "_basic_word_metadata",
+        lambda **kwargs: ("grupo", "die Gruppe", "noun"),
+    )
+    monkeypatch.setattr(
+        listing_views,
+        "generate_word_exercise_phrases_with_chatgpt",
+        lambda *args, **kwargs: {
+            "phrases": [
+                {"label": "example", "source_text": "El grupo llega.", "target_text": "Die Gruppe kommt."},
+            ],
+        },
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Word metadata is missing source article"
+
+    item.refresh_from_db()
+    assert item.spanish_text == "grupo"
+    assert item.german_text == "Gruppe"
 
 
 @pytest.mark.django_db
@@ -1303,8 +1520,8 @@ def test_content_item_question_sends_full_conversation_context_to_model(monkeypa
     assert "Conversation history (oldest to newest):" in call_user_payloads[1]
     assert "How can I use danke in a sentence?" in call_user_payloads[1]
     assert "Nutze es in kurzen Saetzen." in call_user_payloads[1]
-    assert "The answer text itself must be written in SOURCE language" in call_system_prompts[0]
-    assert "Interpret every related question through TARGET language meaning/usage" in call_system_prompts[0]
+    assert "The answer text itself must be written in Spanish" in call_system_prompts[0]
+    assert "Interpret every related question through German meaning/usage" in call_system_prompts[0]
     assert call_kwargs[0]["model"] == "gpt-question-test"
 
 
@@ -1360,11 +1577,14 @@ def test_quick_add_word_uses_contextual_translation_for_existing_item(monkeypatc
         source_text="Está justo a la vuelta de la esquina.",
         target_text="Es ist gleich um die Ecke.",
     )
-    monkeypatch.setattr(
-        management_views,
-        "call_openai_json",
-        lambda *args, **kwargs: {"source_text": "vuelta", "target_text": "Runde"},
-    )
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        if "Resolve a clicked word translation" in system_prompt:
+            return {"source_text": "vuelta", "target_text": "Runde", "word_type": "other"}
+        if "Normalize a other study entry" in system_prompt:
+            return {"source_text": "vuelta", "target_text": "Runde"}
+        return None
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
 
     client = APIClient()
     response = client.post(
@@ -1412,11 +1632,14 @@ def test_quick_add_word_creates_item_with_contextual_translation(monkeypatch):
         source_text="Está justo a la vuelta de la esquina.",
         target_text="Es ist gleich um die Ecke.",
     )
-    monkeypatch.setattr(
-        management_views,
-        "call_openai_json",
-        lambda *args, **kwargs: {"source_text": "esquina", "target_text": "Ecke"},
-    )
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        if "Resolve a clicked word translation" in system_prompt:
+            return {"source_text": "esquina", "target_text": "Ecke", "word_type": "other"}
+        if "Normalize a other study entry" in system_prompt:
+            return {"source_text": "esquina", "target_text": "Ecke"}
+        return None
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
     monkeypatch.setattr(
         content_views,
         "create_audio_file",
@@ -1456,9 +1679,11 @@ def test_quick_add_word_saves_basic_form_and_word_type(monkeypatch):
     from learning.views.content import management as management_views
 
     def fake_call_openai_json(system_prompt, user_input, **kwargs):
-        if "You normalize vocabulary" in system_prompt:
-            return {"source_text": "el libro", "target_text": "das Buch", "word_type": "noun"}
-        return {"source_text": "libros", "target_text": "Buecher"}
+        if "Resolve a clicked word translation" in system_prompt:
+            return {"source_text": "libros", "target_text": "Buecher", "word_type": "noun"}
+        if "Normalize a noun study entry" in system_prompt:
+            return {"source_text": "el libro", "target_text": "das Buch"}
+        return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
     monkeypatch.setattr(
@@ -1466,11 +1691,29 @@ def test_quick_add_word_saves_basic_form_and_word_type(monkeypatch):
         "create_audio_file",
         lambda text, prefix, target_language="german": f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
     )
+    dialog = SavedDialog.objects.create(
+        topic="books",
+        context="shop",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Busco libros.", "target_text": "Ich suche Buecher."}],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Busco libros.",
+        target_text="Ich suche Buecher.",
+    )
 
     client = APIClient()
     response = client.post(
         "/api/content/words/add?source_language=spanish&target_language=german",
-        {"source_text": "libros", "target_text": "Buecher"},
+        {
+            "source_text": "libros",
+            "target_text": "Buecher",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+        },
         format="json",
     )
 
@@ -1481,7 +1724,281 @@ def test_quick_add_word_saves_basic_form_and_word_type(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_quick_add_word_inline_context_fallback_avoids_target_language_source(monkeypatch):
+def test_quick_add_word_creates_same_text_with_different_word_type(monkeypatch):
+    from learning.views import content as content_views
+    from learning.views.content import management_items_quick_add as quick_add_views
+
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="ayuda",
+        german_text="helfen",
+        source_language="spanish",
+        target_language="german",
+        word_type="noun",
+    )
+
+    monkeypatch.setattr(quick_add_views, "_resolve_dialog_click_word_pair", lambda **kwargs: ("ayuda", "helfen", "verb"))
+    monkeypatch.setattr(
+        quick_add_views,
+        "_normalize_word_metadata",
+        lambda **kwargs: ("ayuda", "helfen", "verb"),
+    )
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {"source_text": "ayuda", "target_text": "helfen"},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["created"] is True
+    assert Item.objects.filter(
+        item_type=Item.ItemType.WORD,
+        spanish_text="ayuda",
+        german_text="helfen",
+    ).count() == 2
+
+
+@pytest.mark.django_db
+def test_quick_add_existing_unknown_word_adds_type_and_returns_item(monkeypatch):
+    from learning.views.content import management as management_views
+    from learning.models import ItemDialogOccurrence
+
+    existing = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="poder",
+        german_text="können",
+        source_language="spanish",
+        target_language="german",
+        word_type="",
+    )
+    dialog = SavedDialog.objects.create(
+        topic="work",
+        context="office",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {
+                "source_text": "Puedo ir hoy.",
+                "target_text": "Ich kann heute gehen.",
+            }
+        ],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Puedo ir hoy.",
+        target_text="Ich kann heute gehen.",
+    )
+
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        if "Resolve a clicked word translation" in system_prompt:
+            return {"source_text": "poder", "target_text": "kann", "word_type": "helper"}
+        if "Normalize a helper study entry" in system_prompt:
+            return {"source_text": "poder", "target_text": "können"}
+        return None
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "kann",
+            "target_text": "kann",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["exists"] is True
+    assert payload["id"] == existing.id
+    assert payload["word_type"] == "helper"
+    existing.refresh_from_db()
+    assert existing.word_type == "helper"
+    assert ItemDialogOccurrence.objects.filter(item=existing, dialog=dialog, turn_index=0).exists()
+
+
+@pytest.mark.django_db
+def test_quick_add_existing_noun_missing_articles_opens_existing_item(monkeypatch):
+    from learning.views.content import management as management_views
+    from learning.models import ItemDialogOccurrence
+
+    existing = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="grupo",
+        german_text="Gruppe",
+        source_language="spanish",
+        target_language="german",
+        word_type="noun",
+    )
+    dialog = SavedDialog.objects.create(
+        topic="people",
+        context="meeting",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {
+                "source_text": "El grupo esta aqui.",
+                "target_text": "Die Gruppe ist hier.",
+            }
+        ],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="El grupo esta aqui.",
+        target_text="Die Gruppe ist hier.",
+    )
+
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        if "Resolve a clicked word translation" in system_prompt:
+            return {"source_text": "grupo", "target_text": "Gruppe", "word_type": "noun"}
+        if "Normalize a noun study entry" in system_prompt:
+            return {"source_text": "el grupo", "target_text": "die Gruppe"}
+        return None
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "Gruppe",
+            "target_text": "Gruppe",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["exists"] is True
+    assert payload["id"] == existing.id
+    assert payload["source_text"] == "el grupo"
+    assert payload["target_text"] == "die Gruppe"
+    existing.refresh_from_db()
+    assert existing.spanish_text == "el grupo"
+    assert existing.german_text == "die Gruppe"
+    assert existing.word_type == "noun"
+    assert ItemDialogOccurrence.objects.filter(item=existing, dialog=dialog, turn_index=0).exists()
+
+
+@pytest.mark.django_db
+def test_quick_add_helper_fails_when_metadata_returns_full_phrase(monkeypatch):
+    from learning.views.content import management as management_views
+
+    dialog = SavedDialog.objects.create(
+        topic="work",
+        context="office",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {
+                "source_text": "Puedo ir hoy.",
+                "target_text": "Ich kann heute gehen.",
+            }
+        ],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Puedo ir hoy.",
+        target_text="Ich kann heute gehen.",
+    )
+
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        if "Resolve a clicked word translation" in system_prompt:
+            return {"source_text": "poder", "target_text": "kann", "word_type": "helper"}
+        if "Normalize a helper study entry" in system_prompt:
+            return {
+                "source_text": "puedo ir",
+                "target_text": "Ich kann gehen",
+            }
+        return None
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "kann",
+            "target_text": "kann",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Word metadata generation failed"
+
+
+@pytest.mark.django_db
+def test_quick_add_helper_fails_when_source_translation_matches_target(monkeypatch):
+    from learning.views.content import management as management_views
+
+    dialog = SavedDialog.objects.create(
+        topic="work",
+        context="office",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {
+                "source_text": "Puedo ir hoy.",
+                "target_text": "Ich kann heute gehen.",
+            }
+        ],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Puedo ir hoy.",
+        target_text="Ich kann heute gehen.",
+    )
+
+    def fake_call_openai_json(system_prompt, user_input, **kwargs):
+        if "Resolve a clicked word translation" in system_prompt:
+            return {"source_text": "poder", "target_text": "kann", "word_type": "helper"}
+        if "Normalize a helper study entry" in system_prompt:
+            return {"source_text": "können", "target_text": "können"}
+        return None
+
+    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "kann",
+            "target_text": "kann",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Word metadata generation failed"
+
+
+@pytest.mark.django_db
+def test_quick_add_word_fails_when_resolution_model_returns_nothing(monkeypatch):
     from learning.views.content import management as management_views
 
     monkeypatch.setattr(management_views, "call_openai_json", lambda *args, **kwargs: None)
@@ -1500,16 +2017,12 @@ def test_quick_add_word_inline_context_fallback_avoids_target_language_source(mo
         format="json",
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["created"] is False
-    assert payload["exists"] is False
-    assert payload["source_text"] == "esquina"
-    assert payload["target_text"] == "Ecke"
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Word metadata generation failed"
 
 
 @pytest.mark.django_db
-def test_quick_add_word_dialog_resolution_sanitizes_target_language_source(monkeypatch):
+def test_quick_add_word_fails_when_metadata_model_returns_incomplete_payload(monkeypatch):
     from learning.views.content import management as management_views
 
     dialog = SavedDialog.objects.create(
@@ -1544,12 +2057,8 @@ def test_quick_add_word_dialog_resolution_sanitizes_target_language_source(monke
         format="json",
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["created"] is False
-    assert payload["exists"] is False
-    assert payload["source_text"] == "esquina"
-    assert payload["target_text"] == "Ecke"
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Word metadata generation failed"
 
 
 @pytest.mark.django_db
@@ -1710,6 +2219,12 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
         call_openai_json_fn=fake_call_openai_json,
     )
     generation_words.generate_word_exercise_phrases_with_chatgpt(
+        "poder",
+        "können",
+        word_type="helper",
+        call_openai_json_fn=fake_call_openai_json,
+    )
+    generation_words.generate_word_exercise_phrases_with_chatgpt(
         "algo",
         "etwas",
         word_type="",
@@ -1717,7 +2232,8 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
     )
 
     assert "Generate noun exercise phrases" in captured_prompts[0]
-    assert "Generate exercise phrases for one vocabulary item" in captured_prompts[1]
+    assert "Generate helper-word exercise phrases" in captured_prompts[1]
+    assert "Generate exercise phrases for one vocabulary item" in captured_prompts[2]
 
 
 def test_funny_image_generation_uses_prompt_for_word_type():

@@ -15,8 +15,8 @@ from urllib.request import Request as UrlRequest, urlopen
 from django.conf import settings
 
 from ...auth import apply_user_scope
-from ...models import DialogTurn, ExcludedWordSuggestion, Item, ItemDialogOccurrence, SavedDialog
-from .selection import normalize_word_pair, word_selection_id
+from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
+from .selection import word_selection_id
 from .types import ContentCandidate, ContentPlan
 
 logger = logging.getLogger(__name__)
@@ -27,22 +27,6 @@ OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE = {
     "french": "shimmer",
     "italian": "echo",
     "portuguese": "fable",
-}
-SPANISH_NOUN_ARTICLES = {"el", "la", "los", "las"}
-GERMAN_NOUN_ARTICLES = {"der", "die", "das", "den", "dem", "des"}
-GERMAN_TO_SPANISH_ARTICLE = {
-    "der": "el",
-    "die": "la",
-    "das": "el",
-    "den": "el",
-    "dem": "el",
-    "des": "el",
-}
-SPANISH_TO_GERMAN_ARTICLE = {
-    "el": "der",
-    "la": "die",
-    "los": "die",
-    "las": "die",
 }
 OPENAI_TTS_LANGUAGE_LABEL_BY_STUDY_LANGUAGE = {
     "spanish": "Spanish",
@@ -56,7 +40,7 @@ OPENAI_TTS_VOICES = ("alloy", "echo", "fable", "onyx", "nova", "shimmer")
 OPENAI_TTS_SAMPLE_RATE = 24000
 OPENAI_TTS_DEFAULT_SPEED = 1.25
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
-WORD_TYPE_CHOICES = {"noun", "verb", "adjective", "adverb", "expression", "other"}
+WORD_TYPE_CHOICES = {"noun", "verb", "adjective", "adverb", "helper", "expression", "other"}
 
 
 def normalize_word_type(value: str) -> str:
@@ -160,32 +144,6 @@ def _store_audio_bytes(filename: str, payload: bytes, content_type: str) -> str:
     return _build_local_audio_url(filename)
 
 
-def get_excluded_words_lookup() -> set[tuple[str, str]]:
-    return {
-        normalize_word_pair(spanish_word, german_word)
-        for spanish_word, german_word in ExcludedWordSuggestion.objects.values_list(
-            "spanish_text",
-            "german_text",
-        )
-    }
-
-
-def save_excluded_words(words: list[ContentCandidate]) -> None:
-    saved_count = 0
-    for word in words:
-        normalized_spanish, normalized_german = normalize_word_pair(word.spanish_text, word.german_text)
-        if not normalized_spanish or not normalized_german:
-            continue
-        _, created = ExcludedWordSuggestion.objects.get_or_create(
-            spanish_text=normalized_spanish,
-            german_text=normalized_german,
-        )
-        if created:
-            saved_count += 1
-    if words:
-        logger.info("content.exclude.saved requested=%d created=%d", len(words), saved_count)
-
-
 def item_exists(
     *,
     user,
@@ -194,14 +152,18 @@ def item_exists(
     german_text: str,
     source_language: str = "spanish",
     target_language: str = "german",
+    word_type: str | None = None,
 ) -> bool:
-    return apply_user_scope(Item.objects, user).filter(
+    query = apply_user_scope(Item.objects, user).filter(
         item_type=item_type,
         spanish_text__iexact=spanish_text,
         german_text__iexact=german_text,
         source_language=source_language,
         target_language=target_language,
-    ).exists()
+    )
+    if item_type == Item.ItemType.WORD and word_type is not None:
+        query = query.filter(word_type=normalize_word_type(word_type))
+    return query.exists()
 
 
 def normalize_word_pair_for_item_save(
@@ -213,45 +175,6 @@ def normalize_word_pair_for_item_save(
 ) -> tuple[str, str]:
     source_text_norm = " ".join((spanish_text or "").split()).strip()
     target_text_norm = " ".join((german_text or "").split()).strip()
-
-    def has_article(value: str, language: str) -> bool:
-        parts = value.split()
-        if not parts:
-            return False
-        first = parts[0].lower()
-        if language == "spanish":
-            return first in SPANISH_NOUN_ARTICLES
-        if language == "german":
-            return first in GERMAN_NOUN_ARTICLES
-        return False
-
-    def first_article(value: str) -> str:
-        parts = value.split()
-        return parts[0].lower() if parts else ""
-
-    source_has_article = has_article(source_text_norm, source_language)
-    target_has_article = has_article(target_text_norm, target_language)
-
-    if source_language == "spanish" and not source_has_article and target_language == "german" and target_has_article and source_text_norm:
-        mapped = GERMAN_TO_SPANISH_ARTICLE.get(first_article(target_text_norm), "el")
-        source_text_norm = f"{mapped} {source_text_norm}"
-        source_has_article = True
-
-    if target_language == "spanish" and not target_has_article and source_language == "german" and source_has_article and target_text_norm:
-        mapped = GERMAN_TO_SPANISH_ARTICLE.get(first_article(source_text_norm), "el")
-        target_text_norm = f"{mapped} {target_text_norm}"
-        target_has_article = True
-
-    if source_language == "german" and not source_has_article and target_language == "spanish" and target_has_article and source_text_norm:
-        mapped = SPANISH_TO_GERMAN_ARTICLE.get(first_article(target_text_norm), "der")
-        source_text_norm = f"{mapped} {source_text_norm}"
-        source_has_article = True
-
-    if target_language == "german" and not target_has_article and source_language == "spanish" and source_has_article and target_text_norm:
-        mapped = SPANISH_TO_GERMAN_ARTICLE.get(first_article(source_text_norm), "der")
-        target_text_norm = f"{mapped} {target_text_norm}"
-        target_has_article = True
-
     return source_text_norm, target_text_norm
 
 
@@ -330,6 +253,7 @@ def create_word_if_missing(
     target_language: str = "german",
     exercise_phrases: dict | None = None,
 ) -> Item | None:
+    normalized_word_type = normalize_word_type(candidate.word_type)
     normalized_spanish, normalized_german = normalize_word_pair_for_item_save(
         spanish_text=candidate.spanish_text,
         german_text=candidate.german_text,
@@ -343,6 +267,7 @@ def create_word_if_missing(
         german_text=normalized_german,
         source_language=source_language,
         target_language=target_language,
+        word_type=normalized_word_type,
     ):
         logger.info("content.create.word.skipped_exists topic=%s spanish=%s", topic, normalized_spanish)
         return None
@@ -361,7 +286,7 @@ def create_word_if_missing(
         source_language=source_language,
         target_language=target_language,
         notes=candidate.notes,
-        word_type=normalize_word_type(candidate.word_type),
+        word_type=normalized_word_type,
         example_sentence=phrase_german,
         audio_url=audio_url,
         exercise_phrases=exercise_phrases or {},
@@ -600,6 +525,7 @@ def save_word_dialog_occurrences(
             target_language=target_language,
             spanish_text__iexact=candidate.spanish_text,
             german_text__iexact=candidate.german_text,
+            word_type=normalize_word_type(candidate.word_type),
         )
         if not matching_word_items.exists():
             continue

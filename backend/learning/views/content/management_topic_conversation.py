@@ -48,10 +48,10 @@ class ContentTopicConversationStartView(APIView):
             )
         except RuntimeError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        opening_text = start_payload.get("opening_text", "")
-        opening_translation_text = start_payload.get("opening_translation_text", "")
-        goal_text = start_payload.get("goal_text", "")
-        selected_goal_difficulty = start_payload.get("goal_difficulty", goal_difficulty)
+        opening_text = start_payload["opening_text"]
+        opening_translation_text = start_payload["opening_translation_text"]
+        goal_text = start_payload["goal_text"]
+        selected_goal_difficulty = start_payload["goal_difficulty"]
         opening_audio_url = ""
         if opening_text:
             opening_audio_url = create_audio_file(opening_text, "conversation", target_language=target_language)
@@ -121,7 +121,7 @@ class ContentTopicConversationTurnView(APIView):
         except RuntimeError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         assistant_text = assistant_payload["reply_text"]
-        assistant_translation_text = assistant_payload.get("source_translation", "")
+        assistant_translation_text = assistant_payload["source_translation"]
         goal_achieved = False
         goal_achievement_message = ""
         next_goal_suggestion = ""
@@ -137,10 +137,8 @@ class ContentTopicConversationTurnView(APIView):
                     source_language=source_language,
                     target_language=target_language,
                 )
-            except RuntimeError:
-                goal_achieved = False
-                goal_achievement_message = ""
-                next_goal_suggestion = ""
+            except RuntimeError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         if goal_achieved and next_goal_suggestion:
             goal_achievement_message = f"{goal_achievement_message} {next_goal_suggestion}".strip()
         assistant_audio_url = ""
@@ -154,9 +152,9 @@ class ContentTopicConversationTurnView(APIView):
                 "user_corrected_text": "",
                 "user_corrected_translation_text": "",
                 "user_correction_explanation": "",
-                "user_is_grammatically_correct": bool(analysis.get("is_grammatically_correct", False)),
-                "user_makes_sense_in_context": bool(analysis.get("makes_sense_in_context", False)),
-                "user_needs_correction": bool(analysis.get("needs_correction", True)),
+                "user_is_grammatically_correct": bool(analysis["is_grammatically_correct"]),
+                "user_makes_sense_in_context": bool(analysis["makes_sense_in_context"]),
+                "user_needs_correction": bool(analysis["needs_correction"]),
                 "assistant_text": assistant_text,
                 "assistant_translation_text": assistant_translation_text,
                 "assistant_audio_url": assistant_audio_url,

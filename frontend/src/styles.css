@@ -544,6 +544,19 @@ textarea {
   font-size: 16px;
 }
 
+.add-word-modal-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 12px 0;
+  padding: 6px 10px;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  background: #f0f4f8;
+  color: #102a43;
+  font-size: 15px;
+}
+
 .item-questions-section {
   margin-top: 14px;
   padding: 10px;
@@ -974,7 +987,7 @@ textarea {
 
 .exercise-modal {
   width: min(760px, 95vw);
-  max-height: min(85vh, 760px);
+  height: min(85vh, 760px);
   overflow: hidden;
 }
 
@@ -987,6 +1000,22 @@ textarea {
   min-height: 0;
   overflow-y: auto;
   padding: 0 4px 2px 0;
+}
+
+.exercise-modal-header,
+.exercise-modal-description,
+.exercise-modal-footer {
+  flex: 0 0 auto;
+}
+
+.exercise-modal-footer {
+  border-top: 1px solid #d9e2ec;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.exercise-modal-footer .actions {
+  margin-bottom: 0;
 }
 
 .questions-modal {
@@ -1348,7 +1377,8 @@ button.verb-exercise-entry:disabled {
 .manage-item-link {
   color: #0b4fc4;
   text-decoration: underline;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .manage-item-meta {
@@ -1509,6 +1539,33 @@ button.verb-exercise-entry:disabled {
   .dialog-list-topic,
   .dialog-list-context {
     white-space: normal;
+  }
+
+  .manage-row {
+    align-items: stretch;
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .manage-item-main,
+  .manage-item-text,
+  .manage-item-link,
+  .manage-item-action-button {
+    width: 100%;
+  }
+
+  .manage-item-main {
+    min-width: 100%;
+  }
+
+  .manage-actions-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .manage-toggle-all-button,
+  .manage-actions-row button {
+    width: 100%;
   }
 }
 

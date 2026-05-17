@@ -158,6 +158,18 @@ export interface ContentItemQuestionResponse {
   conversation: ItemQuestionExchange[];
 }
 
+export interface ContentItemRefreshWordResponse {
+  ok: boolean;
+  spanish_text?: string;
+  german_text?: string;
+  word_type?: string;
+  word_type_added?: boolean;
+  word_text_updated?: boolean;
+  exercise_phrases?: ItemExercisePhrases;
+  dialog_occurrences_created?: number;
+  related_dialogs?: SessionItem["related_dialogs"];
+}
+
 export interface ContentItemConversationResponse {
   user_text: string;
   user_translation_text?: string;

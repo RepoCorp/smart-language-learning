@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-import { fetchContentDialogs, quickAddWordFromDialog } from "../api";
+import { fetchContentDialogs, fetchContentItemDetail, quickAddWordFromDialog } from "../api";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
-import type { ContentDialogRecord } from "../types";
+import type { ContentDialogRecord, SessionItem } from "../types";
+import NewItem from "./NewItem";
 
 type WordActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 
@@ -11,6 +12,7 @@ type PendingWordAdd = {
   key: string;
   source: string;
   target: string;
+  wordType: string;
   dialogId: number;
   turnIndex: number;
   sourceLine: string;
@@ -30,6 +32,8 @@ export default function DialogsPage(): JSX.Element {
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, WordActionStatus>>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<PendingWordAdd | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
+  const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
+  const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
   const playbackRunRef = useRef<number>(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const dialogRefs = useRef<Map<number, HTMLLIElement>>(new Map());
@@ -75,6 +79,31 @@ export default function DialogsPage(): JSX.Element {
     }
     setPlayingAll(false);
     setPlayingDialogId(null);
+  };
+
+  const openLinkedWordItem = async (itemId: number): Promise<void> => {
+    setLoadingLinkedWord(true);
+    try {
+      const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
+      setOpenedLinkedWord({
+        id: detail.id,
+        item_type: detail.item_type,
+        spanish_text: detail.spanish_text,
+        german_text: detail.german_text,
+        example_sentence: detail.example_sentence || "",
+        notes: detail.notes || "",
+        word_type: detail.word_type || "",
+        audio_url: detail.audio_url || "",
+        exercise_phrases: detail.exercise_phrases || {},
+        mode: "new",
+        direction: null,
+        options: [],
+        related_dialogs: detail.related_dialogs || [],
+        item_questions: detail.item_questions || [],
+      });
+    } finally {
+      setLoadingLinkedWord(false);
+    }
   };
 
   useEffect(() => {
@@ -138,14 +167,25 @@ export default function DialogsPage(): JSX.Element {
         targetToken,
       );
       if (check.exists) {
+        if (!check.id) {
+          setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+          return;
+        }
+        await openLinkedWordItem(check.id);
         setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
         return;
       }
       setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
+      const resolvedWordType = String(check.word_type || "").trim();
+      if (!resolvedWordType) {
+        setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+        return;
+      }
       setPendingWordAdd({
         key,
         source: check.source_text || targetToken,
         target: check.target_text || targetToken,
+        wordType: resolvedWordType,
         dialogId,
         turnIndex,
         sourceLine,
@@ -178,6 +218,13 @@ export default function DialogsPage(): JSX.Element {
         targetLine,
         clickedTargetToken,
       );
+      if (resultPayload.exists) {
+        if (!resultPayload.id) {
+          setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+          return;
+        }
+        await openLinkedWordItem(resultPayload.id);
+      }
       setWordActionStatus((current) => ({ ...current, [key]: resultPayload.created ? "added" : "exists" }));
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
@@ -403,6 +450,9 @@ export default function DialogsPage(): JSX.Element {
             <p className="add-word-modal-meaning">
               {t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}
             </p>
+            <p className="add-word-modal-type">
+              <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
+            </p>
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>
@@ -415,6 +465,14 @@ export default function DialogsPage(): JSX.Element {
           </div>
         </div>
       )}
+      {openedLinkedWord && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal words-item-modal">
+            <NewItem item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
+          </div>
+        </div>
+      )}
+      {loadingLinkedWord && <p className="hint">{t("session.loading")}</p>}
     </main>
   );
 }

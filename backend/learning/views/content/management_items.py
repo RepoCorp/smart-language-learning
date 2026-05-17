@@ -5,6 +5,7 @@ from .management_items_listing import (
     ContentItemFunnyImageExerciseView,
     ContentItemDetailView,
     ContentItemMarkLearnedView,
+    ContentItemRefreshWordView,
     ContentItemsView,
     ContentWordsView,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "ContentItemExercisesView",
     "ContentItemFunnyImageExerciseView",
     "ContentItemMarkLearnedView",
+    "ContentItemRefreshWordView",
     "ContentItemQuestionView",
     "ContentItemsView",
     "ContentPhraseQuickAddView",

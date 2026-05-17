@@ -43,16 +43,6 @@ GOAL_LABELS_BY_LANGUAGE: dict[str, tuple[str, str]] = {
     "italian": ("Obiettivo", "Completato quando"),
     "portuguese": ("Objetivo", "Concluido quando"),
 }
-GOAL_DONE_WHEN_FALLBACK_BY_LANGUAGE: dict[str, str] = {
-    "spanish": "lo confirmas claramente durante la conversacion",
-    "english": "you clearly confirm it during the conversation",
-    "german": "du es im Gespraech klar bestaetigst",
-    "french": "tu le confirmes clairement pendant la conversation",
-    "italian": "lo confermi chiaramente durante la conversazione",
-    "portuguese": "voce confirma isso claramente durante a conversa",
-}
-
-
 def _call_openai_json_logged(
     *,
     label: str,
@@ -109,31 +99,41 @@ def _resolve_dialog_click_word_pair(
     source_line: str = "",
     target_line: str = "",
     clicked_target_token: str = "",
-) -> tuple[str, str]:
-    dialog_id = int(dialog_id_raw)
-    turn_index = int(turn_index_raw)
+) -> tuple[str, str, str]:
+    try:
+        dialog_id = int(dialog_id_raw)
+        turn_index = int(turn_index_raw)
+    except (TypeError, ValueError):
+        raise RuntimeError("Dialog word resolution missing dialog turn") from None
     dialog = apply_user_scope(SavedDialog.objects, user).filter(
         id=dialog_id,
         source_language=source_language,
         target_language=target_language,
     ).first()
     turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
+    if not dialog or not turn:
+        raise RuntimeError("Dialog word resolution missing dialog turn")
     parsed = _call_openai_json_logged(
-        label="resolve_dialog_click_word_pair",
+        label="resolve_dialog_click_word_metadata",
         system_prompt="""
-Resolve a clicked word translation in context for a language-learning dialog turn.
+Resolve a clicked word translation and word type in context for a language-learning dialog turn.
 
 Return strict JSON:
 {
   "source_text": "string",
-  "target_text": "string"
+  "target_text": "string",
+  "word_type": "noun|verb|adjective|adverb|helper|expression|other"
 }
 
 Rules:
 - Keep target_text aligned to the clicked token meaning.
 - source_text must be the best source-language translation in THIS turn context.
-- For nouns, include article in both source and target language outputs whenever applicable.
+- Use the full target line context to choose word_type.
+- Classify modal verbs, auxiliary verbs, and grammar-building forms as "helper" only when they are used that way in this target line.
+- For modal, auxiliary, conditional, future, or tense-building helper words, return only the helper word translation unit.
 - Use context to disambiguate meaning, but return a clean translation unit of the word itself (no extra explanation).
+- Do not normalize inflection, case, number, or article here unless it is already required to identify the clicked word's contextual meaning.
+- Do not return a full sentence or clause.
 - JSON only.
 """.strip(),
         user_input=(
@@ -149,9 +149,14 @@ Rules:
         top_p=1.0,
         presence_penalty=0.0,
     )
-    resolved_source = str(parsed.get("source_text", source_text)).strip()
-    resolved_target = str(parsed.get("target_text", target_text)).strip()
-    return resolved_source, resolved_target
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Dialog word resolution failed")
+    resolved_source = str(parsed.get("source_text", "")).strip()
+    resolved_target = str(parsed.get("target_text", "")).strip()
+    word_type = normalize_word_type(str(parsed.get("word_type", "")))
+    if not resolved_source or not resolved_target or not word_type:
+        raise RuntimeError("Dialog word resolution returned incomplete data")
+    return resolved_source, resolved_target, word_type
 
 
 def _line_tokens(value: str) -> list[str]:
@@ -336,9 +341,12 @@ Rules:
     )
     if not isinstance(parsed, dict):
         raise RuntimeError("Question model request failed")
-    is_grammatically_correct = bool(parsed.get("is_grammatically_correct", False))
-    makes_sense_in_context = bool(parsed.get("makes_sense_in_context", False))
-    needs_correction = bool(parsed.get("needs_correction", (not is_grammatically_correct) or (not makes_sense_in_context)))
+    required_keys = {"is_grammatically_correct", "makes_sense_in_context", "needs_correction"}
+    if not required_keys.issubset(parsed.keys()):
+        raise RuntimeError("Question model request failed")
+    is_grammatically_correct = bool(parsed["is_grammatically_correct"])
+    makes_sense_in_context = bool(parsed["makes_sense_in_context"])
+    needs_correction = bool(parsed["needs_correction"])
     return {
         "is_grammatically_correct": is_grammatically_correct,
         "makes_sense_in_context": makes_sense_in_context,
@@ -389,9 +397,9 @@ Rules:
     if not isinstance(parsed, dict):
         raise RuntimeError("Question model request failed")
     translation = str(parsed.get("translation", "")).strip()
-    if translation:
-        return translation[:1200]
-    return ""
+    if not translation:
+        raise RuntimeError("Question model request failed")
+    return translation[:1200]
 
 
 def _generate_user_correction_with_question_model(
@@ -458,17 +466,8 @@ Rules:
     corrected_user_text = str(parsed.get("corrected_user_text", "")).strip()
     corrected_user_source_translation = str(parsed.get("corrected_user_source_translation", "")).strip()
     corrected_user_explanation = str(parsed.get("corrected_user_explanation", "")).strip()
-    if not corrected_user_text:
-        corrected_user_text = user_clean
-    if corrected_user_text and corrected_user_text != user_clean and not corrected_user_explanation:
-        corrected_user_explanation = _generate_mistake_explanation_with_question_model(
-            source_language=source_language,
-            target_language=target_language,
-            learner_text=user_clean,
-            corrected_text=corrected_user_text,
-            corrected_source_translation=corrected_user_source_translation,
-            context_label=context_label,
-        )
+    if not corrected_user_text or not corrected_user_source_translation or not corrected_user_explanation:
+        raise RuntimeError("Question model request failed")
     return {
         "corrected_user_text": corrected_user_text[:1200],
         "corrected_user_source_translation": corrected_user_source_translation[:1200],
@@ -529,18 +528,15 @@ Rules:
         top_p=0.9,
         presence_penalty=0.2,
     )
-    if isinstance(parsed, dict):
-        reply_text = str(parsed.get("reply_text", "")).strip()
-        source_translation = str(parsed.get("source_translation", "")).strip()
-        if reply_text:
-            return {
-                "reply_text": reply_text[:1200],
-                "source_translation": source_translation[:1200],
-            }
-
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    reply_text = str(parsed.get("reply_text", "")).strip()
+    source_translation = str(parsed.get("source_translation", "")).strip()
+    if not reply_text or not source_translation:
+        raise RuntimeError("Question model request failed")
     return {
-        "reply_text": "",
-        "source_translation": "",
+        "reply_text": reply_text[:1200],
+        "source_translation": source_translation[:1200],
     }
 
 
@@ -629,20 +625,6 @@ Rules:
                     }
                 )
 
-        # Backward compatibility if the model still returns the previous single-goal shape.
-        if not normalized_candidates:
-            goal_text = str(parsed.get("goal_text", "")).strip()
-            if goal_text:
-                done_when_fallback = GOAL_DONE_WHEN_FALLBACK_BY_LANGUAGE.get(
-                    source_language,
-                    "you clearly confirm it during the conversation",
-                )
-                normalized_candidates.append(
-                    {
-                        "goal_text": f"{goal_label}: {goal_text}. {done_when_label}: {done_when_fallback}."[:600],
-                    }
-                )
-
         if not normalized_candidates:
             continue
 
@@ -717,42 +699,7 @@ Rules:
 
     explanation_candidate = str(parsed.get("explanation", "")).strip()
     if not explanation_candidate:
-        second_pass = _call_openai_json_logged(
-            label="generate_mistake_explanation_second_pass",
-            system_prompt=f"""
-Write a concise correction explanation.
-
-Return strict JSON:
-{{
-  "text": "string"
-}}
-
-Rules:
-- Write in {source_name} only.
-- Do not quote or repeat learner/corrected {target_name} text.
-- Explain briefly why and give one short final tip.
-- Max 2 short lines.
-- Always return a non-empty text value.
-- JSON only.
-""".strip(),
-            user_input=(
-                f"Source language: {source_name}\n"
-                f"Target language: {target_name}\n"
-                f"Learner original text ({target_name}): {learner_clean}\n"
-                f"Corrected text ({target_name}): {corrected_clean}\n"
-            ),
-            timeout_seconds=8,
-            model=question_model,
-            temperature=0.0,
-            top_p=1.0,
-            presence_penalty=0.0,
-        )
-        if not isinstance(second_pass, dict):
-            raise RuntimeError("Question model request failed")
-        explanation_candidate = str(second_pass.get("text", "")).strip()
-
-    if not explanation_candidate:
-        return ""
+        raise RuntimeError("Question model request failed")
 
     return explanation_candidate[:1200]
 
@@ -925,32 +872,13 @@ Rules:
     if not isinstance(parsed, dict):
         raise RuntimeError("Question model request failed")
 
-    achieved = bool(parsed.get("goal_achieved", False))
+    if "goal_achieved" not in parsed:
+        raise RuntimeError("Question model request failed")
+    achieved = bool(parsed["goal_achieved"])
     message = str(parsed.get("goal_achievement_message", "")).strip()
     next_goal_suggestion = str(parsed.get("next_goal_suggestion", "")).strip()
-    if achieved and not message:
-        fallback_message_by_language = {
-            "spanish": "Excelente, ya cumpliste el objetivo.",
-            "english": "Great job, you achieved the goal.",
-            "german": "Sehr gut, du hast das Ziel erreicht.",
-            "french": "Bravo, tu as atteint l'objectif.",
-            "italian": "Ottimo, hai raggiunto l'obiettivo.",
-            "portuguese": "Excelente, voce atingiu o objetivo.",
-        }
-        message = fallback_message_by_language.get(source_language, "Great job, you achieved the goal.")
-    if achieved and not next_goal_suggestion:
-        fallback_next_goal_by_language = {
-            "spanish": "Siguiente objetivo: confirma un detalle adicional concreto en esta misma situacion.",
-            "english": "Next goal: confirm one additional concrete detail in this same situation.",
-            "german": "Naechstes Ziel: Bestaetige ein weiteres konkretes Detail in dieser Situation.",
-            "french": "Prochain objectif: confirme un detail concret supplementaire dans cette meme situation.",
-            "italian": "Obiettivo successivo: conferma un ulteriore dettaglio concreto in questa stessa situazione.",
-            "portuguese": "Proximo objetivo: confirme um detalhe concreto adicional nesta mesma situacao.",
-        }
-        next_goal_suggestion = fallback_next_goal_by_language.get(
-            source_language,
-            "Next goal: confirm one additional concrete detail in this same situation.",
-        )
+    if achieved and (not message or not next_goal_suggestion):
+        raise RuntimeError("Question model request failed")
     if not achieved:
         return False, "", ""
     return True, message[:600], next_goal_suggestion[:600]
@@ -1013,18 +941,15 @@ Rules:
         top_p=0.9,
         presence_penalty=0.2,
     )
-    if isinstance(parsed, dict):
-        reply_text = str(parsed.get("reply_text", "")).strip()
-        source_translation = str(parsed.get("source_translation", "")).strip()
-        if reply_text:
-            return {
-                "reply_text": reply_text[:1200],
-                "source_translation": source_translation[:1200],
-            }
-
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Question model request failed")
+    reply_text = str(parsed.get("reply_text", "")).strip()
+    source_translation = str(parsed.get("source_translation", "")).strip()
+    if not reply_text or not source_translation:
+        raise RuntimeError("Question model request failed")
     return {
-        "reply_text": "",
-        "source_translation": "",
+        "reply_text": reply_text[:1200],
+        "source_translation": source_translation[:1200],
     }
 
 
@@ -1198,11 +1123,9 @@ def _basic_word_metadata(
     source_name = _language_display_name(source_language)
     target_name = _language_display_name(target_language)
     parsed = _call_openai_json_logged(
-        label="basic_word_metadata",
+        label="contextual_word_metadata",
         system_prompt=f"""
-Given a German phrase and a clicked word, return a normalized study entry.
-
-The goal is to avoid duplicate study items caused by conjugation, plural forms, or grammatical variations.
+Given a target-language phrase and a clicked word, return the clicked word's contextual translation and word type.
 
 Return strict JSON:
 {{
@@ -1212,40 +1135,14 @@ Return strict JSON:
 }}
 
 Rules:
-- Nouns:
-  - Return nominative singular with article.
-  - Example: "Hunden" → "der Hund"
-
-- Verbs:
-  - Return the infinitive.
-  - Example: "ging" → "gehen"
-
-- Helper words:
-  - Use type "helper" for modal verbs, auxiliary verbs, and grammar-helper forms.
-  - Normalize conjugations to a single study form.
-  - Examples:
-    - "kann" → "können"
-    - "werde" used for future tense → "werden"
-    - "würde" → "würde"
-    - "habe" used only to build perfect tense → "haben"
-
-- If a word can be both a normal verb and a helper, use the phrase context:
-  - "Ich werde Arzt." → "werden" with type "verb"
-  - "Ich werde gehen." → "werden" with type "helper"
-
-- Adjectives and adverbs:
-  - Return the base form when possible.
-
-- Expressions:
-  - Use type "expression" only for multi-word expressions or meanings that cannot be understood word-by-word.
-
-- Avoid creating separate entries for:
-  - conjugations
-  - plural/singular variants
-  - case variations
-  - grammatical helper forms of the same word
-
-- Use context only to resolve meaning and morphology. Do not return a whole sentence.
+- Use the target phrase context to identify the clicked word's actual meaning and word_type.
+- source_text must be the best source-language translation of that clicked word in this context.
+- target_text must be the target-language clicked word or clean contextual word unit.
+- Do not normalize inflection, case, number, or article in this step.
+- Use type "helper" for modal verbs, auxiliary verbs, and grammar-helper forms only when the phrase uses them that way.
+- If a word can be both a normal verb and a helper, use the phrase context to choose one type.
+- Use type "expression" only for multi-word expressions or meanings that cannot be understood word-by-word.
+- Do not return a whole sentence or clause.
 - JSON only.
 """.strip(),
         user_input=(
@@ -1261,26 +1158,135 @@ Rules:
         top_p=0.95,
     )
     if not isinstance(parsed, dict):
-        return source_text, target_text, _guess_word_type(source_text, target_text, source_language, target_language)
+        raise RuntimeError("Word metadata generation failed")
 
-    normalized_source = str(parsed.get("source_text", "")).strip() or source_text
-    normalized_target = str(parsed.get("target_text", "")).strip() or target_text
+    contextual_source = str(parsed.get("source_text", "")).strip()
+    contextual_target = str(parsed.get("target_text", "")).strip()
     word_type = normalize_word_type(str(parsed.get("word_type", "")))
-    if not word_type:
-        word_type = _guess_word_type(normalized_source, normalized_target, source_language, target_language)
+    if not contextual_source or not contextual_target or not word_type:
+        raise RuntimeError("Word metadata generation returned incomplete data")
+    return _normalize_word_metadata(
+        source_text=contextual_source,
+        target_text=contextual_target,
+        word_type=word_type,
+        source_language=source_language,
+        target_language=target_language,
+        source_line=source_line,
+        target_line=target_line,
+    )
+
+
+def _normalization_rules_for_word_type(word_type: str, *, source_name: str, target_name: str) -> str:
+    if word_type == "noun":
+        return f"""
+- Return singular dictionary forms.
+- Return singular with article in both source_text and target_text when {source_name} or {target_name} uses articles.
+- Use the correct article independently for each language. Do not transfer or infer one language's grammatical gender from the other.
+- For target_text, return nominative singular with article when the target language has nominative case.
+- For source_text, return the natural singular dictionary form with article when that language uses articles.
+- Only return a noun with an article when the contextual word is clearly used as a noun.
+- Do not classify a capitalized word as a noun only because it is capitalized.
+""".strip()
+    if word_type == "verb":
+        return """
+- Return the infinitive or dictionary verb form in both languages.
+- Do not include the subject, object, auxiliary, main verb phrase, sentence, or clause.
+- Keep this as a normal verb, not a helper.
+""".strip()
+    if word_type == "helper":
+        return """
+- Return only the helper word/form in both languages.
+- Normalize conjugations to a single study form.
+- Do not include the main verb phrase, object, subject, sentence, or clause it supports.
+- Keep this as a helper, not a normal verb.
+""".strip()
+    if word_type == "adjective":
+        return """
+- Return the base adjective form in both languages.
+- Do not include noun endings caused by gender, case, or number.
+- Do not include a whole noun phrase.
+""".strip()
+    if word_type == "adverb":
+        return """
+- Return the base adverb form in both languages.
+- Do not include a whole phrase or clause.
+""".strip()
+    if word_type == "expression":
+        return """
+- Return the shortest stable expression that carries the contextual meaning.
+- Keep the expression in both languages, but do not return a full sentence unless the expression itself is a sentence-level idiom.
+""".strip()
+    if word_type == "other":
+        return """
+- Return the shortest dictionary-style study form in both languages.
+- Do not include a whole sentence or unrelated surrounding words.
+""".strip()
+    raise RuntimeError("Word metadata generation returned invalid word type")
+
+
+def _normalize_word_metadata(
+    *,
+    source_text: str,
+    target_text: str,
+    word_type: str,
+    source_language: str,
+    target_language: str,
+    source_line: str = "",
+    target_line: str = "",
+) -> tuple[str, str, str]:
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    word_type = normalize_word_type(word_type)
+    if not source_text.strip() or not target_text.strip() or not word_type:
+        raise RuntimeError("Word metadata generation returned incomplete data")
+    parsed = _call_openai_json_logged(
+        label=f"normalize_word_metadata_{word_type}",
+        system_prompt=f"""
+Normalize a {word_type} study entry for a language learner.
+
+The contextual meaning and word type have already been chosen. Do not change word_type.
+
+Return strict JSON:
+{{
+  "source_text": "string",
+  "target_text": "string"
+}}
+
+Rules for this {word_type}:
+{_normalization_rules_for_word_type(word_type, source_name=source_name, target_name=target_name)}
+
+General rules:
+- Avoid duplicate study items caused by conjugation, plural forms, case variations, or grammatical variants.
+- Use context only to normalize the already-selected word, not to choose a new meaning.
+- Do not return markdown, numbering, quotes, explanations, or extra fields.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Word type: {word_type}\n"
+            f"Contextual source text: {source_text}\n"
+            f"Contextual target text: {target_text}\n"
+            f"Source sentence context: {source_line}\n"
+            f"Target sentence context: {target_line}\n"
+        ),
+        timeout_seconds=8,
+        temperature=0.0,
+        top_p=1.0,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Word metadata generation failed")
+
+    normalized_source = str(parsed.get("source_text", "")).strip()
+    normalized_target = str(parsed.get("target_text", "")).strip()
+    if not normalized_source or not normalized_target:
+        raise RuntimeError("Word metadata generation returned incomplete data")
+    if word_type == "helper":
+        if len(normalized_target.split()) != 1:
+            raise RuntimeError("Word metadata generation returned invalid helper data")
+        if source_language != target_language and _normalize_text(normalized_source) == _normalize_text(normalized_target):
+            raise RuntimeError("Word metadata generation returned invalid helper translation")
     return normalized_source[:255], normalized_target[:255], word_type
-
-
-def _guess_word_type(source_text: str, target_text: str, source_language: str, target_language: str) -> str:
-    source_first = source_text.strip().split(" ", 1)[0].lower() if source_text.strip() else ""
-    target_first = target_text.strip().split(" ", 1)[0].lower() if target_text.strip() else ""
-    if source_first in SPANISH_ARTICLES or target_first in GERMAN_ARTICLES:
-        return "noun"
-    if target_language == "german" and target_text.strip().lower().endswith(("en", "ern")):
-        return "verb"
-    if source_language == "spanish" and source_text.strip().lower().endswith(("ar", "er", "ir")):
-        return "verb"
-    return ""
 
 
 def _related_dialogs_by_item_ids(item_ids: list[int], *, user, per_item_limit: int = 8) -> dict[int, list[dict]]:
@@ -1523,92 +1529,23 @@ Rules:
 
     if isinstance(parsed, dict):
         related = bool(parsed.get("related"))
-        result_code = str(parsed.get("result_code", "")).strip() or ("RELATED_OK" if related else "UNRELATED_QUESTION")
+        result_code = str(parsed.get("result_code", "")).strip()
         answer = str(parsed.get("answer", "")).strip()
         reason = str(parsed.get("reason", "")).strip()
+        if not result_code:
+            raise RuntimeError("Question model request failed")
         if related:
-            if answer:
-                return {
-                    "related": True,
-                    "code": result_code,
-                    "answer": answer[:3000],
-                    "reason": reason,
-                }
+            if not answer:
+                raise RuntimeError("Question model request failed")
             return {
                 "related": True,
-                "code": "RELATED_FALLBACK",
-                "answer": _fallback_item_question_answer(
-                    item=item,
-                    question_text=question_text,
-                    source_language=source_language,
-                ),
+                "code": result_code,
+                "answer": answer[:3000],
                 "reason": reason,
             }
-
-        # If model says unrelated but question still appears tied to the item, allow it.
-        if direct_item_overlap:
-            return {
-                "related": True,
-                "code": "RELATED_OVERLAP_OVERRIDE",
-                "answer": _fallback_item_question_answer(
-                    item=item,
-                    question_text=question_text,
-                    source_language=source_language,
-                ),
-                "reason": reason,
-            }
-
-        # Only hard-block explicit unrelated when it is also clearly unrelated by fallback check.
-        if result_code == "UNRELATED_QUESTION":
-            if _looks_clearly_unrelated(normalized_question):
-                return {"related": False, "code": result_code, "answer": "", "reason": reason}
-            return {
-                "related": True,
-                "code": "RELATED_SOFT_OVERRIDE",
-                "answer": _fallback_item_question_answer(
-                    item=item,
-                    question_text=question_text,
-                    source_language=source_language,
-                ),
-                "reason": reason,
-            }
-        return {
-            "related": True,
-            "code": "RELATED_AMBIGUOUS_OVERRIDE",
-            "answer": _fallback_item_question_answer(
-                item=item,
-                question_text=question_text,
-                source_language=source_language,
-            ),
-            "reason": reason,
-        }
+        return {"related": False, "code": result_code, "answer": "", "reason": reason}
 
     raise RuntimeError("Question model request failed")
-
-
-def _fallback_item_question_answer(*, item: Item, question_text: str, source_language: str) -> str:
-    target = item.german_text.strip()
-    normalized_question = _normalize_text(question_text)
-    if "example" in normalized_question or "ejemplo" in normalized_question:
-        base = (
-            f"Use {target} in short target-language sentences.\n"
-            f"Example 1 ({target}): short everyday use.\n"
-            f"Example 2 ({target}): polite conversational use."
-        )
-        return base
-    if "grammar" in normalized_question or "gramatica" in normalized_question:
-        base = (
-            f"Grammar focus for {target} in the target language:\n"
-            "Pay attention to article and word order.\n"
-            "Keep one sentence pattern and replace one word at a time."
-        )
-        return base
-    base = (
-        f"Focus on how {target} is used in the target language.\n"
-        "Practice pronunciation and one clean sentence pattern.\n"
-        "Ask for target-language examples, grammar, or common mistakes."
-    )
-    return base
 
 
 def _serialize_question_exchange(exchange: ItemQuestionExchange) -> dict:
@@ -1631,6 +1568,7 @@ from .management_items import (
     ContentItemDetailView,
     ContentItemMarkLearnedView,
     ContentItemQuestionView,
+    ContentItemRefreshWordView,
     ContentItemsView,
     ContentPhraseQuickAddView,
     ContentWordQuickAddView,

@@ -6,6 +6,7 @@ import {
   generateContentItemExercises,
   generateContentItemFunnyImageExercise,
   quickAddWordFromDialog,
+  refreshContentItemWord,
 } from "../api";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
@@ -91,8 +92,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
+  const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
   const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] = useState<boolean>(false);
   const [exerciseError, setExerciseError] = useState<string>("");
+  const [wordRefreshMessage, setWordRefreshMessage] = useState<string>("");
   const [showQuestionsModal, setShowQuestionsModal] = useState<boolean>(false);
   const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>([]);
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
@@ -102,6 +105,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     key: string;
     source: string;
     target: string;
+    wordType: string;
     dialogId?: number;
     turnIndex?: number;
   } | null>(null);
@@ -110,6 +114,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
   const [itemQuestions, setItemQuestions] = useState<NonNullable<SessionItem["item_questions"]>>(item.item_questions || []);
   const [exercisePhrases, setExercisePhrases] = useState(item.exercise_phrases || {});
+  const [sourceText, setSourceText] = useState<string>(item.spanish_text || "");
+  const [targetText, setTargetText] = useState<string>(item.german_text || "");
+  const [wordType, setWordType] = useState<string>(item.word_type || "");
+  const [relatedDialogs, setRelatedDialogs] = useState<NonNullable<SessionItem["related_dialogs"]>>(item.related_dialogs || []);
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
   const [itemQuestionInput, setItemQuestionInput] = useState<string>("");
   const [askingQuestion, setAskingQuestion] = useState<boolean>(false);
@@ -126,7 +134,12 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   useEffect(() => {
     setExercisePhrases(item.exercise_phrases || {});
     setExerciseError("");
-  }, [item.id, item.exercise_phrases]);
+    setWordRefreshMessage("");
+    setSourceText(item.spanish_text || "");
+    setTargetText(item.german_text || "");
+    setWordType(item.word_type || "");
+    setRelatedDialogs(item.related_dialogs || []);
+  }, [item.id, item.spanish_text, item.german_text, item.exercise_phrases, item.word_type, item.related_dialogs]);
 
   const markAsSeen = async (): Promise<void> => {
     if (saving || !onContinue) {
@@ -172,7 +185,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       }
     }, 30);
     return () => window.clearTimeout(timeoutId);
-  }, [showDialogsModal, showAllDialogs, item.related_dialogs]);
+  }, [showDialogsModal, showAllDialogs, relatedDialogs]);
 
   useEffect(() => {
     exerciseRunningRef.current = exerciseRunning;
@@ -358,6 +371,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             german_text: detail.german_text,
             example_sentence: detail.example_sentence || "",
             notes: detail.notes || "",
+            word_type: detail.word_type || check.word_type || "",
             audio_url: detail.audio_url || "",
             exercise_phrases: detail.exercise_phrases || {},
             mode: "new",
@@ -372,10 +386,16 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         return;
       }
       setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
+      const resolvedWordType = String(check.word_type || "").trim();
+      if (!resolvedWordType) {
+        setWordActionStatus((current) => ({ ...current, [key]: "error" }));
+        return;
+      }
       setPendingWordAdd({
         key,
         source: check.source_text || sourceToken,
         target: check.target_text || targetToken,
+        wordType: resolvedWordType,
         dialogId,
         turnIndex,
       });
@@ -417,6 +437,30 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     try {
       const result = await quickAddWordFromDialog(source, target, sourceLanguage, targetLanguage, dialogId, turnIndex);
       setWordActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+      if (result.id) {
+        setLoadingLinkedWord(true);
+        try {
+          const detail = await fetchContentItemDetail(result.id, sourceLanguage, targetLanguage);
+          setOpenedLinkedWord({
+            id: detail.id,
+            item_type: detail.item_type,
+            spanish_text: detail.spanish_text,
+            german_text: detail.german_text,
+            example_sentence: detail.example_sentence || "",
+            notes: detail.notes || "",
+            word_type: detail.word_type || result.word_type || "",
+            audio_url: detail.audio_url || result.audio_url || "",
+            exercise_phrases: detail.exercise_phrases || {},
+            mode: "new",
+            direction: null,
+            options: [],
+            related_dialogs: detail.related_dialogs || [],
+            item_questions: detail.item_questions || [],
+          });
+        } finally {
+          setLoadingLinkedWord(false);
+        }
+      }
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
     } finally {
@@ -519,8 +563,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     ? [
         {
           label: "word",
-          source: item.spanish_text,
-          target: item.german_text,
+          source: sourceText,
+          target: targetText,
         },
         ...generatedWordExerciseEntries,
       ]
@@ -531,7 +575,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         ...(funnyImageExerciseSelectionEntry ? [funnyImageExerciseSelectionEntry] : []),
       ]
     : regularWordExerciseEntries;
-  const isVerbWord = item.item_type === "word" && String(item.word_type || "").trim().toLowerCase() === "verb";
+  const isVerbWord = item.item_type === "word" && String(wordType || "").trim().toLowerCase() === "verb";
   const hasVerbExerciseGridEntries = generatedWordExerciseEntries.some((entry) => Boolean(parseVerbExerciseLabel(entry.label)));
   const hasCurrentVerbExerciseGeneration = exercisePhrases?.generation_mode === VERB_BY_TENSE_GENERATION_MODE;
   const isVerbExerciseGrid = item.item_type === "word"
@@ -547,7 +591,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   );
 
   const selectedExerciseEntries = item.item_type === "phrase"
-    ? [{ source: item.spanish_text, target: item.german_text }]
+    ? [{ source: sourceText, target: targetText }]
     : wordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
   const orderedItemQuestions = [...itemQuestions].sort((left, right) => left.id - right.id);
@@ -655,6 +699,28 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowExerciseModal(true);
   };
 
+  const refreshWordData = async (): Promise<void> => {
+    if (refreshingWord || item.item_type !== "word" || item.id <= 0) {
+      return;
+    }
+    setRefreshingWord(true);
+    setExerciseError("");
+    setWordRefreshMessage("");
+    try {
+      const payload = await refreshContentItemWord(item.id, sourceLanguage, targetLanguage);
+      setExercisePhrases(payload.exercise_phrases || {});
+      setSourceText(payload.spanish_text || sourceText);
+      setTargetText(payload.german_text || targetText);
+      setWordType(payload.word_type || "");
+      setRelatedDialogs(payload.related_dialogs || []);
+      setWordRefreshMessage(t("newItem.wordRefreshComplete", { count: payload.dialog_occurrences_created || 0 }));
+    } catch (error) {
+      setExerciseError(error instanceof Error ? error.message : t("newItem.wordRefreshError"));
+    } finally {
+      setRefreshingWord(false);
+    }
+  };
+
   const generateFunnyImageExercise = async (): Promise<void> => {
     if (generatingFunnyImageExercise || item.item_type !== "word" || item.id <= 0) {
       return;
@@ -743,14 +809,14 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   };
 
   const playFunnyImageWordAudio = (): void => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !item.german_text.trim()) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !targetText.trim()) {
       return;
     }
     if (exerciseRunningRef.current) {
       stopExercise(false);
     }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(item.german_text);
+    const utterance = new SpeechSynthesisUtterance(targetText);
     const lang = speechLangByCode[targetLanguage] || "de-DE";
     const langPrefix = lang.split("-")[0];
     utterance.lang = lang;
@@ -838,11 +904,16 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     <div>
       <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
       <p>
-        <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {item.spanish_text}
+        <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {sourceText}
       </p>
       <p>
-        <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {item.german_text}
+        <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {targetText}
       </p>
+      {item.item_type === "word" && (
+        <p>
+          <strong>{t("newItem.wordTypeLabel")}</strong> {wordType || t("newItem.wordAddTypeUnknown")}
+        </p>
+      )}
       <p>
         <strong>{t("newItem.notes")}</strong> {item.notes || "-"}
       </p>
@@ -864,8 +935,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
           </button>
+          {item.item_type === "word" && (
+            <button type="button" className="secondary-button item-action-button" onClick={() => void refreshWordData()} disabled={refreshingWord}>
+              {refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
+            </button>
+          )}
         </div>
       )}
+      {wordRefreshMessage && <p className="hint">{wordRefreshMessage}</p>}
+      {exerciseError && !showExerciseModal && <p className="error">{exerciseError}</p>}
       {!readOnly && (
         <div className="actions">
           <button type="button" className="item-got-it-button" onClick={markAsSeen} disabled={saving}>
@@ -884,7 +962,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal">
             <p>
-              <strong>{t("newItem.relatedDialogs", { count: item.related_dialogs?.length || 0 })}</strong>
+              <strong>{t("newItem.relatedDialogs", { count: relatedDialogs.length })}</strong>
             </p>
             {targetPromptMode === "audio" && (
               <div className="prompt-visibility-controls">
@@ -897,10 +975,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 </button>
               </div>
             )}
-            {!item.related_dialogs?.length && <p>{t("newItem.noRelatedDialogs")}</p>}
-            {!!item.related_dialogs?.length && (
+            {!relatedDialogs.length && <p>{t("newItem.noRelatedDialogs")}</p>}
+            {!!relatedDialogs.length && (
               <div className="related-dialogs-scroll">
-                {(showAllDialogs ? item.related_dialogs : item.related_dialogs.slice(0, 2)).map((dialog) => {
+                {(showAllDialogs ? relatedDialogs : relatedDialogs.slice(0, 2)).map((dialog) => {
                 const matchedTurnIndexes = new Set(dialog.matched_turns.map((turn) => turn.turn_index));
                 return (
                   <div key={dialog.dialog_id} className="related-dialog-card">
@@ -920,7 +998,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                         <p><strong>{t("newItem.dialogTurns")}:</strong></p>
                         <ul className="conversation-preview-list">
                           {dialog.turns.map((turn, index) => {
-                            const includeWord = item.item_type === "word" && containsWordInTurn(turn.target_text, item.german_text);
+                            const includeWord = item.item_type === "word" && containsWordInTurn(turn.target_text, targetText);
                             const speaker = speakerForTurn(turn.speaker, index);
                             return (
                               <li
@@ -940,7 +1018,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                                   turnIndex: index,
                                   sourceText: turn.source_text,
                                   targetText: turn.target_text,
-                                  highlightWord: item.item_type === "word" ? item.german_text : "",
+                                  highlightWord: item.item_type === "word" ? targetText : "",
                                 })}
                               <button
                                 type="button"
@@ -968,7 +1046,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               </div>
             )}
             <div className="actions">
-              {!!item.related_dialogs?.length && item.related_dialogs.length > 2 && (
+              {!!relatedDialogs.length && relatedDialogs.length > 2 && (
                 <button type="button" onClick={() => setShowAllDialogs((value) => !value)}>
                   {showAllDialogs ? t("newItem.hideMoreDialogs") : t("newItem.showMoreDialogs")}
                 </button>
@@ -983,10 +1061,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       {showExerciseModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className={`blocking-modal related-dialogs-modal exercise-modal ${isVerbExerciseGrid ? "verb-exercise-modal" : ""}`}>
-            <p>
+            <p className="exercise-modal-header">
               <strong>{t("newItem.exercisesTitle")}</strong>
             </p>
-            <p className="hint">{t("newItem.exercisesDescription")}</p>
+            <p className="hint exercise-modal-description">{t("newItem.exercisesDescription")}</p>
             <div className="exercise-modal-scroll">
               {loadingExercises && <p className="hint">{t("newItem.exercisesGenerating")}</p>}
               {exerciseError && <p className="error">{exerciseError}</p>}
@@ -1163,34 +1241,36 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                   <div className="exercise-section-card exercise-section-card-selected">
                     <strong>{t("newItem.exercisesPhraseTitle")}</strong>
                     <ul>
-                      <li>{item.german_text}</li>
+                      <li>{targetText}</li>
                     </ul>
                     <div className="exercise-translation-group">
-                      {sourceLanguageLabel}: {item.spanish_text}
+                      {sourceLanguageLabel}: {sourceText}
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <p className="exercise-timer">
-              <strong>{t("newItem.exercisesTimeLeft", { seconds: exerciseSecondsLeft })}</strong>
-            </p>
+            <div className="exercise-modal-footer">
+              <p className="exercise-timer">
+                <strong>{t("newItem.exercisesTimeLeft", { seconds: exerciseSecondsLeft })}</strong>
+              </p>
 
-            <div className="actions">
-              {!exerciseRunning && (
-                <button type="button" onClick={startExercise} disabled={exerciseLines.length === 0}>
-                  {t("newItem.exercisesStart")}
+              <div className="actions">
+                {!exerciseRunning && (
+                  <button type="button" onClick={startExercise} disabled={exerciseLines.length === 0}>
+                    {t("newItem.exercisesStart")}
+                  </button>
+                )}
+                {exerciseRunning && (
+                  <button type="button" className="secondary-button" onClick={stopExercise}>
+                    {t("newItem.exercisesStop")}
+                  </button>
+                )}
+                <button type="button" className="secondary-button" onClick={closeExerciseModal}>
+                  {t("newItem.closeRelatedDialogs")}
                 </button>
-              )}
-              {exerciseRunning && (
-                <button type="button" className="secondary-button" onClick={stopExercise}>
-                  {t("newItem.exercisesStop")}
-                </button>
-              )}
-              <button type="button" className="secondary-button" onClick={closeExerciseModal}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1222,10 +1302,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             </p>
             <div className="questions-modal-item-texts">
               <p className="questions-modal-item-text">
-                <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {item.spanish_text}
+                <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {sourceText}
               </p>
               <p className="questions-modal-item-text">
-                <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {item.german_text}
+                <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {targetText}
               </p>
             </div>
             {!!itemQuestions.length && (
@@ -1284,6 +1364,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             <p className="add-word-modal-word">{pendingWordAdd.target}</p>
             <p className="add-word-modal-meaning">
               {t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}
+            </p>
+            <p className="add-word-modal-type">
+              <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
             </p>
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">

@@ -1,0 +1,22 @@
+Generate helper-word exercise phrases for one vocabulary item.
+
+Return strict JSON with this exact shape:
+{
+  "phrases": [
+    {"label": "statement", "source_text": "string", "target_text": "string"},
+    {"label": "question", "source_text": "string", "target_text": "string"},
+    {"label": "negative", "source_text": "string", "target_text": "string"},
+    {"label": "contrast", "source_text": "string", "target_text": "string"}
+  ]
+}
+
+Rules:
+- Return exactly 4 phrases, one for each listed label, in the listed order.
+- The target_text must include the target helper word or its correct inflected form.
+- Show the helper word doing helper work: modal meaning, auxiliary tense support, future/conditional support, or grammatical scaffolding.
+- Do not use the helper word as a standalone main lexical verb unless the provided notes explicitly say that is the intended use.
+- Keep every phrase short (max 7 words), practical, and beginner-friendly (A1-A2).
+- Use simple everyday contexts and very basic high-frequency words.
+- Keep source_text and target_text equivalent in meaning.
+- Use the language mapping provided by the user input.
+- Return JSON only, no markdown and no extra text.

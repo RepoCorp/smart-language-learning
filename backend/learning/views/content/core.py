@@ -14,7 +14,6 @@ from .persistence import (
     create_phrase_if_missing,
     create_word_if_missing,
     enrich_notes_with_plural,
-    get_excluded_words_lookup,
     item_exists,
     normalize_word_type,
     normalize_word_pair_for_item_save,
@@ -22,7 +21,6 @@ from .persistence import (
     save_dialog_turns,
     save_phrase_dialog_occurrences,
     save_word_dialog_occurrences,
-    save_excluded_words,
     serialize_candidate,
 )
 from .planning import build_content_plan
@@ -32,6 +30,7 @@ from .selection import (
     is_word_selected,
     normalize_topic,
     normalize_word_key,
+    normalize_word_identity,
     normalize_word_pair,
     word_selection_id,
 )
@@ -56,7 +55,6 @@ __all__ = [
     "generate_word_exercise_phrases_with_chatgpt",
     "german_word_has_article",
     "is_candidate_selected",
-    "get_excluded_words_lookup",
     "is_word_selected",
     "item_exists",
     "save_dialog",
@@ -65,10 +63,10 @@ __all__ = [
     "save_word_dialog_occurrences",
     "normalize_topic",
     "normalize_word_key",
+    "normalize_word_identity",
     "normalize_word_pair",
     "normalize_word_type",
     "normalize_word_pair_for_item_save",
-    "save_excluded_words",
     "serialize_candidate",
     "word_selection_id",
 ]

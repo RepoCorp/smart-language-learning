@@ -9,8 +9,8 @@ from .generation import (
     generate_conversation_with_chatgpt,
     generate_keywords_for_phrase_with_chatgpt,
 )
-from .persistence import enrich_notes_with_plural, get_excluded_words_lookup, item_exists
-from .selection import german_word_has_article, normalize_topic, normalize_word_pair
+from .persistence import enrich_notes_with_plural, item_exists
+from .selection import german_word_has_article, normalize_topic
 from .types import ContentCandidate, ContentPlan
 
 logger = logging.getLogger(__name__)
@@ -138,12 +138,10 @@ def build_content_plan(
         )
 
     words: list[ContentCandidate] = []
-    seen: set[tuple[str, str]] = set()
-    excluded_words = get_excluded_words_lookup()
+    seen: set[tuple[str, str, str]] = set()
     skipped_missing_fields = 0
     skipped_without_article = 0
     skipped_not_in_phrase = 0
-    skipped_excluded = 0
     skipped_duplicate = 0
     total_generated_words = 0
 
@@ -151,7 +149,7 @@ def build_content_plan(
         (
             "content.plan.built topic=%s generated=%d kept=%d "
             "phrases=%d skipped_missing=%d skipped_no_article=%d skipped_not_in_phrase=%d "
-            "skipped_excluded=%d skipped_duplicate=%d"
+            "skipped_duplicate=%d"
         ),
         normalized_topic,
         total_generated_words,
@@ -160,7 +158,6 @@ def build_content_plan(
         skipped_missing_fields,
         skipped_without_article,
         skipped_not_in_phrase,
-        skipped_excluded,
         skipped_duplicate,
     )
     return ContentPlan(phrases=phrases, words=words)
