@@ -15,6 +15,11 @@ class OverviewStatsView(APIView):
         now = timezone.now()
         ready_to_review = count_ready_reviews(now, user=user, source_language=source_language, target_language=target_language)
         future_reviews = count_future_reviews(now, user=user, source_language=source_language, target_language=target_language)
+        word_items = apply_user_scope(Item.objects, user).filter(
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+        ).count()
         not_started = apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             source_language=source_language,
@@ -27,6 +32,7 @@ class OverviewStatsView(APIView):
             {
                 "ready_to_review": ready_to_review,
                 "future_reviews": future_reviews,
+                "word_items": word_items,
                 "not_started": not_started,
             }
         )

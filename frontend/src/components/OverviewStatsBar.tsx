@@ -51,6 +51,7 @@ export default function OverviewStatsBar({ topBarControl }: OverviewStatsBarProp
           <span>{t("stats.ready", { count: stats?.ready_to_review ?? "-" })}</span>
           <span>{t("stats.future", { count: stats?.future_reviews ?? "-" })}</span>
           <span>{t("stats.notStarted", { count: stats?.not_started ?? "-" })}</span>
+          <span className="overview-stats-word-count">{t("stats.words", { count: stats?.word_items ?? "-" })}</span>
           {topBarControl ? <div className="overview-stats-top-control">{topBarControl}</div> : null}
         </div>
       </div>

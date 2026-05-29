@@ -16,7 +16,6 @@ Que la imagen tenga solo la palabra y en la parte de abajo escrita la frase
 Sigue sacando cosas raras como sein de stimmt
 
 
-Que muestre cuantas palabras ha aprendido
 Change to an alert colof the button "Mark as learned" in testing
 Poder mutear audio en ejercicio
 Poder ir al elemento desde otros tipos de testing

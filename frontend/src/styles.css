@@ -42,7 +42,13 @@ body {
 }
 
 .overview-stats-top-control {
+  margin-left: 0;
+}
+
+.overview-stats-word-count {
   margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .top-nav {

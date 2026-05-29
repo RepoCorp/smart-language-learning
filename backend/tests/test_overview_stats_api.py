@@ -37,6 +37,7 @@ def test_overview_stats_returns_expected_counts():
     payload = response.json()
     assert payload["ready_to_review"] == 1
     assert payload["future_reviews"] == 1
+    assert payload["word_items"] == 2
     assert payload["not_started"] == 1
 
 
@@ -73,6 +74,7 @@ def test_overview_stats_filters_by_language_pair():
     payload = response.json()
     assert payload["ready_to_review"] == 1
     assert payload["future_reviews"] == 0
+    assert payload["word_items"] == 1
     assert payload["not_started"] == 0
 
 
@@ -108,4 +110,5 @@ def test_overview_stats_excludes_items_marked_as_learned():
     payload = response.json()
     assert payload["ready_to_review"] == 0
     assert payload["future_reviews"] == 0
+    assert payload["word_items"] == 2
     assert payload["not_started"] == 1

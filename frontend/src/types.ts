@@ -213,5 +213,6 @@ export interface TopicConversationHelpResponse {
 export interface OverviewStatsResponse {
   ready_to_review: number;
   future_reviews: number;
+  word_items: number;
   not_started: number;
 }
