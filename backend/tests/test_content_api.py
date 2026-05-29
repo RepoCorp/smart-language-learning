@@ -4,6 +4,18 @@ from rest_framework.test import APIClient
 from learning.models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
 
 
+def test_tts_instruction_forces_target_language_pronunciation():
+    from learning.views.content.persistence import _tts_language_instruction
+
+    instruction = _tts_language_instruction("german")
+
+    assert "Speak only in German" in instruction
+    assert "German phonetics and accent" in instruction
+    assert "looks like English" in instruction
+    assert "still pronounce it as German text" in instruction
+    assert "infer an English pronunciation" in instruction
+
+
 def test_basic_word_metadata_prompt_requires_noun_articles_in_both_languages(monkeypatch):
     from learning.views.content import management as management_views
 

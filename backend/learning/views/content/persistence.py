@@ -51,9 +51,10 @@ def normalize_word_type(value: str) -> str:
 def _tts_language_instruction(target_language: str) -> str:
     language_label = OPENAI_TTS_LANGUAGE_LABEL_BY_STUDY_LANGUAGE.get(target_language, target_language.capitalize())
     return (
-        f"Speak naturally in {language_label}. "
-        "Pronounce the text strictly as written in that language. "
-        "Do not translate, switch language, or reinterpret words as another language."
+        f"Speak only in {language_label}. "
+        f"Every word, syllable, abbreviation, article, and phrase must be pronounced with {language_label} phonetics and accent. "
+        f"If a token looks like English or another language, still pronounce it as {language_label} text. "
+        "Do not translate, switch languages, infer an English pronunciation, or reinterpret words as another language."
     )
 
 

@@ -6,6 +6,7 @@ import {
   generateContentItemExercises,
   generateContentItemFunnyImageExercise,
   quickAddWordFromDialog,
+  regenerateContentItemAudio,
   refreshContentItemWord,
 } from "../api";
 import { useI18n } from "../i18n";
@@ -93,6 +94,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
+  const [regeneratingAudio, setRegeneratingAudio] = useState<boolean>(false);
   const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] = useState<boolean>(false);
   const [exerciseError, setExerciseError] = useState<string>("");
   const [wordRefreshMessage, setWordRefreshMessage] = useState<string>("");
@@ -116,6 +118,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [exercisePhrases, setExercisePhrases] = useState(item.exercise_phrases || {});
   const [sourceText, setSourceText] = useState<string>(item.spanish_text || "");
   const [targetText, setTargetText] = useState<string>(item.german_text || "");
+  const [audioUrl, setAudioUrl] = useState<string>(item.audio_url || "");
   const [wordType, setWordType] = useState<string>(item.word_type || "");
   const [relatedDialogs, setRelatedDialogs] = useState<NonNullable<SessionItem["related_dialogs"]>>(item.related_dialogs || []);
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
@@ -137,9 +140,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setWordRefreshMessage("");
     setSourceText(item.spanish_text || "");
     setTargetText(item.german_text || "");
+    setAudioUrl(item.audio_url || "");
     setWordType(item.word_type || "");
     setRelatedDialogs(item.related_dialogs || []);
-  }, [item.id, item.spanish_text, item.german_text, item.exercise_phrases, item.word_type, item.related_dialogs]);
+  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.related_dialogs]);
 
   const markAsSeen = async (): Promise<void> => {
     if (saving || !onContinue) {
@@ -297,8 +301,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     const sequence: string[] = [];
-    if (item.item_type === "word" && includeWord && item.audio_url) {
-      sequence.push(item.audio_url);
+    if (item.item_type === "word" && includeWord && audioUrl) {
+      sequence.push(audioUrl);
     }
     sequence.push(phraseAudioUrl);
     for (let index = 0; index < sequence.length; index += 1) {
@@ -721,6 +725,25 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     }
   };
 
+  const regenerateAudio = async (): Promise<void> => {
+    if (regeneratingAudio || refreshingWord || item.id <= 0) {
+      return;
+    }
+    setRegeneratingAudio(true);
+    setExerciseError("");
+    setWordRefreshMessage("");
+    try {
+      const nextAudioUrl = await regenerateContentItemAudio(item.id, sourceLanguage, targetLanguage);
+      if (nextAudioUrl) {
+        setAudioUrl(nextAudioUrl);
+      }
+    } catch {
+      setExerciseError(t("newItem.audioRegenerationError"));
+    } finally {
+      setRegeneratingAudio(false);
+    }
+  };
+
   const generateFunnyImageExercise = async (): Promise<void> => {
     if (generatingFunnyImageExercise || item.item_type !== "word" || item.id <= 0) {
       return;
@@ -875,7 +898,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       });
     }, 1000);
 
-    const phraseExerciseAudioSources = item.item_type === "phrase" && item.audio_url ? [item.audio_url] : [];
+    const phraseExerciseAudioSources = item.item_type === "phrase" && audioUrl ? [audioUrl] : [];
     const playOnce = phraseExerciseAudioSources.length
       ? () => playAudioSourcesOnce(phraseExerciseAudioSources, runId)
       : () => speakLinesOnce(exerciseLines, runId);
@@ -917,9 +940,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       <p>
         <strong>{t("newItem.notes")}</strong> {item.notes || "-"}
       </p>
-      {item.audio_url && (
+      {audioUrl && (
         <>
-          <audio controls src={item.audio_url}>
+          <audio controls src={audioUrl}>
             {t("newItem.noAudioSupport")}
           </audio>
         </>
@@ -935,8 +958,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
           </button>
+          <button type="button" className="secondary-button item-action-button" onClick={() => void regenerateAudio()} disabled={regeneratingAudio || refreshingWord}>
+            {regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
+          </button>
           {item.item_type === "word" && (
-            <button type="button" className="secondary-button item-action-button" onClick={() => void refreshWordData()} disabled={refreshingWord}>
+            <button type="button" className="secondary-button item-action-button" onClick={() => void refreshWordData()} disabled={refreshingWord || regeneratingAudio}>
               {refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
             </button>
           )}
@@ -1023,7 +1049,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                               <button
                                 type="button"
                                 className="turn-audio-button"
-                                disabled={!turn.phrase_audio_url || (item.item_type === "word" && includeWord && !item.audio_url)}
+                                disabled={!turn.phrase_audio_url || (item.item_type === "word" && includeWord && !audioUrl)}
                                 onClick={() => void playTurnAudio(turn.phrase_audio_url || "", index, includeWord)}
                               >
                                 {t("newItem.playTurnAudio")}
