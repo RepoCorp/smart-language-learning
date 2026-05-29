@@ -1,5 +1,6 @@
 # Todos
 
+
 Que en la conversacion siempre empiece el usuario, puede ser solo un saludo
 
 Que pueda seleccionar varias palabras para agregar al diccionario, no solo click en individuales si no que pueda seleccionar expresiones completas
@@ -8,15 +9,35 @@ Que al generar contenido pueda darse una lista de palabras para usar y/o pedir q
 Arreglar la generacion de frases para los ejercicios
 Posibilidad de regenerar otras cosas, como las traducciones que a veces estan mal, especialmente en el ejercicio
 
+Que cuando uno complete los items de la sesion le haga fiesta
+
+Que los ejercicios de palabras sea checkbixes con las distintas combinaciones más comunes. Al guardar una palabra guardar la base, sin conjugación, sin pluralidad... En los ejercicios dependiendo del tipo de palabra hace los ejemplos (singular, plural, dativo, presente...) para cada uno hay un botón que explicará la gramatica. (Como funcionará con lo de reflexivos y no se que más? Mirar coso de PONS)
 
 Cuando esta testeando o estudiando poder marcar un elemento como equivocado, ya sea en audio, texto, traduccion, ejercicio... Re crearlo
 Lo de la cantidad de hints sigue fallando e incluso con una, y creo que incluso cuando una es menos del 30% esta marcandoloa como fallido
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
-
+Y una frase que represente la palabra de la forma más simple pero más particular a esa palabra y que se pueda representar en una imagen memorable
 Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la traduce como devolveria cuando realmente es volverse / llegar a ser y solo es devolveria junto con la plabra zuruckgeben
 Pilas con palabras que pueden ser masculino o femenino, cuando busca la palabra base que si diferencie las dos (el doctor, la doctora)
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
 No reconoce cuando cumplio el objetivo en la conversacion 
+Que haga superfiesta cuando uno aprenda x palabras nuevas en el día.
+Poder añadir palabra manualmente
+Que la imagen tenga solo la palabra y en la parte de abajo escrita la frase
+Sigue sacando cosas raras como sein de stimmt
+Que muestre cuantas palabras ha aprendido
+Color a botón marcar aprendido
+Poder mutear audio en ejercicio
+Poder ir al elemento desde otros tipos de testing
+Que indefinido sea en sujeto
+Mejorar lo de los helpers
+Que el audio sea mas rapido y mas "ofuscado"
+Regenerate audio
+Revisar future and present tense ejercicios
+Add con diese diesels...
+Test con armar frase con palabras 
+Que siempre reproduzca el audio en los tests
+Seleccionar longitud del diálogo al crear
 
 Que uno pueda editar las palabras 
 Que la conversacion tenga un boton para terminar y ahi la presenta corregida y la guarda para dejar agregar las palabras  

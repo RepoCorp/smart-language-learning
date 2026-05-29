@@ -432,6 +432,11 @@ textarea {
   box-shadow: 0 0 0 3px rgba(11, 79, 196, 0.22), 0 6px 14px rgba(11, 79, 196, 0.18);
 }
 
+.conversation-turn:focus {
+  outline: 3px solid rgba(11, 79, 196, 0.22);
+  outline-offset: 2px;
+}
+
 .conversation-speaker {
   margin: 0 0 4px 0;
   font-size: 12px;

@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from .management import APIView, Request, Response, SavedDialog, _normalized_pair, apply_user_scope, get_request_user
+from .management import (
+    APIView,
+    Request,
+    Response,
+    SavedDialog,
+    _dialog_turns_with_phrase_audio,
+    _normalized_pair,
+    apply_user_scope,
+    get_request_user,
+)
 
 
 class ContentDialogsView(APIView):
@@ -20,14 +29,7 @@ class ContentDialogsView(APIView):
                 "context": dialog.context,
                 "audio_url": dialog.audio_url,
                 "created_at": dialog.created_at,
-                "turns": [
-                    {
-                        "source_text": turn.source_text,
-                        "target_text": turn.target_text,
-                        "speaker": _speaker_for_index(dialog, turn.turn_index),
-                    }
-                    for turn in dialog.dialog_turns.all()
-                ],
+                "turns": _dialog_turns_with_phrase_audio(dialog, user=user),
             }
             for dialog in rows
         ]

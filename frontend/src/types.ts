@@ -115,6 +115,7 @@ export interface ContentDialogRecord {
     source_text: string;
     target_text: string;
     speaker?: "a" | "b";
+    phrase_audio_url?: string;
   }>;
 }
 

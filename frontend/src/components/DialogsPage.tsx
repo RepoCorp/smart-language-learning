@@ -20,6 +20,11 @@ type PendingWordAdd = {
   clickedTargetToken: string;
 };
 
+type PlayingTurn = {
+  dialogId: number;
+  turnIndex: number;
+};
+
 export default function DialogsPage(): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -28,6 +33,7 @@ export default function DialogsPage(): JSX.Element {
   const [error, setError] = useState<string>("");
   const [playingAll, setPlayingAll] = useState<boolean>(false);
   const [playingDialogId, setPlayingDialogId] = useState<number | null>(null);
+  const [playingTurn, setPlayingTurn] = useState<PlayingTurn | null>(null);
   const [expandedDialogId, setExpandedDialogId] = useState<number | null>(null);
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, WordActionStatus>>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<PendingWordAdd | null>(null);
@@ -37,6 +43,7 @@ export default function DialogsPage(): JSX.Element {
   const playbackRunRef = useRef<number>(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const dialogRefs = useRef<Map<number, HTMLLIElement>>(new Map());
+  const turnRefs = useRef<Map<string, HTMLLIElement>>(new Map());
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
   const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
   const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
@@ -58,8 +65,24 @@ export default function DialogsPage(): JSX.Element {
     focusDialog(dialogId);
   };
 
+  const turnRefKey = (dialogId: number, turnIndex: number): string => `${dialogId}:${turnIndex}`;
+
+  const focusDialogTurn = (dialogId: number, turnIndex: number): void => {
+    setExpandedDialogId(dialogId);
+    window.setTimeout(() => {
+      const turnElement = turnRefs.current.get(turnRefKey(dialogId, turnIndex));
+      if (!turnElement) {
+        focusDialog(dialogId);
+        return;
+      }
+      turnElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      turnElement.focus({ preventScroll: true });
+    }, 0);
+  };
+
   const handleDialogAudioPlay = (dialogId: number): void => {
     setPlayingDialogId(dialogId);
+    setPlayingTurn(null);
     openAndFocusDialog(dialogId);
   };
 
@@ -79,6 +102,7 @@ export default function DialogsPage(): JSX.Element {
     }
     setPlayingAll(false);
     setPlayingDialogId(null);
+    setPlayingTurn(null);
   };
 
   const openLinkedWordItem = async (itemId: number): Promise<void> => {
@@ -303,8 +327,32 @@ export default function DialogsPage(): JSX.Element {
       void audio.play().catch(() => done());
     });
 
+  const dialogHasAllTurnAudio = (dialog: ContentDialogRecord): boolean =>
+    Boolean(dialog.turns?.length) && dialog.turns.every((turn) => Boolean(turn.phrase_audio_url));
+
+  const dialogIsPlayable = (dialog: ContentDialogRecord): boolean => Boolean(dialog.audio_url) || dialogHasAllTurnAudio(dialog);
+
+  const playDialogWithFocusedTurns = async (dialog: ContentDialogRecord, runId: number): Promise<void> => {
+    setPlayingDialogId(dialog.dialog_id);
+    if (dialogHasAllTurnAudio(dialog)) {
+      for (let index = 0; index < dialog.turns.length; index += 1) {
+        if (runId !== playbackRunRef.current) {
+          break;
+        }
+        setPlayingTurn({ dialogId: dialog.dialog_id, turnIndex: index });
+        focusDialogTurn(dialog.dialog_id, index);
+        await playAudioUrl(dialog.turns[index].phrase_audio_url || "", runId);
+      }
+      return;
+    }
+
+    setPlayingTurn(null);
+    openAndFocusDialog(dialog.dialog_id);
+    await playAudioUrl(dialog.audio_url, runId);
+  };
+
   const playAllDialogs = async (): Promise<void> => {
-    const playableDialogs = dialogs.filter((dialog) => dialog.audio_url);
+    const playableDialogs = dialogs.filter(dialogIsPlayable);
     if (!playableDialogs.length) {
       return;
     }
@@ -322,16 +370,17 @@ export default function DialogsPage(): JSX.Element {
       if (runId !== playbackRunRef.current) {
         break;
       }
-      setPlayingDialogId(dialog.dialog_id);
-      openAndFocusDialog(dialog.dialog_id);
-      await playAudioUrl(dialog.audio_url, runId);
+      await playDialogWithFocusedTurns(dialog, runId);
     }
 
     if (runId === playbackRunRef.current) {
       setPlayingAll(false);
       setPlayingDialogId(null);
+      setPlayingTurn(null);
     }
   };
+
+  const hasPlayableDialogs = dialogs.some(dialogIsPlayable);
 
   return (
     <main className="container" data-testid="dialogs-page">
@@ -340,7 +389,7 @@ export default function DialogsPage(): JSX.Element {
       <section className="card">
         <div className="actions">
           {!playingAll ? (
-            <button type="button" onClick={() => void playAllDialogs()} disabled={loading || dialogs.length === 0}>
+            <button type="button" onClick={() => void playAllDialogs()} disabled={loading || !hasPlayableDialogs}>
               {t("dialogs.playAll")}
             </button>
           ) : (
@@ -409,10 +458,20 @@ export default function DialogsPage(): JSX.Element {
                         <ul className="conversation-preview-list">
                           {dialog.turns.map((turn, index) => {
                             const speaker = speakerForTurn(turn.speaker, index);
+                            const isPlayingTurn = playingTurn?.dialogId === dialog.dialog_id && playingTurn.turnIndex === index;
                             return (
                               <li
                                 key={`${dialog.dialog_id}-turn-${index}`}
-                                className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
+                                ref={(element) => {
+                                  const key = turnRefKey(dialog.dialog_id, index);
+                                  if (element) {
+                                    turnRefs.current.set(key, element);
+                                  } else {
+                                    turnRefs.current.delete(key);
+                                  }
+                                }}
+                                className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"} ${isPlayingTurn ? "turn-highlight" : ""}`}
+                                tabIndex={-1}
                               >
                                 <p className="conversation-speaker">
                                   {speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}

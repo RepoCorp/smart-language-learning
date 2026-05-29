@@ -2124,6 +2124,14 @@ def test_content_dialogs_endpoint_returns_saved_dialogs_for_language_pair():
     )
     DialogTurn.objects.create(dialog=dialog_match, turn_index=0, source_text="Hola", target_text="Hallo")
     DialogTurn.objects.create(dialog=dialog_match, turn_index=1, source_text="Adios", target_text="Tschuss")
+    Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Hola",
+        german_text="Hallo",
+        source_language="spanish",
+        target_language="german",
+        audio_url="http://localhost:8000/media/audio/hola.mp3",
+    )
 
     SavedDialog.objects.create(
         topic="ignore",
@@ -2147,6 +2155,8 @@ def test_content_dialogs_endpoint_returns_saved_dialogs_for_language_pair():
     assert len(first_dialog["turns"]) == 2
     assert first_dialog["turns"][0]["source_text"] == "Hola"
     assert first_dialog["turns"][0]["target_text"] == "Hallo"
+    assert first_dialog["turns"][0]["phrase_audio_url"] == "http://localhost:8000/media/audio/hola.mp3"
+    assert first_dialog["turns"][1]["phrase_audio_url"] == ""
 
 
 @pytest.mark.django_db
