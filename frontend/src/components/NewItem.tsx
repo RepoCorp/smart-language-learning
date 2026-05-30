@@ -958,11 +958,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       )}
       {(item.item_type === "word" || item.item_type === "phrase") && (
         <div className="actions item-actions-toolbar">
-          <button type="button" className="secondary-button item-action-button" onClick={() => setShowDialogsModal(true)}>
-            {t("newItem.openRelatedDialogs")}
-          </button>
           <button type="button" className="secondary-button item-action-button" onClick={() => void openExerciseModal()} disabled={loadingExercises}>
             {t("newItem.openExercises")}
+          </button>
+          <button type="button" className="secondary-button item-action-button" onClick={() => setShowDialogsModal(true)}>
+            {t("newItem.openRelatedDialogs")}
           </button>
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
@@ -1123,6 +1123,14 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                     <button
                       type="button"
                       className="secondary-button"
+                      onClick={unselectAllExerciseEntries}
+                      disabled={exerciseRunning || selectedExerciseKeys.length === 0}
+                    >
+                      {t("newItem.exercisesUnselectAll")}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
                       onClick={selectAllExerciseEntries}
                       disabled={exerciseRunning || wordExerciseEntries.length === 0}
                     >
@@ -1135,14 +1143,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                       disabled={exerciseRunning || wordExerciseEntries.length === 0}
                     >
                       {t("newItem.exercisesRandomSelection")}
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={unselectAllExerciseEntries}
-                      disabled={exerciseRunning || selectedExerciseKeys.length === 0}
-                    >
-                      {t("newItem.exercisesUnselectAll")}
                     </button>
                     {funnyImageExerciseEntry ? (
                       <DangerousButton

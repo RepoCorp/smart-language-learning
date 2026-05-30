@@ -10,11 +10,12 @@ import DangerousButton from "./DangerousButton";
 interface PhraseReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
+  onOpenItem?: (itemId: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 2000;
 
-export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
+export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -120,11 +121,23 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
       )}
       <div className="actions">
         {!answerRevealed ? (
-          <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
-            {t("review.revealAnswer")}
-          </button>
+          <>
+            {onOpenItem ? (
+              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+                {t("words.openItem")}
+              </button>
+            ) : null}
+            <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
+              {t("review.revealAnswer")}
+            </button>
+          </>
         ) : (
           <>
+            {onOpenItem ? (
+              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+                {t("words.openItem")}
+              </button>
+            ) : null}
             <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
               {t("review.passed")}
             </button>

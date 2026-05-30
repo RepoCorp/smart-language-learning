@@ -31,6 +31,7 @@ export interface SessionItem {
   exercise_phrases?: ItemExercisePhrases;
   mode: SessionMode;
   direction?: ReviewDirection | null;
+  repeatedAfterFailure?: boolean;
   options: string[];
   option_items?: Array<{
     id: number;

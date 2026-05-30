@@ -441,6 +441,7 @@ describe("SessionPage", () => {
 
     expect(await screen.findByText(/What is the correct Spanish translation\? haus/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /casa/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     expect(screen.getByText(/Answer:/)).toBeInTheDocument();
     expect(screen.getByText(/casa/)).toBeInTheDocument();
@@ -543,6 +544,7 @@ describe("SessionPage", () => {
 
     expect(await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "No entiendo" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     expect(screen.getByText(/Answer:/)).toBeInTheDocument();
     expect(screen.getByText(/No entiendo/)).toBeInTheDocument();
@@ -605,6 +607,7 @@ describe("SessionPage", () => {
 
     await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/);
     expect(screen.queryByRole("button", { name: "Open item: Hola" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     expect(screen.getByTestId("session-page")).toBeInTheDocument();
     expect(submitReview).not.toHaveBeenCalled();
   });
@@ -679,7 +682,7 @@ describe("SessionPage", () => {
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(31, false, "de_to_es"));
   });
 
-  it("shows NewItem after incorrect answer and then moves to next test without showing original test", async () => {
+  it("shows NewItem after incorrect answer and presents the failed item again in the same session", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -716,10 +719,59 @@ describe("SessionPage", () => {
     expect(screen.getByText("casa")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
 
-    await screen.findByText(/Item 2 of 2/);
+    await screen.findByText(/Item 2 of 3/);
     expect(screen.queryByText("New word")).not.toBeInTheDocument();
     expect(screen.queryByText(/Write in German: casa/)).not.toBeInTheDocument();
     expect(await screen.findByText(/Write in German: perro/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId("word-input"), "Hund");
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(41, true, "es_to_de"));
+
+    expect(await screen.findByText(/Item 3 of 3/)).toBeInTheDocument();
+    expect(await screen.findByText(/Write in German: casa/)).toBeInTheDocument();
+    await userEvent.type(screen.getByTestId("word-input"), "Haus");
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(40, false, "es_to_de"));
+    expect(await screen.findByText("Session completed")).toBeInTheDocument();
+  });
+
+  it("does not repeat a failed item more than once in the same session", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 43,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "mesa",
+          german_text: "Tisch",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/Item 1 of 1/);
+    const firstFailButton = screen.getByRole("button", { name: "Fail" });
+    await userEvent.click(firstFailButton);
+    await userEvent.click(firstFailButton);
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(43, false, "es_to_de"));
+
+    await screen.findByText("New word");
+    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
+
+    expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
+    expect(await screen.findByText(/Write in German: mesa/)).toBeInTheDocument();
+    const secondFailButton = screen.getByRole("button", { name: "Fail" });
+    await userEvent.click(secondFailButton);
+    await userEvent.click(secondFailButton);
+    await waitFor(() => expect(submitReview).toHaveBeenCalledTimes(2));
+
+    await screen.findByText("New word");
+    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
+
+    expect(await screen.findByText("Session completed")).toBeInTheDocument();
+    expect(screen.queryByText(/Item 3 of 3/)).not.toBeInTheDocument();
   });
 
   it("does not submit a written answer when Enter is pressed", async () => {

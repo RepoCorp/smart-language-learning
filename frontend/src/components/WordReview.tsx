@@ -242,11 +242,23 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         )}
         <div className="actions">
           {!answerRevealed ? (
-            <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
-              {t("review.revealAnswer")}
-            </button>
+            <>
+              {onOpenItem ? (
+                <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+                  {t("words.openItem")}
+                </button>
+              ) : null}
+              <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
+                {t("review.revealAnswer")}
+              </button>
+            </>
           ) : (
             <>
+              {onOpenItem ? (
+                <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+                  {t("words.openItem")}
+                </button>
+              ) : null}
               <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
                 {t("review.passed")}
               </button>

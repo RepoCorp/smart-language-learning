@@ -220,8 +220,10 @@ export default function SessionPage(): JSX.Element {
     if (!current || sessionOutcome !== null || showExtendPrompt) {
       return;
     }
+    const reviewedItem = current;
+    const reviewResult = reviewedItem.repeatedAfterFailure ? false : correct;
     try {
-      await submitReview(current.id, correct, current.direction ?? undefined);
+      await submitReview(reviewedItem.id, reviewResult, reviewedItem.direction ?? undefined);
     } catch (error) {
       if (isMissingItemError(error)) {
         handleMissingCurrentItem();
@@ -232,6 +234,9 @@ export default function SessionPage(): JSX.Element {
     if (correct) {
       advance();
       return;
+    }
+    if (!reviewedItem.repeatedAfterFailure) {
+      setItems((currentItems) => [...currentItems, { ...reviewedItem, repeatedAfterFailure: true }]);
     }
     setShowIncorrectReviewItem(true);
   };
@@ -557,7 +562,12 @@ export default function SessionPage(): JSX.Element {
               onOpenItem={(itemId) => void openItemModal(itemId)}
             />
           ) : (
-            <PhraseReview key={current.id} item={current} onAnswered={register} />
+            <PhraseReview
+              key={current.id}
+              item={current}
+              onAnswered={register}
+              onOpenItem={(itemId) => void openItemModal(itemId)}
+            />
           )}
         </section>
         {waitingNext && <p>{t("session.movingNext")}</p>}
