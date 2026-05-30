@@ -1,4 +1,5 @@
 .env
+aws-deploy/deploy.env
 
 # Generated media artifacts
 backend/media/audio/*

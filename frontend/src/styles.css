@@ -296,22 +296,16 @@ body {
 }
 
 .session-mark-learned-button,
-.dangerous-primary-button {
-  background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
-  color: #ffffff;
-  border-color: #7f1d1d;
+.dangerous-primary-button,
+.dangerous-action-button {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fca5a5;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(127, 29, 29, 0.28);
+  box-shadow: 0 2px 8px rgba(127, 29, 29, 0.12);
 }
 
-.session-mark-learned-button:hover:not(:disabled),
-.dangerous-primary-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
-  color: #ffffff;
-  box-shadow: 0 5px 14px rgba(127, 29, 29, 0.34);
-}
-
-.dangerous-action-button:hover:not(:disabled) {
+.dangerous-button-armed:not(:disabled) {
   background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
   color: #ffffff;
   border-color: #7f1d1d;

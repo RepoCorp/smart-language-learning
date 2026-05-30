@@ -13,6 +13,7 @@ import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
+import DangerousButton from "./DangerousButton";
 
 interface NewItemProps {
   item: SessionItem;
@@ -1003,13 +1004,13 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
           </button>
-          <button type="button" className="secondary-button item-action-button dangerous-action-button" onClick={() => void regenerateAudio()} disabled={regeneratingAudio || refreshingWord}>
+          <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={regenerateAudio} disabled={regeneratingAudio || refreshingWord}>
             {regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
-          </button>
+          </DangerousButton>
           {item.item_type === "word" && (
-            <button type="button" className="secondary-button item-action-button dangerous-action-button" onClick={() => void refreshWordData()} disabled={refreshingWord || regeneratingAudio}>
+            <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={refreshWordData} disabled={refreshingWord || regeneratingAudio}>
               {refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
-            </button>
+            </DangerousButton>
           )}
         </div>
       )}
@@ -1166,14 +1167,24 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                     >
                       {t("newItem.exercisesUnselectAll")}
                     </button>
-                    <button
-                      type="button"
-                      className={`secondary-button ${funnyImageExerciseEntry ? "dangerous-action-button" : ""}`}
-                      onClick={() => void generateFunnyImageExercise()}
-                      disabled={generatingFunnyImageExercise || item.id <= 0}
-                    >
-                      {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
-                    </button>
+                    {funnyImageExerciseEntry ? (
+                      <DangerousButton
+                        className="secondary-button dangerous-action-button"
+                        onConfirm={generateFunnyImageExercise}
+                        disabled={generatingFunnyImageExercise || item.id <= 0}
+                      >
+                        {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                      </DangerousButton>
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void generateFunnyImageExercise()}
+                        disabled={generatingFunnyImageExercise || item.id <= 0}
+                      >
+                        {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                      </button>
+                    )}
                   </div>
                   {generatingFunnyImageExercise && (
                     <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>

@@ -4,6 +4,7 @@ import { fetchContentItemDetail, fetchSession, markSeen, setContentItemLearned, 
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
+import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
 import WordReview from "./WordReview";
@@ -562,9 +563,9 @@ export default function SessionPage(): JSX.Element {
         </section>
         {waitingNext && <p>{t("session.movingNext")}</p>}
         <div className="actions">
-          <button className="secondary-button session-mark-learned-button" onClick={() => void markCurrentAsLearned()}>
+          <DangerousButton className="secondary-button session-mark-learned-button" onConfirm={markCurrentAsLearned}>
             {t("session.markLearned")}
-          </button>
+          </DangerousButton>
         </div>
       </main>
       {openedItemModal}

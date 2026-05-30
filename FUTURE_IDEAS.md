@@ -3,6 +3,8 @@
 
 Que cuando uno complete los items de la sesion le haga fiesta
 Que haga superfiesta cuando uno aprenda x palabras nuevas en el día.
+
+# Trabajando en esto pero todavia no esta completo. Esta shelved lo que llevo. Buscar conversacin en Codex
 Que indefinido sea en sujeto
 Add con diese diesels...
 
@@ -47,6 +49,15 @@ Usar servicio de autenticacion de Azure
 Add settings to deploy files, like updated roles permissions, env...
 Audio mas rapido y mas "ofuscado"
 escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
+Realmente crear cluster para que deploy no tenga que ser manual
+Actualizar `aws-deploy/ecs-task-backend.json` y `aws-deploy/ecs-task-frontend.json`; ahora el script usa ARNs de task definitions porque esos archivos estan obsoletos.
+
+
+
+Create a script, using AWS deployment service, to create all the initial setup 
+
+
+Upgrade to React router v7
 
 # Future Ideas
 

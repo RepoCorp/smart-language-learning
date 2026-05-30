@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
+import DangerousButton from "./DangerousButton";
 
 function normalize(value: string): string {
   return value.trim();
@@ -342,9 +343,9 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
                 {t("words.openItem")}
               </button>
             ) : null}
-            <button type="button" className="dangerous-primary-button" onClick={() => void failWrittenAnswer()} disabled={isSubmitting}>
+            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
               {t("word.failButton")}
-            </button>
+            </DangerousButton>
           </>
         )}
         {awaitingWrongAccept && (

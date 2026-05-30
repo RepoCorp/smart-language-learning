@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { deleteContentItem, deleteContentTopic, fetchContentItemDetail, fetchContentItems, fetchContentTopics, regenerateContentItemAudio, setContentItemLearned } from "../api";
+import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
@@ -352,9 +353,9 @@ export default function ContentManagePage(): JSX.Element {
                   >
                     {allTopicsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
                   </button>
-                  <button
+                  <DangerousButton
                     className="dangerous-action-button"
-                    onClick={() => void removeSelectedTopics()}
+                    onConfirm={removeSelectedTopics}
                     disabled={
                       Boolean(deletingTopic)
                       || deletingItemId !== null
@@ -364,7 +365,7 @@ export default function ContentManagePage(): JSX.Element {
                     }
                   >
                     {deletingTopic ? t("manage.deleting") : t("manage.deleteSelectedTopics")}
-                  </button>
+                  </DangerousButton>
                 </li>
                 {filteredTopics.map((topic) => (
                   <li key={topic} className="manage-row">
@@ -406,9 +407,9 @@ export default function ContentManagePage(): JSX.Element {
                   >
                     {allWordItemsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
                   </button>
-                  <button
+                  <DangerousButton
                     className="dangerous-action-button"
-                    onClick={() => void removeSelectedItems(filteredWordItems.map((item) => item.id))}
+                    onConfirm={() => removeSelectedItems(filteredWordItems.map((item) => item.id))}
                     disabled={
                       Boolean(deletingTopic)
                       || deletingItemId !== null
@@ -418,7 +419,7 @@ export default function ContentManagePage(): JSX.Element {
                     }
                   >
                     {deletingItemId !== null ? t("manage.deleting") : t("manage.deleteSelectedItems")}
-                  </button>
+                  </DangerousButton>
                 </li>
                 {filteredWordItems.map((item) => (
                   <li key={item.id} className="manage-row manage-item-row">
@@ -449,10 +450,9 @@ export default function ContentManagePage(): JSX.Element {
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
+                    <DangerousButton
                       className="secondary-button manage-item-action-button dangerous-action-button"
-                      onClick={() => void regenerateAudio(item)}
+                      onConfirm={() => regenerateAudio(item)}
                       disabled={
                         Boolean(deletingTopic)
                         || deletingItemId !== null
@@ -461,7 +461,7 @@ export default function ContentManagePage(): JSX.Element {
                       }
                     >
                       {regeneratingAudioItemId === item.id ? t("manage.regeneratingAudio") : t("manage.regenerateAudio")}
-                    </button>
+                    </DangerousButton>
                     <button
                       type="button"
                       className={`manage-item-action-button ${item.is_learned ? "manage-item-action-button-unmark" : "manage-item-action-button-mark"}`}
@@ -499,9 +499,9 @@ export default function ContentManagePage(): JSX.Element {
                   >
                     {allPhraseItemsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
                   </button>
-                  <button
+                  <DangerousButton
                     className="dangerous-action-button"
-                    onClick={() => void removeSelectedItems(filteredPhraseItems.map((item) => item.id))}
+                    onConfirm={() => removeSelectedItems(filteredPhraseItems.map((item) => item.id))}
                     disabled={
                       Boolean(deletingTopic)
                       || deletingItemId !== null
@@ -511,7 +511,7 @@ export default function ContentManagePage(): JSX.Element {
                     }
                   >
                     {deletingItemId !== null ? t("manage.deleting") : t("manage.deleteSelectedItems")}
-                  </button>
+                  </DangerousButton>
                 </li>
                 {filteredPhraseItems.map((item) => (
                   <li key={item.id} className="manage-row manage-item-row">
@@ -542,10 +542,9 @@ export default function ContentManagePage(): JSX.Element {
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
+                    <DangerousButton
                       className="secondary-button manage-item-action-button dangerous-action-button"
-                      onClick={() => void regenerateAudio(item)}
+                      onConfirm={() => regenerateAudio(item)}
                       disabled={
                         Boolean(deletingTopic)
                         || deletingItemId !== null
@@ -554,7 +553,7 @@ export default function ContentManagePage(): JSX.Element {
                       }
                     >
                       {regeneratingAudioItemId === item.id ? t("manage.regeneratingAudio") : t("manage.regenerateAudio")}
-                    </button>
+                    </DangerousButton>
                     <button
                       type="button"
                       className={`manage-item-action-button ${item.is_learned ? "manage-item-action-button-unmark" : "manage-item-action-button-mark"}`}
