@@ -8,6 +8,7 @@ import NewItem from "./NewItem";
 
 const CREATE_NEW_OPTION = "__create_new__";
 type DialogLength = "standard" | "short_three";
+type RequiredWordsLanguage = "source" | "target";
 
 export default function ContentCreatePage(): JSX.Element {
   const { t } = useI18n();
@@ -17,6 +18,8 @@ export default function ContentCreatePage(): JSX.Element {
   const [selectedContext, setSelectedContext] = useState<string>("");
   const [customContext, setCustomContext] = useState<string>("");
   const [conversationDetails, setConversationDetails] = useState<string>("");
+  const [requiredWords, setRequiredWords] = useState<string>("");
+  const [requiredWordsLanguage, setRequiredWordsLanguage] = useState<RequiredWordsLanguage>("target");
   const [dialogLength, setDialogLength] = useState<DialogLength>("standard");
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
@@ -60,6 +63,8 @@ export default function ContentCreatePage(): JSX.Element {
         setSelectedContext("");
         setCustomContext("");
         setConversationDetails("");
+        setRequiredWords("");
+        setRequiredWordsLanguage("target");
         setDialogLength("standard");
         setPreview(null);
         setResult("");
@@ -79,6 +84,8 @@ export default function ContentCreatePage(): JSX.Element {
           setSelectedContext("");
           setCustomContext("");
           setConversationDetails("");
+          setRequiredWords("");
+          setRequiredWordsLanguage("target");
           setDialogLength("standard");
           setPreview(null);
           setResult("");
@@ -159,7 +166,17 @@ export default function ContentCreatePage(): JSX.Element {
     setLoading(true);
     try {
       const details = conversationDetails.trim();
-      const data = await previewContent(resolvedTopic, resolvedContext, details, dialogLength, sourceLanguage, targetLanguage);
+      const required = requiredWords.trim();
+      const data = await previewContent(
+        resolvedTopic,
+        resolvedContext,
+        details,
+        required,
+        requiredWordsLanguage,
+        dialogLength,
+        sourceLanguage,
+        targetLanguage,
+      );
       setPreview(data);
       setSelectedPreviewTurnIndexes([]);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
@@ -424,6 +441,26 @@ export default function ContentCreatePage(): JSX.Element {
             <option value="standard">{t("content.length.standard")}</option>
             <option value="short_three">{t("content.length.shortThree")}</option>
           </select>
+        </div>
+        <div className="content-form-section">
+          <label htmlFor="required-words-input" className="prompt">{t("content.requiredWords.label")}</label>
+          <select
+            id="required-words-language-select"
+            value={requiredWordsLanguage}
+            onChange={(e) => setRequiredWordsLanguage(e.target.value as RequiredWordsLanguage)}
+            disabled={loading || saving}
+          >
+            <option value="target">{t("content.requiredWords.languageTarget")}</option>
+            <option value="source">{t("content.requiredWords.languageSource")}</option>
+          </select>
+          <input
+            id="required-words-input"
+            value={requiredWords}
+            onChange={(e) => setRequiredWords(e.target.value)}
+            placeholder={t("content.requiredWords.placeholder")}
+            disabled={loading || saving}
+          />
+          <p className="hint">{t("content.requiredWords.hint")}</p>
         </div>
         <div className="content-form-section">
           <label htmlFor="conversation-details-input" className="prompt">{t("content.details.label")}</label>

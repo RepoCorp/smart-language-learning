@@ -1,9 +1,7 @@
 # Todos
 
 
-Que en la conversacion siempre empiece el usuario, puede ser solo un saludo
 Que pueda seleccionar varias palabras para agregar al diccionario, no solo click en individuales si no que pueda seleccionar expresiones completas
-Que al generar contenido pueda darse una lista de palabras para usar y/o pedir que primero las genere segun instrucciones
 Que cuando uno complete los items de la sesion le haga fiesta
 Lo de la cantidad de hints sigue fallando e incluso con una, y creo que incluso cuando una es menos del 30% esta marcandoloa como fallido
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
@@ -15,8 +13,6 @@ Que haga superfiesta cuando uno aprenda x palabras nuevas en el día.
 Que la imagen tenga solo la palabra y en la parte de abajo escrita la frase
 Sigue sacando cosas raras como sein de stimmt
 
-
-Seleccionar longitud del diálogo al crear
 
 
 Que siempre reproduzca el audio en los tests

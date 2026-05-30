@@ -59,6 +59,90 @@ def _extract_keywords(text: str) -> list[str]:
     return ordered_unique
 
 
+def _required_word_terms(required_words: str) -> list[str]:
+    raw_terms = re.split(r"[,;\n]+", required_words or "")
+    terms: list[str] = []
+    seen: set[str] = set()
+    for raw_term in raw_terms:
+        term = " ".join(str(raw_term or "").split()).strip()
+        if not term:
+            continue
+        normalized = term.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        terms.append(term)
+    return terms
+
+
+def _required_words_instruction(required_words: str, target_language: str) -> str:
+    terms = _required_word_terms(required_words)
+    if not terms:
+        return "Required target-language words/phrases: none."
+    target_name = _language_label(target_language)
+    return (
+        f"Required {target_name} words/phrases: {'; '.join(terms)}. "
+        "Include every listed item in target_text at least once, using it exactly as written unless a tiny natural inflection is required."
+    )
+
+
+def _translate_required_words_to_target(
+    *,
+    required_words: str,
+    required_words_language: str,
+    source_language: str,
+    target_language: str,
+    call_openai_json_fn,
+) -> str | None:
+    terms = _required_word_terms(required_words)
+    if not terms:
+        return ""
+    if required_words_language != "source":
+        return "; ".join(terms)
+    source_name = _language_label(source_language)
+    target_name = _language_label(target_language)
+    parsed = call_openai_json_fn(
+        f"""
+Translate required language-learning vocabulary from {source_name} into {target_name}.
+
+Return strict JSON:
+{{
+  "target_words": [
+    "string"
+  ]
+}}
+
+Rules:
+- Return exactly one target_words entry for each source word or phrase, in the same order.
+- Each target_words entry must be only the translated vocabulary item, not a sentence.
+- Use the natural dictionary or phrase translation that would fit a beginner dialog.
+- Include articles for nouns when that is natural in {target_name}.
+- JSON only.
+""".strip(),
+        (
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Source words/phrases: {'; '.join(terms)}"
+        ),
+        timeout_seconds=10,
+        temperature=0.2,
+        top_p=1.0,
+    )
+    if not isinstance(parsed, dict):
+        return None
+    raw_translations = parsed.get("target_words")
+    if not isinstance(raw_translations, list):
+        return None
+    translated_terms = []
+    for raw_translation in raw_translations:
+        translation = " ".join(str(raw_translation or "").split()).strip()
+        if translation:
+            translated_terms.append(translation)
+    if len(translated_terms) != len(terms):
+        return None
+    return "; ".join(translated_terms)
+
+
 def _allows_greeting(topic: str, context: str) -> bool:
     merged = _normalize_text(f"{topic} {context}")
     words = set(merged.split())
@@ -107,6 +191,7 @@ def _build_conversation_prompt(
     topic: str,
     context: str,
     conversation_details: str,
+    required_words: str,
     dialog_length: str,
     scenario_description: str,
     source_language: str,
@@ -129,6 +214,7 @@ def _build_conversation_prompt(
         f"Selected scenario: {scenario_description}",
         f"Situation detail: {situation_detail}",
         f"Length requirement: {length_requirement}",
+        _required_words_instruction(required_words, target_language),
         f"Extra user details (temporary, do not treat as saved context): {normalized_details or 'not provided'}",
         (
             "Language mapping: use 'source_text' for "
@@ -148,6 +234,7 @@ def _generate_scenario_pool_with_chatgpt(
     topic: str,
     context: str,
     conversation_details: str,
+    required_words: str,
     source_language: str,
     target_language: str,
     call_openai_json_fn,
@@ -180,6 +267,7 @@ Rules:
             f"Topic: {topic}\n"
             f"Context: {context or 'not provided'}\n"
             f"Extra user details: {conversation_details or 'not provided'}\n"
+            f"Required target-language words/phrases for final dialog: {required_words or 'not provided'}\n"
             f"Source language: {source_name}\n"
             f"Target language: {target_name}\n"
             "Generate varied but practical options with different concrete constraints."
@@ -216,6 +304,8 @@ def generate_conversation_with_chatgpt(
     topic: str,
     context: str = "",
     conversation_details: str = "",
+    required_words: str = "",
+    required_words_language: str = "target",
     dialog_length: str = "standard",
     source_language: str = "spanish",
     target_language: str = "german",
@@ -225,11 +315,21 @@ def generate_conversation_with_chatgpt(
 ) -> list[dict[str, str]] | None:
     style_seed = choice_fn(STYLE_SEEDS)
     creativity_seed = uuid4().hex[:8]
+    target_required_words = _translate_required_words_to_target(
+        required_words=required_words,
+        required_words_language=required_words_language,
+        source_language=source_language,
+        target_language=target_language,
+        call_openai_json_fn=call_openai_json_fn,
+    )
+    if target_required_words is None:
+        return None
     try:
         scenario_pool = _generate_scenario_pool_with_chatgpt(
             topic=topic,
             context=context,
             conversation_details=conversation_details,
+            required_words=target_required_words,
             source_language=source_language,
             target_language=target_language,
             call_openai_json_fn=call_openai_json_fn,
@@ -251,6 +351,7 @@ def generate_conversation_with_chatgpt(
             topic=topic,
             context=context,
             conversation_details=conversation_details,
+            required_words=target_required_words,
             dialog_length=dialog_length,
             scenario_description=selected_scenario,
             source_language=source_language,

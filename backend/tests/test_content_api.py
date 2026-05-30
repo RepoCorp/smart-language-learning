@@ -109,6 +109,41 @@ def test_content_preview_passes_short_three_dialog_length(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_preview_passes_required_dialog_words(monkeypatch):
+    from learning.views.content import api as api_views
+
+    captured = {}
+
+    def fake_generate_conversation(
+        topic,
+        context="",
+        conversation_details="",
+        required_words="",
+        required_words_language="target",
+        **kwargs,
+    ):
+        captured["required_words"] = required_words
+        captured["required_words_language"] = required_words_language
+        return [
+            {"speaker": "a", "spanish_text": "Necesito pan.", "german_text": "Ich brauche Brot.", "notes": ""},
+            {"speaker": "b", "spanish_text": "Puede pagar ahora.", "german_text": "Sie koennen jetzt bezahlen.", "notes": ""},
+        ]
+
+    monkeypatch.setattr(api_views, "generate_conversation_with_chatgpt", fake_generate_conversation)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/preview",
+        {"topic": "shopping", "required_words": "Brot, bezahlen", "required_words_language": "target"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert captured["required_words"] == "Brot, bezahlen"
+    assert captured["required_words_language"] == "target"
+
+
+@pytest.mark.django_db
 def test_content_confirm_creates_only_missing_items(monkeypatch):
     from learning.views import content as content_views
 
@@ -856,6 +891,86 @@ def test_generate_conversation_prompt_can_request_short_three_phrase_dialog(monk
     assert phrases is not None
     assert len(phrases) == 3
     assert "Length requirement: Exactly 3 very short dialogue turns/phrases total." in captured["prompts"][1]
+
+
+@pytest.mark.django_db
+def test_generate_conversation_prompt_includes_required_dialog_words(monkeypatch):
+    from learning.views.content import generation
+
+    captured = {}
+
+    def fake_call_openai_json(system_prompt, user_input, timeout_seconds=10, **kwargs):
+        captured.setdefault("prompts", []).append(user_input)
+        if "Create five distinct conversation scenarios" in system_prompt:
+            return {
+                "scenarios": [
+                    "Comprar pan rapidamente.",
+                    "Pedir cafe para llevar.",
+                    "Pagar en la caja.",
+                    "Preguntar por una mesa.",
+                    "Saludar a un vecino.",
+                ]
+            }
+        return {
+            "conversation": [
+                {"speaker": "a", "source_text": "Necesito pan.", "target_text": "Ich brauche Brot.", "notes": ""},
+                {"speaker": "b", "source_text": "Puede pagar ahora.", "target_text": "Sie koennen jetzt bezahlen.", "notes": ""},
+            ]
+        }
+
+    monkeypatch.setattr(generation, "call_openai_json", fake_call_openai_json)
+    monkeypatch.setattr(generation, "choice", lambda values: values[0])
+
+    phrases = generation.generate_conversation_with_chatgpt("shopping", required_words="Brot, bezahlen")
+
+    assert phrases is not None
+    assert "Required target-language words/phrases for final dialog: Brot; bezahlen" in captured["prompts"][0]
+    assert "Required German words/phrases: Brot; bezahlen." in captured["prompts"][1]
+    assert "Include every listed item in target_text at least once" in captured["prompts"][1]
+
+
+@pytest.mark.django_db
+def test_generate_conversation_translates_source_required_words_before_prompt(monkeypatch):
+    from learning.views.content import generation
+
+    captured = {}
+
+    def fake_call_openai_json(system_prompt, user_input, timeout_seconds=10, **kwargs):
+        captured.setdefault("calls", []).append((system_prompt, user_input))
+        if "Translate required language-learning vocabulary" in system_prompt:
+            return {"target_words": ["das Brot", "bezahlen"]}
+        if "Create five distinct conversation scenarios" in system_prompt:
+            return {
+                "scenarios": [
+                    "Comprar pan rapidamente.",
+                    "Pedir cafe para llevar.",
+                    "Pagar en la caja.",
+                    "Preguntar por una mesa.",
+                    "Saludar a un vecino.",
+                ]
+            }
+        return {
+            "conversation": [
+                {"speaker": "a", "source_text": "Necesito pan.", "target_text": "Ich brauche das Brot.", "notes": ""},
+                {"speaker": "b", "source_text": "Puede pagar ahora.", "target_text": "Sie koennen jetzt bezahlen.", "notes": ""},
+            ]
+        }
+
+    monkeypatch.setattr(generation, "call_openai_json", fake_call_openai_json)
+    monkeypatch.setattr(generation, "choice", lambda values: values[0])
+
+    phrases = generation.generate_conversation_with_chatgpt(
+        "shopping",
+        required_words="pan, pagar",
+        required_words_language="source",
+    )
+
+    assert phrases is not None
+    assert len(captured["calls"]) == 3
+    assert "Source words/phrases: pan; pagar" in captured["calls"][0][1]
+    assert "Required target-language words/phrases for final dialog: das Brot; bezahlen" in captured["calls"][1][1]
+    assert "Required German words/phrases: das Brot; bezahlen." in captured["calls"][2][1]
+    assert "pan, pagar" not in captured["calls"][2][1]
 
 
 @pytest.mark.django_db

@@ -31,6 +31,8 @@ class ContentPreviewView(APIView):
         topic = serializer.validated_data["topic"].strip()
         context = serializer.validated_data.get("context", "").strip()
         conversation_details = serializer.validated_data.get("conversation_details", "").strip()
+        required_words = serializer.validated_data.get("required_words", "").strip()
+        required_words_language = serializer.validated_data.get("required_words_language", "target")
         dialog_length = serializer.validated_data.get("dialog_length", "standard")
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
@@ -51,6 +53,9 @@ class ContentPreviewView(APIView):
         }
         if dialog_length == "short_three":
             generation_kwargs["dialog_length"] = dialog_length
+        if required_words:
+            generation_kwargs["required_words"] = required_words
+            generation_kwargs["required_words_language"] = required_words_language
         generated_conversation = generate_conversation_with_chatgpt(**generation_kwargs)
         if not generated_conversation:
             return Response({"detail": "Could not generate dialog preview"}, status=503)
