@@ -981,21 +981,128 @@ textarea {
   padding: 8px 12px;
 }
 
+.content-create-form {
+  display: grid;
+  gap: 16px;
+}
+
+.content-create-form .actions {
+  margin-top: 2px;
+}
+
+.content-create-form .prompt {
+  font-size: 14px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.content-create-form input,
+.content-create-form select,
+.content-create-form textarea {
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.content-create-form textarea {
+  width: 100%;
+  min-height: 112px;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.content-create-form .hint {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
 .content-form-section {
-  border: 1px solid #d9e2ec;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 12px;
-  background: #f8fafc;
+  display: grid;
+  gap: 8px;
+}
+
+.content-topic-section {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.content-topic-section-required {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  padding: 10px;
+}
+
+.content-required-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.content-required-label span {
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.content-required-hint {
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
 }
 
 .content-form-section-title {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   color: #334e68;
+}
+
+.content-radio-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.content-radio-option {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334e68;
+  line-height: 1.25;
+  cursor: pointer;
+  user-select: none;
+}
+
+.content-radio-option input[type="radio"] {
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.content-radio-option-selected {
+  border-color: #0b4fc4;
+  background: #eff6ff;
+  color: #102a43;
+  box-shadow: 0 0 0 2px rgba(11, 79, 196, 0.1);
 }
 
 .content-audio-option {

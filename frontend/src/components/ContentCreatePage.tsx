@@ -593,14 +593,18 @@ export default function ContentCreatePage(): JSX.Element {
       <h1>{t("content.title")}</h1>
       <p>{t("content.description")}</p>
 
-      <section className="card">
-        <div className="content-form-section">
-          <label htmlFor="topic-select" className="prompt">{t("content.topic.label")}</label>
+      <section className="card content-create-form">
+        <div className={`content-form-section content-topic-section${resolvedTopic ? "" : " content-topic-section-required"}`}>
+          <label htmlFor="topic-select" className="prompt content-required-label">
+            {t("content.topic.label")}
+            <span>{t("content.topic.requiredBadge")}</span>
+          </label>
           <select
             id="topic-select"
             value={selectedTopic}
             onChange={(e) => setSelectedTopic(e.target.value)}
             disabled={loading || saving}
+            aria-invalid={!resolvedTopic}
           >
             <option value="">{previousTopics.length ? t("content.topic.select") : t("content.topic.none")}</option>
             {previousTopics.map((savedTopic) => (
@@ -619,9 +623,11 @@ export default function ContentCreatePage(): JSX.Element {
                 onChange={(e) => setCustomTopic(e.target.value)}
                 placeholder={t("content.topic.placeholder")}
                 disabled={loading || saving}
+                aria-invalid={!resolvedTopic}
               />
             </>
           )}
+          {!resolvedTopic && <p className="content-required-hint">{t("content.topic.requiredHint")}</p>}
         </div>
         <div className="content-form-section">
           <label htmlFor="topic-context-select" className="prompt">{t("content.context.label")}</label>
@@ -650,28 +656,46 @@ export default function ContentCreatePage(): JSX.Element {
           )}
         </div>
         <div className="content-form-section">
-          <label htmlFor="dialog-length-select" className="prompt">{t("content.length.label")}</label>
-          <select
-            id="dialog-length-select"
-            value={dialogLength}
-            onChange={(e) => setDialogLength(e.target.value as DialogLength)}
-            disabled={loading || saving}
-          >
-            <option value="standard">{t("content.length.standard")}</option>
-            <option value="short_three">{t("content.length.shortThree")}</option>
-          </select>
+          <p className="prompt" id="dialog-length-label">{t("content.length.label")}</p>
+          <div className="content-radio-options" role="radiogroup" aria-labelledby="dialog-length-label">
+            {(["standard", "short_three"] as DialogLength[]).map((length) => (
+              <label
+                key={length}
+                className={`content-radio-option${dialogLength === length ? " content-radio-option-selected" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="dialog-length"
+                  value={length}
+                  checked={dialogLength === length}
+                  onChange={() => setDialogLength(length)}
+                  disabled={loading || saving}
+                />
+                {length === "standard" ? t("content.length.standard") : t("content.length.shortThree")}
+              </label>
+            ))}
+          </div>
         </div>
         <div className="content-form-section">
           <label htmlFor="required-words-input" className="prompt">{t("content.requiredWords.label")}</label>
-          <select
-            id="required-words-language-select"
-            value={requiredWordsLanguage}
-            onChange={(e) => setRequiredWordsLanguage(e.target.value as RequiredWordsLanguage)}
-            disabled={loading || saving}
-          >
-            <option value="target">{t("content.requiredWords.languageTarget")}</option>
-            <option value="source">{t("content.requiredWords.languageSource")}</option>
-          </select>
+          <div className="content-radio-options" role="radiogroup" aria-label={t("content.requiredWords.label")}>
+            {(["target", "source"] as RequiredWordsLanguage[]).map((language) => (
+              <label
+                key={language}
+                className={`content-radio-option${requiredWordsLanguage === language ? " content-radio-option-selected" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="required-words-language"
+                  value={language}
+                  checked={requiredWordsLanguage === language}
+                  onChange={() => setRequiredWordsLanguage(language)}
+                  disabled={loading || saving}
+                />
+                {language === "target" ? t("content.requiredWords.languageTarget") : t("content.requiredWords.languageSource")}
+              </label>
+            ))}
+          </div>
           <input
             id="required-words-input"
             value={requiredWords}
@@ -683,12 +707,13 @@ export default function ContentCreatePage(): JSX.Element {
         </div>
         <div className="content-form-section">
           <label htmlFor="conversation-details-input" className="prompt">{t("content.details.label")}</label>
-          <input
+          <textarea
             id="conversation-details-input"
             value={conversationDetails}
             onChange={(e) => setConversationDetails(e.target.value)}
             placeholder={t("content.details.placeholder")}
             disabled={loading || saving}
+            rows={4}
           />
           <p className="hint">{t("content.details.hint")}</p>
         </div>

@@ -6,8 +6,20 @@ When generating the exercises, send only the word in the target language
 Que al escoger sesión procure no incluir frases y sus palabras juntas
 Que cuando uno complete los items de la sesion le haga fiesta
 Que haga superfiesta cuando uno aprenda x palabras nuevas en el día.
-For word retry test no haga lo mismo que en el primer test si no que deje un input libre, sin ninguna validacion, y va mostrando en otra parte la palabra inicialmente escondida y va revelando letras aleatoriamente pero no la primera
-Usar frases mas complejas para el word retry test, de pronto sacandolas de los dialogos
+For word retry test no haga lo mismo que en el primer test si no que deje un input libre, sin ninguna validacion, y va mostrando en otra parte la palabra inicialmente escondida con placeholders para cada letra y va revelando letras aleatoriamente pero no la primera
+- Usar frases mas complejas para el word retry test, de pronto sacandolas de los dialogos, la idea es que la frase sea muy relacionada con la palabra para que se pueda deducir
+- Que no muestre la palabra en el otro idioma, simplemente la frase con el hueco.
+- Si se equivoca al enviar la palabra muestre una imagen de la palabra y reemplaze la letra equivocada por una x
+- Yo incluso consideraría no marcar inmediatamente la posición exacta del error en el primer intento. Ejemplo:Primer fallo:Hay 2 errores. Segundo fallo:Ahora sí se resaltan. Porque obligas a una revisión mental adicional. Pero esto habría que probarlo; demasiada dificultad también puede ser frustrante.
+Frases:
+- Primero autoevaluacion, si responde que falló la vuelve a mostrar en la sesión en ejercicio de bloques.
+- El ejercicio va mostrando tres opciones para la siguiente palabra y no la añade si no es la correcta.
+- Artículos van en el bloque con el noun.
+- Que las opciones de los bloques sean del mismo tipo de palabra
+
+- Una palabra marcada como dificil tiene prioridad para aparecer en las sessiones 
+
+Que la palabra en la imagen sea completa por ejemplo herauskommen y que se muestre
 
 # Trabajando en esto pero todavia no esta completo. Esta shelved lo que llevo. Buscar conversacin en Codex
 Que indefinido sea en sujeto
