@@ -16,6 +16,37 @@ function countLetters(value: string): number {
   return matches ? matches.length : 0;
 }
 
+function isLetter(value: string): boolean {
+  return /^[A-Za-zÀ-ÖØ-öø-ÿ]$/.test(value);
+}
+
+function matchLetterCase(letter: string, reference: string): string {
+  return reference === reference.toUpperCase() ? letter.toUpperCase() : letter.toLowerCase();
+}
+
+function nextLetterSuggestions(correctLetter: string, offset: number): string[] {
+  if (!isLetter(correctLetter)) {
+    return [];
+  }
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const correctLower = correctLetter.toLowerCase();
+  const wrongLetters = alphabet
+    .split("")
+    .filter((letter) => letter !== correctLower)
+    .slice(offset % 20, (offset % 20) + 2);
+  const suggestions = [
+    matchLetterCase(correctLower, correctLetter),
+    ...wrongLetters.map((letter) => matchLetterCase(letter, correctLetter)),
+  ];
+  const correctIndex = offset % suggestions.length;
+  const correct = suggestions.shift();
+  if (!correct) {
+    return [];
+  }
+  suggestions.splice(correctIndex, 0, correct);
+  return suggestions;
+}
+
 interface WordReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
@@ -44,6 +75,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
   const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
+  const [letterSuggestions, setLetterSuggestions] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const isSpanishToGerman = item.direction !== "de_to_es";
@@ -120,6 +152,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     const nextHintLetter = expectedAnswer.charAt(prefixLen);
     const isNewHintStep = Boolean(nextHintLetter) && nextHintLetter !== hintLetter;
     setHintLetter(nextHintLetter);
+    setLetterSuggestions([]);
     if (isNewHintStep) {
       setHintStepsUsed((value) => value + 1);
     }
@@ -140,7 +173,16 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
       return;
     }
 
+    if (!expectedAnswer.startsWith(value)) {
+      const wrongText = value.slice(answer.length) || value.slice(-1);
+      setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
+      setLetterSuggestions(nextLetterSuggestions(expectedAnswer.charAt(answer.length), answer.length));
+      return;
+    }
+
     setAnswer(value);
+    setFeedback("");
+    setLetterSuggestions([]);
     setHintLetter("");
     setAwaitingWrongAccept(false);
 
@@ -210,6 +252,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setHintStepsUsed(0);
     setAwaitingWrongAccept(false);
     setAnswerRevealed(false);
+    setLetterSuggestions([]);
   }, [item.id, item.direction]);
 
   if (useSelfGradedAnswer) {
@@ -307,10 +350,31 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         autoCorrect="off"
         spellCheck={false}
       />
+      {feedback && <p className="word-input-feedback">{feedback}</p>}
+      {letterSuggestions.length > 0 && (
+        <div className="letter-suggestions" role="group" aria-label={t("word.letterSuggestions")}>
+          {letterSuggestions.map((letter) => (
+            <button
+              key={letter}
+              type="button"
+              className="secondary-button letter-suggestion-button"
+              onClick={() => handleAnswerChange(answer + letter)}
+              disabled={isSubmitting || awaitingWrongAccept}
+            >
+              {letter}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="hint">{hint ? t("word.hint", { letter: hint }) : "\u00a0"}</p>
       <div className="actions">
         {!awaitingWrongAccept && (
           <>
+            {onOpenItem ? (
+              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+                {t("words.openItem")}
+              </button>
+            ) : null}
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}
@@ -321,11 +385,6 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
             >
               {t("word.hintButton")}
             </button>
-            {onOpenItem ? (
-              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-                {t("words.openItem")}
-              </button>
-            ) : null}
             <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
               {t("word.failButton")}
             </DangerousButton>
@@ -337,7 +396,6 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
           </button>
         )}
       </div>
-      {feedback && <p>{feedback}</p>}
     </div>
   );
 }

@@ -200,6 +200,38 @@ describe("SessionPage", () => {
     expect(screen.getByText("Hint: a")).toBeInTheDocument();
   });
 
+  it("rejects incorrect letters in written word reviews", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 44,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "gracias",
+          german_text: "danke",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/Write in German/);
+    const input = screen.getByTestId("word-input");
+    await userEvent.type(input, "x");
+
+    expect(input).toHaveValue("");
+    expect(screen.getByText("Wrong letter: x")).toBeInTheDocument();
+    const suggestions = within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button");
+    expect(suggestions).toHaveLength(3);
+    expect(suggestions.map((button) => button.textContent)).toContain("d");
+
+    await userEvent.click(screen.getByRole("button", { name: "d" }));
+    expect(input).toHaveValue("d");
+    expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
+  });
+
   it("trims input from the first mistake before showing the next hint letter", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
@@ -639,7 +671,7 @@ describe("SessionPage", () => {
     await screen.findByText(/Write in German: casa/);
     const actionButtons = screen.getAllByRole("button").map((button) => button.textContent);
     expect(actionButtons).toEqual(expect.arrayContaining(["Hint", "Open item", "Fail"]));
-    expect(actionButtons.indexOf("Hint")).toBeLessThan(actionButtons.indexOf("Open item"));
+    expect(actionButtons.indexOf("Open item")).toBeLessThan(actionButtons.indexOf("Hint"));
     expect(actionButtons.indexOf("Open item")).toBeLessThan(actionButtons.indexOf("Fail"));
     await userEvent.click(screen.getByRole("button", { name: "Open item" }));
 

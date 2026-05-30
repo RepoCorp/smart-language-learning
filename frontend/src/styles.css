@@ -301,6 +301,23 @@ body {
   font-weight: 700;
 }
 
+.word-input-feedback {
+  color: #991b1b;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.letter-suggestions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.letter-suggestion-button {
+  min-width: 44px;
+  padding: 8px 12px;
+}
+
 .actions {
   display: flex;
   gap: 10px;
