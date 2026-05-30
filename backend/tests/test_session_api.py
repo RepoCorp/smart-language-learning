@@ -370,6 +370,7 @@ def test_session_includes_related_dialogs_for_item():
         turn_index=0,
         source_text="Necesito un taxi.",
         target_text="Ich brauche ein Taxi.",
+        audio_url="http://localhost:8000/media/audio/turn-mock.mp3",
     )
     ItemDialogOccurrence.objects.create(
         item=item,
@@ -392,4 +393,5 @@ def test_session_includes_related_dialogs_for_item():
     assert payload_item["related_dialogs"][0]["dialog_id"] == dialog.id
     assert payload_item["related_dialogs"][0]["audio_url"] == "http://localhost:8000/media/audio/dialog-mock.wav"
     assert len(payload_item["related_dialogs"][0]["turns"]) == 2
+    assert payload_item["related_dialogs"][0]["turns"][0]["phrase_audio_url"] == "http://localhost:8000/media/audio/turn-mock.mp3"
     assert payload_item["related_dialogs"][0]["matched_turns"][0]["turn_index"] == 0

@@ -7,6 +7,7 @@ from .management import (
     Request,
     Response,
     _call_openai_json_logged,
+    _ensure_audio_for_dialog_turn,
     _language_display_name,
     _link_phrase_to_dialog_turn,
     _link_word_to_dialog_turn,
@@ -194,6 +195,11 @@ class ContentWordQuickAddView(APIView):
                         "word_type": response_word_type,
                     }
                 )
+            _ensure_audio_for_dialog_turn(
+                user=user,
+                dialog_id_raw=dialog_id_raw,
+                turn_index_raw=turn_index_raw,
+            )
             return Response(
                 {
                     "created": False,
@@ -247,6 +253,11 @@ class ContentWordQuickAddView(APIView):
                     dialog_id_raw=dialog_id_raw,
                     turn_index_raw=turn_index_raw,
                 )
+                _ensure_audio_for_dialog_turn(
+                    user=user,
+                    dialog_id_raw=dialog_id_raw,
+                    turn_index_raw=turn_index_raw,
+                )
             else:
                 return Response({"detail": "Existing word lookup failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response(
@@ -263,6 +274,11 @@ class ContentWordQuickAddView(APIView):
         _link_word_to_dialog_turn(
             user=user,
             item=created,
+            dialog_id_raw=dialog_id_raw,
+            turn_index_raw=turn_index_raw,
+        )
+        _ensure_audio_for_dialog_turn(
+            user=user,
             dialog_id_raw=dialog_id_raw,
             turn_index_raw=turn_index_raw,
         )

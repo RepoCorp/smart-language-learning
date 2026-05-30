@@ -137,6 +137,7 @@ class DialogTurn(models.Model):
     turn_index = models.PositiveIntegerField()
     source_text = models.TextField(blank=True)
     target_text = models.TextField(blank=True)
+    audio_url = models.URLField(blank=True, default="")
 
     class Meta:
         ordering = ("turn_index", "id")

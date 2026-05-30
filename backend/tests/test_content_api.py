@@ -2021,6 +2021,90 @@ def test_quick_add_existing_unknown_word_adds_type_and_returns_item(monkeypatch)
 
 
 @pytest.mark.django_db
+def test_quick_add_word_from_unselected_dialog_turn_creates_phrase_audio_context(monkeypatch):
+    from learning.views.content import management as management_views
+    from learning.views.content import management_items_quick_add as quick_add_views
+    from learning.views.content import persistence as persistence_views
+
+    dialog = SavedDialog.objects.create(
+        topic="errands",
+        context="shopping",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {
+                "source_text": "Compro pan.",
+                "target_text": "Ich kaufe Brot.",
+            },
+            {
+                "source_text": "Voy a la tienda.",
+                "target_text": "Ich gehe zum Laden.",
+            },
+        ],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Compro pan.",
+        target_text="Ich kaufe Brot.",
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=1,
+        source_text="Voy a la tienda.",
+        target_text="Ich gehe zum Laden.",
+    )
+
+    monkeypatch.setattr(
+        quick_add_views,
+        "_resolve_dialog_click_word_pair",
+        lambda **kwargs: ("tienda", "Laden", "noun"),
+    )
+    monkeypatch.setattr(
+        quick_add_views,
+        "_normalize_word_metadata",
+        lambda **kwargs: ("la tienda", "der Laden", "noun"),
+    )
+    def fake_audio(text, prefix, target_language="german"):
+        return f"http://localhost:8000/media/audio/{prefix}-{text[:6]}.mp3"
+
+    monkeypatch.setattr(management_views, "create_audio_file", fake_audio)
+    monkeypatch.setattr(persistence_views, "create_audio_file", fake_audio)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/words/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "Laden",
+            "target_text": "Laden",
+            "dialog_id": dialog.id,
+            "turn_index": turn.turn_index,
+            "source_line": turn.source_text,
+            "target_line": turn.target_text,
+            "clicked_target_token": "Laden",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    word = Item.objects.get(item_type=Item.ItemType.WORD, spanish_text="la tienda", german_text="der Laden")
+    turn.refresh_from_db()
+    assert turn.audio_url.startswith("http://localhost:8000/media/audio/phrase-")
+    assert not Item.objects.filter(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Voy a la tienda.",
+        german_text="Ich gehe zum Laden.",
+    ).exists()
+    assert ItemDialogOccurrence.objects.filter(item=word, dialog=dialog, turn=turn, turn_index=1).exists()
+
+    detail = client.get(f"/api/content/items/{word.id}?source_language=spanish&target_language=german")
+
+    assert detail.status_code == 200
+    related_turns = detail.json()["related_dialogs"][0]["turns"]
+    assert related_turns[1]["phrase_audio_url"] == turn.audio_url
+
+
+@pytest.mark.django_db
 def test_quick_add_existing_noun_missing_articles_opens_existing_item(monkeypatch):
     from learning.views.content import management as management_views
     from learning.models import ItemDialogOccurrence

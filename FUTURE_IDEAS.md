@@ -1,5 +1,6 @@
 # Todos
 
+When generating the exercises, send only the word in the target language
 
 Que cuando uno complete los items de la sesion le haga fiesta
 Que haga superfiesta cuando uno aprenda x palabras nuevas en el día.
@@ -21,6 +22,15 @@ Para las palabras seleccionadas no esta guardando el dialogo. Tambien mirar que 
 Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
 Conversacion topic es requerido para poder empezar pero no se evidencia si se intenta impezar sin definirlo
 Evaluar cuando se consigio el objetivo
+"WARN[0003] Found orphan containers ... rt-language-learning-backend-run-736aefa1f30d]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up. "
+Mejorar ejemplos de helpers y que la imagen lo represente mejor, como por ejemplo que es en el futuro o es como würde 
+Que el helper no lo traduzca como palabra si no como una explicacion o algo asi 
+Mas creatividad para la imagen 
+Pareciera que no incluye el historial de las preguntas entonces no tiene contexto
+En el celular a veces el teclado tapa el input de las preguntas
+Mejorar UI de creacion de contenido
+Mover unselect all, abrir ejercicios y cualquier otro boton que sea el mas usado a la izquierda
+
 
 FEATURES
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
@@ -33,6 +43,8 @@ Si permitor no agregar turnos de un dialogo. Que si los guarde pero algo asi com
 Que palabras o frases que tenga dificultad si le ponga a escribirlas y de pronto lo de la musica
 Que pida algo de definicion del usuario para que en las conversaciones ese sea siempre su rol
 Para la conversacion, en los detalles incluir quien soy yo y quien es el usuario, de pronto si guardar estas opciones en el backend
+Si helper cambia con el genero hacer tambien ejercicios de todos
+Incluir teoria de gramatica en los ejercicios
 
 IMPROVEMENTS
 Do not allow deleting phrases, only mark them as inactive or archived.
@@ -51,12 +63,10 @@ Audio mas rapido y mas "ofuscado"
 escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
 Realmente crear cluster para que deploy no tenga que ser manual
 Actualizar `aws-deploy/ecs-task-backend.json` y `aws-deploy/ecs-task-frontend.json`; ahora el script usa ARNs de task definitions porque esos archivos estan obsoletos.
-
-
-
+Que primero genere una frase y después a esa misma frase le haga las conjugaciones
 Create a script, using AWS deployment service, to create all the initial setup 
 
-
+Alguna forma de preguntar conjugaciones en tests
 Upgrade to React router v7
 Push to github
 Uasar mas variedad de voces
