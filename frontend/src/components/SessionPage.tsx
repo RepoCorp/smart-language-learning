@@ -506,7 +506,13 @@ export default function SessionPage(): JSX.Element {
               onContinue={registerSeenItem}
             />
           ) : current.item_type === "word" ? (
-            <WordReview key={current.id} item={current} onAnswered={register} onOpenOptionItem={(itemId) => void openItemModal(itemId)} />
+            <WordReview
+              key={current.id}
+              item={current}
+              onAnswered={register}
+              onOpenItem={(itemId) => void openItemModal(itemId)}
+              onOpenOptionItem={(itemId) => void openItemModal(itemId)}
+            />
           ) : (
             <PhraseReview key={current.id} item={current} onAnswered={register} onOpenOptionItem={(itemId) => void openItemModal(itemId)} />
           )}

@@ -306,7 +306,7 @@ describe("SessionPage", () => {
     expect(screen.queryByText(/too many hints were used/i)).not.toBeInTheDocument();
   });
 
-  it("supports keyboard shortcuts: Ctrl+Enter hints, Enter submits", async () => {
+  it("does not submit or hint with Enter shortcuts", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -326,7 +326,8 @@ describe("SessionPage", () => {
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "d");
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
-    expect(screen.getByText("Hint: a")).toBeInTheDocument();
+    expect(screen.queryByText("Hint: a")).not.toBeInTheDocument();
+    expect(submitReview).not.toHaveBeenCalled();
 
     await userEvent.type(input, "anke");
     await userEvent.keyboard("{Enter}");
@@ -351,10 +352,10 @@ describe("SessionPage", () => {
     await renderSessionPageAndStart();
 
     await screen.findByTestId("word-input");
-    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+    await userEvent.keyboard("{Enter}");
 
     expect(submitReview).not.toHaveBeenCalled();
-    expect(screen.getByText("Please enter an answer.")).toBeInTheDocument();
+    expect(screen.queryByText("Please enter an answer.")).not.toBeInTheDocument();
   });
 
   it("does not show empty warning when input was cleared by hint", async () => {
@@ -379,7 +380,7 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Hint" }));
     expect(input).toHaveValue("");
 
-    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+    await userEvent.keyboard("{Enter}");
     expect(submitReview).not.toHaveBeenCalled();
     expect(screen.queryByText("Please enter an answer.")).not.toBeInTheDocument();
   });
@@ -415,7 +416,6 @@ describe("SessionPage", () => {
     expect(screen.getByText("Hint: d")).toBeInTheDocument();
 
     await userEvent.type(screen.getByTestId("word-input"), "danke");
-    await userEvent.click(screen.getByRole("button", { name: "Check" }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(10, true, "es_to_de"));
 
     await screen.findByText(/Item 2 of 2/);
@@ -486,11 +486,7 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
-    await userEvent.click(screen.getByRole("button", { name: "Check" }));
-    expect(submitReview).not.toHaveBeenCalled();
-    const accept = screen.getByRole("button", { name: "Accept" });
-    await waitFor(() => expect(accept).toBeEnabled());
-    await userEvent.click(accept);
+    await userEvent.click(screen.getByRole("button", { name: "Fail" }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(13, false, "es_to_de"));
   });
 
@@ -608,6 +604,50 @@ describe("SessionPage", () => {
     expect(submitReview).not.toHaveBeenCalled();
   });
 
+  it("opens the current review item in a closable modal from a written test", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 36,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "casa",
+          german_text: "Haus",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+    vi.mocked(fetchContentItemDetail).mockResolvedValue({
+      id: 36,
+      item_type: "word",
+      spanish_text: "casa",
+      german_text: "Haus",
+      created_at: "2026-05-08T10:00:00Z",
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/Write in German: casa/);
+    const actionButtons = screen.getAllByRole("button").map((button) => button.textContent);
+    expect(actionButtons).toEqual(expect.arrayContaining(["Hint", "Open item", "Fail"]));
+    expect(actionButtons.indexOf("Hint")).toBeLessThan(actionButtons.indexOf("Open item"));
+    expect(actionButtons.indexOf("Open item")).toBeLessThan(actionButtons.indexOf("Fail"));
+    await userEvent.click(screen.getByRole("button", { name: "Open item" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText("casa")).toBeInTheDocument();
+    expect(within(dialog).getByText("Haus")).toBeInTheDocument();
+    expect(fetchContentItemDetail).toHaveBeenCalledWith(36, "spanish", "german");
+    expect(screen.getByTestId("session-page")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText(/Write in German: casa/)).toBeInTheDocument();
+    expect(submitReview).not.toHaveBeenCalled();
+  });
+
   it("allows marking phrase as wrong by choice", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
@@ -659,11 +699,7 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
-    await userEvent.click(screen.getByRole("button", { name: "Check" }));
-    expect(submitReview).not.toHaveBeenCalled();
-    const accept = screen.getByRole("button", { name: "Accept" });
-    await waitFor(() => expect(accept).toBeEnabled());
-    await userEvent.click(accept);
+    await userEvent.click(screen.getByRole("button", { name: "Fail" }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(40, false, "es_to_de"));
 
     expect(await screen.findByText("New word")).toBeInTheDocument();
@@ -676,7 +712,7 @@ describe("SessionPage", () => {
     expect(await screen.findByText(/Write in German: perro/)).toBeInTheDocument();
   });
 
-  it("accepts wrong-answer confirmation with Enter key", async () => {
+  it("does not submit a written answer when Enter is pressed", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -695,12 +731,9 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
-    await userEvent.click(screen.getByRole("button", { name: "Check" }));
-    const accept = await screen.findByRole("button", { name: "Accept" });
-    await waitFor(() => expect(accept).toBeEnabled());
-
     await userEvent.keyboard("{Enter}");
-    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(42, false, "es_to_de"));
+    expect(submitReview).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
   });
 
   it("ends the session when selected items are completed", async () => {

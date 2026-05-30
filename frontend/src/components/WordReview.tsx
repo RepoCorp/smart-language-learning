@@ -18,12 +18,13 @@ function countLetters(value: string): number {
 interface WordReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
+  onOpenItem?: (itemId: number) => void;
   onOpenOptionItem?: (itemId: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 1000;
 
-export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordReviewProps): JSX.Element {
+export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionItem }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -39,7 +40,6 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
   const [feedback, setFeedback] = useState<string>("");
   const [hintLetter, setHintLetter] = useState<string>("");
   const [hintStepsUsed, setHintStepsUsed] = useState<number>(0);
-  const [clearedByHint, setClearedByHint] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
@@ -93,6 +93,13 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
     await submitWithFeedback(false, t("word.feedback.markedWrong", { answer: expectedAnswer }));
   };
 
+  const failWrittenAnswer = async (): Promise<void> => {
+    if (useMultipleChoice || isSubmitting) {
+      return;
+    }
+    await submitWithFeedback(false, t("word.feedback.markedWrong", { answer: expectedAnswer }));
+  };
+
   const showInputAwareHint = (): void => {
     if (useMultipleChoice) {
       return;
@@ -115,9 +122,6 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
     const correctedAnswer = currentAnswer.slice(0, prefixLen);
     if (correctedAnswer !== currentAnswer) {
       setAnswer(correctedAnswer);
-      setClearedByHint(currentAnswer.length > 0 && correctedAnswer.length === 0);
-    } else {
-      setClearedByHint(false);
     }
 
     const nextHintLetter = expectedAnswer.charAt(prefixLen);
@@ -135,38 +139,6 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
     }, 0);
   };
 
-  const check = async (): Promise<void> => {
-    if (useMultipleChoice) {
-      return;
-    }
-    if (isSubmitting) {
-      return;
-    }
-
-    if (!answer.trim()) {
-      if (clearedByHint) {
-        setClearedByHint(false);
-        return;
-      }
-      setFeedback(t("word.feedback.empty"));
-      return;
-    }
-
-    const inputMatches = normalize(answer) === normalize(expectedAnswer);
-    const exceededHintLimit = hasExceededHintLimit(expectedAnswer);
-    if (inputMatches && exceededHintLimit) {
-      requireWrongAccept(
-        t("word.feedback.tooManyHints", { answer: expectedAnswer }),
-      );
-      return;
-    }
-    if (inputMatches) {
-      await submitWithFeedback(true, t("word.feedback.correct"));
-      return;
-    }
-    requireWrongAccept(t("word.feedback.incorrect", { answer: expectedAnswer }));
-  };
-
   const handleAnswerChange = (value: string): void => {
     if (useMultipleChoice) {
       return;
@@ -177,7 +149,6 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
 
     setAnswer(value);
     setHintLetter("");
-    setClearedByHint(false);
     setAwaitingWrongAccept(false);
 
     if (normalize(value) !== normalize(expectedAnswer)) {
@@ -238,25 +209,6 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
     }
     playPromptAudio();
   }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio]);
-
-  useEffect(() => {
-    if (useMultipleChoice || !awaitingWrongAccept) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== "Enter") {
-        return;
-      }
-      event.preventDefault();
-      void acceptWrongAnswer();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [awaitingWrongAccept, isSubmitting, useMultipleChoice]);
 
   useEffect(() => {
     if (!useMultipleChoice || isSubmitting) {
@@ -363,21 +315,6 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
         ref={inputRef}
         value={answer}
         onChange={(e) => handleAnswerChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter") {
-            return;
-          }
-          e.preventDefault();
-          if (awaitingWrongAccept) {
-            void acceptWrongAnswer();
-            return;
-          }
-          if (e.ctrlKey) {
-            showInputAwareHint();
-            return;
-          }
-          void check();
-        }}
         placeholder={t("word.input.placeholder")}
         data-testid="word-input"
         disabled={isSubmitting || awaitingWrongAccept}
@@ -400,7 +337,14 @@ export default function WordReview({ item, onAnswered, onOpenOptionItem }: WordR
             >
               {t("word.hintButton")}
             </button>
-            <button onClick={check} disabled={isSubmitting || !answer.trim()}>{t("word.checkButton")}</button>
+            {onOpenItem ? (
+              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+                {t("words.openItem")}
+              </button>
+            ) : null}
+            <button type="button" className="dangerous-primary-button" onClick={() => void failWrittenAnswer()} disabled={isSubmitting}>
+              {t("word.failButton")}
+            </button>
           </>
         )}
         {awaitingWrongAccept && (

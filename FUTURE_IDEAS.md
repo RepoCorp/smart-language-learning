@@ -16,7 +16,6 @@ Que la imagen tenga solo la palabra y en la parte de abajo escrita la frase
 Sigue sacando cosas raras como sein de stimmt
 
 
-Poder ir al elemento desde otros tipos de testing
 Seleccionar longitud del diálogo al crear
 
 

@@ -295,7 +295,8 @@ body {
   margin-bottom: 12px;
 }
 
-.session-mark-learned-button {
+.session-mark-learned-button,
+.dangerous-primary-button {
   background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
   color: #ffffff;
   border-color: #7f1d1d;
@@ -303,7 +304,8 @@ body {
   box-shadow: 0 4px 12px rgba(127, 29, 29, 0.28);
 }
 
-.session-mark-learned-button:hover:not(:disabled) {
+.session-mark-learned-button:hover:not(:disabled),
+.dangerous-primary-button:hover:not(:disabled) {
   background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
   color: #ffffff;
   box-shadow: 0 5px 14px rgba(127, 29, 29, 0.34);
