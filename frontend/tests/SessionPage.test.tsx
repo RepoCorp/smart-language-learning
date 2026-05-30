@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { vi } from "vitest";
@@ -230,6 +230,74 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "d" }));
     expect(input).toHaveValue("d");
     expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
+  });
+
+  it("allows composed letters in written word reviews", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 46,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "niña",
+          german_text: "Mädchen",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/Write in German/);
+    const input = screen.getByTestId("word-input");
+    await userEvent.type(input, "M");
+
+    fireEvent.change(input, { target: { value: "Ma" } });
+    expect(input).toHaveValue("Ma");
+    expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "Mä" } });
+    expect(input).toHaveValue("Mä");
+    expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
+
+    await userEvent.type(input, "dchen");
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(46, true, "es_to_de"));
+  });
+
+  it("allows IME composition in written word reviews", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 47,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "niña",
+          german_text: "Mädchen",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/Write in German/);
+    const input = screen.getByTestId("word-input");
+    await userEvent.type(input, "M");
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "M¨" } });
+    expect(input).toHaveValue("M¨");
+    expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "Mä" } });
+    fireEvent.compositionEnd(input, { target: { value: "Mä" } });
+    expect(input).toHaveValue("Mä");
+    expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
+
+    await userEvent.type(input, "dchen");
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(47, true, "es_to_de"));
   });
 
   it("trims input from the first mistake before showing the next hint letter", async () => {
@@ -516,6 +584,7 @@ describe("SessionPage", () => {
           item_type: "word",
           spanish_text: "casa",
           german_text: "Haus",
+          example_sentence: "Das Haus ist groß.",
           direction: "es_to_de",
           options: [],
         },
@@ -541,6 +610,14 @@ describe("SessionPage", () => {
           item_type: "word",
           spanish_text: "casa",
           german_text: "Haus",
+          exercise_phrases: {
+            phrases: [
+              {
+                source_text: "La casa es grande.",
+                target_text: "Das Haus ist groß.",
+              },
+            ],
+          },
           direction: "es_to_de",
           options: [],
         },
@@ -760,7 +837,8 @@ describe("SessionPage", () => {
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(41, true, "es_to_de"));
 
     expect(await screen.findByText(/Item 3 of 3/)).toBeInTheDocument();
-    expect(await screen.findByText(/Write in German: casa/)).toBeInTheDocument();
+    expect(await screen.findByText(/Complete the phrase with: casa/)).toBeInTheDocument();
+    expect(screen.getByText("Das ____ ist groß.")).toBeInTheDocument();
     await userEvent.type(screen.getByTestId("word-input"), "Haus");
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(40, false, "es_to_de"));
     expect(await screen.findByText("Session completed")).toBeInTheDocument();
@@ -775,6 +853,14 @@ describe("SessionPage", () => {
           item_type: "word",
           spanish_text: "mesa",
           german_text: "Tisch",
+          exercise_phrases: {
+            phrases: [
+              {
+                source_text: "La mesa está lista.",
+                target_text: "Der Tisch ist bereit.",
+              },
+            ],
+          },
           direction: "es_to_de",
           options: [],
         },
@@ -793,7 +879,8 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
 
     expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
-    expect(await screen.findByText(/Write in German: mesa/)).toBeInTheDocument();
+    expect(await screen.findByText(/Complete the phrase with: mesa/)).toBeInTheDocument();
+    expect(screen.getByText("Der ____ ist bereit.")).toBeInTheDocument();
     const secondFailButton = screen.getByRole("button", { name: "Fail" });
     await userEvent.click(secondFailButton);
     await userEvent.click(secondFailButton);

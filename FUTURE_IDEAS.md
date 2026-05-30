@@ -1,11 +1,13 @@
 # Todos
 
-
+Que cuando se equivoca en una palabra en cualquier sentido marca los dos sentidos como fallos
 In the create content window, make dialog lenght and language of required words a simple radio
 When generating the exercises, send only the word in the target language
-
+Que al escoger sesión procure no incluir frases y sus palabras juntas
 Que cuando uno complete los items de la sesion le haga fiesta
 Que haga superfiesta cuando uno aprenda x palabras nuevas en el día.
+For word retry test no haga lo mismo que en el primer test si no que deje un input libre, sin ninguna validacion, y va mostrando en otra parte la palabra inicialmente escondida y va revelando letras aleatoriamente pero no la primera
+Usar frases mas complejas para el word retry test, de pronto sacandolas de los dialogos
 
 # Trabajando en esto pero todavia no esta completo. Esta shelved lo que llevo. Buscar conversacin en Codex
 Que indefinido sea en sujeto

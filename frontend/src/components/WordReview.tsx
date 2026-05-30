@@ -20,6 +20,28 @@ function isLetter(value: string): boolean {
   return /^[A-Za-zÀ-ÖØ-öø-ÿ]$/.test(value);
 }
 
+function stripDiacritics(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function isSingleBaseLetterForNextDiacritic(value: string, acceptedAnswer: string, expectedAnswer: string): boolean {
+  if (value.length !== acceptedAnswer.length + 1) {
+    return false;
+  }
+  if (!value.startsWith(acceptedAnswer)) {
+    return false;
+  }
+  const typedLetter = value.charAt(acceptedAnswer.length);
+  const expectedLetter = expectedAnswer.charAt(acceptedAnswer.length);
+  if (!isLetter(typedLetter) || !isLetter(expectedLetter)) {
+    return false;
+  }
+  if (typedLetter === expectedLetter) {
+    return false;
+  }
+  return stripDiacritics(expectedLetter).toLowerCase() === typedLetter.toLowerCase();
+}
+
 function matchLetterCase(letter: string, reference: string): string {
   return reference === reference.toUpperCase() ? letter.toUpperCase() : letter.toLowerCase();
 }
@@ -45,6 +67,39 @@ function nextLetterSuggestions(correctLetter: string, offset: number): string[] 
   }
   suggestions.splice(correctIndex, 0, correct);
   return suggestions;
+}
+
+function blankTargetInPhrase(phrase: string, targetText: string): string {
+  const normalizedPhrase = phrase.trim();
+  const normalizedTarget = targetText.trim();
+  if (!normalizedPhrase || !normalizedTarget) {
+    return "";
+  }
+  const escapedTarget = normalizedTarget.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const letterClass = "A-Za-zÀ-ÖØ-öø-ÿ";
+  const match = normalizedPhrase.match(new RegExp(`(^|[^${letterClass}])(${escapedTarget})(?=$|[^${letterClass}])`, "i"));
+  if (!match || match.index === undefined) {
+    return "";
+  }
+  const prefix = match[1] || "";
+  const startIndex = match.index + prefix.length;
+  return `${normalizedPhrase.slice(0, startIndex)}____${normalizedPhrase.slice(startIndex + match[2].length)}`;
+}
+
+function clozePhraseForItem(item: SessionItem): string {
+  const candidates = [
+    ...((item.exercise_phrases?.phrases || []).map((entry) => entry.target_text)),
+    ...((item.exercise_phrases?.first_section || []).map((entry) => entry.target_text)),
+    ...((item.exercise_phrases?.second_section || []).map((entry) => entry.target_text)),
+    item.exercise_phrases?.funny_image_phrase?.target_text || "",
+  ].filter((candidate) => candidate.trim() && candidate.trim().toLowerCase() !== item.german_text.trim().toLowerCase());
+  for (const candidate of candidates) {
+    const cloze = blankTargetInPhrase(candidate, item.german_text);
+    if (cloze) {
+      return cloze;
+    }
+  }
+  return "";
 }
 
 interface WordReviewProps {
@@ -77,12 +132,18 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
   const [letterSuggestions, setLetterSuggestions] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const composingAnswerRef = useRef<boolean>(false);
+  const answerBeforeCompositionRef = useRef<string>("");
+  const pendingCompositionValidationRef = useRef<boolean>(false);
+  const provisionalBaseAnswerRef = useRef<string | null>(null);
 
   const isSpanishToGerman = item.direction !== "de_to_es";
   const useSelfGradedAnswer = !isSpanishToGerman;
+  const useClozeRetry = isSpanishToGerman && Boolean(item.repeatedAfterFailure);
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
+  const clozePhrase = useClozeRetry ? clozePhraseForItem(item) : "";
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
@@ -165,7 +226,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     }, 0);
   };
 
-  const handleAnswerChange = (value: string): void => {
+  const handleAnswerChange = (value: string, acceptedAnswer = answer): void => {
     if (useSelfGradedAnswer) {
       return;
     }
@@ -174,12 +235,26 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     }
 
     if (!expectedAnswer.startsWith(value)) {
-      const wrongText = value.slice(answer.length) || value.slice(-1);
+      if (isSingleBaseLetterForNextDiacritic(value, acceptedAnswer, expectedAnswer)) {
+        provisionalBaseAnswerRef.current = acceptedAnswer;
+        setAnswer(value);
+        setFeedback("");
+        setLetterSuggestions([]);
+        setHintLetter("");
+        setAwaitingWrongAccept(false);
+        return;
+      }
+      const fallbackAnswer = provisionalBaseAnswerRef.current && acceptedAnswer.startsWith(provisionalBaseAnswerRef.current)
+        ? provisionalBaseAnswerRef.current
+        : acceptedAnswer;
+      const wrongText = value.slice(acceptedAnswer.length) || value.slice(fallbackAnswer.length) || value.slice(-1);
+      setAnswer(fallbackAnswer);
       setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
-      setLetterSuggestions(nextLetterSuggestions(expectedAnswer.charAt(answer.length), answer.length));
+      setLetterSuggestions(nextLetterSuggestions(expectedAnswer.charAt(fallbackAnswer.length), fallbackAnswer.length));
       return;
     }
 
+    provisionalBaseAnswerRef.current = null;
     setAnswer(value);
     setFeedback("");
     setLetterSuggestions([]);
@@ -253,6 +328,10 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setAwaitingWrongAccept(false);
     setAnswerRevealed(false);
     setLetterSuggestions([]);
+    composingAnswerRef.current = false;
+    pendingCompositionValidationRef.current = false;
+    answerBeforeCompositionRef.current = "";
+    provisionalBaseAnswerRef.current = null;
   }, [item.id, item.direction]);
 
   if (useSelfGradedAnswer) {
@@ -335,13 +414,50 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         )}
       {hidePromptText ? (
         <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
+      ) : useClozeRetry ? (
+        <>
+          <p className="prompt">{t("word.clozePrompt", { word: item.spanish_text })}</p>
+          <p className="word-cloze-phrase">
+            {clozePhrase || t("word.clozeMissingPhrase")}
+          </p>
+        </>
       ) : (
         <p className="prompt">{t("word.prompt", { language: languageLabel, text: promptText })}</p>
       )}
       <input
         ref={inputRef}
+        className={answer ? "word-input-correct-progress" : ""}
         value={answer}
-        onChange={(e) => handleAnswerChange(e.target.value)}
+        onCompositionStart={() => {
+          composingAnswerRef.current = true;
+          answerBeforeCompositionRef.current = answer;
+        }}
+        onCompositionEnd={(event) => {
+          composingAnswerRef.current = false;
+          pendingCompositionValidationRef.current = true;
+          const acceptedAnswer = answerBeforeCompositionRef.current;
+          const compositionEndValue = event.currentTarget.value;
+          window.setTimeout(() => {
+            if (!pendingCompositionValidationRef.current) {
+              return;
+            }
+            pendingCompositionValidationRef.current = false;
+            handleAnswerChange(compositionEndValue || inputRef.current?.value || "", acceptedAnswer);
+          }, 0);
+        }}
+        onChange={(e) => {
+          const nativeEvent = e.nativeEvent as InputEvent;
+          if (composingAnswerRef.current || nativeEvent.isComposing) {
+            setAnswer(e.target.value);
+            return;
+          }
+          if (pendingCompositionValidationRef.current) {
+            pendingCompositionValidationRef.current = false;
+            handleAnswerChange(e.target.value, answerBeforeCompositionRef.current);
+            return;
+          }
+          handleAnswerChange(e.target.value);
+        }}
         placeholder={t("word.input.placeholder")}
         data-testid="word-input"
         disabled={isSubmitting || awaitingWrongAccept}
