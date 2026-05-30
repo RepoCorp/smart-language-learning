@@ -513,7 +513,7 @@ export default function SessionPage(): JSX.Element {
         </section>
         {waitingNext && <p>{t("session.movingNext")}</p>}
         <div className="actions">
-          <button className="secondary-button" onClick={() => void markCurrentAsLearned()}>
+          <button className="secondary-button session-mark-learned-button" onClick={() => void markCurrentAsLearned()}>
             {t("session.markLearned")}
           </button>
         </div>

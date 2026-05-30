@@ -353,6 +353,7 @@ export default function ContentManagePage(): JSX.Element {
                     {allTopicsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
                   </button>
                   <button
+                    className="dangerous-action-button"
                     onClick={() => void removeSelectedTopics()}
                     disabled={
                       Boolean(deletingTopic)
@@ -406,6 +407,7 @@ export default function ContentManagePage(): JSX.Element {
                     {allWordItemsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
                   </button>
                   <button
+                    className="dangerous-action-button"
                     onClick={() => void removeSelectedItems(filteredWordItems.map((item) => item.id))}
                     disabled={
                       Boolean(deletingTopic)
@@ -449,7 +451,7 @@ export default function ContentManagePage(): JSX.Element {
                     </div>
                     <button
                       type="button"
-                      className="secondary-button manage-item-action-button"
+                      className="secondary-button manage-item-action-button dangerous-action-button"
                       onClick={() => void regenerateAudio(item)}
                       disabled={
                         Boolean(deletingTopic)
@@ -498,6 +500,7 @@ export default function ContentManagePage(): JSX.Element {
                     {allPhraseItemsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
                   </button>
                   <button
+                    className="dangerous-action-button"
                     onClick={() => void removeSelectedItems(filteredPhraseItems.map((item) => item.id))}
                     disabled={
                       Boolean(deletingTopic)
@@ -541,7 +544,7 @@ export default function ContentManagePage(): JSX.Element {
                     </div>
                     <button
                       type="button"
-                      className="secondary-button manage-item-action-button"
+                      className="secondary-button manage-item-action-button dangerous-action-button"
                       onClick={() => void regenerateAudio(item)}
                       disabled={
                         Boolean(deletingTopic)

@@ -102,6 +102,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>([]);
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
   const [exerciseRunning, setExerciseRunning] = useState<boolean>(false);
+  const [exerciseMuted, setExerciseMuted] = useState<boolean>(false);
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<{
     key: string;
@@ -128,6 +129,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const exerciseTimerRef = useRef<number | null>(null);
   const exerciseRunRef = useRef<number>(0);
   const exerciseRunningRef = useRef<boolean>(false);
+  const exerciseMutedRef = useRef<boolean>(false);
   const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastFunnyImageVoiceRef = useRef<string>("");
   const questionsHistoryRef = useRef<HTMLDivElement | null>(null);
@@ -194,6 +196,20 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   useEffect(() => {
     exerciseRunningRef.current = exerciseRunning;
   }, [exerciseRunning]);
+
+  useEffect(() => {
+    exerciseMutedRef.current = exerciseMuted;
+    if (!exerciseMuted) {
+      return;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    if (exerciseAudioRef.current) {
+      exerciseAudioRef.current.pause();
+      exerciseAudioRef.current.currentTime = 0;
+    }
+  }, [exerciseMuted]);
 
   useEffect(() => () => {
     exerciseRunRef.current += 1;
@@ -811,11 +827,16 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       if (!source || exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
         continue;
       }
+      if (exerciseMutedRef.current) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
+        continue;
+      }
       await new Promise<void>((resolve) => {
         const audio = new Audio(source);
         exerciseAudioRef.current = audio;
         audio.onended = () => resolve();
         audio.onerror = () => resolve();
+        audio.onpause = () => resolve();
         void audio.play().catch(() => resolve());
       });
     }
@@ -870,12 +891,34 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
         return;
       }
+      if (exerciseMutedRef.current) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
+        continue;
+      }
       await new Promise<void>((resolve) => {
         const utterance = new SpeechSynthesisUtterance(line);
+        let settled = false;
+        let muteCheck: number | null = null;
+        const finish = (): void => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          if (muteCheck !== null) {
+            window.clearInterval(muteCheck);
+          }
+          resolve();
+        };
+        muteCheck = window.setInterval(() => {
+          if (exerciseRunRef.current !== runId || !exerciseRunningRef.current || exerciseMutedRef.current) {
+            window.speechSynthesis.cancel();
+            finish();
+          }
+        }, 50);
         utterance.lang = speechLangByCode[targetLanguage] || "de-DE";
         utterance.rate = 0.75;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
+        utterance.onend = finish;
+        utterance.onerror = finish;
         window.speechSynthesis.speak(utterance);
       });
     }
@@ -891,7 +934,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       setExerciseSecondsLeft((current) => {
         if (current <= 1) {
           stopExercise(false);
-          playExerciseDoneSound();
+          if (!exerciseMutedRef.current) {
+            playExerciseDoneSound();
+          }
           return 0;
         }
         return current - 1;
@@ -958,11 +1003,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
             {t("newItem.openQuestions")}
           </button>
-          <button type="button" className="secondary-button item-action-button" onClick={() => void regenerateAudio()} disabled={regeneratingAudio || refreshingWord}>
+          <button type="button" className="secondary-button item-action-button dangerous-action-button" onClick={() => void regenerateAudio()} disabled={regeneratingAudio || refreshingWord}>
             {regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
           </button>
           {item.item_type === "word" && (
-            <button type="button" className="secondary-button item-action-button" onClick={() => void refreshWordData()} disabled={refreshingWord || regeneratingAudio}>
+            <button type="button" className="secondary-button item-action-button dangerous-action-button" onClick={() => void refreshWordData()} disabled={refreshingWord || regeneratingAudio}>
               {refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
             </button>
           )}
@@ -1123,7 +1168,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                     </button>
                     <button
                       type="button"
-                      className="secondary-button"
+                      className={`secondary-button ${funnyImageExerciseEntry ? "dangerous-action-button" : ""}`}
                       onClick={() => void generateFunnyImageExercise()}
                       disabled={generatingFunnyImageExercise || item.id <= 0}
                     >
@@ -1291,6 +1336,16 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 {exerciseRunning && (
                   <button type="button" className="secondary-button" onClick={stopExercise}>
                     {t("newItem.exercisesStop")}
+                  </button>
+                )}
+                {exerciseRunning && (
+                  <button
+                    type="button"
+                    className="secondary-button exercise-mute-button"
+                    aria-pressed={exerciseMuted}
+                    onClick={() => setExerciseMuted((value) => !value)}
+                  >
+                    {exerciseMuted ? t("newItem.exercisesUnmute") : t("newItem.exercisesMute")}
                   </button>
                 )}
                 <button type="button" className="secondary-button" onClick={closeExerciseModal}>

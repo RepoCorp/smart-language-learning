@@ -16,13 +16,11 @@ Que la imagen tenga solo la palabra y en la parte de abajo escrita la frase
 Sigue sacando cosas raras como sein de stimmt
 
 
-Change to an alert colof the button "Mark as learned" in testing
-Poder mutear audio en ejercicio
 Poder ir al elemento desde otros tipos de testing
-Que siempre reproduzca el audio en los tests
 Seleccionar longitud del diálogo al crear
 
 
+Que siempre reproduzca el audio en los tests
 Que indefinido sea en sujeto
 Add con diese diesels...
 Mejorar lo de los helpers
