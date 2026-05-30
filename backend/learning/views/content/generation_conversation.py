@@ -107,6 +107,7 @@ def _build_conversation_prompt(
     topic: str,
     context: str,
     conversation_details: str,
+    dialog_length: str,
     scenario_description: str,
     source_language: str,
     target_language: str,
@@ -117,11 +118,17 @@ def _build_conversation_prompt(
     normalized_details = " ".join(conversation_details.split()).strip()
     context_value = normalized_context or "not provided"
     situation_detail = normalized_context or "not provided"
+    length_requirement = (
+        "Exactly 3 very short dialogue turns/phrases total."
+        if dialog_length == "short_three"
+        else "6 to 12 very simple dialogue turns/phrases total."
+    )
     parts = [
         f"Topic: {topic}",
         f"Context: {context_value}",
         f"Selected scenario: {scenario_description}",
         f"Situation detail: {situation_detail}",
+        f"Length requirement: {length_requirement}",
         f"Extra user details (temporary, do not treat as saved context): {normalized_details or 'not provided'}",
         (
             "Language mapping: use 'source_text' for "
@@ -209,6 +216,7 @@ def generate_conversation_with_chatgpt(
     topic: str,
     context: str = "",
     conversation_details: str = "",
+    dialog_length: str = "standard",
     source_language: str = "spanish",
     target_language: str = "german",
     *,
@@ -243,6 +251,7 @@ def generate_conversation_with_chatgpt(
             topic=topic,
             context=context,
             conversation_details=conversation_details,
+            dialog_length=dialog_length,
             scenario_description=selected_scenario,
             source_language=source_language,
             target_language=target_language,

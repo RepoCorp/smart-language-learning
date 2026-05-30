@@ -31,6 +31,7 @@ class ContentPreviewView(APIView):
         topic = serializer.validated_data["topic"].strip()
         context = serializer.validated_data.get("context", "").strip()
         conversation_details = serializer.validated_data.get("conversation_details", "").strip()
+        dialog_length = serializer.validated_data.get("dialog_length", "standard")
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
         save_topic(
@@ -41,13 +42,16 @@ class ContentPreviewView(APIView):
             target_language=target_language,
         )
         logger.info("content.preview.started topic=%s", topic)
-        generated_conversation = generate_conversation_with_chatgpt(
-            topic=topic,
-            context=context,
-            conversation_details=conversation_details,
-            source_language=source_language,
-            target_language=target_language,
-        )
+        generation_kwargs = {
+            "topic": topic,
+            "context": context,
+            "conversation_details": conversation_details,
+            "source_language": source_language,
+            "target_language": target_language,
+        }
+        if dialog_length == "short_three":
+            generation_kwargs["dialog_length"] = dialog_length
+        generated_conversation = generate_conversation_with_chatgpt(**generation_kwargs)
         if not generated_conversation:
             return Response({"detail": "Could not generate dialog preview"}, status=503)
         dialog_turns = [

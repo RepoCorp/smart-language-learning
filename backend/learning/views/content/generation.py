@@ -178,6 +178,7 @@ def generate_conversation_with_chatgpt(
     topic: str,
     context: str = "",
     conversation_details: str = "",
+    dialog_length: str = "standard",
     source_language: str = "spanish",
     target_language: str = "german",
 ) -> list[dict[str, str]] | None:
@@ -185,6 +186,7 @@ def generate_conversation_with_chatgpt(
         topic,
         context=context,
         conversation_details=conversation_details,
+        dialog_length=dialog_length,
         source_language=source_language,
         target_language=target_language,
         call_openai_json_fn=call_openai_json,

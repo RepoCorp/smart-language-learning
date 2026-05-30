@@ -8,7 +8,7 @@ Return strict JSON with this exact shape:
 }
 
 Rules:
-- Create a realistic, day-to-day conversation between two people with 6 to 12 very simple phrases.
+- Create a realistic, day-to-day conversation between two people using the exact length requested in the user prompt.
 - The dialogue must feel natural and coherent: each line should clearly respond to the previous one.
 - Use common real-life situations (for example: greeting, buying something, ordering food, asking directions, meeting someone).
 - If optional context is provided by the user, use it as the situation.

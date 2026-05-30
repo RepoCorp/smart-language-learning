@@ -81,6 +81,34 @@ def test_content_preview_returns_phrase_and_model_keywords(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_preview_passes_short_three_dialog_length(monkeypatch):
+    from learning.views.content import api as api_views
+
+    captured = {}
+
+    def fake_generate_conversation(topic, context="", conversation_details="", dialog_length="standard", **kwargs):
+        captured["dialog_length"] = dialog_length
+        return [
+            {"speaker": "a", "spanish_text": "Hola.", "german_text": "Hallo.", "notes": ""},
+            {"speaker": "b", "spanish_text": "Necesito pan.", "german_text": "Ich brauche Brot.", "notes": ""},
+            {"speaker": "a", "spanish_text": "Gracias.", "german_text": "Danke.", "notes": ""},
+        ]
+
+    monkeypatch.setattr(api_views, "generate_conversation_with_chatgpt", fake_generate_conversation)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/preview",
+        {"topic": "shopping", "dialog_length": "short_three"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert captured["dialog_length"] == "short_three"
+    assert len(response.json()["dialog_turns"]) == 3
+
+
+@pytest.mark.django_db
 def test_content_confirm_creates_only_missing_items(monkeypatch):
     from learning.views import content as content_views
 
@@ -792,6 +820,42 @@ def test_generate_conversation_prompt_includes_context_and_situation_when_missin
     assert "Context: not provided" in captured["user_input"]
     assert "Situation detail: not provided" in captured["user_input"]
     assert "Style seed: small-talk" in captured["user_input"]
+
+
+@pytest.mark.django_db
+def test_generate_conversation_prompt_can_request_short_three_phrase_dialog(monkeypatch):
+    from learning.views.content import generation
+
+    captured = {}
+
+    def fake_call_openai_json(system_prompt, user_input, timeout_seconds=10, **kwargs):
+        captured.setdefault("prompts", []).append(user_input)
+        if "Create five distinct conversation scenarios" in system_prompt:
+            return {
+                "scenarios": [
+                    "Comprar pan rapidamente.",
+                    "Pedir cafe para llevar.",
+                    "Pagar en la caja.",
+                    "Preguntar por una mesa.",
+                    "Saludar a un vecino.",
+                ]
+            }
+        return {
+            "conversation": [
+                {"speaker": "a", "source_text": "Necesito pan.", "target_text": "Ich brauche Brot.", "notes": ""},
+                {"speaker": "b", "source_text": "Aqui tiene.", "target_text": "Hier bitte.", "notes": ""},
+                {"speaker": "a", "source_text": "Gracias.", "target_text": "Danke.", "notes": ""},
+            ]
+        }
+
+    monkeypatch.setattr(generation, "call_openai_json", fake_call_openai_json)
+    monkeypatch.setattr(generation, "choice", lambda values: values[0])
+
+    phrases = generation.generate_conversation_with_chatgpt("shopping", dialog_length="short_three")
+
+    assert phrases is not None
+    assert len(phrases) == 3
+    assert "Length requirement: Exactly 3 very short dialogue turns/phrases total." in captured["prompts"][1]
 
 
 @pytest.mark.django_db

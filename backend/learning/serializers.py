@@ -48,6 +48,11 @@ class ContentTopicSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
     )
+    dialog_length = serializers.ChoiceField(
+        choices=["standard", "short_three"],
+        required=False,
+        default="standard",
+    )
     source_language = serializers.ChoiceField(
         choices=STUDY_LANGUAGE_CHOICES,
         required=False,

@@ -7,6 +7,7 @@ import type { ContentPreviewResponse, SessionItem } from "../types";
 import NewItem from "./NewItem";
 
 const CREATE_NEW_OPTION = "__create_new__";
+type DialogLength = "standard" | "short_three";
 
 export default function ContentCreatePage(): JSX.Element {
   const { t } = useI18n();
@@ -16,6 +17,7 @@ export default function ContentCreatePage(): JSX.Element {
   const [selectedContext, setSelectedContext] = useState<string>("");
   const [customContext, setCustomContext] = useState<string>("");
   const [conversationDetails, setConversationDetails] = useState<string>("");
+  const [dialogLength, setDialogLength] = useState<DialogLength>("standard");
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -58,6 +60,7 @@ export default function ContentCreatePage(): JSX.Element {
         setSelectedContext("");
         setCustomContext("");
         setConversationDetails("");
+        setDialogLength("standard");
         setPreview(null);
         setResult("");
         setDialogAudioUrl("");
@@ -76,6 +79,7 @@ export default function ContentCreatePage(): JSX.Element {
           setSelectedContext("");
           setCustomContext("");
           setConversationDetails("");
+          setDialogLength("standard");
           setPreview(null);
           setResult("");
           setDialogAudioUrl("");
@@ -155,7 +159,7 @@ export default function ContentCreatePage(): JSX.Element {
     setLoading(true);
     try {
       const details = conversationDetails.trim();
-      const data = await previewContent(resolvedTopic, resolvedContext, details, sourceLanguage, targetLanguage);
+      const data = await previewContent(resolvedTopic, resolvedContext, details, dialogLength, sourceLanguage, targetLanguage);
       setPreview(data);
       setSelectedPreviewTurnIndexes([]);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
@@ -408,6 +412,18 @@ export default function ContentCreatePage(): JSX.Element {
               disabled={loading || saving}
             />
           )}
+        </div>
+        <div className="content-form-section">
+          <label htmlFor="dialog-length-select" className="prompt">{t("content.length.label")}</label>
+          <select
+            id="dialog-length-select"
+            value={dialogLength}
+            onChange={(e) => setDialogLength(e.target.value as DialogLength)}
+            disabled={loading || saving}
+          >
+            <option value="standard">{t("content.length.standard")}</option>
+            <option value="short_three">{t("content.length.shortThree")}</option>
+          </select>
         </div>
         <div className="content-form-section">
           <label htmlFor="conversation-details-input" className="prompt">{t("content.details.label")}</label>

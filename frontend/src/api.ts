@@ -232,6 +232,7 @@ export async function previewContent(
   topic: string,
   context = "",
   conversationDetails = "",
+  dialogLength: "standard" | "short_three" = "standard",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentPreviewResponse> {
@@ -242,6 +243,7 @@ export async function previewContent(
       topic,
       context,
       conversation_details: conversationDetails,
+      dialog_length: dialogLength,
       source_language: sourceLanguage,
       target_language: targetLanguage,
     }),
