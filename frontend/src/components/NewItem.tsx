@@ -14,6 +14,7 @@ import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
+import DialogTurnText from "./DialogTurnText";
 
 interface NewItemProps {
   item: SessionItem;
@@ -349,8 +350,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
 
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
 
-  const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
-
   const requestAddWordFromDialogToken = async (
     key: string,
     sourceTokenRaw: string,
@@ -425,6 +424,31 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     }
   };
 
+  const openLinkedDialogItem = async (itemId: number): Promise<void> => {
+    setLoadingLinkedWord(true);
+    try {
+      const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
+      setOpenedLinkedWord({
+        id: detail.id,
+        item_type: detail.item_type,
+        spanish_text: detail.spanish_text,
+        german_text: detail.german_text,
+        example_sentence: detail.example_sentence || "",
+        notes: detail.notes || "",
+        word_type: detail.word_type || "",
+        audio_url: detail.audio_url || "",
+        exercise_phrases: detail.exercise_phrases || {},
+        mode: "new",
+        direction: null,
+        options: [],
+        related_dialogs: detail.related_dialogs || [],
+        item_questions: detail.item_questions || [],
+      });
+    } finally {
+      setLoadingLinkedWord(false);
+    }
+  };
+
   const askItemQuestion = async (): Promise<void> => {
     const questionText = itemQuestionInput.trim();
     if (askingQuestion || !questionText) {
@@ -488,67 +512,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       setAddingWord(false);
       setPendingWordAdd(null);
     }
-  };
-
-  const renderTargetTurnWithLinks = ({
-    dialogId,
-    turnIndex,
-    sourceText,
-    targetText,
-    highlightWord,
-  }: {
-    dialogId: number;
-    turnIndex: number;
-    sourceText: string;
-    targetText: string;
-    highlightWord?: string;
-  }): JSX.Element => {
-    const targetTokens = lineTokens(targetText);
-
-    return (
-      <>
-        {targetTokens.map((token, tokenIndex) => {
-          const targetToken = cleanToken(token);
-          const isWordToken = targetToken.length > 0;
-          if (!isWordToken) {
-            return (
-              <span key={`${dialogId}-${turnIndex}-punct-${tokenIndex}`} className="turn-token-wrap">
-                {token}
-                {tokenIndex < targetTokens.length - 1 ? " " : ""}
-              </span>
-            );
-          }
-          const statusKey = `${dialogId}-${turnIndex}-target-${tokenIndex}`;
-          const status = wordActionStatus[statusKey] || "idle";
-          const showHighlight = !!highlightWord && containsWordInTurn(token, highlightWord);
-          return (
-            <span key={statusKey} className="turn-token-wrap">
-              <button
-                type="button"
-                className={`turn-token-button ${showHighlight ? "turn-word-highlight" : ""}`}
-                onClick={() => void requestAddWordFromDialogToken(
-                  statusKey,
-                  targetToken,
-                  targetToken,
-                  dialogId,
-                  turnIndex,
-                  sourceText,
-                  targetText,
-                )}
-                disabled={status === "saving"}
-              >
-                {token}
-              </button>
-              {tokenIndex < targetTokens.length - 1 ? " " : ""}
-              {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
-              {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
-              {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
-              {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
-            </span>
-          );
-        })}
-      </>
-    );
   };
 
   const sanitizeExerciseEntries = (entries?: Array<{ label?: string; source_text?: string; target_text?: string }>): Array<{ label: string; source: string; target: string }> => {
@@ -1082,16 +1045,30 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                             <p className="conversation-speaker">
                               {speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}
                             </p>
-                            <p className="conversation-line conversation-line-translation">
-                              {hideDialogTargetText
-                                ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
-                                : renderTargetTurnWithLinks({
-                                  dialogId: dialog.dialog_id,
-                                  turnIndex: index,
-                                  sourceText: turn.source_text,
-                                  targetText: turn.target_text,
-                                  highlightWord: item.item_type === "word" ? targetText : "",
-                                })}
+                            <div className="conversation-line conversation-line-translation">
+                              <DialogTurnText
+                                dialogId={dialog.dialog_id}
+                                turnIndex={index}
+                                sourceText={turn.source_text}
+                                targetText={turn.target_text}
+                                sourceLanguage={sourceLanguage}
+                                targetLanguage={targetLanguage}
+                                tokenStatus={wordActionStatus}
+                                statusKeyPrefix={`${dialog.dialog_id}-${index}-target`}
+                                highlightWord={item.item_type === "word" ? targetText : ""}
+                                hideTargetText={hideDialogTargetText}
+                                wordMatches={(token, word) => containsWordInTurn(token, word)}
+                                onOpenItem={openLinkedDialogItem}
+                                onTokenClick={(statusKey, token) => void requestAddWordFromDialogToken(
+                                  statusKey,
+                                  token,
+                                  token,
+                                  dialog.dialog_id,
+                                  index,
+                                  turn.source_text,
+                                  turn.target_text,
+                                )}
+                              />
                               <button
                                 type="button"
                                 className="turn-audio-button"
@@ -1100,7 +1077,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                               >
                                 {t("newItem.playTurnAudio")}
                               </button>
-                            </p>
+                            </div>
                             <p className="conversation-line">
                               {hideDialogTargetText
                                 ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>

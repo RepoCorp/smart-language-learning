@@ -59,6 +59,7 @@ Create a script, using AWS deployment service, to create all the initial setup
 
 Upgrade to React router v7
 Push to github
+Uasar mas variedad de voces
 
 # Future Ideas
 
