@@ -2305,6 +2305,124 @@ def test_quick_add_phrase_returns_existing():
 
 
 @pytest.mark.django_db
+def test_quick_add_phrase_translates_dialog_selection_and_links_turn(monkeypatch):
+    from learning.views.content import management_items_quick_add as quick_add_views
+    from learning.views import content as content_views
+
+    monkeypatch.setattr(
+        content_views,
+        "create_audio_file",
+        lambda text, prefix, target_language="german": "http://localhost:8000/media/audio/phrase-selection.mp3",
+    )
+    calls = []
+
+    def fake_call_openai_json_logged(**kwargs):
+        calls.append(kwargs)
+        return (
+            {"is_valid": True, "target_text": "ein Taxi", "reason": "valid noun phrase"}
+            if kwargs.get("label") == "dialog_phrase_selection_validation"
+            else {"can_translate_without_non_selected_words": True, "source_text": "un taxi"}
+        )
+
+    monkeypatch.setattr(quick_add_views, "_call_openai_json_logged", fake_call_openai_json_logged)
+
+    dialog = SavedDialog.objects.create(
+        topic="travel",
+        context="airport",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Necesito un taxi ahora.", "target_text": "Ich brauche jetzt ein Taxi."}],
+        audio_url="",
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Necesito un taxi ahora.",
+        target_text="Ich brauche jetzt ein Taxi.",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/phrases/add?source_language=spanish&target_language=german",
+        {
+            "target_text": "ein Taxi",
+            "dialog_id": dialog.id,
+            "turn_index": 0,
+            "source_line": "Necesito un taxi ahora.",
+            "target_line": "Ich brauche jetzt ein Taxi.",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["created"] is True
+    assert payload["source_text"] == "un taxi"
+    assert payload["target_text"] == "ein Taxi"
+    phrase = Item.objects.get(item_type=Item.ItemType.PHRASE, spanish_text="un taxi", german_text="ein Taxi")
+    assert ItemDialogOccurrence.objects.filter(item=phrase, dialog=dialog, turn=turn, turn_index=0).exists()
+    validation_input = calls[0]["user_input"]
+    assert "Selected target text: ein Taxi" in validation_input
+    assert "Ich brauche jetzt ein Taxi." not in validation_input
+    assert "Necesito un taxi ahora." not in validation_input
+
+
+@pytest.mark.django_db
+def test_quick_add_phrase_rejects_invalid_dialog_selection(monkeypatch):
+    from learning.views.content import management_items_quick_add as quick_add_views
+
+    monkeypatch.setattr(
+        quick_add_views,
+        "_call_openai_json_logged",
+        lambda **kwargs: {"is_valid": False, "target_text": "", "reason": "needs surrounding words"},
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/phrases/add?source_language=spanish&target_language=german",
+        {
+            "target_text": "brauche jetzt",
+            "source_line": "Necesito un taxi ahora.",
+            "target_line": "Ich brauche jetzt ein Taxi.",
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Selected words do not form a complete expression."
+    assert not Item.objects.filter(item_type=Item.ItemType.PHRASE, german_text="brauche jetzt").exists()
+
+
+@pytest.mark.django_db
+def test_quick_add_phrase_rejects_translation_that_needs_unselected_words(monkeypatch):
+    from learning.views.content import management_items_quick_add as quick_add_views
+
+    def fake_call_openai_json_logged(**kwargs):
+        if kwargs.get("label") == "dialog_phrase_selection_validation":
+            return {"is_valid": True, "target_text": "brauche jetzt", "reason": "looks possible"}
+        return {"can_translate_without_non_selected_words": False, "source_text": ""}
+
+    monkeypatch.setattr(quick_add_views, "_call_openai_json_logged", fake_call_openai_json_logged)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/phrases/add?source_language=spanish&target_language=german",
+        {
+            "target_text": "brauche jetzt",
+            "source_line": "Necesito un taxi ahora.",
+            "target_line": "Ich brauche jetzt ein Taxi.",
+            "check_only": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Selected words do not form a complete expression."
+    assert not Item.objects.filter(item_type=Item.ItemType.PHRASE, german_text="brauche jetzt").exists()
+
+
+@pytest.mark.django_db
 def test_content_dialogs_endpoint_returns_saved_dialogs_for_language_pair():
     dialog_match = SavedDialog.objects.create(
         topic="travel",

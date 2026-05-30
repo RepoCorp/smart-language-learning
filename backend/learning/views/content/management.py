@@ -1111,6 +1111,30 @@ def _link_word_to_dialog_turn(*, user, item: Item, dialog_id_raw, turn_index_raw
     )
 
 
+def _link_phrase_to_dialog_turn(*, user, item: Item, dialog_id_raw, turn_index_raw) -> None:
+    try:
+        dialog_id = int(dialog_id_raw)
+        turn_index = int(turn_index_raw)
+    except (TypeError, ValueError):
+        return
+
+    dialog = apply_user_scope(SavedDialog.objects, user).filter(id=dialog_id).first()
+    if not dialog:
+        return
+    turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
+    if not turn:
+        return
+
+    ItemDialogOccurrence.objects.get_or_create(
+        item=item,
+        dialog=dialog,
+        turn=turn,
+        turn_index=turn_index,
+        side=ItemDialogOccurrence.Side.TARGET,
+        defaults={"match_score": 1.0},
+    )
+
+
 def _basic_word_metadata(
     *,
     source_text: str,

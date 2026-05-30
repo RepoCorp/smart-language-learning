@@ -762,6 +762,10 @@ export async function quickAddPhraseFromConversation(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   checkOnly = false,
+  dialogId?: number,
+  turnIndex?: number,
+  sourceLine = "",
+  targetLine = "",
 ): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
@@ -775,10 +779,23 @@ export async function quickAddPhraseFromConversation(
       target_text: targetText,
       notes: "Added from conversation",
       check_only: checkOnly,
+      dialog_id: dialogId,
+      turn_index: turnIndex,
+      source_line: sourceLine,
+      target_line: targetLine,
     }),
   });
   if (!response.ok) {
-    throw new Error("Failed to add phrase from conversation");
+    let detail = "Failed to add phrase from conversation";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
   }
   notifyOverviewStatsUpdated();
   return (await response.json()) as {

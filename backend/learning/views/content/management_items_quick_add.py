@@ -6,6 +6,9 @@ from .management import (
     Item,
     Request,
     Response,
+    _call_openai_json_logged,
+    _language_display_name,
+    _link_phrase_to_dialog_turn,
     _link_word_to_dialog_turn,
     _normalized_pair,
     _normalize_word_metadata,
@@ -283,15 +286,34 @@ class ContentPhraseQuickAddView(APIView):
         source_language, target_language = _normalized_pair(request)
         source_text = str(request.data.get("source_text", "")).strip()
         target_text = str(request.data.get("target_text", "")).strip()
+        source_line = str(request.data.get("source_line", "")).strip()
+        target_line = str(request.data.get("target_line", "")).strip()
         notes = str(request.data.get("notes", "")).strip()
+        dialog_id_raw = request.data.get("dialog_id")
+        turn_index_raw = request.data.get("turn_index")
         check_only_raw = request.data.get("check_only", False)
         if isinstance(check_only_raw, str):
             check_only = check_only_raw.strip().lower() in {"1", "true", "yes", "on"}
         else:
             check_only = bool(check_only_raw)
 
-        if not source_text or not target_text:
-            return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not target_text:
+            return Response({"detail": "target_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not source_text:
+            try:
+                source_text, target_text = _resolve_dialog_phrase_selection(
+                    selected_target_text=target_text,
+                    source_line=source_line,
+                    target_line=target_line,
+                    source_language=source_language,
+                    target_language=target_language,
+                )
+            except ValueError:
+                return Response({"detail": "Selected words do not form a complete expression."}, status=status.HTTP_400_BAD_REQUEST)
+            except RuntimeError:
+                return Response({"detail": "Phrase translation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        if not source_text:
+            return Response({"detail": "source_text is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         exists = item_exists(
             user=user,
@@ -313,6 +335,13 @@ class ContentPhraseQuickAddView(APIView):
                 .order_by("-id")
                 .first()
             )
+            if existing:
+                _link_phrase_to_dialog_turn(
+                    user=user,
+                    item=existing,
+                    dialog_id_raw=dialog_id_raw,
+                    turn_index_raw=turn_index_raw,
+                )
             return Response(
                 {
                     "created": False,
@@ -348,14 +377,39 @@ class ContentPhraseQuickAddView(APIView):
             target_language=target_language,
         )
         if created is None:
+            existing = (
+                apply_user_scope(Item.objects, user).filter(
+                    item_type=Item.ItemType.PHRASE,
+                    source_language=source_language,
+                    target_language=target_language,
+                    spanish_text__iexact=source_text,
+                    german_text__iexact=target_text,
+                )
+                .order_by("-id")
+                .first()
+            )
+            if existing:
+                _link_phrase_to_dialog_turn(
+                    user=user,
+                    item=existing,
+                    dialog_id_raw=dialog_id_raw,
+                    turn_index_raw=turn_index_raw,
+                )
             return Response(
                 {
                     "created": False,
                     "exists": True,
+                    "id": existing.id if existing else None,
                     "source_text": source_text,
                     "target_text": target_text,
                 }
             )
+        _link_phrase_to_dialog_turn(
+            user=user,
+            item=created,
+            dialog_id_raw=dialog_id_raw,
+            turn_index_raw=turn_index_raw,
+        )
         return Response(
             {
                 "created": True,
@@ -367,3 +421,125 @@ class ContentPhraseQuickAddView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+def _resolve_dialog_phrase_selection(
+    *,
+    selected_target_text: str,
+    source_line: str,
+    target_line: str,
+    source_language: str,
+    target_language: str,
+) -> tuple[str, str]:
+    selected = " ".join(selected_target_text.split()).strip()
+    if not selected:
+        raise RuntimeError("Phrase translation failed")
+    source_name = _language_display_name(source_language)
+    target_name = _language_display_name(target_language)
+    validated_target = _validate_dialog_phrase_selection(
+        selected_target_text=selected,
+        target_name=target_name,
+    )
+    translated_source = _translate_valid_dialog_phrase_selection(
+        selected_target_text=validated_target,
+        source_line=source_line,
+        target_line=target_line,
+        source_name=source_name,
+        target_name=target_name,
+    )
+    return translated_source, validated_target
+
+
+def _validate_dialog_phrase_selection(
+    *,
+    selected_target_text: str,
+    target_name: str,
+) -> str:
+    parsed = _call_openai_json_logged(
+        label="dialog_phrase_selection_validation",
+        system_prompt=f"""
+Validate a selected {target_name} expression from a saved dialog.
+
+Return strict JSON:
+{{
+  "is_valid": true,
+  "target_text": "string",
+  "reason": "string"
+}}
+
+Rules:
+- The selected text must make sense on its own as a useful expression, collocation, or sub-sentence.
+- Allow only tiny cleanup within the selected words: punctuation, capitalization, spacing, or natural inflection.
+- Do not infer missing words or unstated context.
+- Do not complete the meaning using words that were not selected.
+- If the selection needs surrounding words to be grammatically or semantically clear, set is_valid=false.
+- target_text must be empty when is_valid=false.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Selected target text: {selected_target_text}\n"
+        ),
+        timeout_seconds=8,
+        temperature=0.0,
+        top_p=1.0,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Phrase validation failed")
+    if not bool(parsed.get("is_valid")):
+        reason = str(parsed.get("reason", "")).strip()
+        raise ValueError(reason or "It needs surrounding words to make sense or translate correctly.")
+    target_text = str(parsed.get("target_text", "")).strip()
+    if not target_text:
+        raise RuntimeError("Phrase validation failed")
+    return target_text[:255]
+
+
+def _translate_valid_dialog_phrase_selection(
+    *,
+    selected_target_text: str,
+    source_line: str,
+    target_line: str,
+    source_name: str,
+    target_name: str,
+) -> str:
+    parsed = _call_openai_json_logged(
+        label="dialog_phrase_selection_translation",
+        system_prompt=f"""
+Translate a selected target-language phrase from a saved dialog.
+
+Return strict JSON:
+{{
+  "can_translate_without_non_selected_words": true,
+  "source_text": "string"
+}}
+
+Rules:
+- The selected text is in {target_name}; source_text must be its natural {source_name} translation.
+- Translate only the selected text, not the whole sentence.
+- Use the source and target sentence context only to resolve meaning.
+- Do not complete the expression with non-selected words from context.
+- If a faithful translation would require non-selected words, set can_translate_without_non_selected_words=false and return an empty source_text.
+- If source_text includes meaning from words outside the selected target text, set can_translate_without_non_selected_words=false and return an empty source_text.
+- Keep source_text concise and suitable as a phrase study item.
+- Do not return markdown, quotes, explanations, or extra fields.
+- JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {source_name}\n"
+            f"Target language: {target_name}\n"
+            f"Selected target text: {selected_target_text}\n"
+            f"Source sentence context: {source_line or 'not provided'}\n"
+            f"Target sentence context: {target_line or 'not provided'}\n"
+        ),
+        timeout_seconds=8,
+        temperature=0.0,
+        top_p=1.0,
+    )
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Phrase translation failed")
+    if not bool(parsed.get("can_translate_without_non_selected_words", True)):
+        raise ValueError("Phrase translation needs surrounding words")
+    source_text = str(parsed.get("source_text", "")).strip()
+    if not source_text:
+        raise RuntimeError("Phrase translation failed")
+    return source_text[:255]
