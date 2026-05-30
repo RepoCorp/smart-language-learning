@@ -1541,6 +1541,98 @@ button.verb-exercise-entry:disabled {
   z-index: 1400;
 }
 
+.session-celebration-overlay {
+  z-index: 1450;
+}
+
+.session-celebration-modal {
+  position: relative;
+  overflow: hidden;
+  max-width: 560px;
+  border: 3px solid #f59e0b;
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.16), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+  text-align: center;
+}
+
+.session-celebration-kicker {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border: 2px solid #b45309;
+  border-radius: 4px;
+  color: #92400e;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.session-celebration-modal h2 {
+  margin: 0 0 10px;
+  color: #102a43;
+  font-size: 30px;
+}
+
+.session-celebration-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.session-celebration-burst span {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  width: 8px;
+  height: 28px;
+  border-radius: 2px;
+  background: #2563eb;
+  transform-origin: 50% 220px;
+  animation: celebration-pop 1100ms ease-out infinite;
+}
+
+.session-celebration-burst span:nth-child(3n) {
+  background: #f59e0b;
+}
+
+.session-celebration-burst span:nth-child(3n + 1) {
+  background: #16a34a;
+}
+
+.session-celebration-burst span:nth-child(1) { transform: rotate(0deg) translateY(-95px); }
+.session-celebration-burst span:nth-child(2) { transform: rotate(20deg) translateY(-90px); }
+.session-celebration-burst span:nth-child(3) { transform: rotate(40deg) translateY(-96px); }
+.session-celebration-burst span:nth-child(4) { transform: rotate(60deg) translateY(-88px); }
+.session-celebration-burst span:nth-child(5) { transform: rotate(80deg) translateY(-94px); }
+.session-celebration-burst span:nth-child(6) { transform: rotate(100deg) translateY(-90px); }
+.session-celebration-burst span:nth-child(7) { transform: rotate(120deg) translateY(-98px); }
+.session-celebration-burst span:nth-child(8) { transform: rotate(140deg) translateY(-91px); }
+.session-celebration-burst span:nth-child(9) { transform: rotate(160deg) translateY(-96px); }
+.session-celebration-burst span:nth-child(10) { transform: rotate(180deg) translateY(-92px); }
+.session-celebration-burst span:nth-child(11) { transform: rotate(200deg) translateY(-97px); }
+.session-celebration-burst span:nth-child(12) { transform: rotate(220deg) translateY(-90px); }
+.session-celebration-burst span:nth-child(13) { transform: rotate(240deg) translateY(-95px); }
+.session-celebration-burst span:nth-child(14) { transform: rotate(260deg) translateY(-89px); }
+.session-celebration-burst span:nth-child(15) { transform: rotate(280deg) translateY(-97px); }
+.session-celebration-burst span:nth-child(16) { transform: rotate(300deg) translateY(-91px); }
+.session-celebration-burst span:nth-child(17) { transform: rotate(320deg) translateY(-94px); }
+.session-celebration-burst span:nth-child(18) { transform: rotate(340deg) translateY(-99px); }
+
+@keyframes celebration-pop {
+  0% {
+    opacity: 0;
+    scale: 0.5;
+  }
+  30% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.12;
+  }
+}
+
 @media (max-width: 640px) {
   .overview-stats-content {
     padding: 10px 16px;

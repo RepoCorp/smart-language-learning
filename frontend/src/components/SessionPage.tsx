@@ -14,6 +14,7 @@ type StoredSessionState = {
   sessionEndsAtMs: number | null;
   remainingSeconds: number;
   sessionOutcome: "time_up" | "completed" | null;
+  completedNewWordCount: number;
   index: number;
   items: SessionItem[];
   showIncorrectReviewItem: boolean;
@@ -32,6 +33,7 @@ export default function SessionPage(): JSX.Element {
   const [sessionEndsAtMs, setSessionEndsAtMs] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
   const [sessionOutcome, setSessionOutcome] = useState<"time_up" | "completed" | null>(null);
+  const [completedNewWordCount, setCompletedNewWordCount] = useState<number>(0);
   const [index, setIndex] = useState<number>(0);
   const [waitingNext, setWaitingNext] = useState<boolean>(false);
   const [showIncorrectReviewItem, setShowIncorrectReviewItem] = useState<boolean>(false);
@@ -41,6 +43,7 @@ export default function SessionPage(): JSX.Element {
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
   const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
   const [openedItemError, setOpenedItemError] = useState<string>("");
+  const [showNewWordsCelebration, setShowNewWordsCelebration] = useState<boolean>(false);
 
   const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
     setLoading(true);
@@ -48,7 +51,8 @@ export default function SessionPage(): JSX.Element {
     setShowIncorrectReviewItem(false);
     try {
       const data = await fetchSession(5, sourceLanguage, targetLanguage, durationMinutes);
-      setItems(data.items || []);
+      const loadedItems = data.items || [];
+      setItems(loadedItems);
       setIndex(0);
     } catch {
       setError(t("session.loadFailed"));
@@ -72,6 +76,7 @@ export default function SessionPage(): JSX.Element {
       setSessionEndsAtMs(typeof parsed.sessionEndsAtMs === "number" ? parsed.sessionEndsAtMs : null);
       setRemainingSeconds(typeof parsed.remainingSeconds === "number" ? parsed.remainingSeconds : 0);
       setSessionOutcome(parsed.sessionOutcome === "time_up" || parsed.sessionOutcome === "completed" ? parsed.sessionOutcome : null);
+      setCompletedNewWordCount(typeof parsed.completedNewWordCount === "number" ? parsed.completedNewWordCount : 0);
       const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
       setItems(parsedItems);
       setRestoredSnapshotHasItems(parsedItems.length > 0);
@@ -99,6 +104,7 @@ export default function SessionPage(): JSX.Element {
       sessionEndsAtMs,
       remainingSeconds,
       sessionOutcome,
+      completedNewWordCount,
       index,
       items,
       showIncorrectReviewItem,
@@ -113,6 +119,7 @@ export default function SessionPage(): JSX.Element {
     sessionEndsAtMs,
     remainingSeconds,
     sessionOutcome,
+    completedNewWordCount,
     index,
     items,
     showIncorrectReviewItem,
@@ -241,6 +248,15 @@ export default function SessionPage(): JSX.Element {
       }
       throw error;
     }
+    if (current.mode === "new" && current.item_type === "word") {
+      setCompletedNewWordCount((count) => {
+        const nextCount = count + 1;
+        if (nextCount > 0 && nextCount % 5 === 0) {
+          setShowNewWordsCelebration(true);
+        }
+        return nextCount;
+      });
+    }
     advance();
   };
 
@@ -323,6 +339,8 @@ export default function SessionPage(): JSX.Element {
     }
     setError("");
     setSessionOutcome(null);
+    setCompletedNewWordCount(0);
+    setShowNewWordsCelebration(false);
     setShowExtendPrompt(false);
     setRestoredSnapshotHasItems(false);
     setRemainingSeconds(parsed * 60);
@@ -338,10 +356,12 @@ export default function SessionPage(): JSX.Element {
     setRemainingSeconds(0);
     setItems([]);
     setIndex(0);
+    setCompletedNewWordCount(0);
     setError("");
     setShowIncorrectReviewItem(false);
     setWaitingNext(false);
     setRestoredSnapshotHasItems(false);
+    setShowNewWordsCelebration(false);
   };
 
   const minutes = Math.floor(remainingSeconds / 60);
@@ -393,6 +413,25 @@ export default function SessionPage(): JSX.Element {
           <NewItem item={openedItem} readOnly onClose={closeItemModal} />
         )}
       </div>
+    </div>
+  ) : null;
+  const newWordsCelebrationOverlay = showNewWordsCelebration ? (
+    <div className="blocking-modal-overlay session-celebration-overlay" role="dialog" aria-modal="true">
+      <section className="blocking-modal session-celebration-modal">
+        <div className="session-celebration-burst" aria-hidden="true">
+          {Array.from({ length: 18 }, (_, index) => (
+            <span key={index} />
+          ))}
+        </div>
+        <p className="session-celebration-kicker">{t("session.newWordsCelebrationKicker")}</p>
+        <h2>{t("session.newWordsCelebrationTitle")}</h2>
+        <p>{t("session.newWordsCelebrationMessage")}</p>
+        <div className="actions">
+          <button type="button" onClick={() => setShowNewWordsCelebration(false)}>
+            {t("session.newWordsCelebrationContinue")}
+          </button>
+        </div>
+      </section>
     </div>
   ) : null;
 
@@ -450,6 +489,7 @@ export default function SessionPage(): JSX.Element {
       <>
         <main className="container">{t("session.loading")}</main>
         {extendPromptOverlay}
+        {newWordsCelebrationOverlay}
       </>
     );
   }
@@ -459,6 +499,7 @@ export default function SessionPage(): JSX.Element {
       <>
         <main className="container error">{t("session.error", { message: error })}</main>
         {extendPromptOverlay}
+        {newWordsCelebrationOverlay}
       </>
     );
   }
@@ -470,6 +511,7 @@ export default function SessionPage(): JSX.Element {
           <p>{t("session.empty")}</p>
         </main>
         {extendPromptOverlay}
+        {newWordsCelebrationOverlay}
       </>
     );
   }
@@ -479,6 +521,7 @@ export default function SessionPage(): JSX.Element {
       <>
         <main className="container">{t("session.loading")}</main>
         {extendPromptOverlay}
+        {newWordsCelebrationOverlay}
       </>
     );
   }
@@ -526,6 +569,7 @@ export default function SessionPage(): JSX.Element {
       </main>
       {openedItemModal}
       {extendPromptOverlay}
+      {newWordsCelebrationOverlay}
     </>
   );
 }

@@ -1,7 +1,6 @@
 # Todos
 
 
-Que pueda seleccionar varias palabras para agregar al diccionario, no solo click en individuales si no que pueda seleccionar expresiones completas
 Que cuando uno complete los items de la sesion le haga fiesta
 Que haga superfiesta cuando uno aprenda x palabras nuevas en el día.
 Que indefinido sea en sujeto
@@ -34,6 +33,7 @@ Que pida algo de definicion del usuario para que en las conversaciones ese sea s
 Para la conversacion, en los detalles incluir quien soy yo y quien es el usuario, de pronto si guardar estas opciones en el backend
 
 IMPROVEMENTS
+Do not allow deleting phrases, only mark them as inactive or archived.
 Ensayar otros modelos
 Seguridad de S3
 Arreglar allowed hosts de Django
