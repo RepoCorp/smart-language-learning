@@ -1,5 +1,7 @@
 # Todos
 
+
+In the create content window, make dialog lenght and language of required words a simple radio
 When generating the exercises, send only the word in the target language
 
 Que cuando uno complete los items de la sesion le haga fiesta

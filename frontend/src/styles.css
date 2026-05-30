@@ -285,6 +285,22 @@ body {
   font-style: italic;
 }
 
+.revealed-answer {
+  background: #f8fafc;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  color: #102a43;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+}
+
+.revealed-answer span {
+  color: #486581;
+  font-weight: 700;
+}
+
 .actions {
   display: flex;
   gap: 10px;

@@ -5,20 +5,16 @@ import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
-
-function normalize(value: string): string {
-  return value.trim();
-}
+import DangerousButton from "./DangerousButton";
 
 interface PhraseReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
-  onOpenOptionItem?: (itemId: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 2000;
 
-export default function PhraseReview({ item, onAnswered, onOpenOptionItem }: PhraseReviewProps): JSX.Element {
+export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -33,6 +29,7 @@ export default function PhraseReview({ item, onAnswered, onOpenOptionItem }: Phr
   const [feedback, setFeedback] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
+  const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
   const isSpanishToGerman = item.direction !== "de_to_es";
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
@@ -50,14 +47,12 @@ export default function PhraseReview({ item, onAnswered, onOpenOptionItem }: Phr
     void audio.play().catch(() => {});
   };
 
-  const choose = async (choice: string): Promise<void> => {
+  const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
     if (isSubmitting) {
       return;
     }
-
-    const correct = normalize(choice) === normalize(expectedAnswer);
     setIsSubmitting(true);
-    setFeedback(correct ? t("phrase.feedback.correct") : t("phrase.feedback.incorrect", { answer: expectedAnswer }));
+    setFeedback(message);
     try {
       await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
       await onAnswered(correct);
@@ -66,32 +61,21 @@ export default function PhraseReview({ item, onAnswered, onOpenOptionItem }: Phr
     }
   };
 
-  useEffect(() => {
-    if (isSubmitting) {
+  const markSelfGradedAnswer = async (correct: boolean): Promise<void> => {
+    if (isSubmitting || !answerRevealed) {
       return;
     }
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      const index = Number.parseInt(event.key, 10);
-      if (!Number.isInteger(index)) {
-        return;
-      }
-      if (index < 1 || index > item.options.length) {
-        return;
-      }
-      event.preventDefault();
-      void choose(item.options[index - 1]);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isSubmitting, item.options]);
+    await submitWithFeedback(correct, correct ? t("phrase.feedback.correct") : t("phrase.feedback.markedWrong", { answer: expectedAnswer }));
+  };
 
   useEffect(() => {
     setShowPromptText(targetPromptMode === "text");
   }, [targetPromptMode]);
+
+  useEffect(() => {
+    setFeedback("");
+    setAnswerRevealed(false);
+  }, [item.id, item.direction]);
 
   useEffect(() => {
     if (targetPromptMode !== "audio") {
@@ -106,20 +90,6 @@ export default function PhraseReview({ item, onAnswered, onOpenOptionItem }: Phr
     }
     playPromptAudio();
   }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio]);
-
-  const markAsWrongByChoice = async (): Promise<void> => {
-    if (isSubmitting) {
-      return;
-    }
-    setIsSubmitting(true);
-    setFeedback(t("phrase.feedback.markedWrong", { answer: expectedAnswer }));
-    try {
-      await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
-      await onAnswered(false);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div>
@@ -143,33 +113,26 @@ export default function PhraseReview({ item, onAnswered, onOpenOptionItem }: Phr
       ) : (
         <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
       )}
-      <div className="options">
-        {item.options.map((option, idx) => {
-          const optionItem = item.option_items?.[idx];
-          const optionItemId = optionItem?.text === option ? optionItem.id : undefined;
-          return (
-            <div className="option-row" key={option}>
-              <button onClick={() => choose(option)} disabled={isSubmitting}>
-                {idx + 1}. {option}
-              </button>
-              {optionItemId !== undefined && onOpenOptionItem ? (
-                <button
-                  type="button"
-                  className="secondary-button option-open-button"
-                  onClick={() => onOpenOptionItem(optionItemId)}
-                  aria-label={`${t("words.openItem")}: ${option}`}
-                >
-                  {t("words.openItem")}
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      {answerRevealed && (
+        <p className="revealed-answer">
+          <span>{t("review.answerLabel")}</span> {expectedAnswer}
+        </p>
+      )}
       <div className="actions">
-        <button onClick={() => void markAsWrongByChoice()} disabled={isSubmitting}>
-          {t("phrase.markFailed")}
-        </button>
+        {!answerRevealed ? (
+          <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
+            {t("review.revealAnswer")}
+          </button>
+        ) : (
+          <>
+            <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
+              {t("review.passed")}
+            </button>
+            <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting}>
+              {t("review.failed")}
+            </DangerousButton>
+          </>
+        )}
       </div>
       {feedback && <p>{feedback}</p>}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { shouldAutoplayPrompt } from "../audioAutoplayGuard";
 import { useI18n } from "../i18n";
@@ -20,12 +20,11 @@ interface WordReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
   onOpenItem?: (itemId: number) => void;
-  onOpenOptionItem?: (itemId: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 1000;
 
-export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionItem }: WordReviewProps): JSX.Element {
+export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -44,10 +43,11 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
+  const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const isSpanishToGerman = item.direction !== "de_to_es";
-  const useMultipleChoice = !isSpanishToGerman && item.options.length > 0;
+  const useSelfGradedAnswer = !isSpanishToGerman;
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
@@ -55,7 +55,7 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
 
-  const hint = useMemo(() => hintLetter, [hintLetter]);
+  const hint = hintLetter;
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
 
   const hasExceededHintLimit = (value: string): boolean => {
@@ -79,30 +79,22 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
     setAwaitingWrongAccept(true);
   };
 
-  const choose = async (choice: string): Promise<void> => {
-    if (!useMultipleChoice || isSubmitting) {
+  const markSelfGradedAnswer = async (correct: boolean): Promise<void> => {
+    if (!useSelfGradedAnswer || isSubmitting || !answerRevealed) {
       return;
     }
-    const correct = normalize(choice) === normalize(expectedAnswer);
-    await submitWithFeedback(correct, correct ? t("word.feedback.correct") : t("word.feedback.incorrect", { answer: expectedAnswer }));
-  };
-
-  const markAsWrongByChoice = async (): Promise<void> => {
-    if (!useMultipleChoice || isSubmitting) {
-      return;
-    }
-    await submitWithFeedback(false, t("word.feedback.markedWrong", { answer: expectedAnswer }));
+    await submitWithFeedback(correct, correct ? t("word.feedback.correct") : t("word.feedback.markedWrong", { answer: expectedAnswer }));
   };
 
   const failWrittenAnswer = async (): Promise<void> => {
-    if (useMultipleChoice || isSubmitting) {
+    if (useSelfGradedAnswer || isSubmitting) {
       return;
     }
     await submitWithFeedback(false, t("word.feedback.markedWrong", { answer: expectedAnswer }));
   };
 
   const showInputAwareHint = (): void => {
-    if (useMultipleChoice) {
+    if (useSelfGradedAnswer) {
       return;
     }
     if (isSubmitting) {
@@ -141,7 +133,7 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
   };
 
   const handleAnswerChange = (value: string): void => {
-    if (useMultipleChoice) {
+    if (useSelfGradedAnswer) {
       return;
     }
     if (isSubmitting) {
@@ -188,10 +180,10 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
   };
 
   useEffect(() => {
-    if (!useMultipleChoice) {
+    if (!useSelfGradedAnswer) {
       inputRef.current?.focus();
     }
-  }, [useMultipleChoice]);
+  }, [useSelfGradedAnswer]);
 
   useEffect(() => {
     setShowPromptText(targetPromptMode === "text");
@@ -212,29 +204,15 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
   }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio]);
 
   useEffect(() => {
-    if (!useMultipleChoice || isSubmitting) {
-      return;
-    }
+    setAnswer("");
+    setFeedback("");
+    setHintLetter("");
+    setHintStepsUsed(0);
+    setAwaitingWrongAccept(false);
+    setAnswerRevealed(false);
+  }, [item.id, item.direction]);
 
-    const onKeyDown = (event: KeyboardEvent): void => {
-      const index = Number.parseInt(event.key, 10);
-      if (!Number.isInteger(index)) {
-        return;
-      }
-      if (index < 1 || index > item.options.length) {
-        return;
-      }
-      event.preventDefault();
-      void choose(item.options[index - 1]);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isSubmitting, item.options, useMultipleChoice]);
-
-  if (useMultipleChoice) {
+  if (useSelfGradedAnswer) {
     return (
       <div>
         {targetPromptMode === "audio" && allowPromptAudio && (
@@ -257,33 +235,26 @@ export default function WordReview({ item, onAnswered, onOpenItem, onOpenOptionI
         ) : (
           <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
         )}
-        <div className="options">
-          {item.options.map((option, idx) => {
-            const optionItem = item.option_items?.[idx];
-            const optionItemId = optionItem?.text === option ? optionItem.id : undefined;
-            return (
-              <div className="option-row" key={option}>
-                <button onClick={() => void choose(option)} disabled={isSubmitting}>
-                  {idx + 1}. {option}
-                </button>
-                {optionItemId !== undefined && onOpenOptionItem ? (
-                  <button
-                    type="button"
-                    className="secondary-button option-open-button"
-                    onClick={() => onOpenOptionItem(optionItemId)}
-                    aria-label={`${t("words.openItem")}: ${option}`}
-                  >
-                    {t("words.openItem")}
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+        {answerRevealed && (
+          <p className="revealed-answer">
+            <span>{t("review.answerLabel")}</span> {expectedAnswer}
+          </p>
+        )}
         <div className="actions">
-          <button onClick={() => void markAsWrongByChoice()} disabled={isSubmitting}>
-            {t("word.markFailed")}
-          </button>
+          {!answerRevealed ? (
+            <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
+              {t("review.revealAnswer")}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
+                {t("review.passed")}
+              </button>
+              <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting}>
+                {t("review.failed")}
+              </DangerousButton>
+            </>
+          )}
         </div>
         {feedback && <p>{feedback}</p>}
       </div>

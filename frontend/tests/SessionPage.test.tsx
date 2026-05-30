@@ -422,7 +422,7 @@ describe("SessionPage", () => {
     expect(screen.queryByText(/^Hint:/)).not.toBeInTheDocument();
   });
 
-  it("supports german to spanish direction for word reviews", async () => {
+  it("supports self-graded german to spanish direction for word reviews", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -439,12 +439,16 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByText(/Select the correct Spanish translation: haus/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /casa/i }));
+    expect(await screen.findByText(/What is the correct Spanish translation\? haus/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /casa/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    expect(screen.getByText(/Answer:/)).toBeInTheDocument();
+    expect(screen.getByText(/casa/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Passed" }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(12, true, "de_to_es"));
   });
 
-  it("allows marking word as wrong by choice in german to spanish direction", async () => {
+  it("allows marking self-graded word reviews as failed", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -461,8 +465,11 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/Select the correct Spanish translation: haus/);
-    await userEvent.click(screen.getByRole("button", { name: "I recognized it, mark wrong" }));
+    await screen.findByText(/What is the correct Spanish translation\? haus/);
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    const failedButton = screen.getByRole("button", { name: "Failed" });
+    await userEvent.click(failedButton);
+    await userEvent.click(failedButton);
     expect(screen.getByText(/Marked as incorrect by choice/)).toBeInTheDocument();
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(112, false, "de_to_es"));
   });
@@ -486,7 +493,9 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
-    await userEvent.click(screen.getByRole("button", { name: "Fail" }));
+    const failButton = screen.getByRole("button", { name: "Fail" });
+    await userEvent.click(failButton);
+    await userEvent.click(failButton);
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(13, false, "es_to_de"));
   });
 
@@ -515,7 +524,7 @@ describe("SessionPage", () => {
     expect(screen.getByText("Hint: H")).toBeInTheDocument();
   });
 
-  it("supports german to spanish direction for phrase reviews", async () => {
+  it("supports self-graded german to spanish direction for phrase reviews", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -532,12 +541,16 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByText(/Select the correct Spanish translation: Ich verstehe nicht/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "No entiendo" }));
+    expect(await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "No entiendo" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    expect(screen.getByText(/Answer:/)).toBeInTheDocument();
+    expect(screen.getByText(/No entiendo/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Passed" }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(30, true, "de_to_es"));
   });
 
-  it("supports number-key selection for phrase options", async () => {
+  it("does not submit phrase reviews with number keys before the answer is revealed", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -554,12 +567,13 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByRole("button", { name: "1. No entiendo" })).toBeInTheDocument();
+    expect(await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1. No entiendo" })).not.toBeInTheDocument();
     await userEvent.keyboard("1");
-    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(32, true, "de_to_es"));
+    expect(submitReview).not.toHaveBeenCalled();
   });
 
-  it("opens a phrase option item in a closable modal without leaving the session", async () => {
+  it("does not show phrase option item buttons in self-graded reviews", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -589,18 +603,9 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/Select the correct Spanish translation: Ich verstehe nicht/);
-    await userEvent.click(screen.getByRole("button", { name: "Open item: Hola" }));
-
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByText("Hola")).toBeInTheDocument();
-    expect(within(dialog).getByText("Hallo")).toBeInTheDocument();
+    await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/);
+    expect(screen.queryByRole("button", { name: "Open item: Hola" })).not.toBeInTheDocument();
     expect(screen.getByTestId("session-page")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByText(/Select the correct Spanish translation: Ich verstehe nicht/)).toBeInTheDocument();
     expect(submitReview).not.toHaveBeenCalled();
   });
 
@@ -665,8 +670,11 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/Select the correct Spanish translation: Ich verstehe nicht/);
-    await userEvent.click(screen.getByRole("button", { name: "I recognized it, mark wrong" }));
+    await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/);
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    const failedButton = screen.getByRole("button", { name: "Failed" });
+    await userEvent.click(failedButton);
+    await userEvent.click(failedButton);
     expect(screen.getByText(/Marked as incorrect by choice/)).toBeInTheDocument();
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(31, false, "de_to_es"));
   });
@@ -699,7 +707,9 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
-    await userEvent.click(screen.getByRole("button", { name: "Fail" }));
+    const failButton = screen.getByRole("button", { name: "Fail" });
+    await userEvent.click(failButton);
+    await userEvent.click(failButton);
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(40, false, "es_to_de"));
 
     expect(await screen.findByText("New word")).toBeInTheDocument();

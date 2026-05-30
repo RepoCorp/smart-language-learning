@@ -555,10 +555,9 @@ export default function SessionPage(): JSX.Element {
               item={current}
               onAnswered={register}
               onOpenItem={(itemId) => void openItemModal(itemId)}
-              onOpenOptionItem={(itemId) => void openItemModal(itemId)}
             />
           ) : (
-            <PhraseReview key={current.id} item={current} onAnswered={register} onOpenOptionItem={(itemId) => void openItemModal(itemId)} />
+            <PhraseReview key={current.id} item={current} onAnswered={register} />
           )}
         </section>
         {waitingNext && <p>{t("session.movingNext")}</p>}
