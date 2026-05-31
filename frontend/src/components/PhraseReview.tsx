@@ -87,6 +87,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const [placedPhraseTokens, setPlacedPhraseTokens] = useState<PhraseToken[]>([]);
   const [wrongPhraseTokenId, setWrongPhraseTokenId] = useState<string>("");
   const [draggingPhraseTokenId, setDraggingPhraseTokenId] = useState<string>("");
+  const [draggingPhraseTokenPosition, setDraggingPhraseTokenPosition] = useState<{ left: number; top: number } | null>(null);
   const [phraseBuilderComplete, setPhraseBuilderComplete] = useState<boolean>(false);
   const [selectedSituationChoice, setSelectedSituationChoice] = useState<string>("");
   const draggingPhraseTokenIdRef = useRef<string>("");
@@ -95,6 +96,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const phraseBuilderCompleteRef = useRef<boolean>(false);
   const isSubmittingRef = useRef<boolean>(false);
   const phraseBuilderCompletionAudioPlayedRef = useRef<boolean>(false);
+  const activePointerIdRef = useRef<number | null>(null);
+  const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const isSpanishToGerman = item.direction !== "de_to_es";
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
@@ -189,25 +192,33 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     window.setTimeout(() => setWrongPhraseTokenId((current) => (current === tokenId ? "" : current)), 450);
   };
 
-  const handlePhraseBuilderDrop = (tokenId: string, slotIndex: number, placedCount = placedPhraseTokenCountRef.current): void => {
+  const clearPhraseDrag = (): void => {
+    activePointerIdRef.current = null;
+    draggingPhraseTokenIdRef.current = "";
+    pointerDragOffsetRef.current = { x: 0, y: 0 };
+    setDraggingPhraseTokenId("");
+    setDraggingPhraseTokenPosition(null);
+  };
+
+  const handlePhraseBuilderDrop = (tokenId: string, slotIndex: number, placedCount = placedPhraseTokenCountRef.current): boolean => {
     if (isSubmittingRef.current || phraseBuilderCompleteRef.current) {
-      return;
+      return false;
     }
     const token = phraseBuilderTokens.find((candidate) => candidate.id === tokenId);
     if (!token) {
-      return;
+      return false;
     }
     if (placedPhraseTokens.some((placedToken) => placedToken.id === token.id)) {
-      return;
+      return false;
     }
     if (slotIndex !== placedCount) {
       markWrongPhraseToken(token.id);
-      return;
+      return true;
     }
     const expectedToken = expectedPhraseTokens[placedCount];
     if (!expectedToken || token.text !== expectedToken.text) {
       markWrongPhraseToken(token.id);
-      return;
+      return true;
     }
     const nextPlacedTokens = [...placedPhraseTokens, token];
     setPlacedPhraseTokens(nextPlacedTokens);
@@ -219,6 +230,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
         playPhraseAudio();
       }
     }
+    return true;
   };
 
   const handlePhraseBuilderSlotProximity = (clientX: number, clientY: number): void => {
@@ -239,7 +251,38 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     if (!isCloseToNextSlot) {
       return;
     }
-    handlePhraseBuilderDrop(draggingPhraseTokenIdRef.current, placedCount, placedCount);
+    if (handlePhraseBuilderDrop(draggingPhraseTokenIdRef.current, placedCount, placedCount)) {
+      clearPhraseDrag();
+    }
+  };
+
+  const startPointerPhraseDrag = (tokenId: string, pointerId: number, clientX: number, clientY: number, rect: DOMRect): void => {
+    if (isSubmittingRef.current || phraseBuilderCompleteRef.current) {
+      return;
+    }
+    activePointerIdRef.current = pointerId;
+    draggingPhraseTokenIdRef.current = tokenId;
+    pointerDragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
+    setDraggingPhraseTokenId(tokenId);
+    setDraggingPhraseTokenPosition({ left: rect.left, top: rect.top });
+  };
+
+  const movePointerPhraseDrag = (pointerId: number, clientX: number, clientY: number): void => {
+    if (activePointerIdRef.current !== pointerId) {
+      return;
+    }
+    setDraggingPhraseTokenPosition({
+      left: clientX - pointerDragOffsetRef.current.x,
+      top: clientY - pointerDragOffsetRef.current.y,
+    });
+    handlePhraseBuilderSlotProximity(clientX, clientY);
+  };
+
+  const endPointerPhraseDrag = (pointerId: number): void => {
+    if (activePointerIdRef.current !== pointerId) {
+      return;
+    }
+    clearPhraseDrag();
   };
 
   useEffect(() => {
@@ -255,18 +298,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   }, [isSubmitting]);
 
   useEffect(() => {
-    if (!draggingPhraseTokenId) {
-      return;
-    }
-    const onDragOver = (event: DragEvent): void => {
-      event.preventDefault();
-      handlePhraseBuilderSlotProximity(event.clientX, event.clientY);
-    };
-    window.addEventListener("dragover", onDragOver);
-    return () => window.removeEventListener("dragover", onDragOver);
-  }, [draggingPhraseTokenId]);
-
-  useEffect(() => {
     setShowPromptText(targetPromptMode === "text");
   }, [targetPromptMode]);
 
@@ -277,8 +308,11 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     setWrongPhraseTokenId("");
     setPhraseBuilderComplete(false);
     setDraggingPhraseTokenId("");
+    setDraggingPhraseTokenPosition(null);
     setSelectedSituationChoice("");
     draggingPhraseTokenIdRef.current = "";
+    activePointerIdRef.current = null;
+    pointerDragOffsetRef.current = { x: 0, y: 0 };
     phraseBuilderCompletionAudioPlayedRef.current = false;
   }, [item.id, item.direction]);
 
@@ -307,30 +341,12 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
           ref={phraseSlotsRef}
           className="phrase-builder-slots"
           aria-label={t("phrase.builderAnswerLabel")}
-          onDragOver={(event) => {
-            event.preventDefault();
-            handlePhraseBuilderSlotProximity(event.clientX, event.clientY);
-          }}
         >
           {expectedPhraseTokens.map((token, index) => (
             <span
               key={token.id}
               data-slot-index={index}
               className={`phrase-builder-slot${placedPhraseTokens[index] ? " phrase-builder-slot-filled" : ""}`}
-              onDragOver={(event) => {
-                event.preventDefault();
-              }}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                const tokenId = draggingPhraseTokenIdRef.current || event.dataTransfer.getData("text/plain");
-                handlePhraseBuilderDrop(tokenId, index);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const tokenId = event.dataTransfer.getData("text/plain");
-                handlePhraseBuilderDrop(tokenId, index);
-                setDraggingPhraseTokenId("");
-              }}
             >
               {placedPhraseTokens[index]?.text || "\u00a0"}
             </span>
@@ -342,29 +358,44 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
               key={token.id}
               type="button"
               className={`phrase-builder-token${wrongPhraseTokenId === token.id ? " phrase-builder-token-wrong" : ""}${draggingPhraseTokenId === token.id ? " phrase-builder-token-dragging" : ""}`}
-              onDragStart={(event) => {
-                event.dataTransfer.setData("text/plain", token.id);
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setDragImage(
-                  event.currentTarget,
-                  event.currentTarget.offsetWidth / 2,
-                  event.currentTarget.offsetHeight - 10,
-                );
-                draggingPhraseTokenIdRef.current = token.id;
-                setDraggingPhraseTokenId(token.id);
+              style={draggingPhraseTokenId === token.id && draggingPhraseTokenPosition
+                ? {
+                  left: draggingPhraseTokenPosition.left,
+                  top: draggingPhraseTokenPosition.top,
+                }
+                : undefined}
+              onPointerDown={(event) => {
+                if (isSubmitting || phraseBuilderComplete) {
+                  return;
+                }
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                startPointerPhraseDrag(token.id, event.pointerId, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
               }}
-              onDragEnd={() => {
-                draggingPhraseTokenIdRef.current = "";
-                setDraggingPhraseTokenId("");
+              onPointerMove={(event) => {
+                if (activePointerIdRef.current !== event.pointerId) {
+                  return;
+                }
+                event.preventDefault();
+                movePointerPhraseDrag(event.pointerId, event.clientX, event.clientY);
+              }}
+              onPointerUp={(event) => {
+                event.preventDefault();
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+                endPointerPhraseDrag(event.pointerId);
+              }}
+              onPointerCancel={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+                endPointerPhraseDrag(event.pointerId);
               }}
               disabled={isSubmitting || phraseBuilderComplete}
             >
               <span className="phrase-builder-token-text">{token.text}</span>
-              <span
-                className="phrase-builder-token-handle"
-                draggable={!isSubmitting && !phraseBuilderComplete}
-                aria-hidden="true"
-              />
+              <span className="phrase-builder-token-handle" aria-hidden="true" />
             </button>
           ))}
         </div>
