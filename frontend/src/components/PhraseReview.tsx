@@ -98,6 +98,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const phraseBuilderCompletionAudioPlayedRef = useRef<boolean>(false);
   const activePointerIdRef = useRef<number | null>(null);
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const draggingPhraseTokenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const isSpanishToGerman = item.direction !== "de_to_es";
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
@@ -196,6 +197,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     activePointerIdRef.current = null;
     draggingPhraseTokenIdRef.current = "";
     pointerDragOffsetRef.current = { x: 0, y: 0 };
+    draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     setDraggingPhraseTokenId("");
     setDraggingPhraseTokenPosition(null);
   };
@@ -233,7 +235,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     return true;
   };
 
-  const handlePhraseBuilderSlotProximity = (clientX: number, clientY: number): void => {
+  const handlePhraseBuilderSlotProximity = (draggedRect: { left: number; top: number; right: number; bottom: number; width: number; height: number }): void => {
     if (!draggingPhraseTokenIdRef.current || isSubmittingRef.current || phraseBuilderCompleteRef.current) {
       return;
     }
@@ -243,12 +245,11 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
       return;
     }
     const rect = nextSlot.getBoundingClientRect();
-    const tolerance = 44;
-    const isCloseToNextSlot = clientX >= rect.left - tolerance
-      && clientX <= rect.right + tolerance
-      && clientY >= rect.top - tolerance
-      && clientY <= rect.bottom + tolerance;
-    if (!isCloseToNextSlot) {
+    const overlapWidth = Math.max(0, Math.min(draggedRect.right, rect.right) - Math.max(draggedRect.left, rect.left));
+    const overlapHeight = Math.max(0, Math.min(draggedRect.bottom, rect.bottom) - Math.max(draggedRect.top, rect.top));
+    const requiredOverlapWidth = Math.min(draggedRect.width, rect.width) * 0.78;
+    const requiredOverlapHeight = Math.min(draggedRect.height, rect.height) * 0.72;
+    if (overlapWidth < requiredOverlapWidth || overlapHeight < requiredOverlapHeight) {
       return;
     }
     if (handlePhraseBuilderDrop(draggingPhraseTokenIdRef.current, placedCount, placedCount)) {
@@ -263,6 +264,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     activePointerIdRef.current = pointerId;
     draggingPhraseTokenIdRef.current = tokenId;
     pointerDragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
+    draggingPhraseTokenSizeRef.current = { width: rect.width, height: rect.height };
     setDraggingPhraseTokenId(tokenId);
     setDraggingPhraseTokenPosition({ left: rect.left, top: rect.top });
   };
@@ -271,11 +273,19 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     if (activePointerIdRef.current !== pointerId) {
       return;
     }
-    setDraggingPhraseTokenPosition({
+    const nextPosition = {
       left: clientX - pointerDragOffsetRef.current.x,
       top: clientY - pointerDragOffsetRef.current.y,
-    });
-    handlePhraseBuilderSlotProximity(clientX, clientY);
+    };
+    const draggedRect = {
+      ...nextPosition,
+      right: nextPosition.left + draggingPhraseTokenSizeRef.current.width,
+      bottom: nextPosition.top + draggingPhraseTokenSizeRef.current.height,
+      width: draggingPhraseTokenSizeRef.current.width,
+      height: draggingPhraseTokenSizeRef.current.height,
+    };
+    setDraggingPhraseTokenPosition(nextPosition);
+    handlePhraseBuilderSlotProximity(draggedRect);
   };
 
   const endPointerPhraseDrag = (pointerId: number): void => {
@@ -313,6 +323,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     draggingPhraseTokenIdRef.current = "";
     activePointerIdRef.current = null;
     pointerDragOffsetRef.current = { x: 0, y: 0 };
+    draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     phraseBuilderCompletionAudioPlayedRef.current = false;
   }, [item.id, item.direction]);
 
@@ -421,21 +432,40 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     return (
       <div className="phrase-situation-review">
         <p className="prompt prompt-light">{t("phrase.situationPrompt")}</p>
-        <p className="test-source-phrase phrase-review-token-line">
-          <DialogTurnText
-            dialogId={0}
-            turnIndex={0}
-            sourceText={item.spanish_text}
-            targetText={item.german_text}
-            sourceLanguage={sourceLanguage}
-            targetLanguage={targetLanguage}
-            tokenStatus={targetWordStatus}
-            statusKeyPrefix={`phrase-review-${item.id}-target`}
-            onTokenClick={onTargetWordClick}
-            onOpenItem={onOpenItem ? async (itemId) => onOpenItem(itemId) : undefined}
-            showPhraseSelection={false}
-          />
-        </p>
+        {targetPromptMode === "audio" && allowPromptAudio && (
+          <div className="prompt-visibility-controls">
+            <button type="button" className="secondary-button" onClick={() => setShowPromptText((value) => !value)}>
+              {showPromptText ? t("prompt.hideText") : t("prompt.showText")}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={playPromptAudio}
+              disabled={!allowPromptAudio || !item.audio_url}
+            >
+              {t("prompt.playAudio")}
+            </button>
+          </div>
+        )}
+        {hidePromptText ? (
+          <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
+        ) : (
+          <p className="test-source-phrase phrase-review-token-line">
+            <DialogTurnText
+              dialogId={0}
+              turnIndex={0}
+              sourceText={item.spanish_text}
+              targetText={item.german_text}
+              sourceLanguage={sourceLanguage}
+              targetLanguage={targetLanguage}
+              tokenStatus={targetWordStatus}
+              statusKeyPrefix={`phrase-review-${item.id}-target`}
+              onTokenClick={onTargetWordClick}
+              onOpenItem={onOpenItem ? async (itemId) => onOpenItem(itemId) : undefined}
+              showPhraseSelection={false}
+            />
+          </p>
+        )}
         {!situationExpectedAnswer && <p className="hint">{t("phrase.situationUnavailable")}</p>}
         <div className="phrase-situation-options">
           {situationChoices.map((choice) => {
