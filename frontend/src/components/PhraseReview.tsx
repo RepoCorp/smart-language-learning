@@ -419,7 +419,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   if (useSituationReview) {
     const selectedSituationIsCorrect = selectedSituationChoice.trim().toLowerCase() === situationExpectedAnswer.toLowerCase();
     return (
-      <div>
+      <div className="phrase-situation-review">
         <p className="prompt prompt-light">{t("phrase.situationPrompt")}</p>
         <p className="test-source-phrase phrase-review-token-line">
           <DialogTurnText

@@ -1487,25 +1487,27 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       )}
       {showPhraseMeaningModal && item.item_type === "phrase" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+          <div className="blocking-modal related-dialogs-modal phrase-builder-modal phrase-meaning-modal">
             <p>
               <strong>{t("newItem.phraseMeaningTitle")}</strong>
             </p>
-            <PhraseReview
-              key={`phrase-meaning-${item.id}-${sourceText}-${targetText}-${dialogPhraseOptions.join("|")}`}
-              item={phraseMeaningItem}
-              onAnswered={async () => closePhraseMeaningModal()}
-              targetWordStatus={wordActionStatus}
-              onTargetWordClick={(statusKey, token) => void requestAddWordFromDialogToken(
-                statusKey,
-                token,
-                token,
-                phraseOriginTurn?.dialog.dialog_id,
-                phraseOriginTurn?.turn.turn_index,
-                phraseOriginTurn?.turn.source_text || sourceText,
-                phraseOriginTurn?.turn.target_text || targetText,
-              )}
-            />
+            <div className="phrase-meaning-modal-body">
+              <PhraseReview
+                key={`phrase-meaning-${item.id}-${sourceText}-${targetText}-${dialogPhraseOptions.join("|")}`}
+                item={phraseMeaningItem}
+                onAnswered={async () => closePhraseMeaningModal()}
+                targetWordStatus={wordActionStatus}
+                onTargetWordClick={(statusKey, token) => void requestAddWordFromDialogToken(
+                  statusKey,
+                  token,
+                  token,
+                  phraseOriginTurn?.dialog.dialog_id,
+                  phraseOriginTurn?.turn.turn_index,
+                  phraseOriginTurn?.turn.source_text || sourceText,
+                  phraseOriginTurn?.turn.target_text || targetText,
+                )}
+              />
+            </div>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={closePhraseMeaningModal}>
                 {t("newItem.closeRelatedDialogs")}

@@ -533,12 +533,20 @@ body {
   gap: 8px;
 }
 
+.phrase-situation-review {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .phrase-situation-option {
   border: 1px solid #bcccdc;
   background: #ffffff;
   color: #102a43;
   line-height: 1.35;
   text-align: left;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .phrase-situation-option-correct {
@@ -1517,6 +1525,29 @@ textarea {
   text-align: left;
   display: flex;
   flex-direction: column;
+}
+
+.phrase-meaning-modal {
+  width: min(720px, 95vw);
+  overflow: hidden;
+}
+
+.phrase-meaning-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.phrase-meaning-modal .phrase-situation-review {
+  overflow: visible;
+  padding-right: 0;
+}
+
+.phrase-meaning-modal .revealed-answer {
+  max-height: 26vh;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 
 .exercise-modal {
