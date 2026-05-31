@@ -58,6 +58,37 @@ describe("SessionPage", () => {
     expect(submitReview).not.toHaveBeenCalled();
   });
 
+  it("opens the phrase builder test from a phrase item view", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 49,
+          mode: "new",
+          item_type: "phrase",
+          spanish_text: "Buenos días",
+          german_text: "Guten Morgen",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    expect(await screen.findByText("New phrase")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open phrase builder" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Phrase builder")).toBeInTheDocument();
+    expect(within(dialog).getByText(/Build the German phrase for: Buenos días/)).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Guten" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Morgen" }));
+    expect(within(dialog).getByText(/Great, the phrase is in the right order/)).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
   it("supports Enter key for Got it on NewItem", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
@@ -789,6 +820,50 @@ describe("SessionPage", () => {
     await userEvent.click(failedButton);
     expect(screen.getByText(/Marked as incorrect by choice/)).toBeInTheDocument();
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(31, false, "de_to_es"));
+  });
+
+  it("shows a phrase builder for phrase repeats", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 48,
+          mode: "review",
+          item_type: "phrase",
+          spanish_text: "No entiendo",
+          german_text: "Ich verstehe nicht",
+          direction: "de_to_es",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/);
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    const failedButton = screen.getByRole("button", { name: "Failed" });
+    await userEvent.click(failedButton);
+    await userEvent.click(failedButton);
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(48, false, "de_to_es"));
+
+    await screen.findByText("New phrase");
+    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
+
+    expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
+    expect(screen.queryByText(/What is the correct Spanish translation/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Build the Spanish phrase for: Ich verstehe nicht/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "entiendo" }));
+    expect(screen.queryByText(/Great, the phrase is in the right order/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "entiendo" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "No" }));
+    await userEvent.click(screen.getByRole("button", { name: "entiendo" }));
+    expect(screen.getByText(/Great, the phrase is in the right order/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(48, false, "de_to_es"));
+    expect(await screen.findByText("Session completed")).toBeInTheDocument();
   });
 
   it("shows NewItem after incorrect answer and presents the failed item again in the same session", async () => {

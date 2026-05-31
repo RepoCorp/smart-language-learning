@@ -15,6 +15,7 @@ import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import DialogTurnText from "./DialogTurnText";
+import PhraseReview from "./PhraseReview";
 
 interface NewItemProps {
   item: SessionItem;
@@ -93,6 +94,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
+  const [showPhraseBuilderModal, setShowPhraseBuilderModal] = useState<boolean>(false);
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
@@ -166,7 +168,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (showQuestionsModal || showDialogsModal || showExerciseModal) {
+      if (showQuestionsModal || showDialogsModal || showExerciseModal || showPhraseBuilderModal) {
         return;
       }
       if (event.key !== "Enter") {
@@ -180,7 +182,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal]);
+  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showPhraseBuilderModal]);
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -235,6 +237,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setItemQuestionInput("");
     setAskingQuestion(false);
     setShowQuestionsModal(false);
+    setShowPhraseBuilderModal(false);
   }, [item.id, item.item_questions]);
 
   useEffect(() => {
@@ -579,6 +582,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     : wordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
   const orderedItemQuestions = [...itemQuestions].sort((left, right) => left.id - right.id);
+  const phraseBuilderItem: SessionItem = {
+    ...item,
+    spanish_text: sourceText,
+    german_text: targetText,
+    mode: "review",
+    direction: null,
+    repeatedAfterFailure: true,
+    options: [],
+  };
 
   const randomExerciseEntryKeys = (count: number): string[] => {
     const keys = regularWordExerciseEntries.map(exerciseEntryKey);
@@ -932,6 +944,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowExerciseModal(false);
   };
 
+  const closePhraseBuilderModal = (): void => {
+    setShowPhraseBuilderModal(false);
+  };
+
   return (
     <div>
       <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
@@ -961,6 +977,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           <button type="button" className="secondary-button item-action-button" onClick={() => void openExerciseModal()} disabled={loadingExercises}>
             {t("newItem.openExercises")}
           </button>
+          {item.item_type === "phrase" && (
+            <button type="button" className="secondary-button item-action-button" onClick={() => setShowPhraseBuilderModal(true)}>
+              {t("newItem.openPhraseBuilder")}
+            </button>
+          )}
           <button type="button" className="secondary-button item-action-button" onClick={() => setShowDialogsModal(true)}>
             {t("newItem.openRelatedDialogs")}
           </button>
@@ -1101,6 +1122,25 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 </button>
               )}
               <button type="button" onClick={() => setShowDialogsModal(false)}>
+                {t("newItem.closeRelatedDialogs")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPhraseBuilderModal && item.item_type === "phrase" && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <p>
+              <strong>{t("newItem.phraseBuilderTitle")}</strong>
+            </p>
+            <PhraseReview
+              key={`phrase-builder-${item.id}-${sourceText}-${targetText}`}
+              item={phraseBuilderItem}
+              onAnswered={async () => closePhraseBuilderModal()}
+            />
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={closePhraseBuilderModal}>
                 {t("newItem.closeRelatedDialogs")}
               </button>
             </div>
