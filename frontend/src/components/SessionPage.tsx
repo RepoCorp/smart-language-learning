@@ -15,17 +15,31 @@ type StoredSessionState = {
   sessionEndsAtMs: number | null;
   remainingSeconds: number;
   sessionOutcome: "time_up" | "completed" | null;
-  completedNewWordCount: number;
   index: number;
   items: SessionItem[];
   showIncorrectReviewItem: boolean;
   showExtendPrompt: boolean;
 };
 
+type DailyNewItemProgress = {
+  date: string;
+  count: number;
+};
+
+const DAILY_NEW_ITEM_CELEBRATION_INTERVAL = 5;
+
+function todayKey(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export default function SessionPage(): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const sessionStorageKey = `active_session_${sourceLanguage}_${targetLanguage}`;
+  const dailyNewItemStorageKey = `daily_new_items_${sourceLanguage}_${targetLanguage}`;
   const [items, setItems] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -34,7 +48,6 @@ export default function SessionPage(): JSX.Element {
   const [sessionEndsAtMs, setSessionEndsAtMs] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
   const [sessionOutcome, setSessionOutcome] = useState<"time_up" | "completed" | null>(null);
-  const [completedNewWordCount, setCompletedNewWordCount] = useState<number>(0);
   const [index, setIndex] = useState<number>(0);
   const [waitingNext, setWaitingNext] = useState<boolean>(false);
   const [showIncorrectReviewItem, setShowIncorrectReviewItem] = useState<boolean>(false);
@@ -77,7 +90,6 @@ export default function SessionPage(): JSX.Element {
       setSessionEndsAtMs(typeof parsed.sessionEndsAtMs === "number" ? parsed.sessionEndsAtMs : null);
       setRemainingSeconds(typeof parsed.remainingSeconds === "number" ? parsed.remainingSeconds : 0);
       setSessionOutcome(parsed.sessionOutcome === "time_up" || parsed.sessionOutcome === "completed" ? parsed.sessionOutcome : null);
-      setCompletedNewWordCount(typeof parsed.completedNewWordCount === "number" ? parsed.completedNewWordCount : 0);
       const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
       setItems(parsedItems);
       setRestoredSnapshotHasItems(parsedItems.length > 0);
@@ -105,7 +117,6 @@ export default function SessionPage(): JSX.Element {
       sessionEndsAtMs,
       remainingSeconds,
       sessionOutcome,
-      completedNewWordCount,
       index,
       items,
       showIncorrectReviewItem,
@@ -120,7 +131,6 @@ export default function SessionPage(): JSX.Element {
     sessionEndsAtMs,
     remainingSeconds,
     sessionOutcome,
-    completedNewWordCount,
     index,
     items,
     showIncorrectReviewItem,
@@ -266,14 +276,23 @@ export default function SessionPage(): JSX.Element {
       }
       throw error;
     }
-    if (current.mode === "new" && current.item_type === "word") {
-      setCompletedNewWordCount((count) => {
-        const nextCount = count + 1;
-        if (nextCount > 0 && nextCount % 5 === 0) {
-          setShowNewWordsCelebration(true);
+    if (current.mode === "new") {
+      const today = todayKey();
+      let currentProgress: DailyNewItemProgress = { date: today, count: 0 };
+      try {
+        const rawProgress = window.localStorage.getItem(dailyNewItemStorageKey);
+        const parsedProgress = rawProgress ? JSON.parse(rawProgress) as Partial<DailyNewItemProgress> : null;
+        if (parsedProgress?.date === today && typeof parsedProgress.count === "number") {
+          currentProgress = { date: today, count: parsedProgress.count };
         }
-        return nextCount;
-      });
+      } catch {
+        currentProgress = { date: today, count: 0 };
+      }
+      const nextProgress = { date: today, count: currentProgress.count + 1 };
+      window.localStorage.setItem(dailyNewItemStorageKey, JSON.stringify(nextProgress));
+      if (nextProgress.count > 0 && nextProgress.count % DAILY_NEW_ITEM_CELEBRATION_INTERVAL === 0) {
+        setShowNewWordsCelebration(true);
+      }
     }
     advance();
   };
@@ -361,7 +380,6 @@ export default function SessionPage(): JSX.Element {
     }
     setError("");
     setSessionOutcome(null);
-    setCompletedNewWordCount(0);
     setShowNewWordsCelebration(false);
     setShowExtendPrompt(false);
     setRestoredSnapshotHasItems(false);
@@ -378,7 +396,6 @@ export default function SessionPage(): JSX.Element {
     setRemainingSeconds(0);
     setItems([]);
     setIndex(0);
-    setCompletedNewWordCount(0);
     setError("");
     setShowIncorrectReviewItem(false);
     setWaitingNext(false);

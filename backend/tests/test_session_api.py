@@ -467,7 +467,7 @@ def test_phrase_target_to_source_uses_neighboring_dialog_line_as_answer():
     assert payload_item["id"] == phrase.id
     assert payload_item["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
     assert payload_item["dialog_phrase_answer"] == "Estoy perdido"
-    assert payload_item["dialog_phrase_scene"] == "No entiendo\nEstoy perdido"
+    assert payload_item["dialog_phrase_scene"] == "Ich verstehe nicht\nIch bin verloren"
     assert "No entiendo" not in payload_item["dialog_phrase_options"]
     assert "Estoy perdido" in payload_item["dialog_phrase_options"]
     assert "Quiero cafe" in payload_item["dialog_phrase_options"]

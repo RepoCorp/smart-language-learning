@@ -457,11 +457,12 @@ def build_dialog_phrase_options(entries: list[SessionEntry], *, user) -> tuple[d
         ).order_by("turn_index")
         for turn in adjacent_turns:
             source_text = turn.source_text.strip()
-            if source_text and source_text.lower() != occurrence.item.spanish_text.lower():
+            target_text = turn.target_text.strip()
+            if source_text and target_text and source_text.lower() != occurrence.item.spanish_text.lower():
                 scene_lines = (
-                    [source_text, occurrence.item.spanish_text]
+                    [target_text, occurrence.item.german_text]
                     if turn.turn_index < occurrence.turn_index
-                    else [occurrence.item.spanish_text, source_text]
+                    else [occurrence.item.german_text, target_text]
                 )
                 current_audio_url = _phrase_audio_url_for_turn(occurrence.turn, user=user, fallback_item=occurrence.item)
                 adjacent_audio_url = _phrase_audio_url_for_turn(turn, user=user)

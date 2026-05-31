@@ -884,7 +884,7 @@ describe("SessionPage", () => {
           direction: "de_to_es",
           options: ["No entiendo", "Hola", "Gracias"],
           dialog_phrase_answer: "Estoy perdido",
-          dialog_phrase_scene: "No entiendo\nEstoy perdido",
+          dialog_phrase_scene: "Ich verstehe nicht\nIch bin verloren",
           dialog_phrase_options: ["Estoy perdido", "Quiero cafe", "La cuenta, por favor"],
         },
       ],
@@ -911,8 +911,8 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Quiero cafe" }));
     expect(screen.getByText(/Not quite/)).toBeInTheDocument();
     expect(screen.getByText(/Scene:/)).toBeInTheDocument();
-    expect(screen.getAllByText(/No entiendo/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Estoy perdido/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Ich verstehe nicht/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Ich bin verloren/).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Ich" })).toHaveClass("turn-token-button");
     expect(screen.queryByText(/Tap any target-language words/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));

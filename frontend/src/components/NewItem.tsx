@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type FocusEvent, type PointerEvent } from "react";
 
 import {
   askContentItemQuestion,
@@ -43,6 +43,92 @@ const VERB_PERSONS = [
 ] as const;
 type VerbTenseKey = typeof VERB_TENSES[number]["key"];
 type VerbPersonKey = typeof VERB_PERSONS[number]["key"];
+type ItemActionIconName = "exercise" | "warmup" | "letters" | "builder" | "dialogMatch" | "dialogs" | "questions" | "audio" | "refresh";
+
+function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
+  const commonProps = {
+    className: "item-action-icon",
+    viewBox: "0 0 24 24",
+    "aria-hidden": true,
+  };
+
+  if (name === "exercise") {
+    return (
+      <svg {...commonProps}>
+        <path d="M8 5v14l11-7-11-7Z" />
+        <path d="M4 6h1M4 12h1M4 18h1" />
+      </svg>
+    );
+  }
+  if (name === "warmup") {
+    return (
+      <svg {...commonProps}>
+        <path d="M12 3l1.4 4.2L18 9l-4.6 1.8L12 15l-1.4-4.2L6 9l4.6-1.8L12 3Z" />
+        <path d="M6 15l.7 2.1L9 18l-2.3.9L6 21l-.7-2.1L3 18l2.3-.9L6 15Z" />
+      </svg>
+    );
+  }
+  if (name === "letters") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 18 9 6l5 12" />
+        <path d="M6 14h6" />
+        <path d="M16 8h4M18 6v4" />
+      </svg>
+    );
+  }
+  if (name === "builder") {
+    return (
+      <svg {...commonProps}>
+        <rect x="3" y="5" width="7" height="5" rx="1" />
+        <rect x="14" y="5" width="7" height="5" rx="1" />
+        <rect x="8" y="14" width="8" height="5" rx="1" />
+      </svg>
+    );
+  }
+  if (name === "dialogMatch") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 7h10l3 3H4V7Z" />
+        <path d="M20 17H10l-3-3h13v3Z" />
+      </svg>
+    );
+  }
+  if (name === "dialogs") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 5h11v8H8l-4 4V5Z" />
+        <path d="M13 11h7v7l-3-3h-4" />
+      </svg>
+    );
+  }
+  if (name === "questions") {
+    return (
+      <svg {...commonProps}>
+        <path d="M9 9a3 3 0 1 1 4.4 2.6c-.9.5-1.4 1.1-1.4 2.4" />
+        <path d="M12 18h.01" />
+        <circle cx="12" cy="12" r="9" />
+      </svg>
+    );
+  }
+  if (name === "audio") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 10v4h4l5 4V6L8 10H4Z" />
+        <path d="M16 9a4 4 0 0 1 0 6" />
+        <path d="M18.5 6.5a7.5 7.5 0 0 1 0 11" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...commonProps}>
+      <path d="M20 12a8 8 0 0 1-13.7 5.7" />
+      <path d="M4 12A8 8 0 0 1 17.7 6.3" />
+      <path d="M17 3v4h4" />
+      <path d="M7 21v-4H3" />
+    </svg>
+  );
+}
 
 const parseVerbExerciseLabel = (label: string): { tense: VerbTenseKey; person: VerbPersonKey } | null => {
   const normalized = label.trim().toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
@@ -100,6 +186,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showPhraseBuilderModal, setShowPhraseBuilderModal] = useState<boolean>(false);
   const [showPhraseMeaningModal, setShowPhraseMeaningModal] = useState<boolean>(false);
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
+  const [itemActionTooltip, setItemActionTooltip] = useState<{ label: string; left: number; top: number } | null>(null);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
   const [regeneratingAudio, setRegeneratingAudio] = useState<boolean>(false);
@@ -1030,6 +1117,22 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowPhraseMeaningModal(false);
   };
 
+  const showItemActionTooltip = (
+    event: PointerEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>,
+    label: string,
+  ): void => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setItemActionTooltip({
+      label,
+      left: rect.left + rect.width / 2,
+      top: rect.top - 8,
+    });
+  };
+
+  const hideItemActionTooltip = (): void => {
+    setItemActionTooltip(null);
+  };
+
   return (
     <div>
       <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
@@ -1057,48 +1160,142 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       {(item.item_type === "word" || item.item_type === "phrase") && (
         <div className="actions item-actions-toolbar">
           <div className="item-action-group item-action-group-primary" aria-label={t("newItem.actionGroupPractice")}>
-            <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => void openExerciseModal()} disabled={loadingExercises}>
-              {t("newItem.openExercises")}
+            <button
+              type="button"
+              className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
+              onClick={() => void openExerciseModal()}
+              disabled={loadingExercises}
+              aria-label={t("newItem.openExercises")}
+              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
+              onPointerLeave={hideItemActionTooltip}
+              onFocus={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
+              onBlur={hideItemActionTooltip}
+            >
+              <ItemActionIcon name="exercise" />
             </button>
             {item.item_type === "word" && (
-              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowWordIntroPracticeModal(true)}>
-                {t("newItem.openWordIntroPractice")}
+              <button
+                type="button"
+                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
+                onClick={() => setShowWordIntroPracticeModal(true)}
+                aria-label={t("newItem.openWordIntroPractice")}
+                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
+                onPointerLeave={hideItemActionTooltip}
+                onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
+                onBlur={hideItemActionTooltip}
+              >
+                <ItemActionIcon name="warmup" />
               </button>
             )}
             {item.item_type === "word" && (
-              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowWordLetterPracticeModal(true)}>
-                {t("newItem.openWordLetterPractice")}
+              <button
+                type="button"
+                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
+                onClick={() => setShowWordLetterPracticeModal(true)}
+                aria-label={t("newItem.openWordLetterPractice")}
+                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
+                onPointerLeave={hideItemActionTooltip}
+                onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
+                onBlur={hideItemActionTooltip}
+              >
+                <ItemActionIcon name="letters" />
               </button>
             )}
             {item.item_type === "phrase" && (
-              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowPhraseBuilderModal(true)}>
-                {t("newItem.openPhraseBuilder")}
+              <button
+                type="button"
+                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
+                onClick={() => setShowPhraseBuilderModal(true)}
+                aria-label={t("newItem.openPhraseBuilder")}
+                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
+                onPointerLeave={hideItemActionTooltip}
+                onFocus={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
+                onBlur={hideItemActionTooltip}
+              >
+                <ItemActionIcon name="builder" />
               </button>
             )}
             {item.item_type === "phrase" && (
-              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowPhraseMeaningModal(true)}>
-                {t("newItem.openPhraseMeaning")}
+              <button
+                type="button"
+                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
+                onClick={() => setShowPhraseMeaningModal(true)}
+                aria-label={t("newItem.openPhraseMeaning")}
+                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openPhraseMeaning"))}
+                onPointerLeave={hideItemActionTooltip}
+                onFocus={(event) => showItemActionTooltip(event, t("newItem.openPhraseMeaning"))}
+                onBlur={hideItemActionTooltip}
+              >
+                <ItemActionIcon name="dialogMatch" />
               </button>
             )}
           </div>
           <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
-            <button type="button" className="secondary-button item-action-button" onClick={() => setShowDialogsModal(true)}>
-              {t("newItem.openRelatedDialogs")}
+            <button
+              type="button"
+              className="secondary-button item-action-button item-action-button-icon"
+              onClick={() => setShowDialogsModal(true)}
+              aria-label={t("newItem.openRelatedDialogs")}
+              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
+              onPointerLeave={hideItemActionTooltip}
+              onFocus={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
+              onBlur={hideItemActionTooltip}
+            >
+              <ItemActionIcon name="dialogs" />
             </button>
-            <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
-              {t("newItem.openQuestions")}
+            <button
+              type="button"
+              className="secondary-button item-action-button item-action-button-icon"
+              onClick={() => setShowQuestionsModal(true)}
+              aria-label={t("newItem.openQuestions")}
+              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
+              onPointerLeave={hideItemActionTooltip}
+              onFocus={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
+              onBlur={hideItemActionTooltip}
+            >
+              <ItemActionIcon name="questions" />
             </button>
           </div>
-          <div className="item-action-group item-action-group-maintenance" aria-label={t("newItem.actionGroupMaintenance")}>
-            <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={regenerateAudio} disabled={regeneratingAudio || refreshingWord}>
-              {regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
+          <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
+            <DangerousButton
+              className="secondary-button item-action-button item-action-button-icon dangerous-action-button"
+              onConfirm={regenerateAudio}
+              disabled={regeneratingAudio || refreshingWord}
+              aria-label={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
+              onPointerEnter={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
+              onPointerLeave={hideItemActionTooltip}
+              onFocus={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
+              onBlur={hideItemActionTooltip}
+            >
+              <ItemActionIcon name="audio" />
             </DangerousButton>
             {item.item_type === "word" && (
-              <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={refreshWordData} disabled={refreshingWord || regeneratingAudio}>
-                {refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
+              <DangerousButton
+                className="secondary-button item-action-button item-action-button-icon dangerous-action-button"
+                onConfirm={refreshWordData}
+                disabled={refreshingWord || regeneratingAudio}
+                aria-label={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
+                onPointerEnter={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
+                onPointerLeave={hideItemActionTooltip}
+                onFocus={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
+                onBlur={hideItemActionTooltip}
+              >
+                <ItemActionIcon name="refresh" />
               </DangerousButton>
             )}
           </div>
+        </div>
+      )}
+      {itemActionTooltip && (
+        <div
+          className="item-action-tooltip"
+          role="tooltip"
+          style={{
+            left: itemActionTooltip.left,
+            top: itemActionTooltip.top,
+          }}
+        >
+          {itemActionTooltip.label}
         </div>
       )}
       {wordRefreshMessage && <p className="hint">{wordRefreshMessage}</p>}
