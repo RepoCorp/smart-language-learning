@@ -277,6 +277,12 @@ body {
   font-weight: 400;
 }
 
+.test-instruction {
+  color: #486581;
+  font-size: 0.96rem;
+  margin-bottom: 6px;
+}
+
 .prompt-visibility-controls {
   display: flex;
   flex-wrap: wrap;
@@ -306,9 +312,20 @@ body {
 }
 
 .word-input-feedback {
-  color: #991b1b;
   font-weight: 700;
   margin: 8px 0 0;
+}
+
+.word-input-feedback-error {
+  color: #991b1b;
+}
+
+.word-input-feedback-success {
+  color: #166534;
+}
+
+.word-input-feedback-neutral {
+  color: #486581;
 }
 
 .word-input-correct-progress {
@@ -344,14 +361,31 @@ body {
 }
 
 .word-cloze-letter-options {
-  margin-bottom: 4px;
+  gap: 12px;
+  margin: 14px 0 10px;
+  padding: 12px;
+  border: 1px solid #9fb3c8;
+  border-radius: 8px;
+  background: #f8fafc;
+  justify-content: center;
 }
 
 .word-cloze-letter-button {
-  min-width: 46px;
-  min-height: 44px;
-  font-size: 1.2rem;
+  min-width: 64px;
+  min-height: 58px;
+  border: 2px solid #2563eb;
+  background: #e1effe;
+  color: #102a43;
+  font-size: 1.55rem;
   font-weight: 800;
+  box-shadow: 0 4px 10px rgba(16, 42, 67, 0.12);
+}
+
+.word-cloze-letter-button:hover:not(:disabled),
+.word-cloze-letter-button:focus-visible {
+  background: #bfdbfe;
+  border-color: #1d4ed8;
+  color: #0f172a;
 }
 
 .test-source-phrase {

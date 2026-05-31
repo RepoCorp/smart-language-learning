@@ -346,7 +346,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     const remainingTokens = phraseBuilderTokens.filter((token) => !placedIds.has(token.id));
     return (
       <div>
-        <p className="prompt">{t("phrase.builderPrompt", { language: languageLabel })}</p>
+        <p className="prompt prompt-light test-instruction">{t("phrase.builderPrompt", { language: languageLabel })}</p>
         <p className="test-source-phrase">{promptText}</p>
         <div
           ref={phraseSlotsRef}
@@ -431,7 +431,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     const selectedSituationIsCorrect = selectedSituationChoice.trim().toLowerCase() === situationExpectedAnswer.toLowerCase();
     return (
       <div className="phrase-situation-review">
-        <p className="prompt prompt-light">{t("phrase.situationPrompt")}</p>
+        <p className="prompt prompt-light test-instruction">{t("phrase.situationPrompt")}</p>
         {targetPromptMode === "audio" && allowPromptAudio && (
           <div className="prompt-visibility-controls">
             <button type="button" className="secondary-button" onClick={() => setShowPromptText((value) => !value)}>
@@ -553,7 +553,10 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
       {hidePromptText ? (
         <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
       ) : (
-        <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
+        <>
+          <p className="prompt prompt-light test-instruction">{t("phrase.promptInstruction", { language: languageLabel })}</p>
+          <p className="test-source-phrase">{promptText}</p>
+        </>
       )}
       {answerRevealed && (
         <p className="revealed-answer">

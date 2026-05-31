@@ -149,6 +149,7 @@ interface WordReviewProps {
 }
 
 const FEEDBACK_DELAY_MS = 1000;
+type FeedbackTone = "neutral" | "success" | "error";
 
 export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
@@ -164,6 +165,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   };
   const [answer, setAnswer] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
+  const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>("neutral");
   const [hintLetter, setHintLetter] = useState<string>("");
   const [hintStepsUsed, setHintStepsUsed] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -203,6 +205,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
     setIsSubmitting(true);
     setFeedback(message);
+    setFeedbackTone(correct ? "success" : "error");
     try {
       await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
       await onAnswered(correct);
@@ -213,6 +216,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
 
   const requireWrongAccept = (message: string): void => {
     setFeedback(message);
+    setFeedbackTone("error");
     setAwaitingWrongAccept(true);
   };
 
@@ -283,6 +287,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         provisionalBaseAnswerRef.current = acceptedAnswer;
         setAnswer(value);
         setFeedback("");
+        setFeedbackTone("neutral");
         setLetterSuggestions([]);
         setHintLetter("");
         setAwaitingWrongAccept(false);
@@ -294,6 +299,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
       const wrongText = value.slice(acceptedAnswer.length) || value.slice(fallbackAnswer.length) || value.slice(-1);
       setAnswer(fallbackAnswer);
       setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
+      setFeedbackTone("error");
       setLetterSuggestions(nextLetterSuggestions(expectedAnswer.charAt(fallbackAnswer.length), fallbackAnswer.length));
       return;
     }
@@ -301,6 +307,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     provisionalBaseAnswerRef.current = null;
     setAnswer(value);
     setFeedback("");
+    setFeedbackTone("neutral");
     setLetterSuggestions([]);
     setHintLetter("");
     setAwaitingWrongAccept(false);
@@ -338,11 +345,13 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     }
     if (letter !== clozeNextLetter) {
       setFeedback(t("word.feedback.wrongLetter", { letter }));
+      setFeedbackTone("error");
       return;
     }
     const nextAnswer = advancePastFixedCharacters(answer + letter, expectedAnswer);
     setAnswer(nextAnswer);
     setFeedback("");
+    setFeedbackTone("neutral");
     if (normalize(nextAnswer) === normalize(expectedAnswer)) {
       await submitWithFeedback(true, t("word.feedback.correct"));
     }
@@ -395,6 +404,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   useEffect(() => {
     setAnswer("");
     setFeedback("");
+    setFeedbackTone("neutral");
     setHintLetter("");
     setHintStepsUsed(0);
     setAwaitingWrongAccept(false);
@@ -430,7 +440,10 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         {hidePromptText ? (
           <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
         ) : (
-          <p className="prompt">{t("phrase.prompt", { language: languageLabel, text: promptText })}</p>
+          <>
+            <p className="prompt prompt-light test-instruction">{t("phrase.promptInstruction", { language: languageLabel })}</p>
+            <p className="test-source-phrase">{promptText}</p>
+          </>
         )}
         {answerRevealed && (
           <p className="revealed-answer">
@@ -465,7 +478,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
             </>
           )}
         </div>
-        {feedback && <p>{feedback}</p>}
+        {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
       </div>
     );
   }
@@ -490,7 +503,8 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   if (useClozeRetry) {
     return (
       <div>
-        <p className="prompt">{t("word.clozePrompt", { word: item.spanish_text })}</p>
+        <p className="prompt prompt-light test-instruction">{t("word.clozePromptInstruction")}</p>
+        <p className="test-source-phrase">{item.spanish_text}</p>
         <p className="word-cloze-phrase">
           {clozePhrase || t("word.clozeMissingPhrase")}
         </p>
@@ -516,7 +530,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
             )}
           </>
         )}
-        {feedback && <p className="word-input-feedback">{feedback}</p>}
+        {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
         <div className="actions">
           {onOpenItem ? (
             <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
@@ -557,7 +571,10 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
       {hidePromptText ? (
         <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
       ) : (
-        <p className="prompt">{t("word.prompt", { language: languageLabel, text: promptText })}</p>
+        <>
+          <p className="prompt prompt-light test-instruction">{t("word.promptInstruction", { language: languageLabel })}</p>
+          <p className="test-source-phrase">{promptText}</p>
+        </>
       )}
       <input
         ref={inputRef}
@@ -601,7 +618,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         autoCorrect="off"
         spellCheck={false}
       />
-      {feedback && <p className="word-input-feedback">{feedback}</p>}
+      {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
       {letterSuggestions.length > 0 && (
         <div className="letter-suggestions" role="group" aria-label={t("word.letterSuggestions")}>
           {letterSuggestions.map((letter) => (

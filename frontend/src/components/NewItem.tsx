@@ -114,9 +114,12 @@ function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
   if (name === "audio") {
     return (
       <svg {...commonProps}>
-        <path d="M4 10v4h4l5 4V6L8 10H4Z" />
-        <path d="M16 9a4 4 0 0 1 0 6" />
-        <path d="M18.5 6.5a7.5 7.5 0 0 1 0 11" />
+        <path d="M4 10v4h4l4 3V7l-4 3H4Z" />
+        <path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" />
+        <path d="M19 5v4h-4" />
+        <path d="M15 19v-4h4" />
+        <path d="M19 9a7 7 0 0 0-11-3.6" />
+        <path d="M15 15a7 7 0 0 1-11 3.6" />
       </svg>
     );
   }
