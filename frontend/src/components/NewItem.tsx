@@ -16,6 +16,7 @@ import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import DialogTurnText from "./DialogTurnText";
 import PhraseReview from "./PhraseReview";
+import WordReview from "./WordReview";
 
 interface NewItemProps {
   item: SessionItem;
@@ -94,6 +95,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
+  const [showWordIntroPracticeModal, setShowWordIntroPracticeModal] = useState<boolean>(false);
+  const [showWordLetterPracticeModal, setShowWordLetterPracticeModal] = useState<boolean>(false);
   const [showPhraseBuilderModal, setShowPhraseBuilderModal] = useState<boolean>(false);
   const [showPhraseMeaningModal, setShowPhraseMeaningModal] = useState<boolean>(false);
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
@@ -177,7 +180,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (showQuestionsModal || showDialogsModal || showExerciseModal || showPhraseBuilderModal || showPhraseMeaningModal) {
+      if (
+        showQuestionsModal
+        || showDialogsModal
+        || showExerciseModal
+        || showWordIntroPracticeModal
+        || showWordLetterPracticeModal
+        || showPhraseBuilderModal
+        || showPhraseMeaningModal
+      ) {
         return;
       }
       if (event.key !== "Enter") {
@@ -191,7 +202,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showPhraseBuilderModal, showPhraseMeaningModal]);
+  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showWordIntroPracticeModal, showWordLetterPracticeModal, showPhraseBuilderModal, showPhraseMeaningModal]);
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -246,6 +257,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setItemQuestionInput("");
     setAskingQuestion(false);
     setShowQuestionsModal(false);
+    setShowWordIntroPracticeModal(false);
+    setShowWordLetterPracticeModal(false);
     setShowPhraseBuilderModal(false);
     setShowPhraseMeaningModal(false);
   }, [item.id, item.item_questions]);
@@ -604,6 +617,26 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     : wordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
   const orderedItemQuestions = [...itemQuestions].sort((left, right) => left.id - right.id);
+  const wordPracticeItemBase: SessionItem = {
+    ...item,
+    spanish_text: sourceText,
+    german_text: targetText,
+    audio_url: audioUrl,
+    exercise_phrases: exercisePhrases,
+    mode: "review",
+    direction: "es_to_de",
+    repeatedAfterFailure: true,
+    options: [],
+    related_dialogs: relatedDialogs,
+  };
+  const wordIntroPracticeItem: SessionItem = {
+    ...wordPracticeItemBase,
+    repeatPracticeStep: "word_intro",
+  };
+  const wordLetterPracticeItem: SessionItem = {
+    ...wordPracticeItemBase,
+    repeatPracticeStep: "word_cloze",
+  };
   const phraseBuilderItem: SessionItem = {
     ...item,
     spanish_text: sourceText,
@@ -981,6 +1014,14 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowExerciseModal(false);
   };
 
+  const closeWordIntroPracticeModal = (): void => {
+    setShowWordIntroPracticeModal(false);
+  };
+
+  const closeWordLetterPracticeModal = (): void => {
+    setShowWordLetterPracticeModal(false);
+  };
+
   const closePhraseBuilderModal = (): void => {
     setShowPhraseBuilderModal(false);
   };
@@ -1019,6 +1060,16 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => void openExerciseModal()} disabled={loadingExercises}>
               {t("newItem.openExercises")}
             </button>
+            {item.item_type === "word" && (
+              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowWordIntroPracticeModal(true)}>
+                {t("newItem.openWordIntroPractice")}
+              </button>
+            )}
+            {item.item_type === "word" && (
+              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowWordLetterPracticeModal(true)}>
+                {t("newItem.openWordLetterPractice")}
+              </button>
+            )}
             {item.item_type === "phrase" && (
               <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowPhraseBuilderModal(true)}>
                 {t("newItem.openPhraseBuilder")}
@@ -1174,6 +1225,44 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 </button>
               )}
               <button type="button" onClick={() => setShowDialogsModal(false)}>
+                {t("newItem.closeRelatedDialogs")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showWordIntroPracticeModal && item.item_type === "word" && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <p>
+              <strong>{t("newItem.wordIntroPracticeTitle")}</strong>
+            </p>
+            <WordReview
+              key={`word-intro-practice-${item.id}-${sourceText}-${targetText}`}
+              item={wordIntroPracticeItem}
+              onAnswered={async () => closeWordIntroPracticeModal()}
+            />
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={closeWordIntroPracticeModal}>
+                {t("newItem.closeRelatedDialogs")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showWordLetterPracticeModal && item.item_type === "word" && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <p>
+              <strong>{t("newItem.wordLetterPracticeTitle")}</strong>
+            </p>
+            <WordReview
+              key={`word-letter-practice-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}`}
+              item={wordLetterPracticeItem}
+              onAnswered={async () => closeWordLetterPracticeModal()}
+            />
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={closeWordLetterPracticeModal}>
                 {t("newItem.closeRelatedDialogs")}
               </button>
             </div>

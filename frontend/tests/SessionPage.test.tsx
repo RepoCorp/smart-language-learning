@@ -789,6 +789,30 @@ describe("SessionPage", () => {
           german_text: "Haus",
           direction: "es_to_de",
           options: [],
+          related_dialogs: [
+            {
+              dialog_id: 1,
+              topic: "home",
+              context: "",
+              audio_url: "",
+              created_at: "2026-01-01T00:00:00Z",
+              turns: [
+                {
+                  source_text: "Mi casa es pequeña.",
+                  target_text: "Mein Haus ist klein.",
+                },
+              ],
+              matched_turns: [
+                {
+                  turn_index: 0,
+                  side: "target",
+                  match_score: 1,
+                  source_text: "Mi casa es pequeña.",
+                  target_text: "Mein Haus ist klein.",
+                },
+              ],
+            },
+          ],
         },
       ],
     });
@@ -951,8 +975,12 @@ describe("SessionPage", () => {
 
     expect(await screen.findByText(/Item 4 of 4/)).toBeInTheDocument();
     expect(await screen.findByText(/Complete the phrase with: casa/)).toBeInTheDocument();
-    expect(screen.getByText("Das ____ ist groß.")).toBeInTheDocument();
-    await userEvent.type(screen.getByTestId("word-input"), "Haus");
+    expect(screen.getByText("Mein ____ ist klein.")).toBeInTheDocument();
+    expect(screen.queryByTestId("word-input")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "H" }));
+    await userEvent.click(screen.getByRole("button", { name: "a" }));
+    await userEvent.click(screen.getByRole("button", { name: "u" }));
+    await userEvent.click(screen.getByRole("button", { name: "s" }));
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(40, false, "es_to_de"));
     expect(await screen.findByText("Session completed")).toBeInTheDocument();
   });
@@ -998,6 +1026,7 @@ describe("SessionPage", () => {
     expect(await screen.findByText(/Item 3 of 3/)).toBeInTheDocument();
     expect(await screen.findByText(/Complete the phrase with: mesa/)).toBeInTheDocument();
     expect(screen.getByText("Der ____ ist bereit.")).toBeInTheDocument();
+    expect(screen.queryByTestId("word-input")).not.toBeInTheDocument();
     const secondFailButton = screen.getByRole("button", { name: "Fail" });
     await userEvent.click(secondFailButton);
     await userEvent.click(secondFailButton);

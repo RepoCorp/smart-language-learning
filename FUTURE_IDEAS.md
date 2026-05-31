@@ -1,5 +1,6 @@
 # Todos
 
+The other exercise where with the cloze no se que no muestra la palabra en español si no que da la frase y un espacio en el que van apareciendo las letras una a una, en desorden para que el usuario la escriba cuando ya la haya identificado
 Add a "dangerous" button to generate a small, simple, and the cheapest one possible image that represents the word, to the word item views.
 Words box handler esta muy feo
 I like the needs attention idea. What would it do with a word that is tagged as that?

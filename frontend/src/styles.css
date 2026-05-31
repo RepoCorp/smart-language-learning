@@ -330,6 +330,30 @@ body {
   padding: 12px 14px;
 }
 
+.word-letter-progress {
+  border: 1px solid #9fb3c8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #102a43;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+}
+
+.word-cloze-letter-options {
+  margin-bottom: 4px;
+}
+
+.word-cloze-letter-button {
+  min-width: 46px;
+  min-height: 44px;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
 .test-source-phrase {
   margin: 8px 0 14px;
   border: 1px solid #9fb3c8;

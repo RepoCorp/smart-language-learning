@@ -86,7 +86,23 @@ function blankTargetInPhrase(phrase: string, targetText: string): string {
   return `${normalizedPhrase.slice(0, startIndex)}____${normalizedPhrase.slice(startIndex + match[2].length)}`;
 }
 
-function clozePhraseForItem(item: SessionItem): string {
+function dialogClozePhraseForItem(item: SessionItem): string {
+  const matchedTurns = (item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns);
+  const dialogTurns = (item.related_dialogs || []).flatMap((dialog) => dialog.turns);
+  const candidates = [
+    ...matchedTurns.map((turn) => turn.target_text),
+    ...dialogTurns.map((turn) => turn.target_text),
+  ].filter((candidate) => candidate.trim() && candidate.trim().toLowerCase() !== item.german_text.trim().toLowerCase());
+  for (const candidate of candidates) {
+    const cloze = blankTargetInPhrase(candidate, item.german_text);
+    if (cloze) {
+      return cloze;
+    }
+  }
+  return "";
+}
+
+function fallbackClozePhraseForItem(item: SessionItem): string {
   const candidates = [
     ...((item.exercise_phrases?.phrases || []).map((entry) => entry.target_text)),
     ...((item.exercise_phrases?.first_section || []).map((entry) => entry.target_text)),
@@ -100,6 +116,30 @@ function clozePhraseForItem(item: SessionItem): string {
     }
   }
   return "";
+}
+
+function clozePhraseForItem(item: SessionItem): string {
+  return dialogClozePhraseForItem(item) || fallbackClozePhraseForItem(item);
+}
+
+function advancePastFixedCharacters(value: string, expectedAnswer: string): string {
+  let nextValue = value;
+  while (nextValue.length < expectedAnswer.length && !isLetter(expectedAnswer.charAt(nextValue.length))) {
+    nextValue += expectedAnswer.charAt(nextValue.length);
+  }
+  return nextValue;
+}
+
+function clozeLetterProgress(value: string, expectedAnswer: string): string {
+  return expectedAnswer
+    .split("")
+    .map((letter, index) => {
+      if (index < value.length) {
+        return letter;
+      }
+      return isLetter(letter) ? "_" : letter;
+    })
+    .join("");
 }
 
 interface WordReviewProps {
@@ -145,6 +185,9 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
   const clozePhrase = useClozeRetry ? clozePhraseForItem(item) : "";
+  const clozeNextLetter = useClozeRetry ? expectedAnswer.charAt(answer.length) : "";
+  const clozeLetterSuggestions = useClozeRetry ? nextLetterSuggestions(clozeNextLetter, answer.length) : [];
+  const clozeProgress = useClozeRetry ? clozeLetterProgress(answer, expectedAnswer) : "";
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
@@ -289,6 +332,22 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     }
   };
 
+  const chooseClozeLetter = async (letter: string): Promise<void> => {
+    if (!useClozeRetry || isSubmitting || awaitingWrongAccept) {
+      return;
+    }
+    if (letter !== clozeNextLetter) {
+      setFeedback(t("word.feedback.wrongLetter", { letter }));
+      return;
+    }
+    const nextAnswer = advancePastFixedCharacters(answer + letter, expectedAnswer);
+    setAnswer(nextAnswer);
+    setFeedback("");
+    if (normalize(nextAnswer) === normalize(expectedAnswer)) {
+      await submitWithFeedback(true, t("word.feedback.correct"));
+    }
+  };
+
   const playPromptAudio = (): void => {
     if (!allowPromptAudio || !item.audio_url) {
       return;
@@ -345,7 +404,10 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     pendingCompositionValidationRef.current = false;
     answerBeforeCompositionRef.current = "";
     provisionalBaseAnswerRef.current = null;
-  }, [item.id, item.direction]);
+    if (item.repeatPracticeStep === "word_cloze") {
+      setAnswer(advancePastFixedCharacters("", item.german_text));
+    }
+  }, [item.id, item.direction, item.repeatPracticeStep, item.german_text]);
 
   if (useSelfGradedAnswer) {
     return (
@@ -425,6 +487,56 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     );
   }
 
+  if (useClozeRetry) {
+    return (
+      <div>
+        <p className="prompt">{t("word.clozePrompt", { word: item.spanish_text })}</p>
+        <p className="word-cloze-phrase">
+          {clozePhrase || t("word.clozeMissingPhrase")}
+        </p>
+        {clozePhrase && (
+          <>
+            <p className="word-letter-progress" aria-label={t("word.letterBuildLabel")}>
+              {clozeProgress}
+            </p>
+            {clozeLetterSuggestions.length > 0 && (
+              <div className="letter-suggestions word-cloze-letter-options" role="group" aria-label={t("word.letterSuggestions")}>
+                {clozeLetterSuggestions.map((letter) => (
+                  <button
+                    key={letter}
+                    type="button"
+                    className="secondary-button letter-suggestion-button word-cloze-letter-button"
+                    onClick={() => void chooseClozeLetter(letter)}
+                    disabled={isSubmitting}
+                  >
+                    {letter}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {feedback && <p className="word-input-feedback">{feedback}</p>}
+        <div className="actions">
+          {onOpenItem ? (
+            <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+              {t("words.openItem")}
+            </button>
+          ) : null}
+          {clozePhrase ? (
+            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
+              {t("word.failButton")}
+            </DangerousButton>
+          ) : (
+            <button type="button" onClick={() => void continueIntroRetry()} disabled={isSubmitting}>
+              {t("review.continue")}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {targetPromptMode === "audio" && allowPromptAudio && (
@@ -444,13 +556,6 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         )}
       {hidePromptText ? (
         <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
-      ) : useClozeRetry ? (
-        <>
-          <p className="prompt">{t("word.clozePrompt", { word: item.spanish_text })}</p>
-          <p className="word-cloze-phrase">
-            {clozePhrase || t("word.clozeMissingPhrase")}
-          </p>
-        </>
       ) : (
         <p className="prompt">{t("word.prompt", { language: languageLabel, text: promptText })}</p>
       )}
