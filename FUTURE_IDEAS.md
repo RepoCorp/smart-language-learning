@@ -1,5 +1,6 @@
 # Todos
 
+Add a "dangerous" button to generate a small, simple, and the cheapest one possible image that represents the word, to the word item views.
 Words box handler esta muy feo
 I like the needs attention idea. What would it do with a word that is tagged as that?
 In the create content window, make dialog lenght and language of required words a simple radio

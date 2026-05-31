@@ -139,7 +139,8 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
 
   const isSpanishToGerman = item.direction !== "de_to_es";
   const useSelfGradedAnswer = !isSpanishToGerman;
-  const useClozeRetry = isSpanishToGerman && Boolean(item.repeatedAfterFailure);
+  const useIntroRetry = isSpanishToGerman && item.repeatPracticeStep === "word_intro";
+  const useClozeRetry = isSpanishToGerman && Boolean(item.repeatedAfterFailure) && item.repeatPracticeStep !== "word_intro";
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
@@ -296,6 +297,18 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     void audio.play().catch(() => {});
   };
 
+  const continueIntroRetry = async (): Promise<void> => {
+    if (isSubmitting) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onAnswered(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     if (!useSelfGradedAnswer) {
       inputRef.current?.focus();
@@ -391,6 +404,23 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
           )}
         </div>
         {feedback && <p>{feedback}</p>}
+      </div>
+    );
+  }
+
+  if (useIntroRetry) {
+    return (
+      <div>
+        <div className="actions">
+          {onOpenItem ? (
+            <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
+              {t("words.openItem")}
+            </button>
+          ) : null}
+          <button type="button" onClick={() => void continueIntroRetry()} disabled={isSubmitting}>
+            {t("review.continue")}
+          </button>
+        </div>
       </div>
     );
   }

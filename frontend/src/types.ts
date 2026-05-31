@@ -32,6 +32,7 @@ export interface SessionItem {
   mode: SessionMode;
   direction?: ReviewDirection | null;
   repeatedAfterFailure?: boolean;
+  repeatPracticeStep?: "word_intro" | "word_cloze";
   options: string[];
   option_items?: Array<{
     id: number;

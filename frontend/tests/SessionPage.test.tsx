@@ -934,7 +934,7 @@ describe("SessionPage", () => {
     expect(screen.getByText("casa")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
 
-    await screen.findByText(/Item 2 of 3/);
+    await screen.findByText(/Item 2 of 4/);
     expect(screen.queryByText("New word")).not.toBeInTheDocument();
     expect(screen.queryByText(/Write in German: casa/)).not.toBeInTheDocument();
     expect(await screen.findByText(/Write in German: perro/)).toBeInTheDocument();
@@ -942,7 +942,14 @@ describe("SessionPage", () => {
     await userEvent.type(screen.getByTestId("word-input"), "Hund");
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(41, true, "es_to_de"));
 
-    expect(await screen.findByText(/Item 3 of 3/)).toBeInTheDocument();
+    expect(await screen.findByText(/Item 3 of 4/)).toBeInTheDocument();
+    expect(screen.queryByText(/Complete the phrase with: casa/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Item" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(submitReview).toHaveBeenCalledTimes(2);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText(/Item 4 of 4/)).toBeInTheDocument();
     expect(await screen.findByText(/Complete the phrase with: casa/)).toBeInTheDocument();
     expect(screen.getByText("Das ____ ist groß.")).toBeInTheDocument();
     await userEvent.type(screen.getByTestId("word-input"), "Haus");
@@ -984,7 +991,11 @@ describe("SessionPage", () => {
     await screen.findByText("New word");
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
 
-    expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
+    expect(await screen.findByText(/Item 2 of 3/)).toBeInTheDocument();
+    expect(screen.queryByText(/Complete the phrase with: mesa/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText(/Item 3 of 3/)).toBeInTheDocument();
     expect(await screen.findByText(/Complete the phrase with: mesa/)).toBeInTheDocument();
     expect(screen.getByText("Der ____ ist bereit.")).toBeInTheDocument();
     const secondFailButton = screen.getByRole("button", { name: "Fail" });
@@ -996,7 +1007,7 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
 
     expect(await screen.findByText("Session completed")).toBeInTheDocument();
-    expect(screen.queryByText(/Item 3 of 3/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Item 4 of 4/)).not.toBeInTheDocument();
   });
 
   it("does not submit a written answer when Enter is pressed", async () => {

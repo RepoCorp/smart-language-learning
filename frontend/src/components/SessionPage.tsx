@@ -221,6 +221,10 @@ export default function SessionPage(): JSX.Element {
       return;
     }
     const reviewedItem = current;
+    if (reviewedItem.repeatPracticeStep === "word_intro") {
+      advance();
+      return;
+    }
     const reviewResult = reviewedItem.repeatedAfterFailure ? false : correct;
     try {
       await submitReview(reviewedItem.id, reviewResult, reviewedItem.direction ?? undefined);
@@ -236,7 +240,15 @@ export default function SessionPage(): JSX.Element {
       return;
     }
     if (!reviewedItem.repeatedAfterFailure) {
-      setItems((currentItems) => [...currentItems, { ...reviewedItem, repeatedAfterFailure: true }]);
+      if (reviewedItem.item_type === "word" && reviewedItem.direction !== "de_to_es") {
+        setItems((currentItems) => [
+          ...currentItems,
+          { ...reviewedItem, repeatedAfterFailure: true, repeatPracticeStep: "word_intro" },
+          { ...reviewedItem, repeatedAfterFailure: true, repeatPracticeStep: "word_cloze" },
+        ]);
+      } else {
+        setItems((currentItems) => [...currentItems, { ...reviewedItem, repeatedAfterFailure: true }]);
+      }
     }
     setShowIncorrectReviewItem(true);
   };
