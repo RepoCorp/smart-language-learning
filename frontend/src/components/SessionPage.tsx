@@ -301,6 +301,10 @@ export default function SessionPage(): JSX.Element {
         mode: "new",
         direction: null,
         options: [],
+        dialog_phrase_answer: detail.dialog_phrase_answer || "",
+        dialog_phrase_scene: detail.dialog_phrase_scene || "",
+        dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+        dialog_phrase_options: detail.dialog_phrase_options || [],
         related_dialogs: detail.related_dialogs || [],
         item_questions: detail.item_questions || [],
       });

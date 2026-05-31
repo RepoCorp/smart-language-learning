@@ -25,6 +25,7 @@ interface DialogTurnTextProps {
   onTokenClick?: (statusKey: string, token: string, tokenIndex: number) => void;
   onOpenItem?: (itemId: number) => Promise<void>;
   wordMatches?: (token: string, word: string) => boolean;
+  showPhraseSelection?: boolean;
 }
 
 const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
@@ -44,6 +45,7 @@ export default function DialogTurnText({
   onTokenClick,
   onOpenItem,
   wordMatches,
+  showPhraseSelection = true,
 }: DialogTurnTextProps): JSX.Element {
   const { t } = useI18n();
   const [selectingPhrase, setSelectingPhrase] = useState<boolean>(false);
@@ -225,7 +227,7 @@ export default function DialogTurnText({
           })}
         </>
       )}
-      {!hideTargetText && (
+      {!hideTargetText && showPhraseSelection && (
         <>
           <div className="actions turn-action-row">
             {selectingPhrase ? (

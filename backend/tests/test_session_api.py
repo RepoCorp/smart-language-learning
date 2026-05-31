@@ -395,3 +395,80 @@ def test_session_includes_related_dialogs_for_item():
     assert len(payload_item["related_dialogs"][0]["turns"]) == 2
     assert payload_item["related_dialogs"][0]["turns"][0]["phrase_audio_url"] == "http://localhost:8000/media/audio/turn-mock.mp3"
     assert payload_item["related_dialogs"][0]["matched_turns"][0]["turn_index"] == 0
+
+
+@pytest.mark.django_db
+def test_phrase_target_to_source_uses_neighboring_dialog_line_as_answer():
+    now = timezone.now()
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="No entiendo",
+        german_text="Ich verstehe nicht",
+        source_language="spanish",
+        target_language="german",
+        last_reviewed_at_de_to_es=now,
+        due_at_de_to_es=now,
+    )
+    origin_dialog = SavedDialog.objects.create(
+        topic="confusion",
+        context="asking for help",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {"source_text": "No entiendo", "target_text": "Ich verstehe nicht"},
+            {"source_text": "Estoy perdido", "target_text": "Ich bin verloren"},
+        ],
+    )
+    origin_turn = DialogTurn.objects.create(
+        dialog=origin_dialog,
+        turn_index=0,
+        source_text="No entiendo",
+        target_text="Ich verstehe nicht",
+    )
+    ItemDialogOccurrence.objects.create(
+        item=phrase,
+        dialog=origin_dialog,
+        turn=origin_turn,
+        turn_index=0,
+        side=ItemDialogOccurrence.Side.TARGET,
+        match_score=1,
+    )
+    other_dialog = SavedDialog.objects.create(
+        topic="cafe",
+        context="ordering",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {"source_text": "Quiero cafe", "target_text": "Ich moechte Kaffee"},
+            {"source_text": "La cuenta, por favor", "target_text": "Die Rechnung, bitte"},
+        ],
+    )
+    DialogTurn.objects.create(
+        dialog=other_dialog,
+        turn_index=0,
+        source_text="Quiero cafe",
+        target_text="Ich moechte Kaffee",
+    )
+    DialogTurn.objects.create(
+        dialog=other_dialog,
+        turn_index=1,
+        source_text="La cuenta, por favor",
+        target_text="Die Rechnung, bitte",
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/session",
+        {"size": 1, "source_language": "spanish", "target_language": "german"},
+    )
+
+    assert response.status_code == 200
+    payload_item = response.json()["items"][0]
+    assert payload_item["id"] == phrase.id
+    assert payload_item["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
+    assert payload_item["dialog_phrase_answer"] == "Estoy perdido"
+    assert payload_item["dialog_phrase_scene"] == "No entiendo\nEstoy perdido"
+    assert "No entiendo" not in payload_item["dialog_phrase_options"]
+    assert "Estoy perdido" in payload_item["dialog_phrase_options"]
+    assert "Quiero cafe" in payload_item["dialog_phrase_options"]
+    assert "La cuenta, por favor" in payload_item["dialog_phrase_options"]

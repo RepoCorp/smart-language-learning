@@ -23,6 +23,10 @@ class SessionItemSerializer(serializers.Serializer):
     )
     options = serializers.ListField(child=serializers.CharField(), required=False)
     option_items = serializers.ListField(child=serializers.DictField(), required=False)
+    dialog_phrase_answer = serializers.CharField(allow_blank=True, required=False)
+    dialog_phrase_scene = serializers.CharField(allow_blank=True, required=False)
+    dialog_phrase_scene_audio_urls = serializers.ListField(child=serializers.CharField(), required=False)
+    dialog_phrase_options = serializers.ListField(child=serializers.CharField(), required=False)
     related_dialogs = serializers.ListField(child=serializers.DictField(), required=False)
 
 

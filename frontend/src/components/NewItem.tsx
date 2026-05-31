@@ -95,6 +95,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
   const [showPhraseBuilderModal, setShowPhraseBuilderModal] = useState<boolean>(false);
+  const [showPhraseMeaningModal, setShowPhraseMeaningModal] = useState<boolean>(false);
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
@@ -125,6 +126,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [targetText, setTargetText] = useState<string>(item.german_text || "");
   const [audioUrl, setAudioUrl] = useState<string>(item.audio_url || "");
   const [wordType, setWordType] = useState<string>(item.word_type || "");
+  const [dialogPhraseAnswer, setDialogPhraseAnswer] = useState<string>(item.dialog_phrase_answer || "");
+  const [dialogPhraseScene, setDialogPhraseScene] = useState<string>(item.dialog_phrase_scene || "");
+  const [dialogPhraseSceneAudioUrls, setDialogPhraseSceneAudioUrls] = useState<string[]>(item.dialog_phrase_scene_audio_urls || []);
+  const [dialogPhraseOptions, setDialogPhraseOptions] = useState<string[]>(item.dialog_phrase_options || []);
   const [relatedDialogs, setRelatedDialogs] = useState<NonNullable<SessionItem["related_dialogs"]>>(item.related_dialogs || []);
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
   const [itemQuestionInput, setItemQuestionInput] = useState<string>("");
@@ -148,8 +153,12 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setTargetText(item.german_text || "");
     setAudioUrl(item.audio_url || "");
     setWordType(item.word_type || "");
+    setDialogPhraseAnswer(item.dialog_phrase_answer || "");
+    setDialogPhraseScene(item.dialog_phrase_scene || "");
+    setDialogPhraseSceneAudioUrls(item.dialog_phrase_scene_audio_urls || []);
+    setDialogPhraseOptions(item.dialog_phrase_options || []);
     setRelatedDialogs(item.related_dialogs || []);
-  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.related_dialogs]);
+  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.related_dialogs]);
 
   const markAsSeen = async (): Promise<void> => {
     if (saving || !onContinue) {
@@ -168,7 +177,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (showQuestionsModal || showDialogsModal || showExerciseModal || showPhraseBuilderModal) {
+      if (showQuestionsModal || showDialogsModal || showExerciseModal || showPhraseBuilderModal || showPhraseMeaningModal) {
         return;
       }
       if (event.key !== "Enter") {
@@ -182,7 +191,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showPhraseBuilderModal]);
+  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showPhraseBuilderModal, showPhraseMeaningModal]);
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -238,6 +247,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setAskingQuestion(false);
     setShowQuestionsModal(false);
     setShowPhraseBuilderModal(false);
+    setShowPhraseMeaningModal(false);
   }, [item.id, item.item_questions]);
 
   useEffect(() => {
@@ -400,6 +410,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             mode: "new",
             direction: null,
             options: [],
+            dialog_phrase_answer: detail.dialog_phrase_answer || "",
+            dialog_phrase_scene: detail.dialog_phrase_scene || "",
+            dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+            dialog_phrase_options: detail.dialog_phrase_options || [],
             related_dialogs: detail.related_dialogs || [],
             item_questions: detail.item_questions || [],
           });
@@ -444,6 +458,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         mode: "new",
         direction: null,
         options: [],
+        dialog_phrase_answer: detail.dialog_phrase_answer || "",
+        dialog_phrase_scene: detail.dialog_phrase_scene || "",
+        dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+        dialog_phrase_options: detail.dialog_phrase_options || [],
         related_dialogs: detail.related_dialogs || [],
         item_questions: detail.item_questions || [],
       });
@@ -502,6 +520,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             mode: "new",
             direction: null,
             options: [],
+            dialog_phrase_answer: detail.dialog_phrase_answer || "",
+            dialog_phrase_scene: detail.dialog_phrase_scene || "",
+            dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+            dialog_phrase_options: detail.dialog_phrase_options || [],
             related_dialogs: detail.related_dialogs || [],
             item_questions: detail.item_questions || [],
           });
@@ -587,10 +609,25 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     spanish_text: sourceText,
     german_text: targetText,
     mode: "review",
-    direction: null,
+    direction: "es_to_de",
     repeatedAfterFailure: true,
     options: [],
+    dialog_phrase_answer: dialogPhraseAnswer,
+    dialog_phrase_scene: dialogPhraseScene,
+    dialog_phrase_scene_audio_urls: dialogPhraseSceneAudioUrls,
+    dialog_phrase_options: dialogPhraseOptions,
   };
+  const phraseMeaningItem: SessionItem = {
+    ...phraseBuilderItem,
+    direction: "de_to_es",
+    dialog_phrase_options: dialogPhraseOptions,
+  };
+  const phraseOriginTurn = relatedDialogs
+    .flatMap((dialog) => dialog.matched_turns.map((turn) => ({ dialog, turn })))
+    .find(({ turn }) => (
+      turn.source_text.trim().toLowerCase() === sourceText.trim().toLowerCase()
+      || turn.target_text.trim().toLowerCase() === targetText.trim().toLowerCase()
+    ));
 
   const randomExerciseEntryKeys = (count: number): string[] => {
     const keys = regularWordExerciseEntries.map(exerciseEntryKey);
@@ -948,6 +985,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowPhraseBuilderModal(false);
   };
 
+  const closePhraseMeaningModal = (): void => {
+    setShowPhraseMeaningModal(false);
+  };
+
   return (
     <div>
       <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
@@ -974,28 +1015,39 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       )}
       {(item.item_type === "word" || item.item_type === "phrase") && (
         <div className="actions item-actions-toolbar">
-          <button type="button" className="secondary-button item-action-button" onClick={() => void openExerciseModal()} disabled={loadingExercises}>
-            {t("newItem.openExercises")}
-          </button>
-          {item.item_type === "phrase" && (
-            <button type="button" className="secondary-button item-action-button" onClick={() => setShowPhraseBuilderModal(true)}>
-              {t("newItem.openPhraseBuilder")}
+          <div className="item-action-group item-action-group-primary" aria-label={t("newItem.actionGroupPractice")}>
+            <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => void openExerciseModal()} disabled={loadingExercises}>
+              {t("newItem.openExercises")}
             </button>
-          )}
-          <button type="button" className="secondary-button item-action-button" onClick={() => setShowDialogsModal(true)}>
-            {t("newItem.openRelatedDialogs")}
-          </button>
-          <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
-            {t("newItem.openQuestions")}
-          </button>
-          <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={regenerateAudio} disabled={regeneratingAudio || refreshingWord}>
-            {regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
-          </DangerousButton>
-          {item.item_type === "word" && (
-            <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={refreshWordData} disabled={refreshingWord || regeneratingAudio}>
-              {refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
+            {item.item_type === "phrase" && (
+              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowPhraseBuilderModal(true)}>
+                {t("newItem.openPhraseBuilder")}
+              </button>
+            )}
+            {item.item_type === "phrase" && (
+              <button type="button" className="secondary-button item-action-button item-action-button-primary" onClick={() => setShowPhraseMeaningModal(true)}>
+                {t("newItem.openPhraseMeaning")}
+              </button>
+            )}
+          </div>
+          <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
+            <button type="button" className="secondary-button item-action-button" onClick={() => setShowDialogsModal(true)}>
+              {t("newItem.openRelatedDialogs")}
+            </button>
+            <button type="button" className="secondary-button item-action-button" onClick={() => setShowQuestionsModal(true)}>
+              {t("newItem.openQuestions")}
+            </button>
+          </div>
+          <div className="item-action-group item-action-group-maintenance" aria-label={t("newItem.actionGroupMaintenance")}>
+            <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={regenerateAudio} disabled={regeneratingAudio || refreshingWord}>
+              {regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
             </DangerousButton>
-          )}
+            {item.item_type === "word" && (
+              <DangerousButton className="secondary-button item-action-button dangerous-action-button" onConfirm={refreshWordData} disabled={refreshingWord || regeneratingAudio}>
+                {refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
+              </DangerousButton>
+            )}
+          </div>
         </div>
       )}
       {wordRefreshMessage && <p className="hint">{wordRefreshMessage}</p>}
@@ -1141,6 +1193,35 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             />
             <div className="actions">
               <button type="button" className="secondary-button" onClick={closePhraseBuilderModal}>
+                {t("newItem.closeRelatedDialogs")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPhraseMeaningModal && item.item_type === "phrase" && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <p>
+              <strong>{t("newItem.phraseMeaningTitle")}</strong>
+            </p>
+            <PhraseReview
+              key={`phrase-meaning-${item.id}-${sourceText}-${targetText}-${dialogPhraseOptions.join("|")}`}
+              item={phraseMeaningItem}
+              onAnswered={async () => closePhraseMeaningModal()}
+              targetWordStatus={wordActionStatus}
+              onTargetWordClick={(statusKey, token) => void requestAddWordFromDialogToken(
+                statusKey,
+                token,
+                token,
+                phraseOriginTurn?.dialog.dialog_id,
+                phraseOriginTurn?.turn.turn_index,
+                phraseOriginTurn?.turn.source_text || sourceText,
+                phraseOriginTurn?.turn.target_text || targetText,
+              )}
+            />
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={closePhraseMeaningModal}>
                 {t("newItem.closeRelatedDialogs")}
               </button>
             </div>

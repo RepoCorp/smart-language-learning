@@ -37,6 +37,10 @@ export interface SessionItem {
     id: number;
     text: string;
   }>;
+  dialog_phrase_answer?: string;
+  dialog_phrase_scene?: string;
+  dialog_phrase_scene_audio_urls?: string[];
+  dialog_phrase_options?: string[];
   related_dialogs?: Array<{
     dialog_id: number;
     topic: string;
@@ -151,6 +155,10 @@ export interface ContentItemDetailResponse {
   audio_url?: string;
   created_at: string;
   exercise_phrases?: ItemExercisePhrases;
+  dialog_phrase_answer?: string;
+  dialog_phrase_scene?: string;
+  dialog_phrase_scene_audio_urls?: string[];
+  dialog_phrase_options?: string[];
   related_dialogs?: SessionItem["related_dialogs"];
   item_questions?: ItemQuestionExchange[];
 }

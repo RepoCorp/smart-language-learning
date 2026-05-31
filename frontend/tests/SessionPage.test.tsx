@@ -27,6 +27,31 @@ async function renderSessionPageAndStart(): Promise<void> {
   await userEvent.click(screen.getByRole("button", { name: "Start session" }));
 }
 
+function dragPhraseTokenToSlot(token: HTMLElement, slotIndex: number, root: ParentNode = document, finishWithDrop = true): void {
+  const slots = Array.from(root.querySelectorAll(".phrase-builder-slot"));
+  const slot = slots[slotIndex];
+  if (!(slot instanceof HTMLElement)) {
+    throw new Error(`Phrase builder slot ${slotIndex} not found`);
+  }
+  const data = new Map<string, string>();
+  const dataTransfer = {
+    effectAllowed: "move",
+    getData: (type: string) => data.get(type) || "",
+    setData: (type: string, value: string) => {
+      data.set(type, value);
+    },
+  };
+  fireEvent.dragStart(token, { dataTransfer });
+  fireEvent.dragEnter(slot, { dataTransfer });
+  if (!finishWithDrop) {
+    fireEvent.dragEnd(token, { dataTransfer });
+    return;
+  }
+  fireEvent.dragOver(slot, { dataTransfer });
+  fireEvent.drop(slot, { dataTransfer });
+  fireEvent.dragEnd(token, { dataTransfer });
+}
+
 describe("SessionPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,10 +104,11 @@ describe("SessionPage", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Phrase builder")).toBeInTheDocument();
-    expect(within(dialog).getByText(/Build the German phrase for: Buenos días/)).toBeInTheDocument();
+    expect(within(dialog).getByText("Build the German phrase for:")).toBeInTheDocument();
+    expect(within(dialog).getByText("Buenos días")).toHaveClass("test-source-phrase");
 
-    await userEvent.click(within(dialog).getByRole("button", { name: "Guten" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Morgen" }));
+    dragPhraseTokenToSlot(within(dialog).getByRole("button", { name: "Guten" }), 0, dialog, false);
+    dragPhraseTokenToSlot(within(dialog).getByRole("button", { name: "Morgen" }), 1, dialog);
     expect(within(dialog).getByText(/Great, the phrase is in the right order/)).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
@@ -822,7 +848,7 @@ describe("SessionPage", () => {
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(31, false, "de_to_es"));
   });
 
-  it("shows a phrase builder for phrase repeats", async () => {
+  it("shows a situation match test for target-to-source phrase repeats", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {
@@ -832,7 +858,10 @@ describe("SessionPage", () => {
           spanish_text: "No entiendo",
           german_text: "Ich verstehe nicht",
           direction: "de_to_es",
-          options: [],
+          options: ["No entiendo", "Hola", "Gracias"],
+          dialog_phrase_answer: "Estoy perdido",
+          dialog_phrase_scene: "No entiendo\nEstoy perdido",
+          dialog_phrase_options: ["Estoy perdido", "Quiero cafe", "La cuenta, por favor"],
         },
       ],
     });
@@ -851,15 +880,17 @@ describe("SessionPage", () => {
 
     expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
     expect(screen.queryByText(/What is the correct Spanish translation/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Build the Spanish phrase for: Ich verstehe nicht/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "entiendo" }));
-    expect(screen.queryByText(/Great, the phrase is in the right order/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "entiendo" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "No" }));
-    await userEvent.click(screen.getByRole("button", { name: "entiendo" }));
-    expect(screen.getByText(/Great, the phrase is in the right order/)).toBeInTheDocument();
+    expect(screen.getByText("Which line comes right before or after this phrase in its dialog?")).toBeInTheDocument();
+    expect(screen.getByText("Ich verstehe nicht")).toHaveClass("test-source-phrase");
+    expect(screen.queryByRole("button", { name: "Hola" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "No entiendo" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Quiero cafe" }));
+    expect(screen.getByText(/Not quite/)).toBeInTheDocument();
+    expect(screen.getByText(/Scene:/)).toBeInTheDocument();
+    expect(screen.getAllByText(/No entiendo/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Estoy perdido/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Ich" })).toHaveClass("turn-token-button");
+    expect(screen.queryByText(/Tap any target-language words/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(48, false, "de_to_es"));

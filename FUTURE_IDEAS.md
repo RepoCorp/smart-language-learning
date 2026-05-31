@@ -1,6 +1,7 @@
 # Todos
 
-Que cuando se equivoca en una palabra en cualquier sentido marca los dos sentidos como fallos
+Words box handler esta muy feo
+I like the needs attention idea. What would it do with a word that is tagged as that?
 In the create content window, make dialog lenght and language of required words a simple radio
 When generating the exercises, send only the word in the target language
 Que al escoger sesión procure no incluir frases y sus palabras juntas
