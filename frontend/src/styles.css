@@ -408,13 +408,32 @@ body {
 
 .letter-suggestions {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #9fb3c8;
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .letter-suggestion-button {
-  min-width: 44px;
-  padding: 8px 12px;
+  min-width: 56px;
+  min-height: 50px;
+  border: 2px solid #2563eb;
+  background: #e1effe;
+  color: #102a43;
+  font-size: 1.35rem;
+  font-weight: 800;
+  padding: 8px 14px;
+  box-shadow: 0 3px 8px rgba(16, 42, 67, 0.12);
+}
+
+.letter-suggestion-button:hover:not(:disabled),
+.letter-suggestion-button:focus-visible {
+  background: #bfdbfe;
+  border-color: #1d4ed8;
+  color: #0f172a;
 }
 
 .phrase-builder-slots,

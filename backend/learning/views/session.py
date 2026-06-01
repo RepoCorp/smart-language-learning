@@ -436,7 +436,6 @@ def build_dialog_phrase_options(entries: list[SessionEntry], *, user) -> tuple[d
         for entry in entries
         if entry.mode == "review"
         and entry.item.item_type == Item.ItemType.PHRASE
-        and entry.direction == Item.ReviewDirection.GERMAN_TO_SPANISH
     ]
     if not phrase_entries:
         return {}, {}, {}, {}

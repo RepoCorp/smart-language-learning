@@ -734,6 +734,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     mode: "review",
     direction: "es_to_de",
     repeatedAfterFailure: true,
+    repeatPracticeStep: "phrase_builder",
     options: [],
     dialog_phrase_answer: dialogPhraseAnswer,
     dialog_phrase_scene: dialogPhraseScene,
@@ -743,6 +744,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const phraseMeaningItem: SessionItem = {
     ...phraseBuilderItem,
     direction: "de_to_es",
+    repeatPracticeStep: "phrase_dialog_match",
     dialog_phrase_options: dialogPhraseOptions,
   };
   const phraseOriginTurn = relatedDialogs

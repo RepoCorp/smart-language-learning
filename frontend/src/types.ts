@@ -32,7 +32,7 @@ export interface SessionItem {
   mode: SessionMode;
   direction?: ReviewDirection | null;
   repeatedAfterFailure?: boolean;
-  repeatPracticeStep?: "word_intro" | "word_cloze";
+  repeatPracticeStep?: "word_intro" | "word_cloze" | "phrase_builder" | "phrase_dialog_match";
   options: string[];
   option_items?: Array<{
     id: number;

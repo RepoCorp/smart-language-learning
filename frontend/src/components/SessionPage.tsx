@@ -226,12 +226,31 @@ export default function SessionPage(): JSX.Element {
     return error.message.trim().toLowerCase() === "item not found";
   };
 
+  const insertTwoPhaseRetries = (currentItems: SessionItem[], firstRetry: SessionItem, secondRetry: SessionItem): SessionItem[] => {
+    const isSecondRetry = (item: SessionItem): boolean => (
+      item.repeatPracticeStep === "word_cloze" || item.repeatPracticeStep === "phrase_dialog_match"
+    );
+    const firstSecondRetryIndex = currentItems.findIndex(isSecondRetry);
+    const firstRetryInsertIndex = firstSecondRetryIndex === -1 ? currentItems.length : firstSecondRetryIndex;
+    const secondRetryInsertIndex = currentItems.length + 1;
+    const withFirstRetry = [
+      ...currentItems.slice(0, firstRetryInsertIndex),
+      firstRetry,
+      ...currentItems.slice(firstRetryInsertIndex),
+    ];
+    return [
+      ...withFirstRetry.slice(0, secondRetryInsertIndex),
+      secondRetry,
+      ...withFirstRetry.slice(secondRetryInsertIndex),
+    ];
+  };
+
   const register = async (correct: boolean): Promise<void> => {
     if (!current || sessionOutcome !== null || showExtendPrompt) {
       return;
     }
     const reviewedItem = current;
-    if (reviewedItem.repeatPracticeStep === "word_intro") {
+    if (reviewedItem.repeatPracticeStep === "word_intro" || reviewedItem.repeatPracticeStep === "phrase_builder") {
       advance();
       return;
     }
@@ -250,12 +269,38 @@ export default function SessionPage(): JSX.Element {
       return;
     }
     if (!reviewedItem.repeatedAfterFailure) {
-      if (reviewedItem.item_type === "word" && reviewedItem.direction !== "de_to_es") {
-        setItems((currentItems) => [
-          ...currentItems,
-          { ...reviewedItem, repeatedAfterFailure: true, repeatPracticeStep: "word_intro" },
-          { ...reviewedItem, repeatedAfterFailure: true, repeatPracticeStep: "word_cloze" },
-        ]);
+      if (reviewedItem.item_type === "word") {
+        setItems((currentItems) => {
+          const firstRetry = {
+            ...reviewedItem,
+            direction: "es_to_de" as const,
+            repeatedAfterFailure: true,
+            repeatPracticeStep: "word_intro" as const,
+          };
+          const secondRetry = {
+            ...reviewedItem,
+            direction: "es_to_de" as const,
+            repeatedAfterFailure: true,
+            repeatPracticeStep: "word_cloze" as const,
+          };
+          return insertTwoPhaseRetries(currentItems, firstRetry, secondRetry);
+        });
+      } else if (reviewedItem.item_type === "phrase") {
+        setItems((currentItems) => {
+          const firstRetry = {
+            ...reviewedItem,
+            direction: "es_to_de" as const,
+            repeatedAfterFailure: true,
+            repeatPracticeStep: "phrase_builder" as const,
+          };
+          const secondRetry = {
+            ...reviewedItem,
+            direction: "de_to_es" as const,
+            repeatedAfterFailure: true,
+            repeatPracticeStep: "phrase_dialog_match" as const,
+          };
+          return insertTwoPhaseRetries(currentItems, firstRetry, secondRetry);
+        });
       } else {
         setItems((currentItems) => [...currentItems, { ...reviewedItem, repeatedAfterFailure: true }]);
       }

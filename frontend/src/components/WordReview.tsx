@@ -11,11 +11,6 @@ function normalize(value: string): string {
   return value.trim();
 }
 
-function countLetters(value: string): number {
-  const matches = value.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g);
-  return matches ? matches.length : 0;
-}
-
 function isLetter(value: string): boolean {
   return /^[A-Za-zÀ-ÖØ-öø-ÿ]$/.test(value);
 }
@@ -149,6 +144,7 @@ interface WordReviewProps {
 }
 
 const FEEDBACK_DELAY_MS = 1000;
+const MAX_WRITTEN_WORD_ASSISTANCE_STEPS = 2;
 type FeedbackTone = "neutral" | "success" | "error";
 
 export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewProps): JSX.Element {
@@ -167,7 +163,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const [feedback, setFeedback] = useState<string>("");
   const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>("neutral");
   const [hintLetter, setHintLetter] = useState<string>("");
-  const [hintStepsUsed, setHintStepsUsed] = useState<number>(0);
+  const [writtenWordAssistanceSteps, setWrittenWordAssistanceSteps] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
@@ -197,10 +193,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const hint = hintLetter;
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
 
-  const hasExceededHintLimit = (value: string): boolean => {
-    const totalLetters = countLetters(value);
-    return totalLetters > 0 && hintStepsUsed > 1 && hintStepsUsed / totalLetters > 0.3;
-  };
+  const hasExceededWrittenWordAssistanceLimit = (): boolean => writtenWordAssistanceSteps > MAX_WRITTEN_WORD_ASSISTANCE_STEPS;
 
   const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
     setIsSubmitting(true);
@@ -263,7 +256,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setHintLetter(nextHintLetter);
     setLetterSuggestions([]);
     if (isNewHintStep) {
-      setHintStepsUsed((value) => value + 1);
+      setWrittenWordAssistanceSteps((value) => value + 1);
     }
   };
 
@@ -300,6 +293,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
       setAnswer(fallbackAnswer);
       setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
       setFeedbackTone("error");
+      setWrittenWordAssistanceSteps((value) => value + 1);
       setLetterSuggestions(nextLetterSuggestions(expectedAnswer.charAt(fallbackAnswer.length), fallbackAnswer.length));
       return;
     }
@@ -316,8 +310,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
       return;
     }
 
-    const exceededHintLimit = hasExceededHintLimit(expectedAnswer);
-    if (exceededHintLimit) {
+    if (hasExceededWrittenWordAssistanceLimit()) {
       requireWrongAccept(
         t("word.feedback.tooManyHints", { answer: expectedAnswer }),
       );
@@ -406,7 +399,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setFeedback("");
     setFeedbackTone("neutral");
     setHintLetter("");
-    setHintStepsUsed(0);
+    setWrittenWordAssistanceSteps(0);
     setAwaitingWrongAccept(false);
     setAnswerRevealed(false);
     setLetterSuggestions([]);

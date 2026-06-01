@@ -124,8 +124,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     : t(languageKeyByCode[sourceLanguage]);
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const useRepeatPlaceholder = Boolean(item.repeatedAfterFailure);
-  const usePhraseBuilder = useRepeatPlaceholder && isSpanishToGerman;
-  const useSituationReview = useRepeatPlaceholder && !isSpanishToGerman;
+  const usePhraseBuilder = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_builder" || (!item.repeatPracticeStep && isSpanishToGerman));
+  const useSituationReview = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_dialog_match" || (!item.repeatPracticeStep && !isSpanishToGerman));
 
   const playPromptAudio = (): void => {
     if (!allowPromptAudio || !item.audio_url) {
