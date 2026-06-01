@@ -1452,9 +1452,10 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
     raw_turns = dialog.turns if isinstance(dialog.turns, list) else []
     normalized_turns: list[dict] = []
     key_pairs: set[tuple[str, str]] = set()
+    db_turns_by_index = {turn.turn_index: turn for turn in dialog.dialog_turns.all()}
     turn_audio_by_index = {
         turn.turn_index: str(turn.audio_url or "")
-        for turn in dialog.dialog_turns.all()
+        for turn in db_turns_by_index.values()
         if str(turn.audio_url or "").strip()
     }
     if raw_turns:
@@ -1475,7 +1476,7 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
             if source_text and target_text:
                 key_pairs.add((source_text.lower(), target_text.lower()))
     else:
-        for turn in dialog.dialog_turns.all():
+        for turn in db_turns_by_index.values():
             source_text = str(turn.source_text or "").strip()
             target_text = str(turn.target_text or "").strip()
             speaker = _normalize_dialog_speaker("", len(normalized_turns))
@@ -1504,6 +1505,21 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
             (str(item["spanish_text"]).strip().lower(), str(item["german_text"]).strip().lower()): str(item["audio_url"] or "")
             for item in phrase_items
         }
+
+    for turn in normalized_turns:
+        turn_index = turn["turn_index"]
+        if turn_audio_by_index.get(turn_index):
+            continue
+        db_turn = db_turns_by_index.get(turn_index)
+        target_text = str(turn["target_text"] or "").strip()
+        if not db_turn or not target_text:
+            continue
+        audio_url = create_audio_file(target_text, "phrase", target_language=dialog.target_language)
+        if not audio_url:
+            continue
+        db_turn.audio_url = audio_url
+        db_turn.save(update_fields=["audio_url"])
+        turn_audio_by_index[turn_index] = audio_url
 
     return [
         {

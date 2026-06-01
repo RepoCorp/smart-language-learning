@@ -466,12 +466,14 @@ def save_dialog_turns(dialog: SavedDialog, turns: list[dict[str, str]]) -> list[
     for index, turn in enumerate(turns):
         source_text = str(turn.get("source_text", "")).strip()
         target_text = str(turn.get("target_text", "")).strip()
+        audio_url = create_audio_file(target_text, "phrase", target_language=dialog.target_language) if target_text else ""
         created_turns.append(
             DialogTurn.objects.create(
                 dialog=dialog,
                 turn_index=index,
                 source_text=source_text,
                 target_text=target_text,
+                audio_url=audio_url,
             )
         )
     return created_turns

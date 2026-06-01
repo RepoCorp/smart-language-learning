@@ -101,7 +101,7 @@ export interface ContentConfirmResponse {
   source_language?: StudyLanguageCode;
   target_language?: StudyLanguageCode;
   saved_dialog_id?: number;
-  saved_dialog_turns?: Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>;
+  saved_dialog_turns?: Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string }>;
   dialog_audio_url?: string;
   created_sentence_count?: number;
   existing_sentence_count?: number;

@@ -41,7 +41,7 @@ export default function ContentCreatePage(): JSX.Element {
   const [result, setResult] = useState<string>("");
   const [dialogAudioUrl, setDialogAudioUrl] = useState<string>("");
   const [savedDialogId, setSavedDialogId] = useState<number | null>(null);
-  const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>>([]);
+  const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string }>>([]);
   const [selectedPreviewTurnIndexes, setSelectedPreviewTurnIndexes] = useState<number[]>([]);
   const [phraseActionStatus, setPhraseActionStatus] = useState<Record<string, PhraseActionStatus>>({});
   const [phraseActionError, setPhraseActionError] = useState<Record<string, string>>({});
@@ -252,6 +252,14 @@ export default function ContentCreatePage(): JSX.Element {
     } finally {
       setSaving(false);
     }
+  };
+
+  const playAudioUrl = (audioUrl?: string): void => {
+    if (!audioUrl) {
+      return;
+    }
+    const audio = new Audio(audioUrl);
+    void audio.play().catch(() => undefined);
   };
 
   const requestAddWordFromDialogToken = async (
@@ -831,6 +839,15 @@ export default function ContentCreatePage(): JSX.Element {
                     <p className="conversation-line conversation-line-translation">
                       {renderTargetLineWithWordLinks(turn.target_text, turn.source_text, index)}
                     </p>
+                    {turn.phrase_audio_url && (
+                      <button
+                        type="button"
+                        className="turn-audio-button"
+                        onClick={() => playAudioUrl(turn.phrase_audio_url)}
+                      >
+                        {t("newItem.playTurnAudio")}
+                      </button>
+                    )}
                     <p className="conversation-line">{turn.source_text}</p>
                     <div className="actions turn-action-row">
                       {isSelectingPhraseForTurn(index) ? (

@@ -185,7 +185,14 @@ class ContentConfirmView(APIView):
                 "source_language": source_language,
                 "target_language": target_language,
                 "saved_dialog_id": saved_dialog.id,
-                "saved_dialog_turns": dialog_turns,
+                "saved_dialog_turns": [
+                    {
+                        **dialog_turns[turn.turn_index],
+                        "phrase_audio_url": turn.audio_url,
+                    }
+                    for turn in created_turns
+                    if turn.turn_index < len(dialog_turns)
+                ],
                 "dialog_audio_url": dialog_audio_url,
                 "created_sentence_count": created_sentence_count,
                 "existing_sentence_count": existing_sentence_count,
