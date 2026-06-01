@@ -1,5 +1,7 @@
 from .content import (
     ContentConfirmView,
+    ContentDialogDetailView,
+    ContentDialogTurnAudioView,
     ContentDialogsView,
     ContentItemDetailView,
     ContentItemExercisesView,
@@ -30,6 +32,8 @@ from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMe
 
 __all__ = [
     "ContentConfirmView",
+    "ContentDialogDetailView",
+    "ContentDialogTurnAudioView",
     "ContentDialogsView",
     "ContentItemDetailView",
     "ContentItemExercisesView",

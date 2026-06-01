@@ -2545,11 +2545,57 @@ def test_content_dialogs_endpoint_returns_saved_dialogs_for_language_pair():
     assert first_dialog["topic"] == "travel"
     assert first_dialog["context"] == "airport"
     assert first_dialog["audio_url"] == "http://localhost:8000/media/audio/dialog-1.wav"
+    assert first_dialog["turn_count"] == 2
+    assert first_dialog["turns"] == []
+    assert payload["has_more"] is False
+
+    response = client.get(f"/api/content/dialogs/{dialog_match.id}?source_language=spanish&target_language=german")
+
+    assert response.status_code == 200
+    first_dialog = response.json()
     assert len(first_dialog["turns"]) == 2
     assert first_dialog["turns"][0]["source_text"] == "Hola"
     assert first_dialog["turns"][0]["target_text"] == "Hallo"
     assert first_dialog["turns"][0]["phrase_audio_url"] == "http://localhost:8000/media/audio/hola.mp3"
     assert first_dialog["turns"][1]["phrase_audio_url"] == ""
+
+
+@pytest.mark.django_db
+def test_content_dialogs_endpoint_paginates_and_filters_by_topic():
+    for index in range(3):
+        SavedDialog.objects.create(
+            topic=f"travel {index}",
+            context="airport",
+            source_language="spanish",
+            target_language="german",
+        )
+    SavedDialog.objects.create(
+        topic="cooking",
+        context="kitchen",
+        source_language="spanish",
+        target_language="german",
+    )
+
+    client = APIClient()
+    response = client.get("/api/content/dialogs?source_language=spanish&target_language=german&topic=travel&page=1&page_size=2")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["dialogs"]) == 2
+    assert payload["page"] == 1
+    assert payload["page_size"] == 2
+    assert payload["has_more"] is True
+    assert payload["next_page"] == 2
+    assert all("travel" in dialog["topic"] for dialog in payload["dialogs"])
+
+    response = client.get("/api/content/dialogs?source_language=spanish&target_language=german&topic=travel&page=2&page_size=2")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["dialogs"]) == 1
+    assert payload["has_more"] is False
+    assert payload["next_page"] is None
+    assert payload["dialogs"][0]["topic"].startswith("travel")
 
 
 @pytest.mark.django_db

@@ -1506,21 +1506,6 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
             for item in phrase_items
         }
 
-    for turn in normalized_turns:
-        turn_index = turn["turn_index"]
-        if turn_audio_by_index.get(turn_index):
-            continue
-        db_turn = db_turns_by_index.get(turn_index)
-        target_text = str(turn["target_text"] or "").strip()
-        if not db_turn or not target_text:
-            continue
-        audio_url = create_audio_file(target_text, "phrase", target_language=dialog.target_language)
-        if not audio_url:
-            continue
-        db_turn.audio_url = audio_url
-        db_turn.save(update_fields=["audio_url"])
-        turn_audio_by_index[turn_index] = audio_url
-
     return [
         {
             "source_text": turn["source_text"],

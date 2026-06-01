@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { fetchContentDialogs, fetchContentItemDetail, quickAddWordFromDialog } from "../api";
+import { fetchContentDialogDetail, fetchContentDialogs, fetchContentItemDetail, generateContentDialogTurnAudio, quickAddWordFromDialog } from "../api";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentDialogRecord, SessionItem } from "../types";
@@ -26,16 +26,23 @@ type PlayingTurn = {
   turnIndex: number;
 };
 
+const DIALOGS_PAGE_SIZE = 20;
+
 export default function DialogsPage(): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const [dialogs, setDialogs] = useState<ContentDialogRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [nextPage, setNextPage] = useState<number | null>(null);
   const [error, setError] = useState<string>("");
+  const [topicFilter, setTopicFilter] = useState<string>("");
   const [playingAll, setPlayingAll] = useState<boolean>(false);
   const [playingDialogId, setPlayingDialogId] = useState<number | null>(null);
   const [playingTurn, setPlayingTurn] = useState<PlayingTurn | null>(null);
   const [expandedDialogId, setExpandedDialogId] = useState<number | null>(null);
+  const [loadingDialogId, setLoadingDialogId] = useState<number | null>(null);
+  const [loadingTurnAudioKey, setLoadingTurnAudioKey] = useState<string>("");
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, WordActionStatus>>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<PendingWordAdd | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
@@ -78,6 +85,36 @@ export default function DialogsPage(): JSX.Element {
       turnElement.scrollIntoView({ behavior: "smooth", block: "center" });
       turnElement.focus({ preventScroll: true });
     }, 0);
+  };
+
+  const ensureDialogDetail = async (dialogId: number): Promise<ContentDialogRecord | null> => {
+    const existing = dialogs.find((dialog) => dialog.dialog_id === dialogId);
+    if (existing?.turns?.length) {
+      return existing;
+    }
+    setLoadingDialogId(dialogId);
+    try {
+      const detail = await fetchContentDialogDetail(dialogId, sourceLanguage, targetLanguage);
+      setDialogs((current) => current.map((dialog) => (dialog.dialog_id === dialogId ? { ...dialog, ...detail } : dialog)));
+      return detail;
+    } catch {
+      setError(t("dialogs.error.load"));
+      return null;
+    } finally {
+      setLoadingDialogId((current) => (current === dialogId ? null : current));
+    }
+  };
+
+  const toggleDialogExpanded = async (dialogId: number): Promise<void> => {
+    if (expandedDialogId === dialogId) {
+      setExpandedDialogId(null);
+      return;
+    }
+    const detail = await ensureDialogDetail(dialogId);
+    if (!detail) {
+      return;
+    }
+    setExpandedDialogId(dialogId);
   };
 
   const handleDialogAudioPlay = (dialogId: number): void => {
@@ -144,14 +181,16 @@ export default function DialogsPage(): JSX.Element {
       setPendingWordAdd(null);
       stopCurrentPlayback();
       try {
-        const payload = await fetchContentDialogs(sourceLanguage, targetLanguage);
+        const payload = await fetchContentDialogs(sourceLanguage, targetLanguage, 1, DIALOGS_PAGE_SIZE, topicFilter);
         if (!active) {
           return;
         }
         setDialogs(payload.dialogs || []);
+        setNextPage(payload.has_more ? payload.next_page || 2 : null);
       } catch {
         if (active) {
           setDialogs([]);
+          setNextPage(null);
           setError(t("dialogs.error.load"));
         }
       } finally {
@@ -165,7 +204,24 @@ export default function DialogsPage(): JSX.Element {
       active = false;
       stopCurrentPlayback();
     };
-  }, [sourceLanguage, targetLanguage]);
+  }, [sourceLanguage, targetLanguage, topicFilter]);
+
+  const loadMoreDialogs = async (): Promise<void> => {
+    if (!nextPage || loadingMore) {
+      return;
+    }
+    setLoadingMore(true);
+    setError("");
+    try {
+      const payload = await fetchContentDialogs(sourceLanguage, targetLanguage, nextPage, DIALOGS_PAGE_SIZE, topicFilter);
+      setDialogs((current) => [...current, ...(payload.dialogs || [])]);
+      setNextPage(payload.has_more ? payload.next_page || nextPage + 1 : null);
+    } catch {
+      setError(t("dialogs.error.load"));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const requestAddWordFromDialogToken = async (
     key: string,
@@ -285,28 +341,84 @@ export default function DialogsPage(): JSX.Element {
       void audio.play().catch(() => done());
     });
 
+  const updateTurnAudioUrl = (dialogId: number, turnIndex: number, audioUrl: string): void => {
+    setDialogs((current) => current.map((dialog) => {
+      if (dialog.dialog_id !== dialogId) {
+        return dialog;
+      }
+      return {
+        ...dialog,
+        turns: dialog.turns.map((turn, index) => (
+          index === turnIndex ? { ...turn, phrase_audio_url: audioUrl } : turn
+        )),
+      };
+    }));
+  };
+
+  const ensureTurnAudioUrl = async (dialogId: number, turnIndex: number, currentAudioUrl = ""): Promise<string> => {
+    if (currentAudioUrl) {
+      return currentAudioUrl;
+    }
+    const key = `${dialogId}:${turnIndex}`;
+    setLoadingTurnAudioKey(key);
+    try {
+      const audioUrl = await generateContentDialogTurnAudio(dialogId, turnIndex, sourceLanguage, targetLanguage);
+      if (audioUrl) {
+        updateTurnAudioUrl(dialogId, turnIndex, audioUrl);
+      }
+      return audioUrl;
+    } catch {
+      setError(t("dialogs.error.load"));
+      return "";
+    } finally {
+      setLoadingTurnAudioKey((current) => (current === key ? "" : current));
+    }
+  };
+
+  const playTurn = async (dialogId: number, turnIndex: number, currentAudioUrl = ""): Promise<void> => {
+    stopCurrentPlayback();
+    const audioUrl = await ensureTurnAudioUrl(dialogId, turnIndex, currentAudioUrl);
+    if (!audioUrl) {
+      return;
+    }
+    playbackRunRef.current += 1;
+    const runId = playbackRunRef.current;
+    setPlayingDialogId(dialogId);
+    setPlayingTurn({ dialogId, turnIndex });
+    await playAudioUrl(audioUrl, runId);
+    if (runId === playbackRunRef.current) {
+      setPlayingDialogId(null);
+      setPlayingTurn(null);
+    }
+  };
+
   const dialogHasAllTurnAudio = (dialog: ContentDialogRecord): boolean =>
     Boolean(dialog.turns?.length) && dialog.turns.every((turn) => Boolean(turn.phrase_audio_url));
 
   const dialogIsPlayable = (dialog: ContentDialogRecord): boolean => Boolean(dialog.audio_url) || dialogHasAllTurnAudio(dialog);
 
   const playDialogWithFocusedTurns = async (dialog: ContentDialogRecord, runId: number): Promise<void> => {
-    setPlayingDialogId(dialog.dialog_id);
-    if (dialogHasAllTurnAudio(dialog)) {
-      for (let index = 0; index < dialog.turns.length; index += 1) {
+    const detailedDialog = await ensureDialogDetail(dialog.dialog_id);
+    if (!detailedDialog || runId !== playbackRunRef.current) {
+      return;
+    }
+    setPlayingDialogId(detailedDialog.dialog_id);
+    if (dialogHasAllTurnAudio(detailedDialog)) {
+      for (let index = 0; index < detailedDialog.turns.length; index += 1) {
         if (runId !== playbackRunRef.current) {
           break;
         }
-        setPlayingTurn({ dialogId: dialog.dialog_id, turnIndex: index });
-        focusDialogTurn(dialog.dialog_id, index);
-        await playAudioUrl(dialog.turns[index].phrase_audio_url || "", runId);
+        setPlayingTurn({ dialogId: detailedDialog.dialog_id, turnIndex: index });
+        focusDialogTurn(detailedDialog.dialog_id, index);
+        const audioUrl = await ensureTurnAudioUrl(detailedDialog.dialog_id, index, detailedDialog.turns[index].phrase_audio_url || "");
+        await playAudioUrl(audioUrl, runId);
       }
       return;
     }
 
     setPlayingTurn(null);
-    openAndFocusDialog(dialog.dialog_id);
-    await playAudioUrl(dialog.audio_url, runId);
+    openAndFocusDialog(detailedDialog.dialog_id);
+    await playAudioUrl(detailedDialog.audio_url, runId);
   };
 
   const playAllDialogs = async (): Promise<void> => {
@@ -345,6 +457,16 @@ export default function DialogsPage(): JSX.Element {
       <h1>{t("dialogs.title")}</h1>
       <p>{t("dialogs.description")}</p>
       <section className="card">
+        <label className="form-field">
+          <span>{t("dialogs.topicFilter")}</span>
+          <input
+            type="search"
+            value={topicFilter}
+            onChange={(event) => setTopicFilter(event.target.value)}
+            placeholder={t("dialogs.topicFilterPlaceholder")}
+            disabled={loading}
+          />
+        </label>
         <div className="actions">
           {!playingAll ? (
             <button type="button" onClick={() => void playAllDialogs()} disabled={loading || !hasPlayableDialogs}>
@@ -397,20 +519,23 @@ export default function DialogsPage(): JSX.Element {
                     ) : (
                       <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
                     )}
-                    {!!dialog.turns?.length && (
+                    {!!(dialog.turn_count || dialog.turns?.length) && (
                       <button
                         type="button"
                         className="secondary-button"
-                        onClick={() => setExpandedDialogId((current) => (current === dialog.dialog_id ? null : dialog.dialog_id))}
+                        onClick={() => void toggleDialogExpanded(dialog.dialog_id)}
+                        disabled={loadingDialogId === dialog.dialog_id}
                       >
-                        {expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
+                        {loadingDialogId === dialog.dialog_id
+                          ? t("dialogs.loading")
+                          : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
                       </button>
                     )}
                   </div>
                 </div>
-                {!!dialog.turns?.length && (
+                {!!(dialog.turn_count || dialog.turns?.length) && (
                   <>
-                    {expandedDialogId === dialog.dialog_id && (
+                    {expandedDialogId === dialog.dialog_id && !!dialog.turns?.length && (
                       <>
                         <p><strong>{t("newItem.dialogTurns")}:</strong></p>
                         <ul className="conversation-preview-list">
@@ -454,6 +579,14 @@ export default function DialogsPage(): JSX.Element {
                                       token,
                                     )}
                                   />
+                                  <button
+                                    type="button"
+                                    className="turn-audio-button"
+                                    onClick={() => void playTurn(dialog.dialog_id, index, turn.phrase_audio_url || "")}
+                                    disabled={loadingTurnAudioKey === `${dialog.dialog_id}:${index}`}
+                                  >
+                                    {loadingTurnAudioKey === `${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
+                                  </button>
                                 </div>
                                 <p className="conversation-line">{turn.source_text}</p>
                               </li>
@@ -472,6 +605,13 @@ export default function DialogsPage(): JSX.Element {
               </li>
             ))}
           </ul>
+          {nextPage && (
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={() => void loadMoreDialogs()} disabled={loadingMore}>
+                {loadingMore ? t("dialogs.loadingMore") : t("dialogs.loadMore")}
+              </button>
+            </div>
+          )}
         </section>
       )}
 

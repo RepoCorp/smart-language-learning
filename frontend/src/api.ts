@@ -1,5 +1,6 @@
 import type {
   ContentConfirmResponse,
+  ContentDialogRecord,
   ContentDialogsResponse,
   ContentItemsResponse,
   ContentItemDetailResponse,
@@ -354,16 +355,60 @@ export async function fetchContentItems(
 export async function fetchContentDialogs(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  page = 1,
+  pageSize = 20,
+  topic = "",
 ): Promise<ContentDialogsResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
+    page: String(page),
+    page_size: String(pageSize),
   });
+  if (topic.trim()) {
+    params.set("topic", topic.trim());
+  }
   const response = await apiFetch(`${API_BASE}/content/dialogs?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load saved dialogs");
   }
   return (await response.json()) as ContentDialogsResponse;
+}
+
+export async function fetchContentDialogDetail(
+  dialogId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentDialogRecord> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/dialogs/${dialogId}?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to load saved dialog");
+  }
+  return (await response.json()) as ContentDialogRecord;
+}
+
+export async function generateContentDialogTurnAudio(
+  dialogId: number,
+  turnIndex: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<string> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/dialogs/${dialogId}/turns/${turnIndex}/audio?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to generate dialog turn audio");
+  }
+  const payload = (await response.json()) as { audio_url?: string };
+  return payload.audio_url || "";
 }
 
 export async function fetchContentTopicContexts(

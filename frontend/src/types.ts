@@ -48,6 +48,7 @@ export interface SessionItem {
     context: string;
     audio_url: string;
     created_at: string;
+    turn_count?: number;
     turns: Array<{
       source_text: string;
       target_text: string;
@@ -117,6 +118,7 @@ export interface ContentDialogRecord {
   context: string;
   audio_url: string;
   created_at: string;
+  turn_count?: number;
   turns: Array<{
     source_text: string;
     target_text: string;
@@ -127,6 +129,10 @@ export interface ContentDialogRecord {
 
 export interface ContentDialogsResponse {
   dialogs: ContentDialogRecord[];
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
+  next_page?: number | null;
 }
 
 export interface ContentItemRecord {
