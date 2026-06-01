@@ -59,6 +59,7 @@ export default function ContentCreatePage(): JSX.Element {
     targetLine: string;
     clickedTargetToken: string;
     turnIndex: number;
+    note: string;
   } | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
@@ -328,6 +329,7 @@ export default function ContentCreatePage(): JSX.Element {
         targetLine,
         clickedTargetToken: targetToken,
         turnIndex,
+        note: check.notes || "",
       });
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
@@ -900,6 +902,9 @@ export default function ContentCreatePage(): JSX.Element {
             <p className="add-word-modal-type">
               <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
             </p>
+            {pendingWordAdd.note && (
+              <p className="hint">{t("newItem.wordAddNote", { note: pendingWordAdd.note })}</p>
+            )}
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>

@@ -18,6 +18,7 @@ type PendingWordAdd = {
   sourceLine: string;
   targetLine: string;
   clickedTargetToken: string;
+  note: string;
 };
 
 type PlayingTurn = {
@@ -218,6 +219,7 @@ export default function DialogsPage(): JSX.Element {
         sourceLine,
         targetLine,
         clickedTargetToken: targetToken,
+        note: check.notes || "",
       });
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
@@ -486,6 +488,9 @@ export default function DialogsPage(): JSX.Element {
             <p className="add-word-modal-type">
               <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
             </p>
+            {pendingWordAdd.note && (
+              <p className="hint">{t("newItem.wordAddNote", { note: pendingWordAdd.note })}</p>
+            )}
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>

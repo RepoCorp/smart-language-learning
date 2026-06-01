@@ -143,6 +143,7 @@ def generate_word_exercise_phrases_with_chatgpt(
     word_type: str = "",
     source_language: str = "spanish",
     target_language: str = "german",
+    target_contexts: list[str] | None = None,
 ) -> dict:
     return _words.generate_word_exercise_phrases_with_chatgpt(
         spanish_word,
@@ -151,6 +152,7 @@ def generate_word_exercise_phrases_with_chatgpt(
         word_type=word_type,
         source_language=source_language,
         target_language=target_language,
+        target_contexts=target_contexts,
         call_openai_json_fn=call_openai_json,
     )
 
@@ -162,6 +164,7 @@ def generate_funny_image_exercise_phrase_with_chatgpt(
     word_type: str = "",
     source_language: str = "spanish",
     target_language: str = "german",
+    target_contexts: list[str] | None = None,
 ) -> dict:
     return _words.generate_funny_image_exercise_phrase_with_chatgpt(
         source_word,
@@ -170,6 +173,7 @@ def generate_funny_image_exercise_phrase_with_chatgpt(
         word_type=word_type,
         source_language=source_language,
         target_language=target_language,
+        target_contexts=target_contexts,
         call_openai_json_fn=call_openai_json,
     )
 

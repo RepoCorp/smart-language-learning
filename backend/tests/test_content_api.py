@@ -2606,9 +2606,11 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
     from learning.views.content import generation_words
 
     captured_prompts = []
+    captured_inputs = []
 
     def fake_call_openai_json(prompt, user_input, **kwargs):
         captured_prompts.append(prompt)
+        captured_inputs.append(user_input)
         return {
             "phrases": [
                 {"label": "singular", "source_text": "La mesa.", "target_text": "Der Tisch."},
@@ -2619,6 +2621,7 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
         "la mesa",
         "der Tisch",
         word_type="noun",
+        target_contexts=["Der Tisch steht am Fenster.", "Der Tisch ist zu laut."],
         call_openai_json_fn=fake_call_openai_json,
     )
     generation_words.generate_word_exercise_phrases_with_chatgpt(
@@ -2637,12 +2640,18 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
     assert "Generate noun exercise phrases" in captured_prompts[0]
     assert "Generate helper-word exercise phrases" in captured_prompts[1]
     assert "Generate exercise phrases for one vocabulary item" in captured_prompts[2]
+    assert "la mesa" not in captured_inputs[0]
+    assert "der Tisch" in captured_inputs[0]
+    assert "Target-language word/context: der Tisch" in captured_inputs[0]
+    assert "Der Tisch steht am Fenster." in captured_inputs[0]
+    assert "Der Tisch ist zu laut." not in captured_inputs[0]
 
 
 def test_funny_image_generation_uses_prompt_for_word_type():
     from learning.views.content import generation_words
 
     captured_prompts = []
+    captured_inputs = []
     expected_instructions = {
         "noun": [
             "grammatical subject of the sentence",
@@ -2656,6 +2665,7 @@ def test_funny_image_generation_uses_prompt_for_word_type():
 
     def fake_call_openai_json(prompt, user_input, **kwargs):
         captured_prompts.append(prompt)
+        captured_inputs.append(user_input)
         return {
             "source_text": "La mesa lleva un sombrero.",
             "target_text": "Der Tisch tragt einen Hut.",
@@ -2666,6 +2676,7 @@ def test_funny_image_generation_uses_prompt_for_word_type():
             "la mesa",
             "der Tisch",
             word_type=word_type,
+            target_contexts=["Der Tisch steht am Fenster.", "Der Tisch ist zu laut."],
             call_openai_json_fn=fake_call_openai_json,
         )
     generation_words.generate_funny_image_exercise_phrase_with_chatgpt(
@@ -2681,6 +2692,11 @@ def test_funny_image_generation_uses_prompt_for_word_type():
     for snippets in expected_instructions.values():
         for snippet in snippets:
             assert snippet not in captured_prompts[-1]
+    assert "la mesa" not in captured_inputs[0]
+    assert "der Tisch" in captured_inputs[0]
+    assert "Target-language word/context: der Tisch" in captured_inputs[0]
+    assert "Der Tisch steht am Fenster." in captured_inputs[0]
+    assert "Der Tisch ist zu laut." not in captured_inputs[0]
 
 
 def test_verb_exercise_generation_requests_each_tense_separately():

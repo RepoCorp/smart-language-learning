@@ -17,4 +17,5 @@ Rules:
 - The target word must appear in each target_text line exactly as presented in the input (no inflection, no article/case/ending change).
 - Keep source_text and target_text equivalent in meaning.
 - Use the language mapping provided by the user input.
+- If a target-language context example is provided, use it only to infer the intended meaning of the target word.
 - Return JSON only, no markdown and no extra text.

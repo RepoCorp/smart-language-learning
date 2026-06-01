@@ -25,6 +25,7 @@ STUDY_LANGUAGE_LABELS = {
 }
 MAX_EXERCISE_WORDS_PER_PHRASE = 8
 MAX_EXERCISE_PHRASES = 30
+MAX_TARGET_CONTEXTS = 1
 VERB_BY_TENSE_GENERATION_MODE = "verb_by_tense_v1"
 VOCAB_ENTRY_ARTICLES = {
     "der",
@@ -137,12 +138,16 @@ def _exercise_generation_input(
     word_type: str,
     source_language: str,
     target_language: str,
+    target_contexts: list[str] | None = None,
 ) -> str:
+    del spanish_word, notes
+    context_lines = _target_context_lines(target_contexts or [])
     return (
-        f"Word source_text ({_language_label(source_language)}): {spanish_word}\n"
-        f"Word target_text ({_language_label(target_language)}): {german_word}\n"
+        f"Output source_text language: {_language_label(source_language)}\n"
+        f"Target language: {_language_label(target_language)}\n"
+        f"Target-language word/context: {german_word}\n"
+        f"{context_lines}"
         f"Word type: {word_type or 'unknown'}\n"
-        f"Optional notes: {notes}\n"
         f"Language mapping: source_text={_language_label(source_language)}, target_text={_language_label(target_language)}"
     )
 
@@ -155,14 +160,38 @@ def _funny_image_phrase_input(
     word_type: str,
     source_language: str,
     target_language: str,
+    target_contexts: list[str] | None = None,
 ) -> str:
+    del source_word, notes
+    context_lines = _target_context_lines(target_contexts or [])
     return (
-        f"Word source_text ({_language_label(source_language)}): {source_word}\n"
-        f"Word target_text ({_language_label(target_language)}): {target_word}\n"
+        f"Output source_text language: {_language_label(source_language)}\n"
+        f"Target language: {_language_label(target_language)}\n"
+        f"Target-language word/context: {target_word}\n"
+        f"{context_lines}"
         f"Word type: {word_type or 'unknown'}\n"
-        f"Optional notes: {notes}\n"
         f"Language mapping: source_text={_language_label(source_language)}, target_text={_language_label(target_language)}"
     )
+
+
+def _target_context_lines(target_contexts: list[str]) -> str:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for context in target_contexts:
+        value = " ".join(str(context or "").split()).strip()
+        if not value:
+            continue
+        key = value.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(value)
+        if len(cleaned) >= MAX_TARGET_CONTEXTS:
+            break
+    if not cleaned:
+        return ""
+    lines = "\n".join(f"- {context}" for context in cleaned[:MAX_TARGET_CONTEXTS])
+    return f"Target-language context example:\n{lines}\n"
 
 
 def _funny_image_prompt_for_word_type(word_type: str) -> str:
@@ -183,6 +212,7 @@ Rules:
 - target_text must be in the target language.
 - source_text must be the natural translation in the source language.
 - The phrase must center around the target word.
+- If a target-language context example is provided, use it only to infer the intended meaning of the target word.
 - The target word must play the central visual role in the scene.{word_type_instructions}
 - Use very simple vocabulary and grammar.
 - The phrase must describe ONE concrete visual scene that can be illustrated instantly.
@@ -206,6 +236,7 @@ def generate_funny_image_exercise_phrase_with_chatgpt(
     word_type: str = "",
     source_language: str = "spanish",
     target_language: str = "german",
+    target_contexts: list[str] | None = None,
     *,
     call_openai_json_fn,
 ) -> dict:
@@ -218,6 +249,7 @@ def generate_funny_image_exercise_phrase_with_chatgpt(
             word_type=word_type,
             source_language=source_language,
             target_language=target_language,
+            target_contexts=target_contexts,
         ),
         timeout_seconds=12,
         temperature=0.9,
@@ -294,6 +326,7 @@ Rules:
 - Besides the target verb, necessary auxiliaries, and the shared context, use only very basic high-frequency words.
 - Keep source_text and target_text equivalent in meaning.
 - Use the language mapping provided by the user input.
+- If a target-language context example is provided, use it only to infer the intended meaning of the target word.
 - Return JSON only, no markdown and no extra text.
 """.strip()
 
@@ -340,6 +373,7 @@ def generate_word_exercise_phrases_with_chatgpt(
     word_type: str = "",
     source_language: str = "spanish",
     target_language: str = "german",
+    target_contexts: list[str] | None = None,
     *,
     call_openai_json_fn,
 ) -> dict:
@@ -350,6 +384,7 @@ def generate_word_exercise_phrases_with_chatgpt(
         word_type=word_type,
         source_language=source_language,
         target_language=target_language,
+        target_contexts=target_contexts,
     )
     if (word_type or "").strip().lower() == "verb":
         phrases = _generate_verb_exercise_phrases_by_tense(

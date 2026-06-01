@@ -92,6 +92,7 @@ export default function ConversationPage(): JSX.Element {
     sourceLine: string;
     targetLine: string;
     clickedTargetToken: string;
+    note: string;
   } | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
@@ -651,6 +652,7 @@ export default function ConversationPage(): JSX.Element {
         sourceLine: sourceText,
         targetLine: targetText,
         clickedTargetToken: targetToken,
+        note: check.notes || "",
       });
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
@@ -1152,6 +1154,9 @@ export default function ConversationPage(): JSX.Element {
             <p className="add-word-modal-type">
               <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
             </p>
+            {pendingWordAdd.note && (
+              <p className="hint">{t("newItem.wordAddNote", { note: pendingWordAdd.note })}</p>
+            )}
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button

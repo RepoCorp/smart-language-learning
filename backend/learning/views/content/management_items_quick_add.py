@@ -115,6 +115,12 @@ def _find_existing_word_item(
     return existing
 
 
+def _unpack_word_resolution(value) -> tuple[str, str, str, str]:
+    source_text, target_text, word_type, *rest = value
+    note = str(rest[0] if rest else "").strip()
+    return source_text, target_text, word_type, note
+
+
 class ContentWordQuickAddView(APIView):
     def post(self, request: Request) -> Response:
         user = get_request_user(request)
@@ -137,17 +143,19 @@ class ContentWordQuickAddView(APIView):
             return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            source_text, target_text, word_type = _resolve_dialog_click_word_pair(
-                user=user,
-                source_text=source_text,
-                target_text=target_text,
-                source_language=source_language,
-                target_language=target_language,
-                dialog_id_raw=dialog_id_raw,
-                turn_index_raw=turn_index_raw,
-                source_line=source_line,
-                target_line=target_line,
-                clicked_target_token=clicked_target_token,
+            source_text, target_text, word_type, model_note = _unpack_word_resolution(
+                _resolve_dialog_click_word_pair(
+                    user=user,
+                    source_text=source_text,
+                    target_text=target_text,
+                    source_language=source_language,
+                    target_language=target_language,
+                    dialog_id_raw=dialog_id_raw,
+                    turn_index_raw=turn_index_raw,
+                    source_line=source_line,
+                    target_line=target_line,
+                    clicked_target_token=clicked_target_token,
+                )
             )
             source_text, target_text, word_type = _normalize_word_metadata(
                 source_text=source_text,
@@ -158,7 +166,7 @@ class ContentWordQuickAddView(APIView):
                 source_line=source_line,
                 target_line=target_line,
             )
-        except RuntimeError:
+        except (RuntimeError, TypeError, ValueError):
             return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         source_text, target_text = normalize_word_pair_for_item_save(
             spanish_text=source_text,
@@ -166,6 +174,7 @@ class ContentWordQuickAddView(APIView):
             source_language=source_language,
             target_language=target_language,
         )
+        final_notes = model_note or notes
 
         existing = _find_existing_word_item(
             user=user,
@@ -193,6 +202,7 @@ class ContentWordQuickAddView(APIView):
                         "source_text": source_text,
                         "target_text": target_text,
                         "word_type": response_word_type,
+                        "notes": existing.notes or final_notes,
                     }
                 )
             _ensure_audio_for_dialog_turn(
@@ -208,6 +218,7 @@ class ContentWordQuickAddView(APIView):
                     "source_text": source_text,
                     "target_text": target_text,
                     "word_type": response_word_type,
+                    "notes": existing.notes or final_notes,
                 }
             )
 
@@ -220,6 +231,7 @@ class ContentWordQuickAddView(APIView):
                     "source_text": source_text,
                     "target_text": target_text,
                     "word_type": word_type,
+                    "notes": final_notes,
                 }
             )
 
@@ -227,7 +239,7 @@ class ContentWordQuickAddView(APIView):
             spanish_text=source_text,
             german_text=target_text,
             exists=False,
-            notes=notes,
+            notes=final_notes,
             word_type=word_type,
         )
         created = create_word_if_missing(
@@ -268,6 +280,7 @@ class ContentWordQuickAddView(APIView):
                     "source_text": source_text,
                     "target_text": target_text,
                     "word_type": existing.word_type,
+                    "notes": existing.notes or final_notes,
                 }
             )
 
@@ -290,6 +303,7 @@ class ContentWordQuickAddView(APIView):
                 "source_text": created.spanish_text,
                 "target_text": created.german_text,
                 "word_type": created.word_type,
+                "notes": created.notes,
                 "audio_url": created.audio_url,
             },
             status=status.HTTP_201_CREATED,

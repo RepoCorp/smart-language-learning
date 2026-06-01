@@ -99,50 +99,71 @@ def _resolve_dialog_click_word_pair(
     source_line: str = "",
     target_line: str = "",
     clicked_target_token: str = "",
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, str]:
+    target_context = ""
     try:
         dialog_id = int(dialog_id_raw)
         turn_index = int(turn_index_raw)
     except (TypeError, ValueError):
-        raise RuntimeError("Dialog word resolution missing dialog turn") from None
-    dialog = apply_user_scope(SavedDialog.objects, user).filter(
-        id=dialog_id,
-        source_language=source_language,
-        target_language=target_language,
-    ).first()
-    turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
-    if not dialog or not turn:
-        raise RuntimeError("Dialog word resolution missing dialog turn")
+        dialog_id = None
+        turn_index = None
+    if dialog_id is not None and turn_index is not None:
+        dialog = apply_user_scope(SavedDialog.objects, user).filter(
+            id=dialog_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        turn = DialogTurn.objects.filter(dialog_id=dialog_id, turn_index=turn_index).first()
+        if not dialog or not turn:
+            raise RuntimeError("Dialog word resolution missing dialog turn")
+        target_context = str(turn.target_text or "").strip()
+    if not target_context:
+        target_context = target_line.strip()
+    clicked_word = (clicked_target_token or target_text).strip()
+    if not clicked_word or not target_context:
+        raise RuntimeError("Dialog word resolution missing target context")
     parsed = _call_openai_json_logged(
         label="resolve_dialog_click_word_metadata",
         system_prompt="""
-Resolve a clicked word translation and word type in context for a language-learning dialog turn.
+Resolve a clicked target-language word translation and word type in context.
 
 Return strict JSON:
 {
   "source_text": "string",
   "target_text": "string",
-  "word_type": "noun|verb|adjective|adverb|helper|expression|other"
+  "word_type": "noun|verb|adjective|adverb|helper|expression|other",
+  "note": "string"
 }
 
 Rules:
-- Keep target_text aligned to the clicked token meaning.
-- source_text must be the best source-language translation in THIS turn context.
-- Use the full target line context to choose word_type.
+- Use only the clicked target word and the target-language line context to identify the selected word's meaning and word_type.
+- First decide whether translating the clicked word alone would be misleading in THIS context.
+- Expand beyond the clicked word only when the clicked word's standalone translation would be wrong or misleading.
+- If expansion is necessary because the meaning comes from a fixed expression, separable verb, idiom, collocation, grammatical construction, or multi-word unit, return the smallest reusable expression that carries the meaning.
+- The expression must be reusable as a study item. Prefer dictionary-style placeholders like "etwas" or "jemanden" over copying concrete sentence words.
+- Never return the full sentence unless the full sentence itself is a fixed expression.
+- Do not expand just to include articles, possessives, adjectives, objects, or nearby context when the clicked word has a clear standalone meaning.
+- For a clicked noun with a clear standalone meaning, return the noun itself here. Do not return a noun phrase like "sein Freund" unless the entire phrase has a non-literal expression meaning.
+- Never guess a standalone translation if it would be misleading. Prefer returning a larger expression only when necessary.
+- For expressions, target_text must be the target-language expression, source_text must be the translation of that expression, word_type must be "expression", and note must briefly explain why the clicked word alone is insufficient.
+- If the clicked word works as a standalone study item in THIS context, return that standalone unit and use an empty note.
 - Classify modal verbs, auxiliary verbs, and grammar-building forms as "helper" only when they are used that way in this target line.
 - For modal, auxiliary, conditional, future, or tense-building helper words, return only the helper word translation unit.
 - Use context to disambiguate meaning, but return a clean translation unit of the word itself (no extra explanation).
 - Do not normalize inflection, case, number, or article here unless it is already required to identify the clicked word's contextual meaning.
+- Do not decompose compound or derived words into a smaller root when that changes the meaning.
+- Example: clicked "großartig" means "excelente/estupendo"; do not return "groß" or "grande".
 - Do not return a full sentence or clause.
+- Example: in "Was hältst du von der neuen Serie?", clicked "hältst" should become target_text "von etwas halten", source_text like "opinar sobre algo", word_type "expression", because "halten" alone would be misleading.
+- Example: in "Ich halte das Buch in der Hand.", clicked "halte" can become target_text "halten", source_text like "sostener", word_type "verb", because it is a normal standalone verb meaning.
+- Example: in "Mir gefällt mehr sein Freund.", clicked "Freund" should become target_text "Freund", source_text like "amigo", word_type "noun", not "sein Freund".
 - JSON only.
 """.strip(),
         user_input=(
             f"Source language: {_language_display_name(source_language)}\n"
             f"Target language: {_language_display_name(target_language)}\n"
-            f"Dialog topic: {dialog.topic}\n"
-            f"Dialog context: {dialog.context}\n"
-            f"Full target line: {turn.target_text}\n"
-            f"Clicked target token: {target_text}\n"
+            f"Clicked target word: {clicked_word}\n"
+            f"Target-language line context: {target_context}\n"
         ),
         timeout_seconds=6,
         temperature=0.0,
@@ -154,9 +175,10 @@ Rules:
     resolved_source = str(parsed.get("source_text", "")).strip()
     resolved_target = str(parsed.get("target_text", "")).strip()
     word_type = normalize_word_type(str(parsed.get("word_type", "")))
+    note = str(parsed.get("note", "")).strip()
     if not resolved_source or not resolved_target or not word_type:
         raise RuntimeError("Dialog word resolution returned incomplete data")
-    return resolved_source, resolved_target, word_type
+    return resolved_source, resolved_target, word_type, note
 
 
 def _line_tokens(value: str) -> list[str]:
@@ -1174,10 +1196,14 @@ def _basic_word_metadata(
 ) -> tuple[str, str, str]:
     source_name = _language_display_name(source_language)
     target_name = _language_display_name(target_language)
+    target_context = target_line.strip()
+    clicked_word = target_text.strip()
+    if not clicked_word:
+        raise RuntimeError("Word metadata generation returned incomplete data")
     parsed = _call_openai_json_logged(
         label="contextual_word_metadata",
         system_prompt=f"""
-Given a target-language phrase and a clicked word, return the clicked word's contextual translation and word type.
+Given a clicked target-language word and target-language context, return the clicked word's contextual translation and word type.
 
 Return strict JSON:
 {{
@@ -1187,23 +1213,34 @@ Return strict JSON:
 }}
 
 Rules:
-- Use the target phrase context to identify the clicked word's actual meaning and word_type.
-- source_text must be the best source-language translation of that clicked word in this context.
-- target_text must be the target-language clicked word or clean contextual word unit.
+- Use only the clicked target word and target-language context to identify the clicked word's actual meaning and word_type.
+- First decide whether translating the clicked word alone would be misleading in THIS context.
+- Expand beyond the clicked word only when the clicked word's standalone translation would be wrong or misleading.
+- If expansion is necessary because the meaning comes from a fixed expression, separable verb, idiom, collocation, grammatical construction, or multi-word unit, return the smallest reusable expression that carries the meaning.
+- The expression must be reusable as a study item. Prefer dictionary-style placeholders like "etwas" or "jemanden" over copying concrete sentence words.
+- Never return the full sentence unless the full sentence itself is a fixed expression.
+- Do not expand just to include articles, possessives, adjectives, objects, or nearby context when the clicked word has a clear standalone meaning.
+- For a clicked noun with a clear standalone meaning, return the noun itself here. Do not return a noun phrase like "sein Freund" unless the entire phrase has a non-literal expression meaning.
+- Never guess a standalone translation if it would be misleading. Prefer returning a larger expression only when necessary.
+- For expressions, target_text must be the target-language expression, source_text must be the translation of that expression, and word_type must be "expression".
+- If the clicked word works as a standalone study item in THIS context, return that standalone unit.
 - Do not normalize inflection, case, number, or article in this step.
+- Do not decompose compound or derived words into a smaller root when that changes the meaning.
+- Example: clicked "großartig" means "excelente/estupendo"; do not return "groß" or "grande".
 - Use type "helper" for modal verbs, auxiliary verbs, and grammar-helper forms only when the phrase uses them that way.
 - If a word can be both a normal verb and a helper, use the phrase context to choose one type.
 - Use type "expression" only for multi-word expressions or meanings that cannot be understood word-by-word.
 - Do not return a whole sentence or clause.
+- Example: in "Was hältst du von der neuen Serie?", clicked "hältst" should become target_text "von etwas halten", source_text like "opinar sobre algo", word_type "expression".
+- Example: in "Ich halte das Buch in der Hand.", clicked "halte" can become target_text "halten", source_text like "sostener", word_type "verb".
+- Example: in "Mir gefällt mehr sein Freund.", clicked "Freund" should become target_text "Freund", source_text like "amigo", word_type "noun", not "sein Freund".
 - JSON only.
 """.strip(),
         user_input=(
             f"Source language: {source_name}\n"
             f"Target language: {target_name}\n"
-            f"Source text: {source_text}\n"
-            f"Target text: {target_text}\n"
-            f"Source sentence context: {source_line}\n"
-            f"Target sentence context: {target_line}\n"
+            f"Clicked target word: {clicked_word}\n"
+            f"Target-language line context: {target_context}\n"
         ),
         timeout_seconds=8,
         temperature=0.1,
@@ -1256,6 +1293,9 @@ def _normalization_rules_for_word_type(word_type: str, *, source_name: str, targ
         return """
 - Return the base adjective form in both languages.
 - Do not include noun endings caused by gender, case, or number.
+- Only remove inflectional endings. Do not split, shorten, or reduce compound/derived adjectives into a different root word.
+- Preserve the whole adjective when the whole word has its own meaning.
+- Example: "großartige" can normalize to "großartig", but "großartig" must not normalize to "groß"; "großartig" means excellent/great, not simply big.
 - Do not include a whole noun phrase.
 """.strip()
     if word_type == "adverb":
@@ -1267,6 +1307,11 @@ def _normalization_rules_for_word_type(word_type: str, *, source_name: str, targ
         return """
 - Return the shortest stable expression that carries the contextual meaning.
 - Keep the expression in both languages, but do not return a full sentence unless the expression itself is a sentence-level idiom.
+- If the selected target text is only one word but the target-language context shows it belongs to a fixed expression, separable verb, idiom, collocation, grammatical construction, or multi-word unit, expand target_text to the smallest reusable expression that carries that meaning.
+- Prefer dictionary-style placeholders like "etwas" or "jemanden" over copying concrete sentence words.
+- Do not include the full sentence unless the full sentence itself is a fixed expression.
+- Do not include articles, possessives, adjectives, objects, or nearby context unless they are part of the expression's non-literal meaning.
+- Return the translation of the whole expression, not a standalone translation of the clicked word.
 """.strip()
     if word_type == "other":
         return """
@@ -1291,6 +1336,7 @@ def _normalize_word_metadata(
     word_type = normalize_word_type(word_type)
     if not source_text.strip() or not target_text.strip() or not word_type:
         raise RuntimeError("Word metadata generation returned incomplete data")
+    target_context = target_line.strip()
     parsed = _call_openai_json_logged(
         label=f"normalize_word_metadata_{word_type}",
         system_prompt=f"""
@@ -1309,7 +1355,8 @@ Rules for this {word_type}:
 
 General rules:
 - Avoid duplicate study items caused by conjugation, plural forms, case variations, or grammatical variants.
-- Use context only to normalize the already-selected word, not to choose a new meaning.
+- Use only the selected target text and target-language context to normalize the already-selected word, not to choose a new meaning.
+- source_text must be the best source-language translation of the normalized target study entry.
 - Do not return markdown, numbering, quotes, explanations, or extra fields.
 - JSON only.
 """.strip(),
@@ -1317,10 +1364,8 @@ General rules:
             f"Source language: {source_name}\n"
             f"Target language: {target_name}\n"
             f"Word type: {word_type}\n"
-            f"Contextual source text: {source_text}\n"
-            f"Contextual target text: {target_text}\n"
-            f"Source sentence context: {source_line}\n"
-            f"Target sentence context: {target_line}\n"
+            f"Selected target text: {target_text}\n"
+            f"Target-language line context: {target_context}\n"
         ),
         timeout_seconds=8,
         temperature=0.0,
@@ -1333,12 +1378,27 @@ General rules:
     normalized_target = str(parsed.get("target_text", "")).strip()
     if not normalized_source or not normalized_target:
         raise RuntimeError("Word metadata generation returned incomplete data")
+    if word_type == "adjective" and _is_over_reduced_adjective(normalized_target, target_text):
+        normalized_source = source_text
+        normalized_target = target_text
     if word_type == "helper":
         if len(normalized_target.split()) != 1:
             raise RuntimeError("Word metadata generation returned invalid helper data")
         if source_language != target_language and _normalize_text(normalized_source) == _normalize_text(normalized_target):
             raise RuntimeError("Word metadata generation returned invalid helper translation")
     return normalized_source[:255], normalized_target[:255], word_type
+
+
+def _is_over_reduced_adjective(normalized_target: str, original_target: str) -> bool:
+    normalized = _normalize_text(normalized_target)
+    original = _normalize_text(original_target)
+    if not normalized or not original or normalized == original:
+        return False
+    if " " in normalized or " " in original:
+        return False
+    if not original.startswith(normalized):
+        return False
+    return len(original) - len(normalized) > 3
 
 
 def _related_dialogs_by_item_ids(item_ids: list[int], *, user, per_item_limit: int = 8) -> dict[int, list[dict]]:

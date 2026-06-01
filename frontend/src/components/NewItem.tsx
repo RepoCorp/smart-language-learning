@@ -27,6 +27,7 @@ interface NewItemProps {
 
 const MAX_EXERCISE_ENTRIES = 30;
 const VERB_BY_TENSE_GENERATION_MODE = "verb_by_tense_v1";
+const EXERCISE_PHRASE_PAUSE_MS = 650;
 const VERB_TENSES = [
   { key: "present", label: "Present" },
   { key: "perfect", label: "Perfect" },
@@ -209,6 +210,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     wordType: string;
     dialogId?: number;
     turnIndex?: number;
+    sourceLine: string;
+    targetLine: string;
+    clickedTargetToken: string;
+    note: string;
   } | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
@@ -538,6 +543,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         wordType: resolvedWordType,
         dialogId,
         turnIndex,
+        sourceLine: sourceContextLine,
+        targetLine: targetContextLine,
+        clickedTargetToken: targetToken,
+        note: check.notes || "",
       });
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
@@ -600,11 +609,22 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
 
-    const { key, source, target, dialogId, turnIndex } = pendingWordAdd;
+    const { key, source, target, dialogId, turnIndex, sourceLine, targetLine, clickedTargetToken } = pendingWordAdd;
     setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
     setAddingWord(true);
     try {
-      const result = await quickAddWordFromDialog(source, target, sourceLanguage, targetLanguage, dialogId, turnIndex);
+      const result = await quickAddWordFromDialog(
+        source,
+        target,
+        sourceLanguage,
+        targetLanguage,
+        dialogId,
+        turnIndex,
+        false,
+        sourceLine,
+        targetLine,
+        clickedTargetToken,
+      );
       setWordActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
       if (result.id) {
         setLoadingLinkedWord(true);
@@ -960,8 +980,16 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     }
   };
 
+  const pauseBetweenExercisePhrases = async (runId: number): Promise<void> => {
+    if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
+      return;
+    }
+    await new Promise<void>((resolve) => window.setTimeout(resolve, EXERCISE_PHRASE_PAUSE_MS));
+  };
+
   const playAudioSourcesOnce = async (sources: string[], runId: number): Promise<void> => {
-    for (const source of sources) {
+    for (let index = 0; index < sources.length; index += 1) {
+      const source = sources[index];
       if (!source || exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
         continue;
       }
@@ -1002,7 +1030,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     const lang = speechLangByCode[targetLanguage] || "de-DE";
     const langPrefix = lang.split("-")[0];
     utterance.lang = lang;
-    utterance.rate = 0.9;
+    utterance.rate = 0.65;
 
     const matchingVoices = window.speechSynthesis
       .getVoices()
@@ -1025,7 +1053,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     window.speechSynthesis.cancel();
-    for (const line of lines) {
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
       if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
         return;
       }
@@ -1054,11 +1083,14 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
           }
         }, 50);
         utterance.lang = speechLangByCode[targetLanguage] || "de-DE";
-        utterance.rate = 0.75;
+        utterance.rate = 0.48;
         utterance.onend = finish;
         utterance.onerror = finish;
         window.speechSynthesis.speak(utterance);
       });
+      if (index < lines.length - 1) {
+        await pauseBetweenExercisePhrases(runId);
+      }
     }
   };
 
@@ -1851,6 +1883,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             <p className="add-word-modal-type">
               <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
             </p>
+            {pendingWordAdd.note && (
+              <p className="hint">{t("newItem.wordAddNote", { note: pendingWordAdd.note })}</p>
+            )}
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>

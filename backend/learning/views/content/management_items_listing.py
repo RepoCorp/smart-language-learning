@@ -343,6 +343,12 @@ class ContentItemRefreshWordView(APIView):
                 item.word_type = resolved_word_type
                 word_type_added = True
 
+        dialog_occurrences_created = _scan_all_dialogs_for_word(
+            user=user,
+            item=item,
+            source_language=source_language,
+            target_language=target_language,
+        )
         generated = generate_word_exercise_phrases_with_chatgpt(
             item.spanish_text,
             item.german_text,
@@ -350,6 +356,7 @@ class ContentItemRefreshWordView(APIView):
             word_type=item.word_type or "",
             source_language=source_language,
             target_language=target_language,
+            target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
         )
         cleaned = _sanitize_exercise_payload(generated)
         if not cleaned["phrases"]:
@@ -363,12 +370,6 @@ class ContentItemRefreshWordView(APIView):
             update_fields.extend(["spanish_text", "german_text"])
         item.save(update_fields=update_fields)
 
-        dialog_occurrences_created = _scan_all_dialogs_for_word(
-            user=user,
-            item=item,
-            source_language=source_language,
-            target_language=target_language,
-        )
         related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
         return Response(
             {
@@ -425,6 +426,29 @@ def _scan_all_dialogs_for_word(
             target_language=target_language,
         )
     return created
+
+
+def _target_contexts_for_word_exercises(*, user, item: Item, limit: int = 1) -> list[str]:
+    occurrences = (
+        apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
+        .filter(item=item)
+        .select_related("turn")
+        .order_by("-match_score", "created_at", "id")
+    )
+    contexts: list[str] = []
+    seen: set[str] = set()
+    for occurrence in occurrences:
+        target_text = _normalize_spacing(occurrence.turn.target_text)
+        if not target_text:
+            continue
+        key = target_text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        contexts.append(target_text)
+        if len(contexts) >= limit:
+            break
+    return contexts
 
 
 def _sanitize_exercise_entries(value) -> list[dict[str, str]]:
@@ -608,6 +632,12 @@ class ContentItemExercisesView(APIView):
         if item.item_type != Item.ItemType.WORD:
             return Response({"detail": "Exercises are only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
 
+        _scan_all_dialogs_for_word(
+            user=user,
+            item=item,
+            source_language=source_language,
+            target_language=target_language,
+        )
         generated = generate_word_exercise_phrases_with_chatgpt(
             item.spanish_text,
             item.german_text,
@@ -615,6 +645,7 @@ class ContentItemExercisesView(APIView):
             word_type=item.word_type or "",
             source_language=source_language,
             target_language=target_language,
+            target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
         )
         cleaned = _sanitize_exercise_payload(generated)
         if not cleaned["phrases"]:
@@ -639,6 +670,12 @@ class ContentItemFunnyImageExerciseView(APIView):
         if item.item_type != Item.ItemType.WORD:
             return Response({"detail": "Image exercises are only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
 
+        _scan_all_dialogs_for_word(
+            user=user,
+            item=item,
+            source_language=source_language,
+            target_language=target_language,
+        )
         phrase = generate_funny_image_exercise_phrase_with_chatgpt(
             item.spanish_text,
             item.german_text,
@@ -646,6 +683,7 @@ class ContentItemFunnyImageExerciseView(APIView):
             word_type=item.word_type or "",
             source_language=source_language,
             target_language=target_language,
+            target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
         )
         if not phrase:
             return Response({"detail": "Funny image phrase generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
