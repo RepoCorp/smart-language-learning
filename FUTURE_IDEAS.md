@@ -1,5 +1,29 @@
 # Todos
 
+Que el randomness sea sudo y sea simpre lo mismo para la misma palabra en todo contexto
+Que al ir colocando las palabras en los bloques diga la palabra sintetizada 
+Buscar AI que arregle CSS
+Que el ejercicio aleman-español palabra la palabra sale en aleman y seleccion de varias frases en español de cual esta la palabra. O frases en Aleman toda con una palabra tapada
+Que los dialogos puedan ser A1, A2...
+ejercicio palabra aleman espanol arrastrar la palabra a la imagen, siempre la imagen debe estar en la misma direccion, las imagenes estan al rededor de la palabra
+Revelar pistas rascando, en lugar de solo mostrar la letra tiene que rasca y gana
+ejercicio palabra aleman espanol, en una imagen tocar donde esta el ajo y ahi aparece la palabra
+Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
+Que la imagen asociada a la palabra, o la palabra tenga una especie de carta, tenga un borde con un color dependiendo del tipo de la palabra, y/o una forma diferente de carta para el genero o alguna otra clasificacion
+Secuencia: recuperacion activa (ejercicio dificil o auto evaluacion) si falla un ejerccio de asociasion visual/motriz (auditiva?) y despues otro intento de recuperacion
+Gratificacion: asociada a la palabra, no solo confeti. Por ejemplo arrastrando palabra a la imagen, cuando llegue se encaja con la imagen de una manera satisfactoria, se agranda, suena, un sonido corto de exito, aparece la respuesta, de pronto una fusion de la imagen y la palabra
+en las preguntas botones con las preguntas mas frecuentes
+Que la conversacion de la pregunta mande la historia
+Que mutear en el ejercicio no lo lo silencie  si no que pare donde estaba para continuar en la misma parte si se desmutea
+en las ventanas, como generar contenido, limpiar y que las opciones empiecen colapsadas y solo abra el area si se hace click en ella
+
+De español a ingles no use articulo
+Que en los bloques uno tenga que armar sub bloques para ayudar con la estructura de la frase, o poner de entrada algunas palabras y solo tenga que ubicar en las que se ha equivocado en el pasado
+Que el latch del bloque sea mas alejado pero con animacion para llegar suave a su lugar
+Mas largo el handerl del bloque (buscar una palabra mas apropiada)
+Verificar que escena siempre reprodusca las dos frases
+Solo mostrar los retries en el sentido que es, si mi error con la frase fue traduciendola al ingles, el ejercico de match frases no tiene sentido
+Que los bloques destino tengan el tamaño de la palabra, si hago lo de solo unas palabras para ubicar pensar si esas tambien tengan el tamaño y sirven de pista si eso ayuda o no
 Al ir arrastrando los bloques decir la palabra cuando es correcta (sintetizado)
 The other exercise where with the cloze no se que no muestra la palabra en español si no que da la frase y un espacio en el que van apareciendo las letras una a una, en desorden para que el usuario la escriba cuando ya la haya identificado
 Add a "dangerous" button to generate a small, simple, and the cheapest one possible image that represents the word, to the word item views.

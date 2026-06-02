@@ -461,12 +461,34 @@ body {
 }
 
 .phrase-builder-slot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
   border: 1px dashed #9fb3c8;
   background: #f8fafc;
   color: #486581;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.phrase-builder-slot-size,
+.phrase-builder-slot-value {
+  grid-area: 1 / 1;
+}
+
+.phrase-builder-slot-size {
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.phrase-builder-slot-value {
+  white-space: nowrap;
+}
+
+.phrase-builder-slot-latching {
+  border-style: solid;
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  transform: scale(1.02);
 }
 
 .phrase-builder-slot-filled {
@@ -500,7 +522,7 @@ body {
   -webkit-touch-callout: none;
   overflow: visible;
   padding: 10px 12px 8px;
-  margin-bottom: 28px;
+  margin-bottom: 78px;
   cursor: grab;
 }
 
@@ -510,18 +532,10 @@ body {
 
 .phrase-builder-token-handle {
   position: absolute;
-  top: calc(100% - 5px);
+  top: calc(100% - 2px);
   left: 50%;
-  width: 46px;
-  height: 32px;
-  border: 1px solid #9fb3c8;
-  border-top: none;
-  border-radius: 0 0 18px 18px;
-  background:
-    radial-gradient(circle at 16px 17px, rgba(255, 255, 255, 0.9) 0 2px, transparent 3px),
-    radial-gradient(circle at 30px 17px, rgba(255, 255, 255, 0.9) 0 2px, transparent 3px),
-    linear-gradient(180deg, #eef4fb 0%, #c9d8e8 42%, #829ab1 100%);
-  box-shadow: 0 4px 7px rgba(16, 42, 67, 0.18);
+  width: 72px;
+  height: 82px;
   cursor: grab;
   transform: translateX(-50%);
 }
@@ -529,12 +543,12 @@ body {
 .phrase-builder-token-handle::before {
   content: "";
   position: absolute;
-  top: -6px;
+  top: 0;
   left: 50%;
-  width: 58px;
-  height: 12px;
-  border-radius: 0 0 18px 18px;
-  background: #eef4fb;
+  width: 14px;
+  height: 58px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(180deg, #eef4fb 0%, #c9d8e8 100%);
   border: 1px solid #9fb3c8;
   border-top: none;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset;
@@ -544,12 +558,17 @@ body {
 .phrase-builder-token-handle::after {
   content: "";
   position: absolute;
-  bottom: 7px;
+  bottom: 0;
   left: 50%;
-  width: 24px;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(16, 42, 67, 0.28);
+  width: 58px;
+  height: 32px;
+  border: 1px solid #9fb3c8;
+  border-radius: 999px 999px 18px 18px;
+  background:
+    radial-gradient(circle at 20px 15px, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
+    radial-gradient(circle at 38px 15px, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
+    linear-gradient(180deg, #eef4fb 0%, #c9d8e8 48%, #829ab1 100%);
+  box-shadow: 0 6px 10px rgba(16, 42, 67, 0.18);
   transform: translateX(-50%);
 }
 

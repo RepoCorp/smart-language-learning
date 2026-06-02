@@ -26,6 +26,18 @@ type PhraseToken = {
   originalIndex: number;
 };
 
+type DragPosition = {
+  left: number;
+  top: number;
+};
+
+type DragRect = DragPosition & {
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
 function phraseTokens(value: string): PhraseToken[] {
   return value
     .trim()
@@ -68,6 +80,15 @@ function uniqueChoices(values: string[]): string[] {
     });
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function smoothstep(value: number): number {
+  const clamped = clamp(value, 0, 1);
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
 export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordStatus = {}, onTargetWordClick }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
@@ -88,6 +109,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const [wrongPhraseTokenId, setWrongPhraseTokenId] = useState<string>("");
   const [draggingPhraseTokenId, setDraggingPhraseTokenId] = useState<string>("");
   const [draggingPhraseTokenPosition, setDraggingPhraseTokenPosition] = useState<{ left: number; top: number } | null>(null);
+  const [activeLatchSlotIndex, setActiveLatchSlotIndex] = useState<number | null>(null);
   const [phraseBuilderComplete, setPhraseBuilderComplete] = useState<boolean>(false);
   const [selectedSituationChoice, setSelectedSituationChoice] = useState<string>("");
   const draggingPhraseTokenIdRef = useRef<string>("");
@@ -97,6 +119,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const isSubmittingRef = useRef<boolean>(false);
   const phraseBuilderCompletionAudioPlayedRef = useRef<boolean>(false);
   const activePointerIdRef = useRef<number | null>(null);
+  const activeLatchSlotIndexRef = useRef<number | null>(null);
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const draggingPhraseTokenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const isSpanishToGerman = item.direction !== "de_to_es";
@@ -200,6 +223,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     setDraggingPhraseTokenId("");
     setDraggingPhraseTokenPosition(null);
+    activeLatchSlotIndexRef.current = null;
+    setActiveLatchSlotIndex(null);
   };
 
   const handlePhraseBuilderDrop = (tokenId: string, slotIndex: number, placedCount = placedPhraseTokenCountRef.current): boolean => {
@@ -235,26 +260,55 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     return true;
   };
 
-  const handlePhraseBuilderSlotProximity = (draggedRect: { left: number; top: number; right: number; bottom: number; width: number; height: number }): void => {
-    if (!draggingPhraseTokenIdRef.current || isSubmittingRef.current || phraseBuilderCompleteRef.current) {
+  const updateActiveLatchSlotIndex = (nextSlotIndex: number | null): void => {
+    if (activeLatchSlotIndexRef.current === nextSlotIndex) {
       return;
+    }
+    activeLatchSlotIndexRef.current = nextSlotIndex;
+    setActiveLatchSlotIndex(nextSlotIndex);
+  };
+
+  const getPhraseBuilderDragState = (draggedRect: DragRect): { position: DragPosition; shouldLatch: boolean; slotIndex: number | null } => {
+    const basePosition = { left: draggedRect.left, top: draggedRect.top };
+    if (!draggingPhraseTokenIdRef.current || isSubmittingRef.current || phraseBuilderCompleteRef.current) {
+      updateActiveLatchSlotIndex(null);
+      return { position: basePosition, shouldLatch: false, slotIndex: null };
     }
     const placedCount = placedPhraseTokenCountRef.current;
     const nextSlot = phraseSlotsRef.current?.querySelector(`[data-slot-index="${placedCount}"]`);
     if (!(nextSlot instanceof HTMLElement)) {
-      return;
+      updateActiveLatchSlotIndex(null);
+      return { position: basePosition, shouldLatch: false, slotIndex: null };
     }
     const rect = nextSlot.getBoundingClientRect();
-    const overlapWidth = Math.max(0, Math.min(draggedRect.right, rect.right) - Math.max(draggedRect.left, rect.left));
-    const overlapHeight = Math.max(0, Math.min(draggedRect.bottom, rect.bottom) - Math.max(draggedRect.top, rect.top));
-    const requiredOverlapWidth = Math.min(draggedRect.width, rect.width) * 0.78;
-    const requiredOverlapHeight = Math.min(draggedRect.height, rect.height) * 0.72;
-    if (overlapWidth < requiredOverlapWidth || overlapHeight < requiredOverlapHeight) {
-      return;
+    const draggedCenterX = draggedRect.left + (draggedRect.width / 2);
+    const draggedCenterY = draggedRect.top + (draggedRect.height / 2);
+    const slotCenterX = rect.left + (rect.width / 2);
+    const slotCenterY = rect.top + (rect.height / 2);
+    const deltaX = slotCenterX - draggedCenterX;
+    const deltaY = slotCenterY - draggedCenterY;
+    const distance = Math.hypot(deltaX, deltaY);
+    const captureRadius = Math.max(draggedRect.width, draggedRect.height, rect.width, rect.height) * 1.9;
+    if (distance > captureRadius) {
+      updateActiveLatchSlotIndex(null);
+      return { position: basePosition, shouldLatch: false, slotIndex: null };
     }
-    if (handlePhraseBuilderDrop(draggingPhraseTokenIdRef.current, placedCount, placedCount)) {
-      clearPhraseDrag();
-    }
+
+    updateActiveLatchSlotIndex(placedCount);
+    const attractionProgress = 1 - (distance / captureRadius);
+    const attractionStrength = smoothstep(attractionProgress) * 0.68;
+    const targetLeft = rect.left + ((rect.width - draggedRect.width) / 2);
+    const targetTop = rect.top + ((rect.height - draggedRect.height) / 2);
+    const adjustedPosition = {
+      left: basePosition.left + ((targetLeft - basePosition.left) * attractionStrength),
+      top: basePosition.top + ((targetTop - basePosition.top) * attractionStrength),
+    };
+    const latchRadius = Math.max(20, Math.min(draggedRect.width, draggedRect.height, rect.width, rect.height) * 0.3);
+    return {
+      position: adjustedPosition,
+      shouldLatch: distance <= latchRadius,
+      slotIndex: placedCount,
+    };
   };
 
   const startPointerPhraseDrag = (tokenId: string, pointerId: number, clientX: number, clientY: number, rect: DOMRect): void => {
@@ -273,19 +327,22 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     if (activePointerIdRef.current !== pointerId) {
       return;
     }
-    const nextPosition = {
+    const nextPosition: DragPosition = {
       left: clientX - pointerDragOffsetRef.current.x,
       top: clientY - pointerDragOffsetRef.current.y,
     };
-    const draggedRect = {
+    const draggedRect: DragRect = {
       ...nextPosition,
       right: nextPosition.left + draggingPhraseTokenSizeRef.current.width,
       bottom: nextPosition.top + draggingPhraseTokenSizeRef.current.height,
       width: draggingPhraseTokenSizeRef.current.width,
       height: draggingPhraseTokenSizeRef.current.height,
     };
-    setDraggingPhraseTokenPosition(nextPosition);
-    handlePhraseBuilderSlotProximity(draggedRect);
+    const { position, shouldLatch, slotIndex } = getPhraseBuilderDragState(draggedRect);
+    setDraggingPhraseTokenPosition(position);
+    if (shouldLatch && slotIndex !== null && handlePhraseBuilderDrop(draggingPhraseTokenIdRef.current, slotIndex, slotIndex)) {
+      clearPhraseDrag();
+    }
   };
 
   const endPointerPhraseDrag = (pointerId: number): void => {
@@ -319,6 +376,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     setPhraseBuilderComplete(false);
     setDraggingPhraseTokenId("");
     setDraggingPhraseTokenPosition(null);
+    activeLatchSlotIndexRef.current = null;
+    setActiveLatchSlotIndex(null);
     setSelectedSituationChoice("");
     draggingPhraseTokenIdRef.current = "";
     activePointerIdRef.current = null;
@@ -357,9 +416,12 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
             <span
               key={token.id}
               data-slot-index={index}
-              className={`phrase-builder-slot${placedPhraseTokens[index] ? " phrase-builder-slot-filled" : ""}`}
+              className={`phrase-builder-slot${placedPhraseTokens[index] ? " phrase-builder-slot-filled" : ""}${!placedPhraseTokens[index] && activeLatchSlotIndex === index ? " phrase-builder-slot-latching" : ""}`}
             >
-              {placedPhraseTokens[index]?.text || "\u00a0"}
+              <span className="phrase-builder-slot-size">{token.text}</span>
+              <span className="phrase-builder-slot-value">
+                {placedPhraseTokens[index]?.text || "\u00a0"}
+              </span>
             </span>
           ))}
         </div>
