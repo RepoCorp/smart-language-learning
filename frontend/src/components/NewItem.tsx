@@ -290,6 +290,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [dialogPhraseScene, setDialogPhraseScene] = useState<string>(item.dialog_phrase_scene || "");
   const [dialogPhraseSceneAudioUrls, setDialogPhraseSceneAudioUrls] = useState<string[]>(item.dialog_phrase_scene_audio_urls || []);
   const [dialogPhraseOptions, setDialogPhraseOptions] = useState<string[]>(item.dialog_phrase_options || []);
+  const [dialogPhraseTurns, setDialogPhraseTurns] = useState<NonNullable<SessionItem["dialog_phrase_turns"]>>(item.dialog_phrase_turns || []);
+  const [dialogPhraseOddIndex, setDialogPhraseOddIndex] = useState<number | null>(item.dialog_phrase_odd_index ?? null);
   const [relatedDialogs, setRelatedDialogs] = useState<NonNullable<SessionItem["related_dialogs"]>>(item.related_dialogs || []);
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
   const [itemQuestionInput, setItemQuestionInput] = useState<string>("");
@@ -316,8 +318,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setDialogPhraseScene(item.dialog_phrase_scene || "");
     setDialogPhraseSceneAudioUrls(item.dialog_phrase_scene_audio_urls || []);
     setDialogPhraseOptions(item.dialog_phrase_options || []);
+    setDialogPhraseTurns(item.dialog_phrase_turns || []);
+    setDialogPhraseOddIndex(item.dialog_phrase_odd_index ?? null);
     setRelatedDialogs(item.related_dialogs || []);
-  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.related_dialogs]);
+  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.dialog_phrase_turns, item.dialog_phrase_odd_index, item.related_dialogs]);
 
   const markAsSeen = async (): Promise<void> => {
     if (saving || !onContinue) {
@@ -583,6 +587,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             dialog_phrase_scene: detail.dialog_phrase_scene || "",
             dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
             dialog_phrase_options: detail.dialog_phrase_options || [],
+            dialog_phrase_turns: detail.dialog_phrase_turns || [],
+            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             item_questions: detail.item_questions || [],
           });
@@ -635,6 +641,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         dialog_phrase_scene: detail.dialog_phrase_scene || "",
         dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
         dialog_phrase_options: detail.dialog_phrase_options || [],
+        dialog_phrase_turns: detail.dialog_phrase_turns || [],
+        dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
         related_dialogs: detail.related_dialogs || [],
         item_questions: detail.item_questions || [],
       });
@@ -737,6 +745,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
             dialog_phrase_scene: detail.dialog_phrase_scene || "",
             dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
             dialog_phrase_options: detail.dialog_phrase_options || [],
+            dialog_phrase_turns: detail.dialog_phrase_turns || [],
+            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             item_questions: detail.item_questions || [],
           });
@@ -850,12 +860,13 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     dialog_phrase_scene: dialogPhraseScene,
     dialog_phrase_scene_audio_urls: dialogPhraseSceneAudioUrls,
     dialog_phrase_options: dialogPhraseOptions,
+    dialog_phrase_turns: dialogPhraseTurns,
+    dialog_phrase_odd_index: dialogPhraseOddIndex,
   };
   const phraseMeaningItem: SessionItem = {
     ...phraseBuilderItem,
     direction: "de_to_es",
     repeatPracticeStep: "phrase_dialog_match",
-    dialog_phrase_options: dialogPhraseOptions,
   };
   const phraseOriginTurn = relatedDialogs
     .flatMap((dialog) => dialog.matched_turns.map((turn) => ({ dialog, turn })))

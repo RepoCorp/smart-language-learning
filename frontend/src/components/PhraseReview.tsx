@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { beginPromptAutoplaySuppression, shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
 import { deterministicSort } from "../deterministic";
@@ -60,19 +60,6 @@ function shufflePhraseTokens(tokens: PhraseToken[], seed: string): PhraseToken[]
   return keptOriginalOrder ? [...shuffled].reverse() : shuffled;
 }
 
-function uniqueChoices(values: string[]): string[] {
-  const seen = new Set<string>();
-  return values
-    .map((value) => value.trim())
-    .filter((value) => {
-      if (!value || seen.has(value.toLowerCase())) {
-        return false;
-      }
-      seen.add(value.toLowerCase());
-      return true;
-    });
-}
-
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -80,6 +67,10 @@ function clamp(value: number, min: number, max: number): number {
 function smoothstep(value: number): number {
   const clamped = clamp(value, 0, 1);
   return clamped * clamped * (3 - 2 * clamped);
+}
+
+function speakerForTurn(speaker: string | undefined, index: number): "a" | "b" {
+  return speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
 }
 
 const speechLangByCode: Record<StudyLanguageCode, string> = {
@@ -113,7 +104,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const [draggingPhraseTokenPosition, setDraggingPhraseTokenPosition] = useState<{ left: number; top: number } | null>(null);
   const [activeLatchSlotIndex, setActiveLatchSlotIndex] = useState<number | null>(null);
   const [phraseBuilderComplete, setPhraseBuilderComplete] = useState<boolean>(false);
-  const [selectedSituationChoice, setSelectedSituationChoice] = useState<string>("");
+  const [selectedSituationChoiceIndex, setSelectedSituationChoiceIndex] = useState<number | null>(null);
+  const [wrongSituationChoiceIndexes, setWrongSituationChoiceIndexes] = useState<number[]>([]);
   const draggingPhraseTokenIdRef = useRef<string>("");
   const phraseSlotsRef = useRef<HTMLDivElement | null>(null);
   const placedPhraseTokenCountRef = useRef<number>(0);
@@ -137,19 +129,20 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     [expectedPhraseTokens, itemDeterministicKey],
   );
   const situationExpectedAnswer = (item.dialog_phrase_answer || "").trim();
-  const situationSceneLines = (item.dialog_phrase_scene || situationExpectedAnswer)
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+  const situationTurns = useMemo(
+    () => (
+      item.dialog_phrase_turns?.length
+        ? item.dialog_phrase_turns
+        : (item.dialog_phrase_options || []).map((targetText, index) => ({
+          source_text: "",
+          target_text: targetText,
+          speaker: index % 2 === 0 ? "a" : "b",
+        }))
+    ),
+    [item.dialog_phrase_options, item.dialog_phrase_turns],
+  );
   const situationSceneAudioUrls = (item.dialog_phrase_scene_audio_urls || []).filter((audioUrl) => audioUrl.trim().length > 0);
-  const situationChoices = useMemo(() => {
-    const dialogChoices = uniqueChoices(item.dialog_phrase_options || []);
-    const dialogChoicesIncludeAnswer = dialogChoices.some((choice) => choice.toLowerCase() === situationExpectedAnswer.toLowerCase());
-    if (situationExpectedAnswer && dialogChoices.length >= 2 && dialogChoicesIncludeAnswer) {
-      return dialogChoices.slice(0, 4);
-    }
-    return situationExpectedAnswer ? uniqueChoices([situationExpectedAnswer, ...dialogChoices]).slice(0, 4) : [];
-  }, [situationExpectedAnswer, item.dialog_phrase_options]);
+  const situationOddIndex = item.dialog_phrase_odd_index ?? null;
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
@@ -157,9 +150,10 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const useRepeatPlaceholder = Boolean(item.repeatedAfterFailure);
   const usePhraseBuilder = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_builder" || (!item.repeatPracticeStep && isSpanishToGerman));
   const useSituationReview = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_dialog_match" || (!item.repeatPracticeStep && !isSpanishToGerman));
+  const shouldSuppressPromptAudio = useSituationReview;
 
   const playPromptAudio = (): void => {
-    if (!allowPromptAudio || !item.audio_url) {
+    if (!allowPromptAudio || !item.audio_url || shouldSuppressPromptAudio) {
       return;
     }
     const audio = new Audio(item.audio_url);
@@ -297,12 +291,18 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     await submitWithFeedback(correct, correct ? t("phrase.feedback.correct") : t("phrase.feedback.markedWrong", { answer: expectedAnswer }));
   };
 
-  const selectSituationChoice = (choice: string): void => {
-    if (selectedSituationChoice || isSubmitting) {
+  const selectSituationChoice = (choiceIndex: number): void => {
+    if (selectedSituationChoiceIndex !== null || isSubmitting) {
       return;
     }
-    setSelectedSituationChoice(choice);
-    playSituationScene();
+    if (choiceIndex === situationOddIndex) {
+      setSelectedSituationChoiceIndex(choiceIndex);
+      playSituationScene();
+      return;
+    }
+    setWrongSituationChoiceIndexes((current) => (
+      current.includes(choiceIndex) ? current : [...current, choiceIndex]
+    ));
   };
 
   const markWrongPhraseToken = (tokenId: string): void => {
@@ -481,7 +481,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     setDraggingPhraseTokenPosition(null);
     activeLatchSlotIndexRef.current = null;
     setActiveLatchSlotIndex(null);
-    setSelectedSituationChoice("");
+    setSelectedSituationChoiceIndex(null);
+    setWrongSituationChoiceIndexes([]);
     draggingPhraseTokenIdRef.current = "";
     activePointerIdRef.current = null;
     pointerDragOffsetRef.current = { x: 0, y: 0 };
@@ -504,12 +505,15 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     if (!allowPromptAudio) {
       return;
     }
+    if (shouldSuppressPromptAudio) {
+      return;
+    }
     const autoplayKey = `phrase:${item.id}:${item.audio_url || ""}:${targetPromptMode}`;
     if (!shouldAutoplayPrompt(autoplayKey)) {
       return;
     }
     playPromptAudio();
-  }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio]);
+  }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio, shouldSuppressPromptAudio]);
 
   if (usePhraseBuilder) {
     const placedIds = new Set(placedPhraseTokens.map((token) => token.id));
@@ -618,88 +622,77 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   }
 
   if (useSituationReview) {
-    const selectedSituationIsCorrect = selectedSituationChoice.trim().toLowerCase() === situationExpectedAnswer.toLowerCase();
+    const selectedSituationIsCorrect = selectedSituationChoiceIndex !== null && selectedSituationChoiceIndex === situationOddIndex;
     return (
       <div className="phrase-situation-review">
         <p className="prompt prompt-light test-instruction">{t("phrase.situationPrompt")}</p>
-        {targetPromptMode === "audio" && allowPromptAudio && (
-          <div className="prompt-visibility-controls">
-            <button type="button" className="secondary-button" onClick={() => setShowPromptText((value) => !value)}>
-              {showPromptText ? t("prompt.hideText") : t("prompt.showText")}
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={playPromptAudio}
-              disabled={!allowPromptAudio || !item.audio_url}
-            >
-              {t("prompt.playAudio")}
-            </button>
-          </div>
-        )}
-        {hidePromptText ? (
-          <p className="prompt prompt-audio-placeholder">{t("prompt.audioOnly")}</p>
-        ) : (
-          <p className="test-source-phrase phrase-review-token-line">
-            <DialogTurnText
-              dialogId={0}
-              turnIndex={0}
-              sourceText={item.spanish_text}
-              targetText={item.german_text}
-              sourceLanguage={sourceLanguage}
-              targetLanguage={targetLanguage}
-              tokenStatus={targetWordStatus}
-              statusKeyPrefix={`phrase-review-${item.id}-target`}
-              onTokenClick={onTargetWordClick}
-              onOpenItem={onOpenItem ? async (itemId) => onOpenItem(itemId) : undefined}
-              showPhraseSelection={false}
-            />
-          </p>
-        )}
         {!situationExpectedAnswer && <p className="hint">{t("phrase.situationUnavailable")}</p>}
-        <div className="phrase-situation-options">
-          {situationChoices.map((choice) => {
-            const isSelected = selectedSituationChoice === choice;
-            const isCorrectChoice = choice.trim().toLowerCase() === situationExpectedAnswer.toLowerCase();
-            const answeredClass = selectedSituationChoice
-              ? isCorrectChoice
+        <div className="phrase-situation-options conversation-preview-list">
+          {situationTurns.map((turn, choiceIndex) => {
+            const isSelected = selectedSituationChoiceIndex === choiceIndex;
+            const isCorrectChoice = situationOddIndex === choiceIndex;
+            const wasWrongPick = wrongSituationChoiceIndexes.includes(choiceIndex);
+            let answeredClass = "";
+            if (selectedSituationChoiceIndex !== null) {
+              answeredClass = isCorrectChoice
                 ? " phrase-situation-option-correct"
                 : isSelected
                   ? " phrase-situation-option-wrong"
-                  : ""
+                  : "";
+            } else if (wasWrongPick) {
+              answeredClass = " phrase-situation-option-wrong";
+            }
+            const revealedSourceText = selectedSituationIsCorrect && isCorrectChoice
+              ? expectedAnswer
               : "";
+            const speaker = speakerForTurn(turn.speaker, choiceIndex);
             return (
-              <button
-                key={choice}
-                type="button"
-                className={`phrase-situation-option${answeredClass}`}
-                onClick={() => selectSituationChoice(choice)}
-                disabled={Boolean(selectedSituationChoice) || isSubmitting}
+              <div
+                key={`${choiceIndex}-${turn.target_text}`}
+                className={`phrase-situation-option conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}${answeredClass}`}
               >
-                {t("phrase.situationChoice", { text: choice })}
-              </button>
+                <div className="phrase-situation-option-main">
+                  <p className="conversation-speaker">
+                    {speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}
+                  </p>
+                  <div className="phrase-situation-line conversation-line conversation-line-translation phrase-review-token-line">
+                    <DialogTurnText
+                      dialogId={0}
+                      turnIndex={choiceIndex}
+                      sourceText={turn.source_text}
+                      targetText={turn.target_text}
+                      sourceLanguage={sourceLanguage}
+                      targetLanguage={targetLanguage}
+                      tokenStatus={targetWordStatus}
+                      statusKeyPrefix={`phrase-situation-${item.id}-${choiceIndex}`}
+                      onTokenClick={onTargetWordClick}
+                      onOpenItem={onOpenItem ? async (itemId) => onOpenItem(itemId) : undefined}
+                      showPhraseSelection={false}
+                    />
+                  </div>
+                  {revealedSourceText && (
+                    <p className="phrase-situation-source-reveal">
+                      {revealedSourceText}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="phrase-situation-pick"
+                  onClick={() => selectSituationChoice(choiceIndex)}
+                  disabled={selectedSituationChoiceIndex !== null || isSubmitting}
+                >
+                  {t("phrase.situationPick")}
+                </button>
+              </div>
             );
           })}
         </div>
-        {selectedSituationChoice && (
+        {(selectedSituationChoiceIndex !== null || wrongSituationChoiceIndexes.length > 0) && (
           <>
             <p className={`phrase-situation-feedback ${selectedSituationIsCorrect ? "phrase-situation-feedback-correct" : "phrase-situation-feedback-wrong"}`}>
               {selectedSituationIsCorrect ? t("phrase.situationCorrect") : t("phrase.situationWrong")}
             </p>
-            <p className="revealed-answer">
-              <span>{t("phrase.situationSceneLabel")}</span>
-              {situationSceneLines.map((line, index) => (
-                <Fragment key={`${line}-${index}`}>
-                  <br />
-                  {line}
-                </Fragment>
-              ))}
-            </p>
-            {!!situationSceneAudioUrls.length && (
-              <button type="button" className="secondary-button phrase-scene-play-button" onClick={playSituationScene}>
-                {t("phrase.situationPlayScene")}
-              </button>
-            )}
           </>
         )}
         <div className="actions">
@@ -708,7 +701,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
               {t("words.openItem")}
             </button>
           ) : null}
-          {selectedSituationChoice && (
+          {selectedSituationChoiceIndex !== null && (
             <button type="button" onClick={() => void onAnswered(true)} disabled={isSubmitting}>
               {t("review.continue")}
             </button>

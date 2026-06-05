@@ -439,8 +439,10 @@ def test_phrase_target_to_source_uses_neighboring_dialog_line_as_answer():
         source_language="spanish",
         target_language="german",
         turns=[
-            {"source_text": "Quiero cafe", "target_text": "Ich moechte Kaffee"},
-            {"source_text": "La cuenta, por favor", "target_text": "Die Rechnung, bitte"},
+            {"source_text": "Quiero cafe", "target_text": "Ich moechte Kaffee", "speaker": "a"},
+            {"source_text": "Con leche?", "target_text": "Mit Milch?", "speaker": "b"},
+            {"source_text": "Si, por favor", "target_text": "Ja, bitte", "speaker": "a"},
+            {"source_text": "Algo mas?", "target_text": "Sonst noch etwas?", "speaker": "b"},
         ],
     )
     DialogTurn.objects.create(
@@ -452,8 +454,20 @@ def test_phrase_target_to_source_uses_neighboring_dialog_line_as_answer():
     DialogTurn.objects.create(
         dialog=other_dialog,
         turn_index=1,
-        source_text="La cuenta, por favor",
-        target_text="Die Rechnung, bitte",
+        source_text="Con leche?",
+        target_text="Mit Milch?",
+    )
+    DialogTurn.objects.create(
+        dialog=other_dialog,
+        turn_index=2,
+        source_text="Si, por favor",
+        target_text="Ja, bitte",
+    )
+    DialogTurn.objects.create(
+        dialog=other_dialog,
+        turn_index=3,
+        source_text="Algo mas?",
+        target_text="Sonst noch etwas?",
     )
 
     client = APIClient()
@@ -467,8 +481,13 @@ def test_phrase_target_to_source_uses_neighboring_dialog_line_as_answer():
     assert payload_item["id"] == phrase.id
     assert payload_item["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
     assert payload_item["dialog_phrase_answer"] == "Estoy perdido"
-    assert payload_item["dialog_phrase_scene"] == "Ich verstehe nicht\nIch bin verloren"
+    assert payload_item["dialog_phrase_odd_index"] in {0, 1, 2, 3}
+    assert len(payload_item["dialog_phrase_options"]) == 4
+    assert len(payload_item["dialog_phrase_turns"]) == 4
+    assert payload_item["dialog_phrase_turns"][payload_item["dialog_phrase_odd_index"]]["target_text"] == "Estoy perdido"
+    assert payload_item["dialog_phrase_options"][payload_item["dialog_phrase_odd_index"]] == "Estoy perdido"
     assert "No entiendo" not in payload_item["dialog_phrase_options"]
-    assert "Estoy perdido" in payload_item["dialog_phrase_options"]
-    assert "Quiero cafe" in payload_item["dialog_phrase_options"]
-    assert "La cuenta, por favor" in payload_item["dialog_phrase_options"]
+    remaining_dialog_lines = {"Ich moechte Kaffee", "Mit Milch?", "Ja, bitte", "Sonst noch etwas?"}
+    displayed_lines = set(payload_item["dialog_phrase_options"])
+    assert "Estoy perdido" in displayed_lines
+    assert len(displayed_lines & remaining_dialog_lines) == 3

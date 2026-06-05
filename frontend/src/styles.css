@@ -727,7 +727,8 @@ body {
 }
 
 .phrase-situation-options {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -738,13 +739,37 @@ body {
 }
 
 .phrase-situation-option {
-  border: 1px solid #bcccdc;
-  background: #ffffff;
-  color: #102a43;
+  width: min(100%, 680px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   line-height: 1.35;
   text-align: left;
   white-space: normal;
   word-break: break-word;
+}
+
+.phrase-situation-pick {
+  min-width: 72px;
+  align-self: center;
+  flex: 0 0 auto;
+}
+
+.phrase-situation-line {
+  min-width: 0;
+}
+
+.phrase-situation-option-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.phrase-situation-source-reveal {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #334e68;
 }
 
 .phrase-situation-option-correct {

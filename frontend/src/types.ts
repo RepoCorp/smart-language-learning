@@ -19,6 +19,13 @@ export interface ItemExercisePhrases {
   funny_image_phrase?: ExercisePhrase;
 }
 
+export interface DialogPhraseTurn {
+  source_text: string;
+  target_text: string;
+  speaker?: "a" | "b";
+  phrase_audio_url?: string;
+}
+
 export interface SessionItem {
   id: number;
   item_type: ItemType;
@@ -42,6 +49,8 @@ export interface SessionItem {
   dialog_phrase_scene?: string;
   dialog_phrase_scene_audio_urls?: string[];
   dialog_phrase_options?: string[];
+  dialog_phrase_turns?: DialogPhraseTurn[];
+  dialog_phrase_odd_index?: number | null;
   related_dialogs?: Array<{
     dialog_id: number;
     topic: string;
@@ -166,6 +175,8 @@ export interface ContentItemDetailResponse {
   dialog_phrase_scene?: string;
   dialog_phrase_scene_audio_urls?: string[];
   dialog_phrase_options?: string[];
+  dialog_phrase_turns?: DialogPhraseTurn[];
+  dialog_phrase_odd_index?: number | null;
   related_dialogs?: SessionItem["related_dialogs"];
   item_questions?: ItemQuestionExchange[];
 }

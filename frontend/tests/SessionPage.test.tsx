@@ -884,8 +884,15 @@ describe("SessionPage", () => {
           direction: "de_to_es",
           options: ["No entiendo", "Hola", "Gracias"],
           dialog_phrase_answer: "Estoy perdido",
-          dialog_phrase_scene: "Ich verstehe nicht\nIch bin verloren",
-          dialog_phrase_options: ["Estoy perdido", "Quiero cafe", "La cuenta, por favor"],
+          dialog_phrase_scene: "Ich moechte Kaffee\nEstoy perdido\nJa, bitte\nSonst noch etwas?",
+          dialog_phrase_options: ["Ich moechte Kaffee", "Estoy perdido", "Ja, bitte", "Sonst noch etwas?"],
+          dialog_phrase_turns: [
+            { source_text: "Quiero cafe", target_text: "Ich moechte Kaffee", speaker: "a" },
+            { source_text: "Con leche?", target_text: "Estoy perdido", speaker: "b" },
+            { source_text: "Si, por favor", target_text: "Ja, bitte", speaker: "a" },
+            { source_text: "Algo mas?", target_text: "Sonst noch etwas?", speaker: "b" },
+          ],
+          dialog_phrase_odd_index: 1,
         },
       ],
     });
@@ -905,14 +912,11 @@ describe("SessionPage", () => {
     expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
     expect(screen.queryByText(/What is the correct Spanish translation/)).not.toBeInTheDocument();
     expect(screen.getByText("Which line comes right before or after this phrase in its dialog?")).toBeInTheDocument();
-    expect(screen.getByText("Ich verstehe nicht")).toHaveClass("test-source-phrase");
-    expect(screen.queryByRole("button", { name: "Hola" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "No entiendo" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Quiero cafe" }));
+    expect(screen.queryByText("No entiendo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Quiero cafe")).not.toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Pick" })[0]);
     expect(screen.getByText(/Not quite/)).toBeInTheDocument();
-    expect(screen.getByText(/Scene:/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Ich verstehe nicht/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Ich bin verloren/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Estoy perdido/).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Ich" })).toHaveClass("turn-token-button");
     expect(screen.queryByText(/Tap any target-language words/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));

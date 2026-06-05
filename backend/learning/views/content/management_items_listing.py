@@ -30,6 +30,7 @@ from .management import (
     timezone,
 )
 from ...models import DialogTurn, ItemDialogOccurrence, SavedDialog
+from ..dialog_phrase_match import build_dialog_phrase_match_payload
 from .core import (
     generate_funny_image_exercise_phrase_with_chatgpt,
     generate_word_exercise_phrases_with_chatgpt,
@@ -137,7 +138,7 @@ class ContentItemDetailView(APIView):
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
         related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
-        dialog_phrase_answer, dialog_phrase_scene, dialog_phrase_scene_audio_urls, dialog_phrase_options = _dialog_phrase_options_for_item(item, user=user)
+        dialog_phrase_payload = _dialog_phrase_options_for_item(item, user=user)
         return Response(
             {
                 "id": item.id,
@@ -150,10 +151,12 @@ class ContentItemDetailView(APIView):
                 "audio_url": item.audio_url,
                 "exercise_phrases": item.exercise_phrases or {},
                 "created_at": item.created_at,
-                "dialog_phrase_answer": dialog_phrase_answer,
-                "dialog_phrase_scene": dialog_phrase_scene,
-                "dialog_phrase_scene_audio_urls": dialog_phrase_scene_audio_urls,
-                "dialog_phrase_options": dialog_phrase_options,
+                "dialog_phrase_answer": dialog_phrase_payload["answer"],
+                "dialog_phrase_scene": dialog_phrase_payload["scene"],
+                "dialog_phrase_scene_audio_urls": dialog_phrase_payload["scene_audio_urls"],
+                "dialog_phrase_options": dialog_phrase_payload["options"],
+                "dialog_phrase_turns": dialog_phrase_payload["turns"],
+                "dialog_phrase_odd_index": dialog_phrase_payload["odd_index"],
                 "related_dialogs": related_dialogs_map.get(item.id, []),
                 "item_questions": _item_question_history(item),
             }
@@ -199,75 +202,8 @@ class ContentItemDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def _dialog_phrase_options_for_item(item: Item, *, user) -> tuple[str, str, list[str], list[str]]:
-    if item.item_type != Item.ItemType.PHRASE:
-        return "", "", [], []
-
-    occurrences = list(
-        apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
-        .filter(item=item)
-        .select_related("dialog", "turn")
-    )
-    origin_dialog_ids = {occurrence.dialog_id for occurrence in occurrences}
-    adjacent_scenes: list[tuple[str, str, tuple[str, ...]]] = []
-    for occurrence in occurrences:
-        adjacent_turns = DialogTurn.objects.filter(
-            dialog=occurrence.dialog,
-            turn_index__in=[occurrence.turn_index - 1, occurrence.turn_index + 1],
-        ).order_by("turn_index")
-        for turn in adjacent_turns:
-            source_text = turn.source_text.strip()
-            target_text = turn.target_text.strip()
-            if source_text and target_text and source_text.lower() != item.spanish_text.lower():
-                scene_lines = (
-                    [target_text, item.german_text]
-                    if turn.turn_index < occurrence.turn_index
-                    else [item.german_text, target_text]
-                )
-                current_audio_url = _phrase_audio_url_for_turn(occurrence.turn, user=user, fallback_item=item)
-                adjacent_audio_url = _phrase_audio_url_for_turn(turn, user=user)
-                audio_urls = (
-                    [adjacent_audio_url, current_audio_url]
-                    if turn.turn_index < occurrence.turn_index
-                    else [current_audio_url, adjacent_audio_url]
-                )
-                adjacent_scenes.append((source_text, "\n".join(scene_lines), tuple(audio_url for audio_url in audio_urls if audio_url)))
-    adjacent_scenes = list(dict.fromkeys(adjacent_scenes))
-    deterministic_scene = _deterministic_choice(
-        adjacent_scenes,
-        seed=f"phrase-scene:{item.item_type}:{item.spanish_text}:{item.german_text}",
-        key_fn=lambda scene: f"{scene[0]}|{scene[1]}|{'|'.join(scene[2])}",
-    )
-    correct_answer, correct_scene, correct_audio_urls = deterministic_scene if deterministic_scene else ("", "", ())
-    if not correct_answer:
-        return "", "", [], []
-
-    turns = apply_user_scope(DialogTurn.objects, user, field="dialog__user").filter(
-        dialog__source_language=item.source_language,
-        dialog__target_language=item.target_language,
-    )
-    if origin_dialog_ids:
-        turns = turns.exclude(dialog_id__in=origin_dialog_ids)
-    source_answers = list(
-        turns.exclude(source_text__iexact=item.spanish_text)
-        .exclude(target_text__iexact=item.german_text)
-        .exclude(source_text__iexact=correct_answer)
-        .values_list("source_text", flat=True)
-    )
-    distractors = list(dict.fromkeys(answer.strip() for answer in source_answers if answer and answer.strip()))
-    distractors = [answer for answer in distractors if answer.lower() != correct_answer.lower()]
-    sorted_distractors = _deterministic_sort(
-        distractors,
-        seed=f"text-distractors:{correct_answer}",
-        key_fn=lambda answer: answer,
-    )
-    choices = sorted_distractors[:3] + [correct_answer]
-    choices = _deterministic_sort(
-        choices,
-        seed=f"text-choices:{correct_answer}",
-        key_fn=lambda answer: answer,
-    )
-    return correct_answer, correct_scene, list(correct_audio_urls), choices
+def _dialog_phrase_options_for_item(item: Item, *, user) -> dict:
+    return build_dialog_phrase_match_payload(item, user=user)
 
 
 def _phrase_audio_url_for_turn(turn: DialogTurn, *, user, fallback_item: Item | None = None) -> str:

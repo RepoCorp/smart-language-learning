@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from ..auth import apply_user_scope, get_request_user
 from ..models import DialogTurn, Item, ItemDialogOccurrence
 from ..serializers import SessionItemSerializer
+from .dialog_phrase_match import build_dialog_phrase_match_payload
 
 
 @dataclass(frozen=True)
@@ -351,7 +352,14 @@ def entry_key(entry: SessionEntry) -> tuple[int, str | None]:
 
 def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
     option_items_map = build_review_options(entries, user=user)
-    dialog_phrase_answers_map, dialog_phrase_scenes_map, dialog_phrase_scene_audio_map, dialog_phrase_options_map = build_dialog_phrase_options(entries, user=user)
+    (
+        dialog_phrase_answers_map,
+        dialog_phrase_scenes_map,
+        dialog_phrase_scene_audio_map,
+        dialog_phrase_options_map,
+        dialog_phrase_turns_map,
+        dialog_phrase_odd_index_map,
+    ) = build_dialog_phrase_options(entries, user=user)
     related_dialogs_map = build_related_dialogs_map(entries, user=user)
     payload: list[dict] = []
 
@@ -376,6 +384,8 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "dialog_phrase_scene": dialog_phrase_scenes_map.get(entry_key(entry), ""),
                 "dialog_phrase_scene_audio_urls": dialog_phrase_scene_audio_map.get(entry_key(entry), []),
                 "dialog_phrase_options": dialog_phrase_options_map.get(entry_key(entry), []),
+                "dialog_phrase_turns": dialog_phrase_turns_map.get(entry_key(entry), []),
+                "dialog_phrase_odd_index": dialog_phrase_odd_index_map.get(entry_key(entry)),
                 "related_dialogs": related_dialogs_map.get(entry.item.id, []),
             }
         )
@@ -451,7 +461,14 @@ def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int
     return options_map
 
 
-def build_dialog_phrase_options(entries: list[SessionEntry], *, user) -> tuple[dict[tuple[int, str | None], str], dict[tuple[int, str | None], str], dict[tuple[int, str | None], list[str]], dict[tuple[int, str | None], list[str]]]:
+def build_dialog_phrase_options(entries: list[SessionEntry], *, user) -> tuple[
+    dict[tuple[int, str | None], str],
+    dict[tuple[int, str | None], str],
+    dict[tuple[int, str | None], list[str]],
+    dict[tuple[int, str | None], list[str]],
+    dict[tuple[int, str | None], list[dict]],
+    dict[tuple[int, str | None], int | None],
+]:
     phrase_entries = [
         entry
         for entry in entries
@@ -459,77 +476,25 @@ def build_dialog_phrase_options(entries: list[SessionEntry], *, user) -> tuple[d
         and entry.item.item_type == Item.ItemType.PHRASE
     ]
     if not phrase_entries:
-        return {}, {}, {}, {}
-
-    item_ids = [entry.item.id for entry in phrase_entries]
-    origin_dialog_ids_by_item: dict[int, set[int]] = defaultdict(set)
-    adjacent_scenes_by_item: dict[int, list[tuple[str, str, tuple[str, ...]]]] = defaultdict(list)
-    occurrences = list(
-        apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
-        .filter(item_id__in=item_ids)
-        .select_related("dialog", "turn")
-    )
-    for occurrence in occurrences:
-        origin_dialog_ids_by_item[occurrence.item_id].add(occurrence.dialog_id)
-        adjacent_turns = DialogTurn.objects.filter(
-            dialog=occurrence.dialog,
-            turn_index__in=[occurrence.turn_index - 1, occurrence.turn_index + 1],
-        ).order_by("turn_index")
-        for turn in adjacent_turns:
-            source_text = turn.source_text.strip()
-            target_text = turn.target_text.strip()
-            if source_text and target_text and source_text.lower() != occurrence.item.spanish_text.lower():
-                scene_lines = (
-                    [target_text, occurrence.item.german_text]
-                    if turn.turn_index < occurrence.turn_index
-                    else [occurrence.item.german_text, target_text]
-                )
-                current_audio_url = _phrase_audio_url_for_turn(occurrence.turn, user=user, fallback_item=occurrence.item)
-                adjacent_audio_url = _phrase_audio_url_for_turn(turn, user=user)
-                audio_urls = (
-                    [adjacent_audio_url, current_audio_url]
-                    if turn.turn_index < occurrence.turn_index
-                    else [current_audio_url, adjacent_audio_url]
-                )
-                adjacent_scenes_by_item[occurrence.item_id].append(
-                    (source_text, "\n".join(scene_lines), tuple(audio_url for audio_url in audio_urls if audio_url))
-                )
+        return {}, {}, {}, {}, {}, {}
 
     answers_map: dict[tuple[int, str | None], str] = {}
     scenes_map: dict[tuple[int, str | None], str] = {}
     scene_audio_map: dict[tuple[int, str | None], list[str]] = {}
     options_map: dict[tuple[int, str | None], list[str]] = {}
+    turns_map: dict[tuple[int, str | None], list[dict]] = {}
+    odd_index_map: dict[tuple[int, str | None], int | None] = {}
     for entry in phrase_entries:
         item = entry.item
-        adjacent_scenes = list(dict.fromkeys(adjacent_scenes_by_item.get(item.id, [])))
-        deterministic_scene = _deterministic_choice(
-            adjacent_scenes,
-            seed=f"phrase-scene:{item.item_type}:{item.spanish_text}:{item.german_text}",
-            key_fn=lambda scene: f"{scene[0]}|{scene[1]}|{'|'.join(scene[2])}",
-        )
-        correct_answer, correct_scene, correct_audio_urls = deterministic_scene if deterministic_scene else ("", "", ())
-        answers_map[entry_key(entry)] = correct_answer
-        scenes_map[entry_key(entry)] = correct_scene
-        scene_audio_map[entry_key(entry)] = list(correct_audio_urls)
-        if not correct_answer:
-            options_map[entry_key(entry)] = []
-            continue
-        turns = apply_user_scope(DialogTurn.objects, user, field="dialog__user").filter(
-            dialog__source_language=item.source_language,
-            dialog__target_language=item.target_language,
-        )
-        origin_dialog_ids = origin_dialog_ids_by_item.get(item.id, set())
-        if origin_dialog_ids:
-            turns = turns.exclude(dialog_id__in=origin_dialog_ids)
-        source_answers = list(
-            turns.exclude(source_text__iexact=item.spanish_text)
-            .exclude(target_text__iexact=item.german_text)
-            .exclude(source_text__iexact=correct_answer)
-            .values_list("source_text", flat=True)
-        )
-        options_map[entry_key(entry)] = build_text_choices(correct_answer, source_answers)
+        payload = build_dialog_phrase_match_payload(item, user=user)
+        answers_map[entry_key(entry)] = payload["answer"]
+        scenes_map[entry_key(entry)] = payload["scene"]
+        scene_audio_map[entry_key(entry)] = payload["scene_audio_urls"]
+        options_map[entry_key(entry)] = payload["options"]
+        turns_map[entry_key(entry)] = payload["turns"]
+        odd_index_map[entry_key(entry)] = payload["odd_index"]
 
-    return answers_map, scenes_map, scene_audio_map, options_map
+    return answers_map, scenes_map, scene_audio_map, options_map, turns_map, odd_index_map
 
 
 def _phrase_audio_url_for_turn(turn: DialogTurn, *, user, fallback_item: Item | None = None) -> str:

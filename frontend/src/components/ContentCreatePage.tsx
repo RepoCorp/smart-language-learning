@@ -313,6 +313,8 @@ export default function ContentCreatePage(): JSX.Element {
             dialog_phrase_scene: detail.dialog_phrase_scene || "",
             dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
             dialog_phrase_options: detail.dialog_phrase_options || [],
+            dialog_phrase_turns: detail.dialog_phrase_turns || [],
+            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             item_questions: detail.item_questions || [],
           });
@@ -537,6 +539,8 @@ export default function ContentCreatePage(): JSX.Element {
             dialog_phrase_scene: detail.dialog_phrase_scene || "",
             dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
             dialog_phrase_options: detail.dialog_phrase_options || [],
+            dialog_phrase_turns: detail.dialog_phrase_turns || [],
+            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             item_questions: detail.item_questions || [],
           });

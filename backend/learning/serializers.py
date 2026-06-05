@@ -27,6 +27,8 @@ class SessionItemSerializer(serializers.Serializer):
     dialog_phrase_scene = serializers.CharField(allow_blank=True, required=False)
     dialog_phrase_scene_audio_urls = serializers.ListField(child=serializers.CharField(), required=False)
     dialog_phrase_options = serializers.ListField(child=serializers.CharField(), required=False)
+    dialog_phrase_turns = serializers.ListField(child=serializers.DictField(), required=False)
+    dialog_phrase_odd_index = serializers.IntegerField(required=False, allow_null=True)
     related_dialogs = serializers.ListField(child=serializers.DictField(), required=False)
 
 
