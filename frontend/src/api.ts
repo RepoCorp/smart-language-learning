@@ -577,6 +577,7 @@ export async function setContentItemLearned(
 export async function askContentItemQuestion(
   itemId: number,
   questionText: string,
+  conversationHistory: Array<{ question_text: string; answer_text: string; created_at?: string }> = [],
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentItemQuestionResponse> {
@@ -587,7 +588,7 @@ export async function askContentItemQuestion(
   const response = await apiFetch(`${API_BASE}/content/items/${itemId}/question?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question_text: questionText }),
+    body: JSON.stringify({ question_text: questionText, conversation_history: conversationHistory }),
   });
   if (!response.ok) {
     let detail = "Failed to answer item question";

@@ -50,6 +50,7 @@ class ContentItemQuestionView(APIView):
                 question_text=question_text,
                 source_language=source_language,
                 target_language=target_language,
+                conversation_history=request.data.get("conversation_history"),
             )
         except RuntimeError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)

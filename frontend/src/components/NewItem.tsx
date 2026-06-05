@@ -9,6 +9,7 @@ import {
   regenerateContentItemAudio,
   refreshContentItemWord,
 } from "../api";
+import { deterministicIndex, deterministicNumber, deterministicTake } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -44,7 +45,21 @@ const VERB_PERSONS = [
 ] as const;
 type VerbTenseKey = typeof VERB_TENSES[number]["key"];
 type VerbPersonKey = typeof VERB_PERSONS[number]["key"];
-type ItemActionIconName = "exercise" | "warmup" | "letters" | "builder" | "dialogMatch" | "dialogs" | "questions" | "audio" | "refresh";
+type ItemActionIconName =
+  | "exercise"
+  | "warmup"
+  | "letters"
+  | "builder"
+  | "dialogMatch"
+  | "dialogs"
+  | "questions"
+  | "audio"
+  | "selectAll"
+  | "clearAll"
+  | "random"
+  | "image"
+  | "openImage"
+  | "refresh";
 
 function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
   const commonProps = {
@@ -121,6 +136,53 @@ function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
         <path d="M15 19v-4h4" />
         <path d="M19 9a7 7 0 0 0-11-3.6" />
         <path d="M15 15a7 7 0 0 1-11 3.6" />
+      </svg>
+    );
+  }
+  if (name === "selectAll") {
+    return (
+      <svg {...commonProps}>
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <path d="m8.5 12 2.2 2.2 4.8-5.2" />
+      </svg>
+    );
+  }
+  if (name === "clearAll") {
+    return (
+      <svg {...commonProps}>
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <path d="m9 10 6 6" />
+        <path d="m15 10-6 6" />
+      </svg>
+    );
+  }
+  if (name === "random") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 8h3l4 8h3" />
+        <path d="M14 8h6" />
+        <path d="m17 5 3 3-3 3" />
+        <path d="M4 16h3l2-4" />
+        <path d="M14 16h6" />
+        <path d="m17 13 3 3-3 3" />
+      </svg>
+    );
+  }
+  if (name === "image") {
+    return (
+      <svg {...commonProps}>
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <circle cx="9" cy="10" r="1.5" />
+        <path d="m6 17 4-4 3 3 2-2 3 3" />
+      </svg>
+    );
+  }
+  if (name === "openImage") {
+    return (
+      <svg {...commonProps}>
+        <rect x="4" y="7" width="10" height="10" rx="2" />
+        <path d="M13 5h6v6" />
+        <path d="m19 5-8 8" />
       </svg>
     );
   }
@@ -238,7 +300,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const exerciseRunningRef = useRef<boolean>(false);
   const exerciseMutedRef = useRef<boolean>(false);
   const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
-  const lastFunnyImageVoiceRef = useRef<string>("");
   const questionsHistoryRef = useRef<HTMLDivElement | null>(null);
   const questionInputRef = useRef<HTMLInputElement | null>(null);
   const hideDialogTargetText = targetPromptMode === "audio" && !showDialogTargetText;
@@ -590,7 +651,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setAskingQuestion(true);
     setItemQuestionError("");
     try {
-      const response = await askContentItemQuestion(item.id, questionText, sourceLanguage, targetLanguage);
+      const response = await askContentItemQuestion(item.id, questionText, itemQuestions, sourceLanguage, targetLanguage);
       setItemQuestions(response.conversation || []);
       setItemQuestionInput("");
     } catch (error) {
@@ -603,6 +664,35 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       setAskingQuestion(false);
     }
   };
+
+  const askPresetItemQuestion = async (questionText: string): Promise<void> => {
+    const trimmed = questionText.trim();
+    if (askingQuestion || !trimmed) {
+      return;
+    }
+    setAskingQuestion(true);
+    setItemQuestionError("");
+    try {
+      const response = await askContentItemQuestion(item.id, trimmed, itemQuestions, sourceLanguage, targetLanguage);
+      setItemQuestions(response.conversation || []);
+      setItemQuestionInput("");
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setItemQuestionError(error.message);
+      } else {
+        setItemQuestionError(t("newItem.questionsError"));
+      }
+    } finally {
+      setAskingQuestion(false);
+    }
+  };
+
+  const quickItemQuestions = [
+    t("newItem.questionsQuickMeaning"),
+    t("newItem.questionsQuickUse"),
+    t("newItem.questionsQuickExamples"),
+    t("newItem.questionsQuickMistakes"),
+  ];
 
   const confirmAddWordFromDialog = async (): Promise<void> => {
     if (!pendingWordAdd || addingWord) {
@@ -773,13 +863,14 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       turn.source_text.trim().toLowerCase() === sourceText.trim().toLowerCase()
       || turn.target_text.trim().toLowerCase() === targetText.trim().toLowerCase()
     ));
+  const itemDeterministicKey = `${item.item_type}:${sourceText.trim().toLowerCase()}=>${targetText.trim().toLowerCase()}`;
 
-  const randomExerciseEntryKeys = (count: number): string[] => {
+  const deterministicExerciseEntryKeys = (count: number): string[] => {
     const keys = regularWordExerciseEntries.map(exerciseEntryKey);
     if (keys.length <= count) {
       return keys;
     }
-    return [...keys].sort(() => Math.random() - 0.5).slice(0, count);
+    return deterministicTake(keys, count, `${itemDeterministicKey}:exercise-keys:${count}`, (key) => key);
   };
 
   const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] => verbExerciseGridEntries
@@ -798,7 +889,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setSelectedExerciseKeys(verbExerciseKeysForTense(tense));
   };
 
-  const selectRandomVerbExerciseGroup = (): void => {
+  const selectDeterministicVerbExerciseGroup = (): void => {
     const groups = [
       ...VERB_PERSONS.map((person) => verbExerciseKeysForPerson(person.key)),
       ...VERB_TENSES.map((tense) => verbExerciseKeysForTense(tense.key)),
@@ -807,7 +898,8 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       setSelectedExerciseKeys([]);
       return;
     }
-    setSelectedExerciseKeys(groups[Math.floor(Math.random() * groups.length)]);
+    const selectedGroupIndex = deterministicIndex(groups.length, `${itemDeterministicKey}:verb-group`);
+    setSelectedExerciseKeys(groups[selectedGroupIndex]);
   };
 
   useEffect(() => {
@@ -816,11 +908,11 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       return;
     }
     if (isVerbExerciseGrid) {
-      selectRandomVerbExerciseGroup();
+      selectDeterministicVerbExerciseGroup();
       return;
     }
-    setSelectedExerciseKeys(randomExerciseEntryKeys(2));
-  }, [showExerciseModal, item.id, item.item_type]);
+    setSelectedExerciseKeys(deterministicExerciseEntryKeys(2));
+  }, [showExerciseModal, item.id, item.item_type, isVerbExerciseGrid, itemDeterministicKey]);
 
   const toggleExerciseEntry = (entry: { label?: string; source: string; target: string }): void => {
     const key = exerciseEntryKey(entry);
@@ -841,10 +933,10 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
 
   const selectRandomExerciseEntries = (): void => {
     if (isVerbExerciseGrid) {
-      selectRandomVerbExerciseGroup();
+      selectDeterministicVerbExerciseGroup();
       return;
     }
-    setSelectedExerciseKeys(randomExerciseEntryKeys(2));
+    setSelectedExerciseKeys(deterministicExerciseEntryKeys(2));
   };
 
   const unselectAllExerciseEntries = (): void => {
@@ -1035,15 +1127,13 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     const matchingVoices = window.speechSynthesis
       .getVoices()
       .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
-    const selectableVoices = matchingVoices.length > 1
-      ? matchingVoices.filter((voice) => voice.voiceURI !== lastFunnyImageVoiceRef.current)
-      : matchingVoices;
-    const selectedVoice = selectableVoices[Math.floor(Math.random() * selectableVoices.length)];
+    const selectedVoice = matchingVoices.length
+      ? matchingVoices[deterministicIndex(matchingVoices.length, `${itemDeterministicKey}:funny-image-voice`)]
+      : undefined;
     if (selectedVoice) {
       utterance.voice = selectedVoice;
-      lastFunnyImageVoiceRef.current = selectedVoice.voiceURI;
     } else {
-      utterance.pitch = 0.85 + Math.random() * 0.35;
+      utterance.pitch = deterministicNumber(`${itemDeterministicKey}:funny-image-pitch`, 0.85, 1.2);
     }
     window.speechSynthesis.speak(utterance);
   };
@@ -1468,6 +1558,9 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       {showWordIntroPracticeModal && item.item_type === "word" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closeWordIntroPracticeModal}>
+              ×
+            </button>
             <p>
               <strong>{t("newItem.wordIntroPracticeTitle")}</strong>
             </p>
@@ -1476,17 +1569,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               item={wordIntroPracticeItem}
               onAnswered={async () => closeWordIntroPracticeModal()}
             />
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={closeWordIntroPracticeModal}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
-            </div>
           </div>
         </div>
       )}
       {showWordLetterPracticeModal && item.item_type === "word" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closeWordLetterPracticeModal}>
+              ×
+            </button>
             <p>
               <strong>{t("newItem.wordLetterPracticeTitle")}</strong>
             </p>
@@ -1495,17 +1586,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               item={wordLetterPracticeItem}
               onAnswered={async () => closeWordLetterPracticeModal()}
             />
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={closeWordLetterPracticeModal}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
-            </div>
           </div>
         </div>
       )}
       {showPhraseBuilderModal && item.item_type === "phrase" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closePhraseBuilderModal}>
+              ×
+            </button>
             <p>
               <strong>{t("newItem.phraseBuilderTitle")}</strong>
             </p>
@@ -1514,17 +1603,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               item={phraseBuilderItem}
               onAnswered={async () => closePhraseBuilderModal()}
             />
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={closePhraseBuilderModal}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
-            </div>
           </div>
         </div>
       )}
       {showPhraseMeaningModal && item.item_type === "phrase" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal phrase-builder-modal phrase-meaning-modal">
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closePhraseMeaningModal}>
+              ×
+            </button>
             <p>
               <strong>{t("newItem.phraseMeaningTitle")}</strong>
             </p>
@@ -1545,17 +1632,15 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 )}
               />
             </div>
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={closePhraseMeaningModal}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
-            </div>
           </div>
         </div>
       )}
       {showExerciseModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className={`blocking-modal related-dialogs-modal exercise-modal ${isVerbExerciseGrid ? "verb-exercise-modal" : ""}`}>
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closeExerciseModal}>
+              ×
+            </button>
             <p className="exercise-modal-header">
               <strong>{t("newItem.exercisesTitle")}</strong>
             </p>
@@ -1568,46 +1653,69 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                   <div className="exercise-selection-actions">
                     <button
                       type="button"
-                      className="secondary-button"
+                      className="secondary-button exercise-action-icon-button"
                       onClick={unselectAllExerciseEntries}
                       disabled={exerciseRunning || selectedExerciseKeys.length === 0}
+                      aria-label={t("newItem.exercisesUnselectAll")}
+                      title={t("newItem.exercisesUnselectAll")}
                     >
-                      {t("newItem.exercisesUnselectAll")}
+                      <ItemActionIcon name="clearAll" />
                     </button>
                     <button
                       type="button"
-                      className="secondary-button"
+                      className="secondary-button exercise-action-icon-button"
                       onClick={selectAllExerciseEntries}
                       disabled={exerciseRunning || wordExerciseEntries.length === 0}
+                      aria-label={t("newItem.exercisesSelectAll")}
+                      title={t("newItem.exercisesSelectAll")}
                     >
-                      {t("newItem.exercisesSelectAll")}
+                      <ItemActionIcon name="selectAll" />
                     </button>
                     <button
                       type="button"
-                      className="secondary-button"
+                      className="secondary-button exercise-action-icon-button"
                       onClick={selectRandomExerciseEntries}
                       disabled={exerciseRunning || wordExerciseEntries.length === 0}
+                      aria-label={t("newItem.exercisesRandomSelection")}
+                      title={t("newItem.exercisesRandomSelection")}
                     >
-                      {t("newItem.exercisesRandomSelection")}
+                      <ItemActionIcon name="random" />
                     </button>
-                    {funnyImageExerciseEntry ? (
-                      <DangerousButton
-                        className="secondary-button dangerous-action-button"
-                        onConfirm={generateFunnyImageExercise}
-                        disabled={generatingFunnyImageExercise || item.id <= 0}
-                      >
-                        {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
-                      </DangerousButton>
-                    ) : (
+                    {funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
                       <button
                         type="button"
-                        className="secondary-button"
-                        onClick={() => void generateFunnyImageExercise()}
-                        disabled={generatingFunnyImageExercise || item.id <= 0}
+                        className="secondary-button exercise-action-icon-button"
+                        onClick={() => setShowFunnyImageModal(true)}
+                        aria-label={t("newItem.exercisesFunnyImageShow")}
+                        title={t("newItem.exercisesFunnyImageShow")}
                       >
-                        {generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                        <ItemActionIcon name="openImage" />
                       </button>
                     )}
+                    <div className="exercise-image-actions">
+                      {funnyImageExerciseEntry ? (
+                        <DangerousButton
+                          className="secondary-button dangerous-action-button exercise-action-icon-button"
+                          onConfirm={generateFunnyImageExercise}
+                          disabled={generatingFunnyImageExercise || item.id <= 0}
+                          aria-label={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                          title={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                        >
+                          <ItemActionIcon name="image" />
+                        </DangerousButton>
+                      ) : (
+                        <button
+                          type="button"
+                          className="secondary-button exercise-action-icon-button"
+                          onClick={() => void generateFunnyImageExercise()}
+                          disabled={generatingFunnyImageExercise || item.id <= 0}
+                          aria-label={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                          title={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
+                        >
+                          <ItemActionIcon name="image" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {generatingFunnyImageExercise && (
                     <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>
@@ -1627,13 +1735,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                           <em className="exercise-phrase-label">{funnyImageExerciseSelectionEntry.label}</em>
                         </span>
                       </label>
-                      <button
-                        type="button"
-                        className="secondary-button funny-image-open-button"
-                        onClick={() => setShowFunnyImageModal(true)}
-                      >
-                        {t("newItem.exercisesFunnyImageShow")}
-                      </button>
                     </div>
                   )}
                   {isVerbExerciseGrid ? (
@@ -1782,9 +1883,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                     {exerciseMuted ? t("newItem.exercisesUnmute") : t("newItem.exercisesMute")}
                   </button>
                 )}
-                <button type="button" className="secondary-button" onClick={closeExerciseModal}>
-                  {t("newItem.closeRelatedDialogs")}
-                </button>
               </div>
             </div>
           </div>
@@ -1843,6 +1941,19 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 ))}
               </div>
             )}
+            <div className="item-question-presets">
+              {quickItemQuestions.map((question) => (
+                <button
+                  key={question}
+                  type="button"
+                  className="secondary-button item-question-preset"
+                  disabled={askingQuestion}
+                  onClick={() => void askPresetItemQuestion(question)}
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
             <form
               className="item-questions-actions"
               onSubmit={(event) => {

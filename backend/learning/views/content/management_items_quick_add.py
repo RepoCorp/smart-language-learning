@@ -121,6 +121,148 @@ def _unpack_word_resolution(value) -> tuple[str, str, str, str]:
     return source_text, target_text, word_type, note
 
 
+def _helper_note(*, source_text: str) -> str:
+    translation = " ".join((source_text or "").split()).strip()
+    if translation:
+        return (
+            f'Helper word: this is a grammar/support word. In this context it is best understood as "{translation}", '
+            "which may be a short phrase rather than a single standalone word."
+        )[:255]
+    return (
+        "Helper word: this is a grammar/support word, so its meaning depends on the larger phrase and may not map to a single standalone word."
+    )[:255]
+
+
+def _phrase_quick_add_response(
+    *,
+    user,
+    source_language: str,
+    target_language: str,
+    source_text: str,
+    target_text: str,
+    notes: str,
+    word_type: str = "",
+    dialog_id_raw,
+    turn_index_raw,
+    check_only: bool,
+) -> Response:
+    exists = item_exists(
+        user=user,
+        item_type=Item.ItemType.PHRASE,
+        spanish_text=source_text,
+        german_text=target_text,
+        source_language=source_language,
+        target_language=target_language,
+    )
+    if exists:
+        existing = (
+            apply_user_scope(Item.objects, user).filter(
+                item_type=Item.ItemType.PHRASE,
+                source_language=source_language,
+                target_language=target_language,
+                spanish_text__iexact=source_text,
+                german_text__iexact=target_text,
+            )
+            .order_by("-id")
+            .first()
+        )
+        if existing:
+            _link_phrase_to_dialog_turn(
+                user=user,
+                item=existing,
+                dialog_id_raw=dialog_id_raw,
+                turn_index_raw=turn_index_raw,
+            )
+        return Response(
+            {
+                "created": False,
+                "exists": True,
+                "id": existing.id if existing else None,
+                "source_text": source_text,
+                "target_text": target_text,
+                "word_type": word_type,
+                "notes": existing.notes or notes,
+            }
+        )
+
+    if check_only:
+        return Response(
+            {
+                "created": False,
+                "exists": False,
+                "id": None,
+                "source_text": source_text,
+                "target_text": target_text,
+                "word_type": word_type,
+                "notes": notes,
+            }
+        )
+
+    candidate = ContentCandidate(
+        spanish_text=source_text,
+        german_text=target_text,
+        exists=False,
+        notes=notes,
+    )
+    created = create_phrase_if_missing(
+        user=user,
+        candidate=candidate,
+        topic="conversation-click",
+        source_language=source_language,
+        target_language=target_language,
+    )
+    if created is None:
+        existing = (
+            apply_user_scope(Item.objects, user).filter(
+                item_type=Item.ItemType.PHRASE,
+                source_language=source_language,
+                target_language=target_language,
+                spanish_text__iexact=source_text,
+                german_text__iexact=target_text,
+            )
+            .order_by("-id")
+            .first()
+        )
+        if existing:
+            _link_phrase_to_dialog_turn(
+                user=user,
+                item=existing,
+                dialog_id_raw=dialog_id_raw,
+                turn_index_raw=turn_index_raw,
+            )
+        return Response(
+            {
+                "created": False,
+                    "exists": True,
+                    "id": existing.id if existing else None,
+                    "source_text": source_text,
+                    "target_text": target_text,
+                    "word_type": word_type,
+                    "notes": existing.notes or notes,
+                }
+            )
+
+    _link_phrase_to_dialog_turn(
+        user=user,
+        item=created,
+        dialog_id_raw=dialog_id_raw,
+        turn_index_raw=turn_index_raw,
+    )
+    return Response(
+        {
+            "created": True,
+            "exists": False,
+            "id": created.id,
+            "source_text": created.spanish_text,
+            "target_text": created.german_text,
+            "word_type": word_type,
+            "notes": created.notes,
+            "audio_url": created.audio_url,
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
 class ContentWordQuickAddView(APIView):
     def post(self, request: Request) -> Response:
         user = get_request_user(request)
@@ -168,13 +310,41 @@ class ContentWordQuickAddView(APIView):
             )
         except (RuntimeError, TypeError, ValueError):
             return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        final_notes = model_note or notes
+        if word_type == "expression":
+            try:
+                source_text, target_text = _resolve_dialog_phrase_selection(
+                    selected_target_text=target_text,
+                    source_line=source_line,
+                    target_line=target_line,
+                    source_language=source_language,
+                    target_language=target_language,
+                )
+            except ValueError:
+                return Response({"detail": "Selected words do not form a complete expression."}, status=status.HTTP_400_BAD_REQUEST)
+            except RuntimeError:
+                return Response({"detail": "Phrase translation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return _phrase_quick_add_response(
+                user=user,
+                source_language=source_language,
+                target_language=target_language,
+                source_text=source_text,
+                target_text=target_text,
+                notes=final_notes,
+                word_type=word_type,
+                dialog_id_raw=dialog_id_raw,
+                turn_index_raw=turn_index_raw,
+                check_only=check_only,
+            )
         source_text, target_text = normalize_word_pair_for_item_save(
             spanish_text=source_text,
             german_text=target_text,
             source_language=source_language,
             target_language=target_language,
         )
-        final_notes = model_note or notes
+        if word_type == "helper":
+            helper_note = _helper_note(source_text=source_text)
+            final_notes = f"{final_notes} {helper_note}".strip() if final_notes else helper_note
 
         existing = _find_existing_word_item(
             user=user,
@@ -344,112 +514,16 @@ class ContentPhraseQuickAddView(APIView):
                 return Response({"detail": "Phrase translation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         if not source_text:
             return Response({"detail": "source_text is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        exists = item_exists(
+        return _phrase_quick_add_response(
             user=user,
-            item_type=Item.ItemType.PHRASE,
-            spanish_text=source_text,
-            german_text=target_text,
             source_language=source_language,
             target_language=target_language,
-        )
-        if exists:
-            existing = (
-                apply_user_scope(Item.objects, user).filter(
-                    item_type=Item.ItemType.PHRASE,
-                    source_language=source_language,
-                    target_language=target_language,
-                    spanish_text__iexact=source_text,
-                    german_text__iexact=target_text,
-                )
-                .order_by("-id")
-                .first()
-            )
-            if existing:
-                _link_phrase_to_dialog_turn(
-                    user=user,
-                    item=existing,
-                    dialog_id_raw=dialog_id_raw,
-                    turn_index_raw=turn_index_raw,
-                )
-            return Response(
-                {
-                    "created": False,
-                    "exists": True,
-                    "id": existing.id if existing else None,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-
-        if check_only:
-            return Response(
-                {
-                    "created": False,
-                    "exists": False,
-                    "id": None,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-
-        candidate = ContentCandidate(
-            spanish_text=source_text,
-            german_text=target_text,
-            exists=False,
+            source_text=source_text,
+            target_text=target_text,
             notes=notes,
-        )
-        created = create_phrase_if_missing(
-            user=user,
-            candidate=candidate,
-            topic="conversation-click",
-            source_language=source_language,
-            target_language=target_language,
-        )
-        if created is None:
-            existing = (
-                apply_user_scope(Item.objects, user).filter(
-                    item_type=Item.ItemType.PHRASE,
-                    source_language=source_language,
-                    target_language=target_language,
-                    spanish_text__iexact=source_text,
-                    german_text__iexact=target_text,
-                )
-                .order_by("-id")
-                .first()
-            )
-            if existing:
-                _link_phrase_to_dialog_turn(
-                    user=user,
-                    item=existing,
-                    dialog_id_raw=dialog_id_raw,
-                    turn_index_raw=turn_index_raw,
-                )
-            return Response(
-                {
-                    "created": False,
-                    "exists": True,
-                    "id": existing.id if existing else None,
-                    "source_text": source_text,
-                    "target_text": target_text,
-                }
-            )
-        _link_phrase_to_dialog_turn(
-            user=user,
-            item=created,
             dialog_id_raw=dialog_id_raw,
             turn_index_raw=turn_index_raw,
-        )
-        return Response(
-            {
-                "created": True,
-                "exists": False,
-                "id": created.id,
-                "source_text": created.spanish_text,
-                "target_text": created.german_text,
-                "audio_url": created.audio_url,
-            },
-            status=status.HTTP_201_CREATED,
+            check_only=check_only,
         )
 
 

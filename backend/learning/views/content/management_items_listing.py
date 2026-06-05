@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
-import random
 from pathlib import Path
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
@@ -38,6 +38,26 @@ from .core import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _deterministic_hash(*parts: object) -> str:
+    normalized = "||".join(str(part).strip().lower() for part in parts)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _deterministic_sort(values: list, *, seed: str, key_fn) -> list:
+    decorated = [
+        (f"{_deterministic_hash(seed, key_fn(value), index)}", index, value)
+        for index, value in enumerate(values)
+    ]
+    decorated.sort(key=lambda entry: (entry[0], entry[1]))
+    return [value for _, _, value in decorated]
+
+
+def _deterministic_choice(values: list, *, seed: str, key_fn):
+    if not values:
+        return None
+    return _deterministic_sort(values, seed=seed, key_fn=key_fn)[0]
 MAX_EXERCISE_PHRASES = 30
 ARTICLES_BY_LANGUAGE = {
     "spanish": {"el", "la", "los", "las", "un", "una", "unos", "unas"},
@@ -213,7 +233,12 @@ def _dialog_phrase_options_for_item(item: Item, *, user) -> tuple[str, str, list
                 )
                 adjacent_scenes.append((source_text, "\n".join(scene_lines), tuple(audio_url for audio_url in audio_urls if audio_url)))
     adjacent_scenes = list(dict.fromkeys(adjacent_scenes))
-    correct_answer, correct_scene, correct_audio_urls = random.choice(adjacent_scenes) if adjacent_scenes else ("", "", ())
+    deterministic_scene = _deterministic_choice(
+        adjacent_scenes,
+        seed=f"phrase-scene:{item.item_type}:{item.spanish_text}:{item.german_text}",
+        key_fn=lambda scene: f"{scene[0]}|{scene[1]}|{'|'.join(scene[2])}",
+    )
+    correct_answer, correct_scene, correct_audio_urls = deterministic_scene if deterministic_scene else ("", "", ())
     if not correct_answer:
         return "", "", [], []
 
@@ -231,9 +256,17 @@ def _dialog_phrase_options_for_item(item: Item, *, user) -> tuple[str, str, list
     )
     distractors = list(dict.fromkeys(answer.strip() for answer in source_answers if answer and answer.strip()))
     distractors = [answer for answer in distractors if answer.lower() != correct_answer.lower()]
-    random.shuffle(distractors)
-    choices = distractors[:3] + [correct_answer]
-    random.shuffle(choices)
+    sorted_distractors = _deterministic_sort(
+        distractors,
+        seed=f"text-distractors:{correct_answer}",
+        key_fn=lambda answer: answer,
+    )
+    choices = sorted_distractors[:3] + [correct_answer]
+    choices = _deterministic_sort(
+        choices,
+        seed=f"text-choices:{correct_answer}",
+        key_fn=lambda answer: answer,
+    )
     return correct_answer, correct_scene, list(correct_audio_urls), choices
 
 

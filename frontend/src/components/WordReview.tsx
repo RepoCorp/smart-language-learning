@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { shouldAutoplayPrompt } from "../audioAutoplayGuard";
+import { shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -117,6 +117,18 @@ function clozePhraseForItem(item: SessionItem): string {
   return dialogClozePhraseForItem(item) || fallbackClozePhraseForItem(item);
 }
 
+function splitClozePhrase(phrase: string): { before: string; after: string } | null {
+  const marker = "____";
+  const markerIndex = phrase.indexOf(marker);
+  if (markerIndex === -1) {
+    return null;
+  }
+  return {
+    before: phrase.slice(0, markerIndex),
+    after: phrase.slice(markerIndex + marker.length),
+  };
+}
+
 function advancePastFixedCharacters(value: string, expectedAnswer: string): string {
   let nextValue = value;
   while (nextValue.length < expectedAnswer.length && !isLetter(expectedAnswer.charAt(nextValue.length))) {
@@ -146,6 +158,15 @@ interface WordReviewProps {
 const FEEDBACK_DELAY_MS = 1000;
 const MAX_WRITTEN_WORD_ASSISTANCE_STEPS = 2;
 type FeedbackTone = "neutral" | "success" | "error";
+
+const speechLangByCode: Record<StudyLanguageCode, string> = {
+  spanish: "es-ES",
+  english: "en-US",
+  german: "de-DE",
+  french: "fr-FR",
+  italian: "it-IT",
+  portuguese: "pt-PT",
+};
 
 export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
@@ -186,6 +207,11 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const clozeNextLetter = useClozeRetry ? expectedAnswer.charAt(answer.length) : "";
   const clozeLetterSuggestions = useClozeRetry ? nextLetterSuggestions(clozeNextLetter, answer.length) : [];
   const clozeProgress = useClozeRetry ? clozeLetterProgress(answer, expectedAnswer) : "";
+  const completedClozePhrase = useClozeRetry && normalize(answer) === normalize(expectedAnswer);
+  const clozePhraseParts = useClozeRetry ? splitClozePhrase(clozePhrase) : null;
+  const completedClozePhraseText = clozePhraseParts
+    ? `${clozePhraseParts.before}${expectedAnswer}${clozePhraseParts.after}`.trim()
+    : "";
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
@@ -195,12 +221,48 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
 
   const hasExceededWrittenWordAssistanceLimit = (): boolean => writtenWordAssistanceSteps > MAX_WRITTEN_WORD_ASSISTANCE_STEPS;
 
+  const playCompletionAudio = async (): Promise<boolean> => {
+    if (useClozeRetry && completedClozePhraseText && typeof window !== "undefined" && "speechSynthesis" in window) {
+      await new Promise<void>((resolve) => {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.resume();
+        const utterance = new SpeechSynthesisUtterance(completedClozePhraseText);
+        utterance.lang = speechLangByCode[targetLanguage] || "de-DE";
+        utterance.rate = 0.6;
+        utterance.onend = () => resolve();
+        utterance.onerror = () => resolve();
+        window.speechSynthesis.speak(utterance);
+      });
+      return true;
+    }
+    if (!item.audio_url) {
+      return false;
+    }
+    const audio = new Audio(item.audio_url);
+    suppressPromptAutoplayForAudio(audio);
+    await new Promise<void>((resolve) => {
+      const finish = (): void => resolve();
+      audio.onended = finish;
+      audio.onerror = finish;
+      audio.onabort = finish;
+      void audio.play().catch(finish);
+    });
+    return true;
+  };
+
   const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
     setIsSubmitting(true);
     setFeedback(message);
     setFeedbackTone(correct ? "success" : "error");
     try {
-      await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
+      if (correct) {
+        const played = await playCompletionAudio();
+        if (!played) {
+          await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
+        }
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
+      }
       await onAnswered(correct);
     } finally {
       setIsSubmitting(false);
@@ -364,6 +426,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     }
     setIsSubmitting(true);
     try {
+      await playCompletionAudio();
       await onAnswered(true);
     } finally {
       setIsSubmitting(false);
@@ -499,9 +562,17 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         <p className="prompt prompt-light test-instruction">{t("word.clozePromptInstruction")}</p>
         <p className="test-source-phrase">{item.spanish_text}</p>
         <p className="word-cloze-phrase">
-          {clozePhrase || t("word.clozeMissingPhrase")}
+          {clozePhraseParts
+            ? (
+              <>
+                {clozePhraseParts.before}
+                {completedClozePhrase ? <span className="word-cloze-answer-filled">{expectedAnswer}</span> : "____"}
+                {clozePhraseParts.after}
+              </>
+            )
+            : (clozePhrase || t("word.clozeMissingPhrase"))}
         </p>
-        {clozePhrase && (
+        {clozePhrase && !completedClozePhrase && (
           <>
             <p className="word-letter-progress" aria-label={t("word.letterBuildLabel")}>
               {clozeProgress}

@@ -146,10 +146,12 @@ Rules:
 - For a clicked noun with a clear standalone meaning, return the noun itself here. Do not return a noun phrase like "sein Freund" unless the entire phrase has a non-literal expression meaning.
 - Never guess a standalone translation if it would be misleading. Prefer returning a larger expression only when necessary.
 - For expressions, target_text must be the target-language expression, source_text must be the translation of that expression, word_type must be "expression", and note must briefly explain why the clicked word alone is insufficient.
-- If the clicked word works as a standalone study item in THIS context, return that standalone unit and use an empty note.
+- For helper words, keep target_text as the helper word itself, but source_text may be either a single word or a short natural phrase if that is the only faithful translation in context.
+- For helper words, note must briefly explain the helper role or why the translation is contextual.
+- If the clicked word works as a standalone study item in THIS context, return that standalone unit and use an empty note, except for helper words which should still include the brief helper explanation note.
 - Classify modal verbs, auxiliary verbs, and grammar-building forms as "helper" only when they are used that way in this target line.
 - For modal, auxiliary, conditional, future, or tense-building helper words, return only the helper word translation unit.
-- Use context to disambiguate meaning, but return a clean translation unit of the word itself (no extra explanation).
+- Use context to disambiguate meaning. For helper words, a short source-language phrase is allowed when needed, but target_text must stay the helper word itself.
 - Do not normalize inflection, case, number, or article here unless it is already required to identify the clicked word's contextual meaning.
 - Do not decompose compound or derived words into a smaller root when that changes the meaning.
 - Example: clicked "großartig" means "excelente/estupendo"; do not return "groß" or "grande".
@@ -178,6 +180,18 @@ Rules:
     note = str(parsed.get("note", "")).strip()
     if not resolved_source or not resolved_target or not word_type:
         raise RuntimeError("Dialog word resolution returned incomplete data")
+    if word_type in {"helper", "expression"}:
+        resolved_source, resolved_target, note = _refine_special_click_resolution(
+            clicked_word=clicked_word,
+            source_context=source_line.strip(),
+            target_context=target_context,
+            source_language=source_language,
+            target_language=target_language,
+            source_text=resolved_source,
+            target_text=resolved_target,
+            word_type=word_type,
+            note=note,
+        )
     return resolved_source, resolved_target, word_type, note
 
 
@@ -191,6 +205,78 @@ def _normalize_word_token(value: str) -> str:
 
 def _clean_edge_punctuation(value: str) -> str:
     return re.sub(r"^[^\wÀ-ÖØ-öø-ÿ]+|[^\wÀ-ÖØ-öø-ÿ]+$", "", value or "", flags=re.UNICODE).strip()
+
+
+def _refine_special_click_resolution(
+    *,
+    clicked_word: str,
+    source_context: str,
+    target_context: str,
+    source_language: str,
+    target_language: str,
+    source_text: str,
+    target_text: str,
+    word_type: str,
+    note: str,
+) -> tuple[str, str, str]:
+    parsed = _call_openai_json_logged(
+        label=f"refine_{word_type}_click_resolution",
+        system_prompt=f"""
+Refine a clicked target-language {word_type} study item using full line context.
+
+Return strict JSON:
+{{
+  "source_text": "string",
+  "target_text": "string",
+  "note": "string"
+}}
+
+Rules:
+- Do not change the item type. It is already confirmed to be "{word_type}".
+- Use the clicked word plus the full source and target line context to refine the best study unit.
+- Keep the result minimal but meaningful in both languages.
+- Never return the full sentence unless the full sentence itself is the smallest reusable unit.
+- Do not add meaning from unselected surrounding words unless that meaning is required to make the unit understandable.
+- source_text and target_text must stay aligned in meaning.
+
+Expression-specific rules:
+- target_text must be the smallest reusable target-language expression that carries the meaning in context.
+- Prefer a multi-word expression when the clicked word alone would be misleading.
+- Do not collapse an expression to a single word if the meaning in context depends on a larger group.
+- source_text must be the smallest natural source-language translation of that same expression, not the whole sentence.
+- note must briefly explain why the clicked word alone is insufficient.
+
+Helper-specific rules:
+- target_text must stay the helper word or normalized helper form itself, not the whole verb phrase or sentence.
+- source_text may be a single word or a short natural phrase, whichever is the most faithful translation in context.
+- If a one-word translation would be misleading, use a short phrase instead.
+- note must briefly explain the helper role in context.
+
+- Return JSON only.
+""".strip(),
+        user_input=(
+            f"Source language: {_language_display_name(source_language)}\n"
+            f"Target language: {_language_display_name(target_language)}\n"
+            f"Clicked target word: {clicked_word}\n"
+            f"Current source_text: {source_text}\n"
+            f"Current target_text: {target_text}\n"
+            f"Current note: {note or '(empty)'}\n"
+            f"Source-language line context: {source_context or 'not provided'}\n"
+            f"Target-language line context: {target_context}\n"
+        ),
+        timeout_seconds=6,
+        temperature=0.0,
+        top_p=1.0,
+        presence_penalty=0.0,
+    )
+    if not isinstance(parsed, dict):
+        return source_text, target_text, note
+    refined_source = str(parsed.get("source_text", "")).strip() or source_text
+    refined_target = str(parsed.get("target_text", "")).strip() or target_text
+    refined_note = str(parsed.get("note", "")).strip() or note
+    if word_type == "expression" and len(refined_target.split()) == 1 and len(target_context.split()) > 1:
+        return source_text, target_text, note
+    return refined_source, refined_target, refined_note
 
 
 def _parse_item_conversation_history(raw_value) -> list[dict[str, str]]:
@@ -1254,6 +1340,18 @@ Rules:
     word_type = normalize_word_type(str(parsed.get("word_type", "")))
     if not contextual_source or not contextual_target or not word_type:
         raise RuntimeError("Word metadata generation returned incomplete data")
+    if word_type in {"helper", "expression"}:
+        contextual_source, contextual_target, _ = _refine_special_click_resolution(
+            clicked_word=clicked_word,
+            source_context=source_line.strip(),
+            target_context=target_context,
+            source_language=source_language,
+            target_language=target_language,
+            source_text=contextual_source,
+            target_text=contextual_target,
+            word_type=word_type,
+            note="",
+        )
     return _normalize_word_metadata(
         source_text=contextual_source,
         target_text=contextual_target,
@@ -1284,8 +1382,10 @@ def _normalization_rules_for_word_type(word_type: str, *, source_name: str, targ
 """.strip()
     if word_type == "helper":
         return """
-- Return only the helper word/form in both languages.
+- Return the helper word/form in target_text.
 - Normalize conjugations to a single study form.
+- source_text may be a single word or a short natural phrase when that is the most faithful translation of the helper in context.
+- Keep source_text concise; do not turn it into a full clause or sentence.
 - Do not include the main verb phrase, object, subject, sentence, or clause it supports.
 - Keep this as a helper, not a normal verb.
 """.strip()
@@ -1575,6 +1675,7 @@ def _model_answer_or_reject_item_question(
     question_text: str,
     source_language: str,
     target_language: str,
+    conversation_history: list[dict] | None = None,
 ) -> dict:
     normalized_question = _normalize_text(question_text)
     if not normalized_question:
@@ -1589,12 +1690,32 @@ def _model_answer_or_reject_item_question(
     )
 
     history_rows = list(item.question_exchanges.order_by("created_at", "id"))
-    history_lines: list[str] = []
-    for idx, row in enumerate(history_rows, start=1):
+    merged_history: list[tuple[str, str]] = []
+    seen_pairs: set[tuple[str, str]] = set()
+    for row in history_rows:
         question = str(row.question_text or "").strip()
         answer = str(row.answer_text or "").strip()
         if not question and not answer:
             continue
+        pair = (question, answer)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        merged_history.append(pair)
+    for entry in conversation_history or []:
+        if not isinstance(entry, dict):
+            continue
+        question = str(entry.get("question_text", "")).strip()
+        answer = str(entry.get("answer_text", "")).strip()
+        if not question and not answer:
+            continue
+        pair = (question, answer)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        merged_history.append(pair)
+    history_lines: list[str] = []
+    for idx, (question, answer) in enumerate(merged_history, start=1):
         history_lines.append(f"{idx}. Learner: {question}")
         history_lines.append(f"{idx}. Tutor: {answer}")
     history_text = "\n".join(history_lines) if history_lines else "(no previous conversation)"

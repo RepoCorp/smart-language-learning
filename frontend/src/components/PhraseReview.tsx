@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
-import { shouldAutoplayPrompt } from "../audioAutoplayGuard";
+import { beginPromptAutoplaySuppression, shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
+import { deterministicSort } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -50,19 +51,11 @@ function phraseTokens(value: string): PhraseToken[] {
     }));
 }
 
-function hashToken(value: string): number {
-  return value.split("").reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0);
-}
-
-function shufflePhraseTokens(tokens: PhraseToken[], seed: number): PhraseToken[] {
+function shufflePhraseTokens(tokens: PhraseToken[], seed: string): PhraseToken[] {
   if (tokens.length < 2) {
     return tokens;
   }
-  const shuffled = [...tokens].sort((left, right) => {
-    const leftHash = hashToken(`${seed}:${left.id}:${left.text}`);
-    const rightHash = hashToken(`${seed}:${right.id}:${right.text}`);
-    return leftHash - rightHash;
-  });
+  const shuffled = deterministicSort(tokens, seed, (token) => `${token.id}:${token.text}`);
   const keptOriginalOrder = shuffled.every((token, index) => token.originalIndex === index);
   return keptOriginalOrder ? [...shuffled].reverse() : shuffled;
 }
@@ -88,6 +81,15 @@ function smoothstep(value: number): number {
   const clamped = clamp(value, 0, 1);
   return clamped * clamped * (3 - 2 * clamped);
 }
+
+const speechLangByCode: Record<StudyLanguageCode, string> = {
+  spanish: "es-ES",
+  english: "en-US",
+  german: "de-DE",
+  french: "fr-FR",
+  italian: "it-IT",
+  portuguese: "pt-PT",
+};
 
 export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordStatus = {}, onTargetWordClick }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
@@ -120,14 +122,20 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const phraseBuilderCompletionAudioPlayedRef = useRef<boolean>(false);
   const activePointerIdRef = useRef<number | null>(null);
   const activeLatchSlotIndexRef = useRef<number | null>(null);
+  const placedTokenVoiceRef = useRef<string>("");
+  const pendingPlacedTokenAudioTimeoutRef = useRef<number | null>(null);
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const draggingPhraseTokenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const isSpanishToGerman = item.direction !== "de_to_es";
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
+  const itemDeterministicKey = `${item.item_type}:${item.spanish_text.trim().toLowerCase()}=>${item.german_text.trim().toLowerCase()}`;
   const expectedPhraseTokens = useMemo(() => phraseTokens(expectedAnswer), [expectedAnswer]);
-  const phraseBuilderTokens = useMemo(() => shufflePhraseTokens(expectedPhraseTokens, item.id), [expectedPhraseTokens, item.id]);
+  const phraseBuilderTokens = useMemo(
+    () => shufflePhraseTokens(expectedPhraseTokens, `phrase-builder:${itemDeterministicKey}`),
+    [expectedPhraseTokens, itemDeterministicKey],
+  );
   const situationExpectedAnswer = (item.dialog_phrase_answer || "").trim();
   const situationSceneLines = (item.dialog_phrase_scene || situationExpectedAnswer)
     .split(/\n+/)
@@ -158,27 +166,105 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     void audio.play().catch(() => {});
   };
 
-  const playPhraseAudio = (): void => {
+  const playPhraseAudio = async (): Promise<boolean> => {
     if (!item.audio_url) {
-      return;
+      return false;
     }
     const audio = new Audio(item.audio_url);
-    void audio.play().catch(() => {});
+    suppressPromptAutoplayForAudio(audio);
+    await new Promise<void>((resolve) => {
+      const finish = (): void => resolve();
+      audio.onended = finish;
+      audio.onerror = finish;
+      audio.onabort = finish;
+      void audio.play().catch(finish);
+    });
+    return true;
+  };
+
+  const continueWithCompletionAudio = async (): Promise<void> => {
+    if (isSubmitting) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await playPhraseAudio();
+      await onAnswered(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const playPlacedPhraseTokenAudio = (tokenText: string, playFullPhraseAfter = false): void => {
+    const trimmedTokenText = tokenText.trim();
+    if (!trimmedTokenText) {
+      if (playFullPhraseAfter) {
+        void playPhraseAudio();
+      }
+      return;
+    }
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      if (playFullPhraseAfter) {
+        void playPhraseAudio();
+      }
+      return;
+    }
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+    const utterance = new SpeechSynthesisUtterance(trimmedTokenText);
+    const lang = speechLangByCode[targetLanguage] || "de-DE";
+    const langPrefix = lang.split("-")[0];
+    utterance.lang = lang;
+    utterance.rate = 0.7;
+    const matchingVoices = window.speechSynthesis
+      .getVoices()
+      .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
+    const selectedVoice = matchingVoices.find((voice) => voice.voiceURI === placedTokenVoiceRef.current)
+      || matchingVoices[0];
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      placedTokenVoiceRef.current = selectedVoice.voiceURI;
+    }
+    if (playFullPhraseAfter) {
+      utterance.onend = () => { void playPhraseAudio(); };
+      utterance.onerror = () => { void playPhraseAudio(); };
+    }
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const schedulePlacedPhraseTokenAudio = (tokenText: string, playFullPhraseAfter = false): void => {
+    if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
+      window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
+      pendingPlacedTokenAudioTimeoutRef.current = null;
+    }
+    pendingPlacedTokenAudioTimeoutRef.current = window.setTimeout(() => {
+      pendingPlacedTokenAudioTimeoutRef.current = null;
+      playPlacedPhraseTokenAudio(tokenText, playFullPhraseAfter);
+    }, 80);
   };
 
   const playSituationScene = (): void => {
     if (!situationSceneAudioUrls.length) {
       return;
     }
+    const releaseSuppression = beginPromptAutoplaySuppression(Math.max(2200, situationSceneAudioUrls.length * 2200));
     const playNext = (index: number): void => {
       const audioUrl = situationSceneAudioUrls[index];
       if (!audioUrl) {
+        releaseSuppression();
         return;
       }
       const audio = new Audio(audioUrl);
-      audio.onended = () => playNext(index + 1);
-      audio.onerror = () => playNext(index + 1);
-      void audio.play().catch(() => playNext(index + 1));
+      const finish = (): void => {
+        if (index >= situationSceneAudioUrls.length - 1) {
+          releaseSuppression();
+          return;
+        }
+        playNext(index + 1);
+      };
+      audio.onended = finish;
+      audio.onerror = finish;
+      void audio.play().catch(finish);
     };
     playNext(0);
   };
@@ -190,7 +276,14 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     setIsSubmitting(true);
     setFeedback(message);
     try {
-      await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
+      if (correct) {
+        const played = await playPhraseAudio();
+        if (!played) {
+          await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
+        }
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
+      }
       await onAnswered(correct);
     } finally {
       setIsSubmitting(false);
@@ -209,6 +302,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
       return;
     }
     setSelectedSituationChoice(choice);
+    playSituationScene();
   };
 
   const markWrongPhraseToken = (tokenId: string): void => {
@@ -248,13 +342,14 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
       return true;
     }
     const nextPlacedTokens = [...placedPhraseTokens, token];
+    const completedPhrase = nextPlacedTokens.length === expectedPhraseTokens.length;
     setPlacedPhraseTokens(nextPlacedTokens);
     setWrongPhraseTokenId("");
-    if (nextPlacedTokens.length === expectedPhraseTokens.length) {
+    schedulePlacedPhraseTokenAudio(token.text, completedPhrase);
+    if (completedPhrase) {
       setPhraseBuilderComplete(true);
       if (!phraseBuilderCompletionAudioPlayedRef.current) {
         phraseBuilderCompletionAudioPlayedRef.current = true;
-        playPhraseAudio();
       }
     }
     return true;
@@ -303,10 +398,18 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
       left: basePosition.left + ((targetLeft - basePosition.left) * attractionStrength),
       top: basePosition.top + ((targetTop - basePosition.top) * attractionStrength),
     };
-    const latchRadius = Math.max(20, Math.min(draggedRect.width, draggedRect.height, rect.width, rect.height) * 0.3);
+    const slotMiddleBandWidth = rect.width * 0.36;
+    const slotMiddleBandHeight = rect.height * 0.36;
+    const slotMiddleLeft = slotCenterX - (slotMiddleBandWidth / 2);
+    const slotMiddleRight = slotCenterX + (slotMiddleBandWidth / 2);
+    const slotMiddleTop = slotCenterY - (slotMiddleBandHeight / 2);
+    const slotMiddleBottom = slotCenterY + (slotMiddleBandHeight / 2);
+    const coversMiddleHorizontally = draggedRect.right >= slotMiddleLeft && draggedRect.left <= slotMiddleRight;
+    const coversMiddleVertically = draggedRect.bottom >= slotMiddleTop && draggedRect.top <= slotMiddleBottom;
+    const latchRadius = Math.max(20, Math.min(draggedRect.width, draggedRect.height, rect.width, rect.height) * 0.22);
     return {
       position: adjustedPosition,
-      shouldLatch: distance <= latchRadius,
+      shouldLatch: (coversMiddleHorizontally && coversMiddleVertically) || distance <= latchRadius,
       slotIndex: placedCount,
     };
   };
@@ -384,6 +487,14 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     pointerDragOffsetRef.current = { x: 0, y: 0 };
     draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     phraseBuilderCompletionAudioPlayedRef.current = false;
+    placedTokenVoiceRef.current = "";
+    if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
+      window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
+      pendingPlacedTokenAudioTimeoutRef.current = null;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
   }, [item.id, item.direction]);
 
   useEffect(() => {
@@ -402,75 +513,92 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
 
   if (usePhraseBuilder) {
     const placedIds = new Set(placedPhraseTokens.map((token) => token.id));
-    const remainingTokens = phraseBuilderTokens.filter((token) => !placedIds.has(token.id));
     return (
-      <div>
+      <div className="phrase-builder-review">
         <p className="prompt prompt-light test-instruction">{t("phrase.builderPrompt", { language: languageLabel })}</p>
         <p className="test-source-phrase">{promptText}</p>
-        <div
-          ref={phraseSlotsRef}
-          className="phrase-builder-slots"
-          aria-label={t("phrase.builderAnswerLabel")}
-        >
-          {expectedPhraseTokens.map((token, index) => (
-            <span
-              key={token.id}
-              data-slot-index={index}
-              className={`phrase-builder-slot${placedPhraseTokens[index] ? " phrase-builder-slot-filled" : ""}${!placedPhraseTokens[index] && activeLatchSlotIndex === index ? " phrase-builder-slot-latching" : ""}`}
-            >
-              <span className="phrase-builder-slot-size">{token.text}</span>
-              <span className="phrase-builder-slot-value">
-                {placedPhraseTokens[index]?.text || "\u00a0"}
+        <div className="phrase-builder-target-zone">
+          <div
+            ref={phraseSlotsRef}
+            className="phrase-builder-slots"
+            aria-label={t("phrase.builderAnswerLabel")}
+          >
+            {expectedPhraseTokens.map((token, index) => (
+              <span
+                key={token.id}
+                data-slot-index={index}
+                className={`phrase-builder-slot${placedPhraseTokens[index] ? " phrase-builder-slot-filled" : ""}${!placedPhraseTokens[index] && activeLatchSlotIndex === index ? " phrase-builder-slot-latching" : ""}`}
+              >
+                <span className="phrase-builder-slot-size">{token.text}</span>
+                <span className="phrase-builder-slot-value">
+                  {placedPhraseTokens[index]?.text || "\u00a0"}
+                </span>
               </span>
-            </span>
-          ))}
+            ))}
+          </div>
         </div>
-        <div className="phrase-builder-bank" aria-label={t("phrase.builderBankLabel")}>
-          {remainingTokens.map((token) => (
-            <button
-              key={token.id}
-              type="button"
-              className={`phrase-builder-token${wrongPhraseTokenId === token.id ? " phrase-builder-token-wrong" : ""}${draggingPhraseTokenId === token.id ? " phrase-builder-token-dragging" : ""}`}
-              style={draggingPhraseTokenId === token.id && draggingPhraseTokenPosition
-                ? {
-                  left: draggingPhraseTokenPosition.left,
-                  top: draggingPhraseTokenPosition.top,
-                }
-                : undefined}
-              onPointerDown={(event) => {
-                if (isSubmitting || phraseBuilderComplete) {
-                  return;
-                }
-                event.preventDefault();
-                event.currentTarget.setPointerCapture(event.pointerId);
-                startPointerPhraseDrag(token.id, event.pointerId, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
-              }}
-              onPointerMove={(event) => {
-                if (activePointerIdRef.current !== event.pointerId) {
-                  return;
-                }
-                event.preventDefault();
-                movePointerPhraseDrag(event.pointerId, event.clientX, event.clientY);
-              }}
-              onPointerUp={(event) => {
-                event.preventDefault();
-                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  event.currentTarget.releasePointerCapture(event.pointerId);
-                }
-                endPointerPhraseDrag(event.pointerId);
-              }}
-              onPointerCancel={(event) => {
-                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  event.currentTarget.releasePointerCapture(event.pointerId);
-                }
-                endPointerPhraseDrag(event.pointerId);
-              }}
-              disabled={isSubmitting || phraseBuilderComplete}
-            >
-              <span className="phrase-builder-token-text">{token.text}</span>
-              <span className="phrase-builder-token-handle" aria-hidden="true" />
-            </button>
-          ))}
+        <div className="phrase-builder-bank-scroll">
+          <div className="phrase-builder-bank" aria-label={t("phrase.builderBankLabel")}>
+            {phraseBuilderTokens.map((token) => {
+              const isPlaced = placedIds.has(token.id);
+              const isDragging = draggingPhraseTokenId === token.id;
+              return (
+                <span
+                  key={token.id}
+                  className="phrase-builder-token-shell"
+                  aria-hidden={isPlaced ? true : undefined}
+                >
+                  <span className="phrase-builder-token-placeholder" aria-hidden="true">
+                    <span className="phrase-builder-token-text">{token.text}</span>
+                    <span className="phrase-builder-token-handle" aria-hidden="true" />
+                  </span>
+                  <button
+                    type="button"
+                    className={`phrase-builder-token${isPlaced ? " phrase-builder-token-placed" : ""}${wrongPhraseTokenId === token.id ? " phrase-builder-token-wrong" : ""}${isDragging ? " phrase-builder-token-dragging" : ""}`}
+                    style={isDragging && draggingPhraseTokenPosition
+                      ? {
+                        left: draggingPhraseTokenPosition.left,
+                        top: draggingPhraseTokenPosition.top,
+                      }
+                      : undefined}
+                    onPointerDown={(event) => {
+                      if (isPlaced || isSubmitting || phraseBuilderComplete) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      startPointerPhraseDrag(token.id, event.pointerId, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+                    }}
+                    onPointerMove={(event) => {
+                      if (activePointerIdRef.current !== event.pointerId) {
+                        return;
+                      }
+                      event.preventDefault();
+                      movePointerPhraseDrag(event.pointerId, event.clientX, event.clientY);
+                    }}
+                    onPointerUp={(event) => {
+                      event.preventDefault();
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                        event.currentTarget.releasePointerCapture(event.pointerId);
+                      }
+                      endPointerPhraseDrag(event.pointerId);
+                    }}
+                    onPointerCancel={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                        event.currentTarget.releasePointerCapture(event.pointerId);
+                      }
+                      endPointerPhraseDrag(event.pointerId);
+                    }}
+                    disabled={isPlaced || isSubmitting || phraseBuilderComplete}
+                    tabIndex={isPlaced ? -1 : undefined}
+                  >
+                    <span className="phrase-builder-token-text">{token.text}</span>
+                    <span className="phrase-builder-token-handle" aria-hidden="true" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
         </div>
         {phraseBuilderComplete && <p className="phrase-builder-success">{t("phrase.builderComplete")}</p>}
         <div className="actions">
@@ -586,7 +714,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
             </button>
           )}
           {!situationExpectedAnswer && (
-            <button type="button" onClick={() => void onAnswered(true)} disabled={isSubmitting}>
+            <button type="button" onClick={() => void continueWithCompletionAudio()} disabled={isSubmitting}>
               {t("review.continue")}
             </button>
           )}

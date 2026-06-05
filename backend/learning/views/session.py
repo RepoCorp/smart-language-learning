@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import math
+import hashlib
 from dataclasses import dataclass
 from collections import defaultdict
 
@@ -24,10 +25,30 @@ class SessionEntry:
     due_at_sort: object | None = None
 
 
-REVIEW_WORD_SECONDS = 15
-REVIEW_PHRASE_SECONDS = 20
-NEW_WORD_SECONDS = 45
-NEW_PHRASE_SECONDS = 45
+REVIEW_WORD_SECONDS = 25
+REVIEW_PHRASE_SECONDS = 35
+NEW_WORD_SECONDS = 70
+NEW_PHRASE_SECONDS = 80
+
+
+def _deterministic_hash(*parts: object) -> str:
+    normalized = "||".join(str(part).strip().lower() for part in parts)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _deterministic_sort(values: list, *, seed: str, key_fn) -> list:
+    decorated = [
+        (f"{_deterministic_hash(seed, key_fn(value), index)}", index, value)
+        for index, value in enumerate(values)
+    ]
+    decorated.sort(key=lambda entry: (entry[0], entry[1]))
+    return [value for _, _, value in decorated]
+
+
+def _deterministic_choice(values: list, *, seed: str, key_fn):
+    if not values:
+        return None
+    return _deterministic_sort(values, seed=seed, key_fn=key_fn)[0]
 
 
 class SessionView(APIView):
@@ -481,7 +502,12 @@ def build_dialog_phrase_options(entries: list[SessionEntry], *, user) -> tuple[d
     for entry in phrase_entries:
         item = entry.item
         adjacent_scenes = list(dict.fromkeys(adjacent_scenes_by_item.get(item.id, [])))
-        correct_answer, correct_scene, correct_audio_urls = random.choice(adjacent_scenes) if adjacent_scenes else ("", "", ())
+        deterministic_scene = _deterministic_choice(
+            adjacent_scenes,
+            seed=f"phrase-scene:{item.item_type}:{item.spanish_text}:{item.german_text}",
+            key_fn=lambda scene: f"{scene[0]}|{scene[1]}|{'|'.join(scene[2])}",
+        )
+        correct_answer, correct_scene, correct_audio_urls = deterministic_scene if deterministic_scene else ("", "", ())
         answers_map[entry_key(entry)] = correct_answer
         scenes_map[entry_key(entry)] = correct_scene
         scene_audio_map[entry_key(entry)] = list(correct_audio_urls)
@@ -525,17 +551,29 @@ def _phrase_audio_url_for_turn(turn: DialogTurn, *, user, fallback_item: Item | 
 def build_text_choices(correct_answer: str, source_answers: list[str]) -> list[str]:
     unique_answers = list(dict.fromkeys(answer.strip() for answer in source_answers if answer and answer.strip()))
     distractors = [answer for answer in unique_answers if answer.lower() != correct_answer.lower()]
-    random.shuffle(distractors)
-    choice_texts = distractors[:3] + [correct_answer]
-    random.shuffle(choice_texts)
+    sorted_distractors = _deterministic_sort(
+        distractors,
+        seed=f"text-distractors:{correct_answer}",
+        key_fn=lambda answer: answer,
+    )
+    choice_texts = sorted_distractors[:3] + [correct_answer]
+    choice_texts = _deterministic_sort(
+        choice_texts,
+        seed=f"text-choices:{correct_answer}",
+        key_fn=lambda answer: answer,
+    )
     return choice_texts
 
 
 def build_choices(correct_answer: str, source_answers: list[tuple[int, str]]) -> list[dict]:
     unique_answers_by_text = {answer: item_id for item_id, answer in source_answers}
     distractors = [answer for answer in unique_answers_by_text if answer != correct_answer]
-    random.shuffle(distractors)
-    choice_texts = distractors[:3] + [correct_answer]
+    sorted_distractors = _deterministic_sort(
+        distractors,
+        seed=f"item-distractors:{correct_answer}",
+        key_fn=lambda answer: answer,
+    )
+    choice_texts = sorted_distractors[:3] + [correct_answer]
     choices = [
         {
             "id": unique_answers_by_text[answer],
@@ -544,7 +582,11 @@ def build_choices(correct_answer: str, source_answers: list[tuple[int, str]]) ->
         for answer in choice_texts
         if answer in unique_answers_by_text
     ]
-    random.shuffle(choices)
+    choices = _deterministic_sort(
+        choices,
+        seed=f"item-choices:{correct_answer}",
+        key_fn=lambda choice: f"{choice['id']}|{choice['text']}",
+    )
     return choices
 
 
