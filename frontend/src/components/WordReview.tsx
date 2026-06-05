@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
+import { deterministicSort } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -117,6 +118,19 @@ function clozePhraseForItem(item: SessionItem): string {
   return dialogClozePhraseForItem(item) || fallbackClozePhraseForItem(item);
 }
 
+function warmupContextSentenceForItem(item: SessionItem): string {
+  const candidates = [
+    item.example_sentence || "",
+    ...((item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => turn.target_text))),
+    ...((item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => turn.target_text))),
+    ...((item.exercise_phrases?.phrases || []).map((entry) => entry.target_text)),
+    ...((item.exercise_phrases?.first_section || []).map((entry) => entry.target_text)),
+    ...((item.exercise_phrases?.second_section || []).map((entry) => entry.target_text)),
+    item.exercise_phrases?.funny_image_phrase?.target_text || "",
+  ].filter((candidate) => candidate.trim());
+  return candidates.find((candidate) => blankTargetInPhrase(candidate, item.german_text)) || "";
+}
+
 function splitClozePhrase(phrase: string): { before: string; after: string } | null {
   const marker = "____";
   const markerIndex = phrase.indexOf(marker);
@@ -145,6 +159,36 @@ function clozeLetterProgress(value: string, expectedAnswer: string): string {
         return letter;
       }
       return isLetter(letter) ? "_" : letter;
+    })
+    .join("");
+}
+
+function warmupRevealOrderForValue(value: string, seed: string): number[] {
+  const revealableIndices = value
+    .split("")
+    .map((letter, index) => ({ letter, index }))
+    .filter(({ letter }) => isLetter(letter))
+    .map(({ index }) => index);
+  if (revealableIndices.length <= 1) {
+    return revealableIndices;
+  }
+  const firstIndex = revealableIndices[0];
+  const remaining = deterministicSort(
+    revealableIndices.slice(1),
+    seed,
+    (entry, index) => `${value.charAt(entry)}:${entry}:${index}`,
+  );
+  return [...remaining, firstIndex];
+}
+
+function warmupProgress(value: string, revealedIndexes: Set<number>): string {
+  return value
+    .split("")
+    .map((letter, index) => {
+      if (!isLetter(letter)) {
+        return letter;
+      }
+      return revealedIndexes.has(index) ? letter : "_";
     })
     .join("");
 }
@@ -190,6 +234,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
   const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
   const [letterSuggestions, setLetterSuggestions] = useState<string[]>([]);
+  const [warmupRevealCount, setWarmupRevealCount] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const composingAnswerRef = useRef<boolean>(false);
   const answerBeforeCompositionRef = useRef<string>("");
@@ -212,6 +257,16 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const completedClozePhraseText = clozePhraseParts
     ? `${clozePhraseParts.before}${expectedAnswer}${clozePhraseParts.after}`.trim()
     : "";
+  const warmupRevealOrder = useIntroRetry
+    ? warmupRevealOrderForValue(expectedAnswer, `${item.id}:${expectedAnswer}:${item.direction || ""}:warmup`)
+    : [];
+  const warmupRevealedIndexes = new Set(warmupRevealOrder.slice(0, warmupRevealCount));
+  const warmupProgressText = useIntroRetry ? warmupProgress(expectedAnswer, warmupRevealedIndexes) : "";
+  const warmupContextSentence = useIntroRetry ? warmupContextSentenceForItem(item) : "";
+  const warmupContextParts = useIntroRetry ? splitClozePhrase(blankTargetInPhrase(warmupContextSentence, expectedAnswer)) : null;
+  const warmupAllLettersRevealed = useIntroRetry && warmupRevealCount >= warmupRevealOrder.length;
+  const warmupInputIsWrong = useIntroRetry && Boolean(answer) && !expectedAnswer.startsWith(answer);
+  const warmupInputIsCorrect = useIntroRetry && normalize(answer) === normalize(expectedAnswer);
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
@@ -412,6 +467,44 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     }
   };
 
+  const revealNextWarmupLetter = (): void => {
+    if (!useIntroRetry || isSubmitting) {
+      return;
+    }
+    setWarmupRevealCount((current) => {
+      const nextCount = Math.min(current + 1, warmupRevealOrder.length);
+      if (nextCount >= warmupRevealOrder.length && normalize(answer) !== normalize(expectedAnswer)) {
+        setFeedback(t("word.warmupAllLettersShown", { answer: expectedAnswer }));
+        setFeedbackTone("error");
+      }
+      return nextCount;
+    });
+  };
+
+  const handleWarmupAnswerChange = (value: string): void => {
+    if (!useIntroRetry || isSubmitting) {
+      return;
+    }
+    setAnswer(value);
+    if (warmupAllLettersRevealed && normalize(value) !== normalize(expectedAnswer)) {
+      setFeedback(t("word.warmupAllLettersShown", { answer: expectedAnswer }));
+      setFeedbackTone("error");
+    } else {
+      setFeedback("");
+      setFeedbackTone("neutral");
+    }
+    setAwaitingWrongAccept(false);
+    if (normalize(value) !== normalize(expectedAnswer)) {
+      return;
+    }
+    const warmupSuccessMessage = warmupRevealCount === 0
+      ? t("word.warmupPerfect")
+      : warmupRevealCount <= 2
+        ? t("word.warmupAlmostPerfect")
+        : t("word.feedback.correct");
+    void submitWithFeedback(true, warmupSuccessMessage);
+  };
+
   const playPromptAudio = (): void => {
     if (!allowPromptAudio || !item.audio_url) {
       return;
@@ -420,7 +513,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     void audio.play().catch(() => {});
   };
 
-  const continueIntroRetry = async (): Promise<void> => {
+  const continueSuccessfulRetry = async (): Promise<void> => {
     if (isSubmitting) {
       return;
     }
@@ -466,6 +559,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setAwaitingWrongAccept(false);
     setAnswerRevealed(false);
     setLetterSuggestions([]);
+    setWarmupRevealCount(0);
     composingAnswerRef.current = false;
     pendingCompositionValidationRef.current = false;
     answerBeforeCompositionRef.current = "";
@@ -542,15 +636,88 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   if (useIntroRetry) {
     return (
       <div>
+        <p className="prompt prompt-light test-instruction">{t("word.warmupPromptInstruction")}</p>
+        {warmupContextSentence && (
+          <p className="word-warmup-context">
+            {warmupContextParts
+              ? (
+                <>
+                  {warmupContextParts.before}
+                  <span className="word-warmup-context-answer" aria-label={t("word.letterBuildLabel")}>
+                    {warmupProgressText || expectedAnswer}
+                  </span>
+                  {warmupContextParts.after}
+                </>
+              )
+              : warmupContextSentence}
+          </p>
+        )}
+        {!warmupContextSentence && (
+          <p className="word-warmup-progress" aria-label={t("word.letterBuildLabel")}>
+            {warmupProgressText || expectedAnswer}
+          </p>
+        )}
+        <input
+          ref={inputRef}
+          className={warmupInputIsWrong ? "word-input-error-progress" : warmupInputIsCorrect ? "word-input-correct-progress" : ""}
+          value={answer}
+          onCompositionStart={() => {
+            composingAnswerRef.current = true;
+            answerBeforeCompositionRef.current = answer;
+          }}
+          onCompositionEnd={(event) => {
+            composingAnswerRef.current = false;
+            pendingCompositionValidationRef.current = true;
+            const compositionEndValue = event.currentTarget.value;
+            window.setTimeout(() => {
+              if (!pendingCompositionValidationRef.current) {
+                return;
+              }
+              pendingCompositionValidationRef.current = false;
+              handleWarmupAnswerChange(compositionEndValue || inputRef.current?.value || "");
+            }, 0);
+          }}
+          onChange={(event) => {
+            const nativeEvent = event.nativeEvent as InputEvent;
+            if (composingAnswerRef.current || nativeEvent.isComposing) {
+              setAnswer(event.target.value);
+              return;
+            }
+            if (pendingCompositionValidationRef.current) {
+              pendingCompositionValidationRef.current = false;
+              handleWarmupAnswerChange(event.target.value);
+              return;
+            }
+            handleWarmupAnswerChange(event.target.value);
+          }}
+          placeholder={t("word.input.placeholder")}
+          data-testid="word-input"
+          disabled={isSubmitting}
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+        {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
         <div className="actions">
           {onOpenItem ? (
             <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
               {t("words.openItem")}
             </button>
           ) : null}
-          <button type="button" onClick={() => void continueIntroRetry()} disabled={isSubmitting}>
-            {t("review.continue")}
+          <button
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onPointerDown={(event) => event.preventDefault()}
+            onTouchStart={(event) => event.preventDefault()}
+            onClick={revealNextWarmupLetter}
+            disabled={isSubmitting || warmupRevealCount >= warmupRevealOrder.length}
+          >
+            {t("word.warmupRevealButton")}
           </button>
+          <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
+            {t("word.failButton")}
+          </DangerousButton>
         </div>
       </div>
     );
@@ -566,7 +733,9 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
             ? (
               <>
                 {clozePhraseParts.before}
-                {completedClozePhrase ? <span className="word-cloze-answer-filled">{expectedAnswer}</span> : "____"}
+                {completedClozePhrase
+                  ? <span className="word-cloze-answer-filled">{expectedAnswer}</span>
+                  : <span className="word-cloze-answer-progress">{clozeProgress || "____"}</span>}
                 {clozePhraseParts.after}
               </>
             )
@@ -574,9 +743,6 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         </p>
         {clozePhrase && !completedClozePhrase && (
           <>
-            <p className="word-letter-progress" aria-label={t("word.letterBuildLabel")}>
-              {clozeProgress}
-            </p>
             {clozeLetterSuggestions.length > 0 && (
               <div className="letter-suggestions word-cloze-letter-options" role="group" aria-label={t("word.letterSuggestions")}>
                 {clozeLetterSuggestions.map((letter) => (
@@ -606,7 +772,7 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
               {t("word.failButton")}
             </DangerousButton>
           ) : (
-            <button type="button" onClick={() => void continueIntroRetry()} disabled={isSubmitting}>
+            <button type="button" onClick={() => void continueSuccessfulRetry()} disabled={isSubmitting}>
               {t("review.continue")}
             </button>
           )}
