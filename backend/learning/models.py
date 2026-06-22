@@ -40,6 +40,8 @@ class Item(models.Model):
     audio_url = models.URLField(blank=True)
     exercise_phrases = models.JSONField(default=dict, blank=True)
     is_learned = models.BooleanField(default=False)
+    is_difficult = models.BooleanField(default=False)
+    difficult_marked_at = models.DateTimeField(null=True, blank=True)
 
     repetition_count = models.PositiveIntegerField(default=0)
     interval_days = models.PositiveIntegerField(default=1)

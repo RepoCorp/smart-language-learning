@@ -135,6 +135,48 @@ def test_session_duration_minutes_matches_expected_time_target():
 
 
 @pytest.mark.django_db
+def test_difficult_session_returns_preplanned_exercises_without_regular_items():
+    word = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="casa",
+        german_text="Haus",
+        is_difficult=True,
+    )
+    second_word = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="mesa",
+        german_text="Tisch",
+        is_difficult=True,
+    )
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="No entiendo",
+        german_text="Ich verstehe nicht",
+        is_difficult=True,
+    )
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="nuevo",
+        german_text="neu",
+    )
+
+    client = APIClient()
+    response = client.get("/api/session", {"session_type": "difficult", "duration_minutes": 5})
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["id"] for item in items] == [second_word.id, word.id, second_word.id, word.id, phrase.id, phrase.id]
+    assert items[0]["repeatPracticeStep"] == "word_intro"
+    assert items[1]["repeatPracticeStep"] == "word_intro"
+    assert items[2]["repeatPracticeStep"] == "word_cloze"
+    assert items[3]["repeatPracticeStep"] == "word_cloze"
+    assert items[4]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
+    assert items[4]["repeatedAfterFailure"] is True
+    assert "repeatPracticeStep" not in items[4] or items[4]["repeatPracticeStep"] is None
+    assert items[5]["repeatPracticeStep"] == "phrase_builder"
+
+
+@pytest.mark.django_db
 def test_phrase_review_contains_correct_option():
     now = timezone.now()
     phrase = Item.objects.create(

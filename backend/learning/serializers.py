@@ -21,6 +21,12 @@ class SessionItemSerializer(serializers.Serializer):
         allow_null=True,
         required=False,
     )
+    repeatedAfterFailure = serializers.BooleanField(required=False)
+    repeatPracticeStep = serializers.ChoiceField(
+        choices=["word_intro", "word_cloze", "phrase_builder"],
+        required=False,
+        allow_null=True,
+    )
     options = serializers.ListField(child=serializers.CharField(), required=False)
     option_items = serializers.ListField(child=serializers.DictField(), required=False)
     dialog_phrase_answer = serializers.CharField(allow_blank=True, required=False)
@@ -39,6 +45,10 @@ class SubmitReviewSerializer(serializers.Serializer):
 
 
 class MarkSeenSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField()
+
+
+class CompleteDifficultItemSerializer(serializers.Serializer):
     item_id = serializers.IntegerField()
 
 

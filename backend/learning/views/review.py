@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,4 +32,8 @@ class SubmitReviewView(APIView):
             apply_review_result(item, correct, direction=direction)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if not correct:
+            item.is_difficult = True
+            item.difficult_marked_at = timezone.now()
+            item.save(update_fields=["is_difficult", "difficult_marked_at", "updated_at"])
         return Response({"ok": True})

@@ -1,22 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { beginPromptAutoplaySuppression, shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
+import { shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
 import { deterministicSort } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
-import DialogTurnText from "./DialogTurnText";
-
-type ActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 
 interface PhraseReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
   onOpenItem?: (itemId: number) => void;
-  targetWordStatus?: Record<string, ActionStatus>;
-  onTargetWordClick?: (statusKey: string, token: string, tokenIndex: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 2000;
@@ -69,10 +64,6 @@ function smoothstep(value: number): number {
   return clamped * clamped * (3 - 2 * clamped);
 }
 
-function speakerForTurn(speaker: string | undefined, index: number): "a" | "b" {
-  return speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
-}
-
 const speechLangByCode: Record<StudyLanguageCode, string> = {
   spanish: "es-ES",
   english: "en-US",
@@ -82,7 +73,7 @@ const speechLangByCode: Record<StudyLanguageCode, string> = {
   portuguese: "pt-PT",
 };
 
-export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordStatus = {}, onTargetWordClick }: PhraseReviewProps): JSX.Element {
+export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -104,8 +95,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   const [draggingPhraseTokenPosition, setDraggingPhraseTokenPosition] = useState<{ left: number; top: number } | null>(null);
   const [activeLatchSlotIndex, setActiveLatchSlotIndex] = useState<number | null>(null);
   const [phraseBuilderComplete, setPhraseBuilderComplete] = useState<boolean>(false);
-  const [selectedSituationChoiceIndex, setSelectedSituationChoiceIndex] = useState<number | null>(null);
-  const [wrongSituationChoiceIndexes, setWrongSituationChoiceIndexes] = useState<number[]>([]);
   const draggingPhraseTokenIdRef = useRef<string>("");
   const phraseSlotsRef = useRef<HTMLDivElement | null>(null);
   const placedPhraseTokenCountRef = useRef<number>(0);
@@ -128,29 +117,13 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     () => shufflePhraseTokens(expectedPhraseTokens, `phrase-builder:${itemDeterministicKey}`),
     [expectedPhraseTokens, itemDeterministicKey],
   );
-  const situationExpectedAnswer = (item.dialog_phrase_answer || "").trim();
-  const situationTurns = useMemo(
-    () => (
-      item.dialog_phrase_turns?.length
-        ? item.dialog_phrase_turns
-        : (item.dialog_phrase_options || []).map((targetText, index) => ({
-          source_text: "",
-          target_text: targetText,
-          speaker: index % 2 === 0 ? "a" : "b",
-        }))
-    ),
-    [item.dialog_phrase_options, item.dialog_phrase_turns],
-  );
-  const situationSceneAudioUrls = (item.dialog_phrase_scene_audio_urls || []).filter((audioUrl) => audioUrl.trim().length > 0);
-  const situationOddIndex = item.dialog_phrase_odd_index ?? null;
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const useRepeatPlaceholder = Boolean(item.repeatedAfterFailure);
   const usePhraseBuilder = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_builder" || (!item.repeatPracticeStep && isSpanishToGerman));
-  const useSituationReview = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_dialog_match" || (!item.repeatPracticeStep && !isSpanishToGerman));
-  const shouldSuppressPromptAudio = useSituationReview;
+  const shouldSuppressPromptAudio = false;
 
   const playPromptAudio = (): void => {
     if (!allowPromptAudio || !item.audio_url || shouldSuppressPromptAudio) {
@@ -176,91 +149,81 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     return true;
   };
 
-  const continueWithCompletionAudio = async (): Promise<void> => {
-    if (isSubmitting) {
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await playPhraseAudio();
-      await onAnswered(true);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const playPlacedPhraseTokenAudio = (tokenText: string, playFullPhraseAfter = false): void => {
-    const trimmedTokenText = tokenText.trim();
-    if (!trimmedTokenText) {
-      if (playFullPhraseAfter) {
-        void playPhraseAudio();
-      }
+  const playPlacedPhraseTokenAudio = async (phraseText: string): Promise<void> => {
+    const trimmedPhraseText = phraseText.trim();
+    if (!trimmedPhraseText) {
       return;
     }
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      if (playFullPhraseAfter) {
-        void playPhraseAudio();
-      }
       return;
     }
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.resume();
-    const utterance = new SpeechSynthesisUtterance(trimmedTokenText);
-    const lang = speechLangByCode[targetLanguage] || "de-DE";
-    const langPrefix = lang.split("-")[0];
-    utterance.lang = lang;
-    utterance.rate = 0.7;
-    const matchingVoices = window.speechSynthesis
-      .getVoices()
-      .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
-    const selectedVoice = matchingVoices.find((voice) => voice.voiceURI === placedTokenVoiceRef.current)
-      || matchingVoices[0];
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-      placedTokenVoiceRef.current = selectedVoice.voiceURI;
-    }
-    if (playFullPhraseAfter) {
-      utterance.onend = () => { void playPhraseAudio(); };
-      utterance.onerror = () => { void playPhraseAudio(); };
-    }
-    window.speechSynthesis.speak(utterance);
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+      const resolveOnce = (): void => {
+        if (resolved) {
+          return;
+        }
+        resolved = true;
+        resolve();
+      };
+      const fallbackTimeout = window.setTimeout(resolveOnce, Math.min(5000, Math.max(1800, trimmedPhraseText.length * 90)));
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+      const utterance = new SpeechSynthesisUtterance(trimmedPhraseText);
+      const lang = speechLangByCode[targetLanguage] || "de-DE";
+      const langPrefix = lang.split("-")[0];
+      utterance.lang = lang;
+      utterance.rate = 0.7;
+      const matchingVoices = window.speechSynthesis
+        .getVoices()
+        .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
+      const selectedVoice = matchingVoices.find((voice) => voice.voiceURI === placedTokenVoiceRef.current)
+        || matchingVoices[0];
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        placedTokenVoiceRef.current = selectedVoice.voiceURI;
+      }
+      utterance.onend = () => {
+        window.clearTimeout(fallbackTimeout);
+        resolveOnce();
+      };
+      utterance.onerror = () => {
+        window.clearTimeout(fallbackTimeout);
+        resolveOnce();
+      };
+      window.speechSynthesis.speak(utterance);
+    });
   };
 
-  const schedulePlacedPhraseTokenAudio = (tokenText: string, playFullPhraseAfter = false): void => {
+  const schedulePlacedPhraseTokenAudio = async (phraseText: string): Promise<void> => {
     if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
       window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
       pendingPlacedTokenAudioTimeoutRef.current = null;
     }
-    pendingPlacedTokenAudioTimeoutRef.current = window.setTimeout(() => {
-      pendingPlacedTokenAudioTimeoutRef.current = null;
-      playPlacedPhraseTokenAudio(tokenText, playFullPhraseAfter);
-    }, 80);
+    await new Promise<void>((resolve) => {
+      pendingPlacedTokenAudioTimeoutRef.current = window.setTimeout(() => {
+        pendingPlacedTokenAudioTimeoutRef.current = null;
+        resolve();
+      }, 80);
+    });
+    await playPlacedPhraseTokenAudio(phraseText);
   };
 
-  const playSituationScene = (): void => {
-    if (!situationSceneAudioUrls.length) {
+  const completePhraseBuilder = async (phraseText: string): Promise<void> => {
+    if (isSubmittingRef.current || phraseBuilderCompletionAudioPlayedRef.current) {
       return;
     }
-    const releaseSuppression = beginPromptAutoplaySuppression(Math.max(2200, situationSceneAudioUrls.length * 2200));
-    const playNext = (index: number): void => {
-      const audioUrl = situationSceneAudioUrls[index];
-      if (!audioUrl) {
-        releaseSuppression();
-        return;
-      }
-      const audio = new Audio(audioUrl);
-      const finish = (): void => {
-        if (index >= situationSceneAudioUrls.length - 1) {
-          releaseSuppression();
-          return;
-        }
-        playNext(index + 1);
-      };
-      audio.onended = finish;
-      audio.onerror = finish;
-      void audio.play().catch(finish);
-    };
-    playNext(0);
+    phraseBuilderCompletionAudioPlayedRef.current = true;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await schedulePlacedPhraseTokenAudio(phraseText);
+      await playPhraseAudio();
+      await onAnswered(true);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
@@ -270,12 +233,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     setIsSubmitting(true);
     setFeedback(message);
     try {
-      if (correct) {
-        const played = await playPhraseAudio();
-        if (!played) {
-          await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
-        }
-      } else {
+      const played = await playPhraseAudio();
+      if (!played) {
         await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
       }
       await onAnswered(correct);
@@ -289,20 +248,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
       return;
     }
     await submitWithFeedback(correct, correct ? t("phrase.feedback.correct") : t("phrase.feedback.markedWrong", { answer: expectedAnswer }));
-  };
-
-  const selectSituationChoice = (choiceIndex: number): void => {
-    if (selectedSituationChoiceIndex !== null || isSubmitting) {
-      return;
-    }
-    if (choiceIndex === situationOddIndex) {
-      setSelectedSituationChoiceIndex(choiceIndex);
-      playSituationScene();
-      return;
-    }
-    setWrongSituationChoiceIndexes((current) => (
-      current.includes(choiceIndex) ? current : [...current, choiceIndex]
-    ));
   };
 
   const markWrongPhraseToken = (tokenId: string): void => {
@@ -343,15 +288,14 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     }
     const nextPlacedTokens = [...placedPhraseTokens, token];
     const completedPhrase = nextPlacedTokens.length === expectedPhraseTokens.length;
+    const placedPhraseText = nextPlacedTokens.map((placedToken) => placedToken.text).join(" ");
     setPlacedPhraseTokens(nextPlacedTokens);
     setWrongPhraseTokenId("");
-    schedulePlacedPhraseTokenAudio(token.text, completedPhrase);
     if (completedPhrase) {
       setPhraseBuilderComplete(true);
-      if (!phraseBuilderCompletionAudioPlayedRef.current) {
-        phraseBuilderCompletionAudioPlayedRef.current = true;
-      }
+      return true;
     }
+    void schedulePlacedPhraseTokenAudio(placedPhraseText);
     return true;
   };
 
@@ -464,6 +408,17 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
   }, [phraseBuilderComplete]);
 
   useEffect(() => {
+    if (!usePhraseBuilder || !phraseBuilderComplete) {
+      return;
+    }
+    const placedPhraseText = placedPhraseTokens.map((placedToken) => placedToken.text).join(" ");
+    if (!placedPhraseText.trim()) {
+      return;
+    }
+    void completePhraseBuilder(placedPhraseText);
+  }, [usePhraseBuilder, phraseBuilderComplete, placedPhraseTokens]);
+
+  useEffect(() => {
     isSubmittingRef.current = isSubmitting;
   }, [isSubmitting]);
 
@@ -481,8 +436,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
     setDraggingPhraseTokenPosition(null);
     activeLatchSlotIndexRef.current = null;
     setActiveLatchSlotIndex(null);
-    setSelectedSituationChoiceIndex(null);
-    setWrongSituationChoiceIndexes([]);
     draggingPhraseTokenIdRef.current = "";
     activePointerIdRef.current = null;
     pointerDragOffsetRef.current = { x: 0, y: 0 };
@@ -554,7 +507,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
                 >
                   <span className="phrase-builder-token-placeholder" aria-hidden="true">
                     <span className="phrase-builder-token-text">{token.text}</span>
-                    <span className="phrase-builder-token-handle" aria-hidden="true" />
                   </span>
                   <button
                     type="button"
@@ -597,7 +549,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
                     tabIndex={isPlaced ? -1 : undefined}
                   >
                     <span className="phrase-builder-token-text">{token.text}</span>
-                    <span className="phrase-builder-token-handle" aria-hidden="true" />
                   </button>
                 </span>
               );
@@ -611,106 +562,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem, targetWordS
               {t("words.openItem")}
             </button>
           ) : null}
-          {phraseBuilderComplete && (
-            <button type="button" onClick={() => void onAnswered(true)} disabled={isSubmitting}>
-              {t("review.continue")}
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (useSituationReview) {
-    const selectedSituationIsCorrect = selectedSituationChoiceIndex !== null && selectedSituationChoiceIndex === situationOddIndex;
-    return (
-      <div className="phrase-situation-review">
-        <p className="prompt prompt-light test-instruction">{t("phrase.situationPrompt")}</p>
-        {!situationExpectedAnswer && <p className="hint">{t("phrase.situationUnavailable")}</p>}
-        <div className="phrase-situation-options conversation-preview-list">
-          {situationTurns.map((turn, choiceIndex) => {
-            const isSelected = selectedSituationChoiceIndex === choiceIndex;
-            const isCorrectChoice = situationOddIndex === choiceIndex;
-            const wasWrongPick = wrongSituationChoiceIndexes.includes(choiceIndex);
-            let answeredClass = "";
-            if (selectedSituationChoiceIndex !== null) {
-              answeredClass = isCorrectChoice
-                ? " phrase-situation-option-correct"
-                : isSelected
-                  ? " phrase-situation-option-wrong"
-                  : "";
-            } else if (wasWrongPick) {
-              answeredClass = " phrase-situation-option-wrong";
-            }
-            const revealedSourceText = selectedSituationIsCorrect && isCorrectChoice
-              ? expectedAnswer
-              : "";
-            const speaker = speakerForTurn(turn.speaker, choiceIndex);
-            return (
-              <div
-                key={`${choiceIndex}-${turn.target_text}`}
-                className={`phrase-situation-option conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}${answeredClass}`}
-              >
-                <div className="phrase-situation-option-main">
-                  <p className="conversation-speaker">
-                    {speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}
-                  </p>
-                  <div className="phrase-situation-line conversation-line conversation-line-translation phrase-review-token-line">
-                    <DialogTurnText
-                      dialogId={0}
-                      turnIndex={choiceIndex}
-                      sourceText={turn.source_text}
-                      targetText={turn.target_text}
-                      sourceLanguage={sourceLanguage}
-                      targetLanguage={targetLanguage}
-                      tokenStatus={targetWordStatus}
-                      statusKeyPrefix={`phrase-situation-${item.id}-${choiceIndex}`}
-                      onTokenClick={onTargetWordClick}
-                      onOpenItem={onOpenItem ? async (itemId) => onOpenItem(itemId) : undefined}
-                      showPhraseSelection={false}
-                    />
-                  </div>
-                  {revealedSourceText && (
-                    <p className="phrase-situation-source-reveal">
-                      {revealedSourceText}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="phrase-situation-pick"
-                  onClick={() => selectSituationChoice(choiceIndex)}
-                  disabled={selectedSituationChoiceIndex !== null || isSubmitting}
-                >
-                  {t("phrase.situationPick")}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-        {(selectedSituationChoiceIndex !== null || wrongSituationChoiceIndexes.length > 0) && (
-          <>
-            <p className={`phrase-situation-feedback ${selectedSituationIsCorrect ? "phrase-situation-feedback-correct" : "phrase-situation-feedback-wrong"}`}>
-              {selectedSituationIsCorrect ? t("phrase.situationCorrect") : t("phrase.situationWrong")}
-            </p>
-          </>
-        )}
-        <div className="actions">
-          {onOpenItem ? (
-            <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-              {t("words.openItem")}
-            </button>
-          ) : null}
-          {selectedSituationChoiceIndex !== null && (
-            <button type="button" onClick={() => void onAnswered(true)} disabled={isSubmitting}>
-              {t("review.continue")}
-            </button>
-          )}
-          {!situationExpectedAnswer && (
-            <button type="button" onClick={() => void continueWithCompletionAudio()} disabled={isSubmitting}>
-              {t("review.continue")}
-            </button>
-          )}
         </div>
       </div>
     );

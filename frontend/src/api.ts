@@ -16,6 +16,7 @@ import type {
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
+  SessionType,
   StudyLanguageCode,
 } from "./types";
 
@@ -198,11 +199,13 @@ export async function fetchSession(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   durationMinutes?: number,
+  sessionType: SessionType = "standard",
 ): Promise<SessionResponse> {
   const params = new URLSearchParams({
     size: String(size),
     source_language: sourceLanguage,
     target_language: targetLanguage,
+    session_type: sessionType,
   });
   if (durationMinutes !== undefined) {
     params.set("duration_minutes", String(durationMinutes));
@@ -250,6 +253,28 @@ export async function markSeen(itemId: number): Promise<void> {
 
   if (!response.ok) {
     let detail = "Failed to mark item as seen";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  notifyOverviewStatsUpdated();
+}
+
+export async function completeDifficultItem(itemId: number): Promise<void> {
+  const response = await apiFetch(`${API_BASE}/difficult-items/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ item_id: itemId }),
+  });
+
+  if (!response.ok) {
+    let detail = "Failed to complete difficult item";
     try {
       const payload = (await response.json()) as { detail?: string };
       if (payload.detail) {

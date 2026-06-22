@@ -118,17 +118,89 @@ function clozePhraseForItem(item: SessionItem): string {
   return dialogClozePhraseForItem(item) || fallbackClozePhraseForItem(item);
 }
 
-function warmupContextSentenceForItem(item: SessionItem): string {
-  const candidates = [
-    item.example_sentence || "",
-    ...((item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => turn.target_text))),
-    ...((item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => turn.target_text))),
-    ...((item.exercise_phrases?.phrases || []).map((entry) => entry.target_text)),
-    ...((item.exercise_phrases?.first_section || []).map((entry) => entry.target_text)),
-    ...((item.exercise_phrases?.second_section || []).map((entry) => entry.target_text)),
-    item.exercise_phrases?.funny_image_phrase?.target_text || "",
-  ].filter((candidate) => candidate.trim());
-  return candidates.find((candidate) => blankTargetInPhrase(candidate, item.german_text)) || "";
+function normalizedSearchText(value: string): string {
+  return stripDiacritics(value).toLowerCase().trim();
+}
+
+function targetWordSearchTerms(value: string): string[] {
+  const ignoredTerms = new Set(["der", "die", "das", "ein", "eine", "einen", "einem", "einer"]);
+  const normalizedValue = normalizedSearchText(value);
+  const terms = normalizedValue
+    .split(/[^a-zA-ZÀ-ÖØ-öø-ÿ]+/)
+    .filter((part) => part.length > 1 && !ignoredTerms.has(part));
+  return Array.from(new Set([normalizedValue, ...terms].filter(Boolean)));
+}
+
+function completionPhraseForItem(item: SessionItem): { text: string; audioUrl: string } {
+  const targetTerms = targetWordSearchTerms(item.german_text);
+  if (!targetTerms.length) {
+    return { text: "", audioUrl: "" };
+  }
+
+  const containsTargetWord = (targetText: string): boolean => {
+    const normalizedTarget = normalizedSearchText(targetText);
+    return normalizedTarget.length > 0
+      && !targetTerms.includes(normalizedTarget)
+      && targetTerms.some((term) => normalizedTarget.includes(term));
+  };
+  const dialogTurnCandidates = (item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => ({
+    target: turn.target_text,
+    audioUrl: turn.phrase_audio_url || "",
+  })));
+  const matchedAudioTurn = (item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => {
+    const relatedTurn = dialog.turns.find((entry, index) => index === turn.turn_index);
+    return {
+      target: relatedTurn?.target_text || turn.target_text || "",
+      audioUrl: relatedTurn?.phrase_audio_url || "",
+    };
+  })).find((candidate) => candidate.audioUrl && containsTargetWord(candidate.target));
+  if (matchedAudioTurn) {
+    return { text: matchedAudioTurn.target, audioUrl: matchedAudioTurn.audioUrl };
+  }
+
+  const containingAudioTurn = dialogTurnCandidates.find((candidate) => candidate.audioUrl && containsTargetWord(candidate.target));
+  if (containingAudioTurn) {
+    return { text: containingAudioTurn.target, audioUrl: containingAudioTurn.audioUrl };
+  }
+
+  return { text: "", audioUrl: "" };
+}
+
+function warmupContextPairForItem(item: SessionItem): { target: string; source: string } {
+  const dialogCandidates = [
+    ...((item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => ({
+      source: turn.source_text,
+      target: turn.target_text,
+    })))),
+    ...((item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => ({
+      source: turn.source_text,
+      target: turn.target_text,
+    })))),
+  ];
+  const exerciseCandidates = [
+    ...((item.exercise_phrases?.phrases || []).map((entry) => ({
+      source: entry.source_text,
+      target: entry.target_text,
+    }))),
+    ...((item.exercise_phrases?.first_section || []).map((entry) => ({
+      source: entry.source_text,
+      target: entry.target_text,
+    }))),
+    ...((item.exercise_phrases?.second_section || []).map((entry) => ({
+      source: entry.source_text,
+      target: entry.target_text,
+    }))),
+    ...(item.exercise_phrases?.funny_image_phrase
+      ? [{
+        source: item.exercise_phrases.funny_image_phrase.source_text,
+        target: item.exercise_phrases.funny_image_phrase.target_text,
+      }]
+      : []),
+  ];
+  const candidates = [...dialogCandidates, ...exerciseCandidates].filter(
+    (candidate) => candidate.target.trim() && candidate.source.trim(),
+  );
+  return candidates.find((candidate) => blankTargetInPhrase(candidate.target, item.german_text)) || { target: "", source: "" };
 }
 
 function splitClozePhrase(phrase: string): { before: string; after: string } | null {
@@ -203,15 +275,6 @@ const FEEDBACK_DELAY_MS = 1000;
 const MAX_WRITTEN_WORD_ASSISTANCE_STEPS = 2;
 type FeedbackTone = "neutral" | "success" | "error";
 
-const speechLangByCode: Record<StudyLanguageCode, string> = {
-  spanish: "es-ES",
-  english: "en-US",
-  german: "de-DE",
-  french: "fr-FR",
-  italian: "it-IT",
-  portuguese: "pt-PT",
-};
-
 export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
@@ -235,7 +298,9 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
   const [letterSuggestions, setLetterSuggestions] = useState<string[]>([]);
   const [warmupRevealCount, setWarmupRevealCount] = useState<number>(0);
+  const [completionPreview, setCompletionPreview] = useState<{ word: string; phrase: string } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const completionAudioRef = useRef<HTMLAudioElement | null>(null);
   const composingAnswerRef = useRef<boolean>(false);
   const answerBeforeCompositionRef = useRef<string>("");
   const pendingCompositionValidationRef = useRef<boolean>(false);
@@ -248,25 +313,27 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
+  const targetWordText = item.german_text;
   const clozePhrase = useClozeRetry ? clozePhraseForItem(item) : "";
   const clozeNextLetter = useClozeRetry ? expectedAnswer.charAt(answer.length) : "";
   const clozeLetterSuggestions = useClozeRetry ? nextLetterSuggestions(clozeNextLetter, answer.length) : [];
   const clozeProgress = useClozeRetry ? clozeLetterProgress(answer, expectedAnswer) : "";
   const completedClozePhrase = useClozeRetry && normalize(answer) === normalize(expectedAnswer);
   const clozePhraseParts = useClozeRetry ? splitClozePhrase(clozePhrase) : null;
-  const completedClozePhraseText = clozePhraseParts
-    ? `${clozePhraseParts.before}${expectedAnswer}${clozePhraseParts.after}`.trim()
-    : "";
   const warmupRevealOrder = useIntroRetry
     ? warmupRevealOrderForValue(expectedAnswer, `${item.id}:${expectedAnswer}:${item.direction || ""}:warmup`)
     : [];
   const warmupRevealedIndexes = new Set(warmupRevealOrder.slice(0, warmupRevealCount));
   const warmupProgressText = useIntroRetry ? warmupProgress(expectedAnswer, warmupRevealedIndexes) : "";
-  const warmupContextSentence = useIntroRetry ? warmupContextSentenceForItem(item) : "";
+  const warmupContextPair = useIntroRetry ? warmupContextPairForItem(item) : { target: "", source: "" };
+  const warmupContextSentence = warmupContextPair.target;
+  const warmupContextTranslation = warmupContextPair.source;
   const warmupContextParts = useIntroRetry ? splitClozePhrase(blankTargetInPhrase(warmupContextSentence, expectedAnswer)) : null;
   const warmupAllLettersRevealed = useIntroRetry && warmupRevealCount >= warmupRevealOrder.length;
   const warmupInputIsWrong = useIntroRetry && Boolean(answer) && !expectedAnswer.startsWith(answer);
   const warmupInputIsCorrect = useIntroRetry && normalize(answer) === normalize(expectedAnswer);
+  const showWarmupTranslation = useIntroRetry && Boolean(warmupContextTranslation) && (warmupInputIsCorrect || warmupAllLettersRevealed);
+  const completionPhrase = completionPhraseForItem(item);
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
@@ -276,31 +343,58 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
 
   const hasExceededWrittenWordAssistanceLimit = (): boolean => writtenWordAssistanceSteps > MAX_WRITTEN_WORD_ASSISTANCE_STEPS;
 
-  const playCompletionAudio = async (): Promise<boolean> => {
-    if (useClozeRetry && completedClozePhraseText && typeof window !== "undefined" && "speechSynthesis" in window) {
-      await new Promise<void>((resolve) => {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.resume();
-        const utterance = new SpeechSynthesisUtterance(completedClozePhraseText);
-        utterance.lang = speechLangByCode[targetLanguage] || "de-DE";
-        utterance.rate = 0.6;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
-        window.speechSynthesis.speak(utterance);
-      });
-      return true;
+  const waitForPreviewPaint = async (): Promise<void> => {
+    if (typeof window === "undefined") {
+      return;
     }
-    if (!item.audio_url) {
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.setTimeout(resolve, 0)));
+  };
+
+  const playAudioUrl = async (audioUrl: string): Promise<boolean> => {
+    if (!audioUrl) {
       return false;
     }
-    const audio = new Audio(item.audio_url);
+    const audio = completionAudioRef.current || new Audio();
+    completionAudioRef.current = audio;
+    audio.pause();
+    audio.currentTime = 0;
+    audio.src = audioUrl;
     suppressPromptAutoplayForAudio(audio);
-    await new Promise<void>((resolve) => {
-      const finish = (): void => resolve();
+    return await new Promise<boolean>((resolve) => {
+      let started = false;
+      const finish = (): void => resolve(started);
       audio.onended = finish;
       audio.onerror = finish;
       audio.onabort = finish;
-      void audio.play().catch(finish);
+      audio.load();
+      void audio.play()
+        .then(() => {
+          started = true;
+        })
+        .catch(() => resolve(false));
+    });
+  };
+
+  const playCompletionAudio = async (): Promise<boolean> => {
+    let playedAny = false;
+    if (await playAudioUrl(item.audio_url || "")) {
+      playedAny = true;
+    }
+    if (completionPhrase.audioUrl) {
+      if (await playAudioUrl(completionPhrase.audioUrl)) {
+        playedAny = true;
+      }
+    }
+    return playedAny;
+  };
+
+  const showTargetCompletionPreview = (): boolean => {
+    if (!targetWordText && !completionPhrase.text) {
+      return false;
+    }
+    setCompletionPreview({
+      word: targetWordText,
+      phrase: completionPhrase.text,
     });
     return true;
   };
@@ -309,13 +403,13 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setIsSubmitting(true);
     setFeedback(message);
     setFeedbackTone(correct ? "success" : "error");
+    const showingPreview = showTargetCompletionPreview();
     try {
-      if (correct) {
-        const played = await playCompletionAudio();
-        if (!played) {
-          await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
-        }
-      } else {
+      if (showingPreview) {
+        await waitForPreviewPaint();
+      }
+      const played = await playCompletionAudio();
+      if (!played) {
         await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
       }
       await onAnswered(correct);
@@ -369,9 +463,14 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     }
 
     const nextHintLetter = expectedAnswer.charAt(prefixLen);
-    const isNewHintStep = Boolean(nextHintLetter) && nextHintLetter !== hintLetter;
-    setHintLetter(nextHintLetter);
-    setLetterSuggestions([]);
+    const nextSuggestions = nextHintLetter
+      ? nextLetterSuggestions(nextHintLetter, prefixLen)
+      : [];
+    const isNewHintStep = Boolean(nextHintLetter)
+      && nextHintLetter !== hintLetter
+      && nextSuggestions.join("|") !== letterSuggestions.join("|");
+    setHintLetter("");
+    setLetterSuggestions(nextSuggestions);
     if (isNewHintStep) {
       setWrittenWordAssistanceSteps((value) => value + 1);
     }
@@ -410,8 +509,8 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
       setAnswer(fallbackAnswer);
       setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
       setFeedbackTone("error");
-      setWrittenWordAssistanceSteps((value) => value + 1);
-      setLetterSuggestions(nextLetterSuggestions(expectedAnswer.charAt(fallbackAnswer.length), fallbackAnswer.length));
+      setLetterSuggestions([]);
+      setHintLetter("");
       return;
     }
 
@@ -443,6 +542,14 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setAwaitingWrongAccept(false);
     setIsSubmitting(true);
     try {
+      const showingPreview = showTargetCompletionPreview();
+      if (showingPreview) {
+        await waitForPreviewPaint();
+      }
+      const played = await playCompletionAudio();
+      if (!played) {
+        await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
+      }
       await onAnswered(false);
     } finally {
       setIsSubmitting(false);
@@ -560,10 +667,15 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
     setAnswerRevealed(false);
     setLetterSuggestions([]);
     setWarmupRevealCount(0);
+    setCompletionPreview(null);
     composingAnswerRef.current = false;
     pendingCompositionValidationRef.current = false;
     answerBeforeCompositionRef.current = "";
     provisionalBaseAnswerRef.current = null;
+    if (completionAudioRef.current) {
+      completionAudioRef.current.pause();
+      completionAudioRef.current.src = "";
+    }
     if (item.repeatPracticeStep === "word_cloze") {
       setAnswer(advancePastFixedCharacters("", item.german_text));
     }
@@ -596,9 +708,23 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
           </>
         )}
         {answerRevealed && (
-          <p className="revealed-answer">
-            <span>{t("review.answerLabel")}</span> {expectedAnswer}
-          </p>
+          <>
+            <p className="revealed-answer">
+              <span>{t("review.answerLabel")}</span> {expectedAnswer}
+            </p>
+            {completionPreview && (
+              <>
+                <p className="revealed-answer">
+                  <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
+                </p>
+                {completionPreview.phrase && (
+                  <p className="revealed-answer">
+                    <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
+                  </p>
+                )}
+              </>
+            )}
+          </>
         )}
         <div className="actions">
           {!answerRevealed ? (
@@ -657,6 +783,11 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
             {warmupProgressText || expectedAnswer}
           </p>
         )}
+        {showWarmupTranslation && (
+          <p className="revealed-answer">
+            <span>{t("word.warmupTranslationLabel")}</span> {warmupContextTranslation}
+          </p>
+        )}
         <input
           ref={inputRef}
           className={warmupInputIsWrong ? "word-input-error-progress" : warmupInputIsCorrect ? "word-input-correct-progress" : ""}
@@ -699,6 +830,18 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
           spellCheck={false}
         />
         {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
+        {completionPreview && (
+          <>
+            <p className="revealed-answer">
+              <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
+            </p>
+            {completionPreview.phrase && (
+              <p className="revealed-answer">
+                <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
+              </p>
+            )}
+          </>
+        )}
         <div className="actions">
           {onOpenItem ? (
             <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
@@ -761,6 +904,18 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
           </>
         )}
         {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
+        {completionPreview && (
+          <>
+            <p className="revealed-answer">
+              <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
+            </p>
+            {completionPreview.phrase && (
+              <p className="revealed-answer">
+                <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
+              </p>
+            )}
+          </>
+        )}
         <div className="actions">
           {onOpenItem ? (
             <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
@@ -849,6 +1004,18 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         spellCheck={false}
       />
       {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
+      {completionPreview && (
+        <>
+          <p className="revealed-answer">
+            <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
+          </p>
+          {completionPreview.phrase && (
+            <p className="revealed-answer">
+              <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
+            </p>
+          )}
+        </>
+      )}
       {letterSuggestions.length > 0 && (
         <div className="letter-suggestions" role="group" aria-label={t("word.letterSuggestions")}>
           {letterSuggestions.map((letter) => (

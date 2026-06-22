@@ -27,6 +27,12 @@ class OverviewStatsView(APIView):
             last_reviewed_at_es_to_de__isnull=True,
             last_reviewed_at_de_to_es__isnull=True,
         ).count()
+        difficult_items = apply_user_scope(Item.objects, user).filter(
+            is_learned=False,
+            is_difficult=True,
+            source_language=source_language,
+            target_language=target_language,
+        ).count()
 
         return Response(
             {
@@ -34,6 +40,7 @@ class OverviewStatsView(APIView):
                 "future_reviews": future_reviews,
                 "word_items": word_items,
                 "not_started": not_started,
+                "difficult_items": difficult_items,
             }
         )
 

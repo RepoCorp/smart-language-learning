@@ -39,6 +39,7 @@ def test_overview_stats_returns_expected_counts():
     assert payload["future_reviews"] == 1
     assert payload["word_items"] == 2
     assert payload["not_started"] == 1
+    assert payload["difficult_items"] == 0
 
 
 @pytest.mark.django_db
@@ -76,6 +77,7 @@ def test_overview_stats_filters_by_language_pair():
     assert payload["future_reviews"] == 0
     assert payload["word_items"] == 1
     assert payload["not_started"] == 0
+    assert payload["difficult_items"] == 0
 
 
 @pytest.mark.django_db
@@ -112,3 +114,33 @@ def test_overview_stats_excludes_items_marked_as_learned():
     assert payload["future_reviews"] == 0
     assert payload["word_items"] == 2
     assert payload["not_started"] == 1
+    assert payload["difficult_items"] == 0
+
+
+@pytest.mark.django_db
+def test_overview_stats_includes_difficult_item_count():
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="mesa",
+        german_text="Tisch",
+        source_language="spanish",
+        target_language="german",
+        is_difficult=True,
+    )
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hello",
+        german_text="bonjour",
+        source_language="english",
+        target_language="french",
+        is_difficult=True,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/overview-stats",
+        {"source_language": "spanish", "target_language": "german"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["difficult_items"] == 1

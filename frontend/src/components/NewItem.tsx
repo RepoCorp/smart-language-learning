@@ -250,7 +250,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const [showWordIntroPracticeModal, setShowWordIntroPracticeModal] = useState<boolean>(false);
   const [showWordLetterPracticeModal, setShowWordLetterPracticeModal] = useState<boolean>(false);
   const [showPhraseBuilderModal, setShowPhraseBuilderModal] = useState<boolean>(false);
-  const [showPhraseMeaningModal, setShowPhraseMeaningModal] = useState<boolean>(false);
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [itemActionTooltip, setItemActionTooltip] = useState<{ label: string; left: number; top: number } | null>(null);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
@@ -347,7 +346,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
         || showWordIntroPracticeModal
         || showWordLetterPracticeModal
         || showPhraseBuilderModal
-        || showPhraseMeaningModal
       ) {
         return;
       }
@@ -362,7 +360,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showWordIntroPracticeModal, showWordLetterPracticeModal, showPhraseBuilderModal, showPhraseMeaningModal]);
+  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showWordIntroPracticeModal, showWordLetterPracticeModal, showPhraseBuilderModal]);
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -420,7 +418,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowWordIntroPracticeModal(false);
     setShowWordLetterPracticeModal(false);
     setShowPhraseBuilderModal(false);
-    setShowPhraseMeaningModal(false);
   }, [item.id, item.item_questions]);
 
   useEffect(() => {
@@ -863,17 +860,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     dialog_phrase_turns: dialogPhraseTurns,
     dialog_phrase_odd_index: dialogPhraseOddIndex,
   };
-  const phraseMeaningItem: SessionItem = {
-    ...phraseBuilderItem,
-    direction: "de_to_es",
-    repeatPracticeStep: "phrase_dialog_match",
-  };
-  const phraseOriginTurn = relatedDialogs
-    .flatMap((dialog) => dialog.matched_turns.map((turn) => ({ dialog, turn })))
-    .find(({ turn }) => (
-      turn.source_text.trim().toLowerCase() === sourceText.trim().toLowerCase()
-      || turn.target_text.trim().toLowerCase() === targetText.trim().toLowerCase()
-    ));
   const itemDeterministicKey = `${item.item_type}:${sourceText.trim().toLowerCase()}=>${targetText.trim().toLowerCase()}`;
 
   const deterministicExerciseEntryKeys = (count: number): string[] => {
@@ -1251,10 +1237,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setShowPhraseBuilderModal(false);
   };
 
-  const closePhraseMeaningModal = (): void => {
-    setShowPhraseMeaningModal(false);
-  };
-
   const showItemActionTooltip = (
     event: PointerEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>,
     label: string,
@@ -1351,20 +1333,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                 onBlur={hideItemActionTooltip}
               >
                 <ItemActionIcon name="builder" />
-              </button>
-            )}
-            {item.item_type === "phrase" && (
-              <button
-                type="button"
-                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-                onClick={() => setShowPhraseMeaningModal(true)}
-                aria-label={t("newItem.openPhraseMeaning")}
-                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openPhraseMeaning"))}
-                onPointerLeave={hideItemActionTooltip}
-                onFocus={(event) => showItemActionTooltip(event, t("newItem.openPhraseMeaning"))}
-                onBlur={hideItemActionTooltip}
-              >
-                <ItemActionIcon name="dialogMatch" />
               </button>
             )}
           </div>
@@ -1614,35 +1582,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
               item={phraseBuilderItem}
               onAnswered={async () => closePhraseBuilderModal()}
             />
-          </div>
-        </div>
-      )}
-      {showPhraseMeaningModal && item.item_type === "phrase" && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal related-dialogs-modal phrase-builder-modal phrase-meaning-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closePhraseMeaningModal}>
-              ×
-            </button>
-            <p>
-              <strong>{t("newItem.phraseMeaningTitle")}</strong>
-            </p>
-            <div className="phrase-meaning-modal-body">
-              <PhraseReview
-                key={`phrase-meaning-${item.id}-${sourceText}-${targetText}-${dialogPhraseOptions.join("|")}`}
-                item={phraseMeaningItem}
-                onAnswered={async () => closePhraseMeaningModal()}
-                targetWordStatus={wordActionStatus}
-                onTargetWordClick={(statusKey, token) => void requestAddWordFromDialogToken(
-                  statusKey,
-                  token,
-                  token,
-                  phraseOriginTurn?.dialog.dialog_id,
-                  phraseOriginTurn?.turn.turn_index,
-                  phraseOriginTurn?.turn.source_text || sourceText,
-                  phraseOriginTurn?.turn.target_text || targetText,
-                )}
-              />
-            </div>
           </div>
         </div>
       )}

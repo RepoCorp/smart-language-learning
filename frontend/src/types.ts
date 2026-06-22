@@ -1,5 +1,6 @@
 export type ItemType = "word" | "phrase";
 export type SessionMode = "new" | "review";
+export type SessionType = "standard" | "difficult";
 export type ReviewDirection = "es_to_de" | "de_to_es";
 export type StudyLanguageCode = "spanish" | "english" | "german" | "french" | "italian" | "portuguese";
 
@@ -39,7 +40,7 @@ export interface SessionItem {
   mode: SessionMode;
   direction?: ReviewDirection | null;
   repeatedAfterFailure?: boolean;
-  repeatPracticeStep?: "word_intro" | "word_cloze" | "phrase_builder" | "phrase_dialog_match";
+  repeatPracticeStep?: "word_intro" | "word_cloze" | "phrase_builder";
   options: string[];
   option_items?: Array<{
     id: number;
@@ -242,4 +243,5 @@ export interface OverviewStatsResponse {
   future_reviews: number;
   word_items: number;
   not_started: number;
+  difficult_items: number;
 }

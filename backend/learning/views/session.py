@@ -24,12 +24,18 @@ class SessionEntry:
     mode: str
     direction: str | None
     due_at_sort: object | None = None
+    repeated_after_failure: bool = False
+    repeat_practice_step: str | None = None
 
 
 REVIEW_WORD_SECONDS = 25
 REVIEW_PHRASE_SECONDS = 35
 NEW_WORD_SECONDS = 70
 NEW_PHRASE_SECONDS = 80
+DIFFICULT_WORD_INTRO_SECONDS = 35
+DIFFICULT_WORD_CLOZE_SECONDS = 40
+DIFFICULT_PHRASE_REVIEW_SECONDS = 30
+DIFFICULT_PHRASE_BUILDER_SECONDS = 40
 
 
 def _deterministic_hash(*parts: object) -> str:
@@ -57,6 +63,7 @@ class SessionView(APIView):
         user = get_request_user(request)
         size = _safe_int(request.query_params.get("size"), default=5, minimum=1, maximum=100)
         duration_minutes = _safe_int(request.query_params.get("duration_minutes"), default=None, minimum=1, maximum=180)
+        session_type = (request.query_params.get("session_type", "standard") or "standard").strip().lower()
         source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
         target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
         now = timezone.now()
@@ -68,6 +75,7 @@ class SessionView(APIView):
             now=now,
             source_language=source_language,
             target_language=target_language,
+            session_type=session_type,
         )
         payload = serialize_entries(entries, user=user)
         serializer = SessionItemSerializer(payload, many=True)
@@ -81,8 +89,18 @@ def build_session_entries(
     now,
     source_language: str,
     target_language: str,
+    session_type: str = "standard",
     duration_minutes: int | None = None,
 ) -> list[SessionEntry]:
+    if session_type == "difficult":
+        return build_difficult_session_entries(
+            user=user,
+            size=size,
+            now=now,
+            source_language=source_language,
+            target_language=target_language,
+            duration_minutes=duration_minutes,
+        )
     if duration_minutes is not None:
         return build_duration_based_session_entries(
             user=user,
@@ -170,6 +188,15 @@ def trim_entries_to_target_duration(entries: list[SessionEntry], target_seconds:
 
 
 def estimated_seconds_for_entry(entry: SessionEntry) -> int:
+    if entry.repeated_after_failure:
+        if entry.repeat_practice_step == "word_intro":
+            return DIFFICULT_WORD_INTRO_SECONDS
+        if entry.repeat_practice_step == "word_cloze":
+            return DIFFICULT_WORD_CLOZE_SECONDS
+        if entry.repeat_practice_step == "phrase_builder":
+            return DIFFICULT_PHRASE_BUILDER_SECONDS
+        if entry.item.item_type == Item.ItemType.PHRASE:
+            return DIFFICULT_PHRASE_REVIEW_SECONDS
     if entry.mode == "new":
         return NEW_PHRASE_SECONDS if entry.item.item_type == Item.ItemType.PHRASE else NEW_WORD_SECONDS
     return REVIEW_PHRASE_SECONDS if entry.item.item_type == Item.ItemType.PHRASE else REVIEW_WORD_SECONDS
@@ -334,6 +361,74 @@ def build_upcoming_entries(
     return entries
 
 
+def build_difficult_session_entries(
+    *,
+    user,
+    size: int,
+    now,
+    source_language: str,
+    target_language: str,
+    duration_minutes: int | None,
+) -> list[SessionEntry]:
+    difficult_items = list(
+        apply_user_scope(Item.objects, user).filter(
+            is_learned=False,
+            is_difficult=True,
+            source_language=source_language,
+            target_language=target_language,
+        ).order_by("-difficult_marked_at", "id")
+    )
+
+    entries: list[SessionEntry] = []
+    difficult_word_items = [item for item in difficult_items if item.item_type == Item.ItemType.WORD]
+    difficult_phrase_items = [item for item in difficult_items if item.item_type == Item.ItemType.PHRASE]
+
+    for item in difficult_word_items:
+        entries.append(
+            SessionEntry(
+                item=item,
+                mode="review",
+                direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
+                repeated_after_failure=True,
+                repeat_practice_step="word_intro",
+            )
+        )
+
+    for item in difficult_word_items:
+        entries.append(
+            SessionEntry(
+                item=item,
+                mode="review",
+                direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
+                repeated_after_failure=True,
+                repeat_practice_step="word_cloze",
+            )
+        )
+
+    for item in difficult_phrase_items:
+        entries.append(
+            SessionEntry(
+                item=item,
+                mode="review",
+                direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
+                repeated_after_failure=True,
+            )
+        )
+        entries.append(
+            SessionEntry(
+                item=item,
+                mode="review",
+                direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
+                repeated_after_failure=True,
+                repeat_practice_step="phrase_builder",
+            )
+        )
+
+    if duration_minutes is not None:
+        return trim_entries_to_target_duration(entries, target_seconds=duration_minutes * 60)
+    return entries[:size]
+
+
 def randomize_review_order(entries: list[SessionEntry]) -> None:
     random.shuffle(entries)
 
@@ -378,6 +473,8 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "exercise_phrases": entry.item.exercise_phrases or {},
                 "mode": entry.mode,
                 "direction": entry.direction,
+                "repeatedAfterFailure": entry.repeated_after_failure,
+                "repeatPracticeStep": entry.repeat_practice_step,
                 "options": [option["text"] for option in option_items],
                 "option_items": option_items,
                 "dialog_phrase_answer": dialog_phrase_answers_map.get(entry_key(entry), ""),

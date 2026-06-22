@@ -5,6 +5,25 @@ For word retry test no haga lo mismo que en el primer test si no que deje un inp
 Pareciera que no incluye el historial de las preguntas entonces no tiene contexto
 
 
+Ejercicios de expresiones no pueden ser como las frases
+En la sección de calentar palabra que muestre los espacios para cada letra
+Spread items from same phrase considering sides
+Modo no audio en ninguna parte (como cuando uno esta en publico y no puede escuchar)
+Continue en bloques automáticamente
+ejercicio de Ordenar letras
+Mover boton para siguiente palabra a la iquierda
+Que no seleccione el texto del boton en los bloques
+Retome focus after clicking letter option
+Slider para tamaño session, separado para review y para aprender
+Validar ejercicios, traducciones y esas cosas con otro modelo
+Que los ejercicios de un helper sean otros usos del helpee
+Escoger frases pa guardar en donde se guardan las palabras (que solo sea una pantalla para seleccionar todo)
+Generar dialogos con diferentes acentos
+Que los ejercicios de bloques capturen esas reglas de órdenes y grupos de palabras gramaticales
+Conteo de Palabras que sea solo las que ya se empezaron o son aprendidas
+Memorización de reglas, como lo de algunos casos en los que los sustantivos tienen un género en particular (PONS)
+
+
 Buscar AI que arregle CSS
 Que el ejercicio aleman-español palabra la palabra sale en aleman y seleccion de varias frases en español de cual esta la palabra. O frases en Aleman toda con una palabra tapada
 Que los dialogos puedan ser A1, A2...

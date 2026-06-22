@@ -29,6 +29,7 @@ from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
 from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
+from .difficult_items import CompleteDifficultItemView
 
 __all__ = [
     "ContentConfirmView",
@@ -59,6 +60,7 @@ __all__ = [
     "SubmitReviewView",
     "MarkSeenView",
     "SessionView",
+    "CompleteDifficultItemView",
     "AuthLoginView",
     "AuthLogoutView",
     "AuthMeView",

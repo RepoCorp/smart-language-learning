@@ -57,6 +57,27 @@ def test_submit_review_resets_progress_on_incorrect_answer():
     assert item.repetition_count_de_to_es == 1
     assert item.interval_days_de_to_es >= 2
     assert item.repetition_count_es_to_de == 0
+    assert item.is_difficult is True
+    assert item.difficult_marked_at is not None
+
+
+@pytest.mark.django_db
+def test_complete_difficult_item_clears_flag():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="gracias",
+        german_text="danke",
+        is_difficult=True,
+        difficult_marked_at=timezone.now(),
+    )
+
+    client = APIClient()
+    response = client.post("/api/difficult-items/complete", {"item_id": item.id}, format="json")
+
+    assert response.status_code == 200
+    item.refresh_from_db()
+    assert item.is_difficult is False
+    assert item.difficult_marked_at is None
 
 
 @pytest.mark.django_db
