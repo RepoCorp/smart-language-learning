@@ -5,7 +5,7 @@ from learning.models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestion
 
 
 def test_tts_instruction_forces_target_language_pronunciation():
-    from learning.views.content.persistence import _tts_language_instruction
+    from learning.views.content.audio import _tts_language_instruction
 
     instruction = _tts_language_instruction("german")
 
@@ -17,7 +17,7 @@ def test_tts_instruction_forces_target_language_pronunciation():
 
 
 def test_tts_dialog_instruction_can_request_accent(settings):
-    from learning.views.content.persistence import _tts_dialog_instruction
+    from learning.views.content.audio import _tts_dialog_instruction
 
     settings.OPENAI_TTS_DIALOG_ACCENT = "Berlin German"
 
@@ -30,7 +30,7 @@ def test_tts_dialog_instruction_can_request_accent(settings):
 
 
 def test_elevenlabs_item_audio_is_used_when_configured(monkeypatch, settings):
-    from learning.views.content import persistence as content_persistence
+    from learning.views.content import audio as content_audio
 
     captured_calls = []
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
@@ -40,10 +40,10 @@ def test_elevenlabs_item_audio_is_used_when_configured(monkeypatch, settings):
         captured_calls.append(kwargs)
         return b"audio-bytes"
 
-    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_audio", fake_elevenlabs_audio)
-    monkeypatch.setattr(content_persistence, "_deterministic_index", lambda seed, count: 1)
+    monkeypatch.setattr(content_audio, "_elevenlabs_tts_audio", fake_elevenlabs_audio)
+    monkeypatch.setattr(content_audio, "_deterministic_index", lambda seed, count: 1)
 
-    audio_bytes, voice = content_persistence._item_tts_audio_bytes(
+    audio_bytes, voice = content_audio._item_tts_audio_bytes(
         text="Guten Morgen.",
         prefix="phrase",
         target_language="german",
@@ -63,14 +63,14 @@ def test_elevenlabs_item_audio_is_used_when_configured(monkeypatch, settings):
 
 
 def test_elevenlabs_item_audio_falls_back_to_openai_without_audio(monkeypatch, settings):
-    from learning.views.content import persistence as content_persistence
+    from learning.views.content import audio as content_audio
 
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
     settings.ELEVENLABS_VOICE_ID = "leipzig-default"
-    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_audio", lambda **kwargs: None)
-    monkeypatch.setattr(content_persistence, "_openai_tts_audio", lambda **kwargs: b"openai-audio")
+    monkeypatch.setattr(content_audio, "_elevenlabs_tts_audio", lambda **kwargs: None)
+    monkeypatch.setattr(content_audio, "_openai_tts_audio", lambda **kwargs: b"openai-audio")
 
-    audio_bytes, voice = content_persistence._item_tts_audio_bytes(
+    audio_bytes, voice = content_audio._item_tts_audio_bytes(
         text="Guten Morgen.",
         prefix="phrase",
         target_language="german",
@@ -82,22 +82,22 @@ def test_elevenlabs_item_audio_falls_back_to_openai_without_audio(monkeypatch, s
 
 
 def test_elevenlabs_dialog_audio_uses_configured_voice_ids(monkeypatch, settings):
-    from learning.views.content import persistence as content_persistence
+    from learning.views.content import audio as content_audio
 
     captured_calls = []
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
     settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = "voice-a, voice-b"
 
-    monkeypatch.setattr(content_persistence, "sample", lambda values, count: list(values)[:count])
-    monkeypatch.setattr(content_persistence, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
+    monkeypatch.setattr(content_audio, "sample", lambda values, count: list(values)[:count])
+    monkeypatch.setattr(content_audio, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
 
     def fake_pcm(text, voice_id, target_language):
         captured_calls.append((text, voice_id, target_language))
         return b"\x01\x00\x02\x00"
 
-    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_pcm", fake_pcm)
+    monkeypatch.setattr(content_audio, "_elevenlabs_tts_pcm", fake_pcm)
 
-    audio_url = content_persistence.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
+    audio_url = content_audio.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
 
     assert audio_url.startswith("stored://dialog-")
     assert captured_calls == [
@@ -107,7 +107,7 @@ def test_elevenlabs_dialog_audio_uses_configured_voice_ids(monkeypatch, settings
 
 
 def test_elevenlabs_dialog_audio_can_use_general_voice_pool(monkeypatch, settings):
-    from learning.views.content import persistence as content_persistence
+    from learning.views.content import audio as content_audio
 
     captured_calls = []
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
@@ -115,16 +115,16 @@ def test_elevenlabs_dialog_audio_can_use_general_voice_pool(monkeypatch, setting
     settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = ""
     settings.ELEVENLABS_GERMAN_VOICE_IDS = "voice-a, voice-b, voice-c"
 
-    monkeypatch.setattr(content_persistence, "sample", lambda values, count: list(values)[:count])
-    monkeypatch.setattr(content_persistence, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
+    monkeypatch.setattr(content_audio, "sample", lambda values, count: list(values)[:count])
+    monkeypatch.setattr(content_audio, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
 
     def fake_pcm(text, voice_id, target_language):
         captured_calls.append((text, voice_id, target_language))
         return b"\x01\x00\x02\x00"
 
-    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_pcm", fake_pcm)
+    monkeypatch.setattr(content_audio, "_elevenlabs_tts_pcm", fake_pcm)
 
-    audio_url = content_persistence.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
+    audio_url = content_audio.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
 
     assert audio_url.startswith("stored://dialog-")
     assert captured_calls == [
@@ -171,14 +171,14 @@ def test_dialog_turn_audio_reuses_dialog_speaker_voices(monkeypatch, settings):
 
 
 def test_elevenlabs_voice_pool_reads_language_specific_env(monkeypatch, settings):
-    from learning.views.content import persistence as content_persistence
+    from learning.views.content import audio as content_audio
 
     monkeypatch.delenv("ELEVENLABS_VOICE_IDS", raising=False)
     monkeypatch.setenv("ELEVENLABS_GERMAN_PHRASE_VOICE_IDS", "env-voice-a, env-voice-b")
     if hasattr(settings, "ELEVENLABS_GERMAN_PHRASE_VOICE_IDS"):
         delattr(settings, "ELEVENLABS_GERMAN_PHRASE_VOICE_IDS")
 
-    voice_ids = content_persistence._elevenlabs_voice_ids(target_language="german", kind="phrase")
+    voice_ids = content_audio._elevenlabs_voice_ids(target_language="german", kind="phrase")
 
     assert voice_ids == ["env-voice-a", "env-voice-b"]
 

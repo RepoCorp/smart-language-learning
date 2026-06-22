@@ -22,7 +22,7 @@ Generar dialogos con diferentes acentos
 Que los ejercicios de bloques capturen esas reglas de órdenes y grupos de palabras gramaticales
 Conteo de Palabras que sea solo las que ya se empezaron o son aprendidas
 Memorización de reglas, como lo de algunos casos en los que los sustantivos tienen un género en particular (PONS)
-
+With eleven labs it is sometimes truncating the dialog
 
 Buscar AI que arregle CSS
 Que el ejercicio aleman-español palabra la palabra sale en aleman y seleccion de varias frases en español de cual esta la palabra. O frases en Aleman toda con una palabra tapada
