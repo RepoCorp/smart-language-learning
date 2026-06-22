@@ -16,6 +16,173 @@ def test_tts_instruction_forces_target_language_pronunciation():
     assert "infer an English pronunciation" in instruction
 
 
+def test_tts_dialog_instruction_can_request_accent(settings):
+    from learning.views.content.persistence import _tts_dialog_instruction
+
+    settings.OPENAI_TTS_DIALOG_ACCENT = "Berlin German"
+
+    instruction = _tts_dialog_instruction("german")
+
+    assert "Speak only in German" in instruction
+    assert "natural Berlin German accent" in instruction
+    assert "Keep the exact words" in instruction
+    assert "do not add slang" in instruction
+
+
+def test_elevenlabs_item_audio_is_used_when_configured(monkeypatch, settings):
+    from learning.views.content import persistence as content_persistence
+
+    captured_calls = []
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    settings.ELEVENLABS_GERMAN_PHRASE_VOICE_IDS = "leipzig-phrase-a,leipzig-phrase-b"
+
+    def fake_elevenlabs_audio(**kwargs):
+        captured_calls.append(kwargs)
+        return b"audio-bytes"
+
+    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_audio", fake_elevenlabs_audio)
+    monkeypatch.setattr(content_persistence, "_deterministic_index", lambda seed, count: 1)
+
+    audio_bytes, voice = content_persistence._item_tts_audio_bytes(
+        text="Guten Morgen.",
+        prefix="phrase",
+        target_language="german",
+        default_speed=1.25,
+    )
+
+    assert audio_bytes == b"audio-bytes"
+    assert voice == "elevenlabs:leipzig-phrase-b"
+    assert captured_calls == [
+        {
+            "text": "Guten Morgen.",
+            "voice_id": "leipzig-phrase-b",
+            "target_language": "german",
+            "output_format": "mp3_44100_128",
+        }
+    ]
+
+
+def test_elevenlabs_item_audio_falls_back_to_openai_without_audio(monkeypatch, settings):
+    from learning.views.content import persistence as content_persistence
+
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    settings.ELEVENLABS_VOICE_ID = "leipzig-default"
+    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_audio", lambda **kwargs: None)
+    monkeypatch.setattr(content_persistence, "_openai_tts_audio", lambda **kwargs: b"openai-audio")
+
+    audio_bytes, voice = content_persistence._item_tts_audio_bytes(
+        text="Guten Morgen.",
+        prefix="phrase",
+        target_language="german",
+        default_speed=1.25,
+    )
+
+    assert audio_bytes == b"openai-audio"
+    assert voice == "openai:onyx"
+
+
+def test_elevenlabs_dialog_audio_uses_configured_voice_ids(monkeypatch, settings):
+    from learning.views.content import persistence as content_persistence
+
+    captured_calls = []
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = "voice-a, voice-b"
+
+    monkeypatch.setattr(content_persistence, "sample", lambda values, count: list(values)[:count])
+    monkeypatch.setattr(content_persistence, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
+
+    def fake_pcm(text, voice_id, target_language):
+        captured_calls.append((text, voice_id, target_language))
+        return b"\x01\x00\x02\x00"
+
+    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_pcm", fake_pcm)
+
+    audio_url = content_persistence.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
+
+    assert audio_url.startswith("stored://dialog-")
+    assert captured_calls == [
+        ("Hallo.", "voice-a", "german"),
+        ("Wie geht's?", "voice-b", "german"),
+    ]
+
+
+def test_elevenlabs_dialog_audio_can_use_general_voice_pool(monkeypatch, settings):
+    from learning.views.content import persistence as content_persistence
+
+    captured_calls = []
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    settings.ELEVENLABS_DIALOG_VOICE_IDS = ""
+    settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = ""
+    settings.ELEVENLABS_GERMAN_VOICE_IDS = "voice-a, voice-b, voice-c"
+
+    monkeypatch.setattr(content_persistence, "sample", lambda values, count: list(values)[:count])
+    monkeypatch.setattr(content_persistence, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
+
+    def fake_pcm(text, voice_id, target_language):
+        captured_calls.append((text, voice_id, target_language))
+        return b"\x01\x00\x02\x00"
+
+    monkeypatch.setattr(content_persistence, "_elevenlabs_tts_pcm", fake_pcm)
+
+    audio_url = content_persistence.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
+
+    assert audio_url.startswith("stored://dialog-")
+    assert captured_calls == [
+        ("Hallo.", "voice-a", "german"),
+        ("Wie geht's?", "voice-b", "german"),
+    ]
+
+
+@pytest.mark.django_db
+def test_dialog_turn_audio_reuses_dialog_speaker_voices(monkeypatch, settings):
+    from learning.views.content import persistence as content_persistence
+
+    captured_calls = []
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    dialog = SavedDialog.objects.create(
+        topic="greetings",
+        context="",
+        source_language="spanish",
+        target_language="german",
+        turns=[],
+    )
+
+    def fake_create_audio_file(text, prefix, target_language="german", voice_id=""):
+        captured_calls.append((text, prefix, target_language, voice_id))
+        return f"audio://{voice_id}/{text}"
+
+    monkeypatch.setattr(content_persistence, "create_audio_file", fake_create_audio_file)
+
+    content_persistence.save_dialog_turns(
+        dialog,
+        [
+            {"source_text": "Hola.", "target_text": "Hallo."},
+            {"source_text": "Como estas?", "target_text": "Wie geht es dir?"},
+            {"source_text": "Bien.", "target_text": "Gut."},
+        ],
+        speaker_voice_ids=("voice-a", "voice-b"),
+    )
+
+    assert captured_calls == [
+        ("Hallo.", "phrase", "german", "voice-a"),
+        ("Wie geht es dir?", "phrase", "german", "voice-b"),
+        ("Gut.", "phrase", "german", "voice-a"),
+    ]
+
+
+def test_elevenlabs_voice_pool_reads_language_specific_env(monkeypatch, settings):
+    from learning.views.content import persistence as content_persistence
+
+    monkeypatch.delenv("ELEVENLABS_VOICE_IDS", raising=False)
+    monkeypatch.setenv("ELEVENLABS_GERMAN_PHRASE_VOICE_IDS", "env-voice-a, env-voice-b")
+    if hasattr(settings, "ELEVENLABS_GERMAN_PHRASE_VOICE_IDS"):
+        delattr(settings, "ELEVENLABS_GERMAN_PHRASE_VOICE_IDS")
+
+    voice_ids = content_persistence._elevenlabs_voice_ids(target_language="german", kind="phrase")
+
+    assert voice_ids == ["env-voice-a", "env-voice-b"]
+
+
 def test_basic_word_metadata_prompt_requires_noun_articles_in_both_languages(monkeypatch):
     from learning.views.content import management as management_views
 
@@ -1447,7 +1614,10 @@ def test_content_confirm_saves_dialog_and_returns_turns(monkeypatch):
 
 @pytest.mark.django_db
 def test_content_confirm_generates_dialog_audio_when_requested(monkeypatch):
+    from learning.views.content import api as content_api_views
     from learning.views import content as content_views
+    from learning.views.content import persistence as content_persistence
+    from learning.views.content.persistence import DialogAudioResult
 
     captured_dialog_lines = []
 
@@ -1461,21 +1631,33 @@ def test_content_confirm_generates_dialog_audio_when_requested(monkeypatch):
     )
     monkeypatch.setattr(content_views, "generate_keywords_for_phrase_with_chatgpt", lambda s, g, **kwargs: [])
     monkeypatch.setattr(
-        content_views,
+        content_persistence,
         "create_audio_file",
-        lambda text, prefix: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+        lambda text, prefix, **kwargs: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
     )
 
     def fake_dialog_audio(lines, target_language="german"):
         captured_dialog_lines.extend(lines)
-        return "http://localhost:8000/media/audio/dialog-mock.wav"
+        return DialogAudioResult(
+            audio_url="http://localhost:8000/media/audio/dialog-mock.wav",
+            provider="openai",
+            voices=("voice-a", "voice-b"),
+        )
 
-    monkeypatch.setattr(content_views, "create_dialog_audio_file", fake_dialog_audio)
+    monkeypatch.setattr(content_api_views, "create_dialog_audio", fake_dialog_audio)
 
     client = APIClient()
     response = client.post(
         "/api/content/confirm",
-        {"topic": "greetings", "selected_words": [], "create_dialog_audio": True},
+        {
+            "topic": "greetings",
+            "selected_words": [],
+            "create_dialog_audio": True,
+            "dialog_turns": [
+                {"source_text": "Buenos dias.", "target_text": "Guten Morgen.", "speaker": "a"},
+                {"source_text": "Como estas?", "target_text": "Wie geht es dir?", "speaker": "b"},
+            ],
+        },
         format="json",
     )
     assert response.status_code == 200

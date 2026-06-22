@@ -9,6 +9,7 @@ from .generation import (
 )
 from .persistence import (
     count_new_items,
+    create_dialog_audio,
     create_dialog_audio_file,
     create_audio_file,
     create_phrase_if_missing,
@@ -42,6 +43,7 @@ __all__ = [
     "build_content_plan",
     "call_openai_json",
     "count_new_items",
+    "create_dialog_audio",
     "create_dialog_audio_file",
     "create_audio_file",
     "create_phrase_if_missing",

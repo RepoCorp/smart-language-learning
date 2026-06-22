@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import logging
+import os
 import re
 import wave
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from random import sample
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
@@ -36,11 +40,41 @@ OPENAI_TTS_LANGUAGE_LABEL_BY_STUDY_LANGUAGE = {
     "italian": "Italian",
     "portuguese": "Portuguese",
 }
-OPENAI_TTS_VOICES = ("alloy", "echo", "fable", "onyx", "nova", "shimmer")
+TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE = {
+    "spanish": "es",
+    "english": "en",
+    "german": "de",
+    "french": "fr",
+    "italian": "it",
+    "portuguese": "pt",
+}
+OPENAI_TTS_VOICES = (
+    "alloy",
+    "ash",
+    "ballad",
+    "coral",
+    "echo",
+    "fable",
+    "onyx",
+    "nova",
+    "sage",
+    "shimmer",
+    "verse",
+    "marin",
+    "cedar",
+)
 OPENAI_TTS_SAMPLE_RATE = 24000
-OPENAI_TTS_DEFAULT_SPEED = 1.25
+OPENAI_TTS_DEFAULT_SPEED = 1.5
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
+OPENAI_TTS_PHRASE_DEFAULT_SPEED = 1.25
 WORD_TYPE_CHOICES = {"noun", "verb", "adjective", "adverb", "helper", "expression", "other"}
+
+
+@dataclass(frozen=True)
+class DialogAudioResult:
+    audio_url: str
+    provider: str
+    voices: tuple[str, str] | None = None
 
 
 def normalize_word_type(value: str) -> str:
@@ -56,6 +90,81 @@ def _tts_language_instruction(target_language: str) -> str:
         f"If a token looks like English or another language, still pronounce it as {language_label} text. "
         "Do not translate, switch languages, infer an English pronunciation, or reinterpret words as another language."
     )
+
+
+def _tts_dialog_instruction(target_language: str) -> str:
+    accent = str(getattr(settings, "OPENAI_TTS_DIALOG_ACCENT", "")).strip()
+    accent_instruction = (
+        f" Use a natural {accent} accent and pronunciation."
+        if accent
+        else " Use a natural native-speaker accent and pronunciation."
+    )
+    return (
+        f"{_tts_language_instruction(target_language)}"
+        f"{accent_instruction} "
+        "Keep the exact words from the input; do not add slang, rewrite, or change the wording."
+    )
+
+
+def _configured_tts_provider() -> str:
+    provider = str(getattr(settings, "AUDIO_TTS_PROVIDER", "openai")).strip().lower()
+    return provider if provider in {"openai", "elevenlabs"} else "openai"
+
+
+def _comma_separated_values(value: str) -> list[str]:
+    return [entry.strip() for entry in value.split(",") if entry.strip()]
+
+
+def _deterministic_index(seed: str, count: int) -> int:
+    if count <= 0:
+        return 0
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    return int(digest[:12], 16) % count
+
+
+def _language_setting_name(prefix: str, target_language: str, suffix: str) -> str:
+    normalized_language = re.sub(r"[^A-Z0-9]+", "_", target_language.upper()).strip("_")
+    return f"{prefix}_{normalized_language}_{suffix}"
+
+
+def _setting_or_env(setting_name: str, default: str = "") -> str:
+    configured = getattr(settings, setting_name, None)
+    if configured is not None:
+        return str(configured).strip()
+    return os.getenv(setting_name, default).strip()
+
+
+def _elevenlabs_voice_ids(*, target_language: str, kind: str = "") -> list[str]:
+    kind_prefix = f"{kind.upper()}_" if kind else ""
+    setting_candidates = [
+        _language_setting_name("ELEVENLABS", target_language, f"{kind_prefix}VOICE_IDS"),
+        _language_setting_name("ELEVENLABS", target_language, f"{kind_prefix}VOICE_ID"),
+        f"ELEVENLABS_{kind_prefix}VOICE_IDS",
+        f"ELEVENLABS_{kind_prefix}VOICE_ID",
+        "ELEVENLABS_VOICE_IDS",
+        "ELEVENLABS_VOICE_ID",
+    ]
+    for setting_name in setting_candidates:
+        voice_ids = _comma_separated_values(_setting_or_env(setting_name))
+        if voice_ids:
+            return voice_ids
+    return []
+
+
+def _elevenlabs_voice_id(*, target_language: str, kind: str = "", seed: str = "") -> str:
+    voice_ids = _elevenlabs_voice_ids(target_language=target_language, kind=kind)
+    if not voice_ids:
+        return ""
+    return voice_ids[_deterministic_index(seed or f"{target_language}:{kind}", len(voice_ids))]
+
+
+def _elevenlabs_dialog_voice_ids(target_language: str) -> list[str]:
+    language_specific = _setting_or_env(_language_setting_name("ELEVENLABS", target_language, "DIALOG_VOICE_IDS"))
+    configured = language_specific or _setting_or_env("ELEVENLABS_DIALOG_VOICE_IDS")
+    voice_ids = _comma_separated_values(configured)
+    if len(voice_ids) >= 2:
+        return voice_ids
+    return _elevenlabs_voice_ids(target_language=target_language)
 
 
 def _build_local_audio_url(filename: str) -> str:
@@ -302,7 +411,7 @@ def create_word_if_missing(
     return item
 
 
-def create_audio_file(text: str, prefix: str, target_language: str = "german") -> str:
+def create_audio_file(text: str, prefix: str, target_language: str = "german", voice_id: str = "") -> str:
     if not text.strip():
         logger.warning("content.audio.skipped prefix=%s reason=empty_text", prefix)
         return ""
@@ -312,14 +421,30 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german") -
         slug = "audio"
     filename = f"{prefix}-{slug[:32]}-{uuid4().hex[:8]}.mp3"
 
-    voice = OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE.get(target_language, "alloy")
-    audio_bytes = _openai_tts_audio(
-        text=text,
-        voice=voice,
-        speed=float(getattr(settings, "OPENAI_TTS_ITEM_SPEED", OPENAI_TTS_ITEM_DEFAULT_SPEED)),
-        response_format="mp3",
-        instructions=_tts_language_instruction(target_language),
-    )
+    default_speed = OPENAI_TTS_PHRASE_DEFAULT_SPEED if prefix == "phrase" else OPENAI_TTS_ITEM_DEFAULT_SPEED
+    if voice_id and _configured_tts_provider() == "elevenlabs":
+        audio_bytes = _elevenlabs_tts_audio(
+            text=text,
+            voice_id=voice_id,
+            target_language=target_language,
+            output_format=str(getattr(settings, "ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")),
+        )
+        voice = f"elevenlabs:{voice_id}"
+        if not audio_bytes:
+            logger.warning("content.audio.elevenlabs.voice_fallback prefix=%s target_language=%s voice_id=%s", prefix, target_language, voice_id)
+            audio_bytes, voice = _item_tts_audio_bytes(
+                text=text,
+                prefix=prefix,
+                target_language=target_language,
+                default_speed=default_speed,
+            )
+    else:
+        audio_bytes, voice = _item_tts_audio_bytes(
+            text=text,
+            prefix=prefix,
+            target_language=target_language,
+            default_speed=default_speed,
+        )
     if not audio_bytes:
         logger.warning("content.audio.failed prefix=%s filename=%s target_language=%s", prefix, filename, target_language)
         return ""
@@ -375,23 +500,112 @@ def _openai_tts_audio(
         return None
 
 
-def _openai_tts_pcm(text: str, voice: str) -> bytes | None:
+def _elevenlabs_tts_audio(
+    *,
+    text: str,
+    voice_id: str,
+    target_language: str,
+    output_format: str,
+) -> bytes | None:
+    api_key = str(getattr(settings, "ELEVENLABS_API_KEY", "")).strip()
+    if not api_key or not voice_id:
+        return None
+    model_id = str(getattr(settings, "ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")).strip() or "eleven_multilingual_v2"
+    output = output_format.strip() or "mp3_44100_128"
+    language_code = TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE.get(target_language, target_language[:2].lower())
+    body = {
+        "text": text,
+        "model_id": model_id,
+        "language_code": language_code,
+    }
+    request = UrlRequest(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{quote(voice_id)}?output_format={quote(output)}",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "xi-api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    timeout_seconds = int(getattr(settings, "OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", 40))
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            return response.read()
+    except (HTTPError, URLError, TimeoutError):
+        return None
+
+
+def _item_tts_audio_bytes(*, text: str, prefix: str, target_language: str, default_speed: float) -> tuple[bytes | None, str]:
+    if _configured_tts_provider() == "elevenlabs":
+        voice_id = _elevenlabs_voice_id(target_language=target_language, kind=prefix, seed=f"{target_language}:{prefix}:{text}")
+        audio_bytes = _elevenlabs_tts_audio(
+            text=text,
+            voice_id=voice_id,
+            target_language=target_language,
+            output_format=str(getattr(settings, "ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")),
+        )
+        if audio_bytes:
+            return audio_bytes, f"elevenlabs:{voice_id}"
+        logger.warning("content.audio.elevenlabs.fallback_openai prefix=%s target_language=%s", prefix, target_language)
+
+    voice = OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE.get(target_language, "alloy")
+    return (
+        _openai_tts_audio(
+            text=text,
+            voice=voice,
+            speed=float(getattr(settings, "OPENAI_TTS_ITEM_SPEED", default_speed)),
+            response_format="mp3",
+            instructions=_tts_language_instruction(target_language),
+        ),
+        f"openai:{voice}",
+    )
+
+
+def _openai_tts_pcm(text: str, voice: str, target_language: str) -> bytes | None:
     return _openai_tts_audio(
         text=text,
         voice=voice,
         speed=float(getattr(settings, "OPENAI_TTS_SPEED", OPENAI_TTS_DEFAULT_SPEED)),
         response_format="pcm",
+        instructions=_tts_dialog_instruction(target_language),
     )
 
 
-def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "german") -> str:
+def _elevenlabs_tts_pcm(text: str, voice_id: str, target_language: str) -> bytes | None:
+    return _elevenlabs_tts_audio(
+        text=text,
+        voice_id=voice_id,
+        target_language=target_language,
+        output_format=str(getattr(settings, "ELEVENLABS_PCM_OUTPUT_FORMAT", "pcm_24000")),
+    )
+
+
+def create_dialog_audio(dialog_lines: list[str], target_language: str = "german") -> DialogAudioResult:
     cleaned_lines = [line.strip() for line in dialog_lines if line and line.strip()]
     if len(cleaned_lines) < 2:
-        return ""
-    if len(OPENAI_TTS_VOICES) < 2:
-        return ""
+        return DialogAudioResult(audio_url="", provider=_configured_tts_provider())
+    provider = _configured_tts_provider()
+    use_elevenlabs = provider == "elevenlabs"
+    logger.info(
+        "content.audio.dialog.provider_check provider=%s elevenlabs_key=%s elevenlabs_dialog_voice_count=%d target_language=%s",
+        provider,
+        bool(str(getattr(settings, "ELEVENLABS_API_KEY", "")).strip()),
+        len(_elevenlabs_dialog_voice_ids(target_language)),
+        target_language,
+    )
+    if use_elevenlabs:
+        dialog_voices = _elevenlabs_dialog_voice_ids(target_language)
+        if len(dialog_voices) < 2:
+            logger.warning("content.audio.dialog.elevenlabs_missing_voices target_language=%s", target_language)
+            use_elevenlabs = False
 
-    voice_a, voice_b = sample(list(OPENAI_TTS_VOICES), 2)
+    if use_elevenlabs:
+        voice_a, voice_b = sample(dialog_voices, 2)
+    else:
+        if len(OPENAI_TTS_VOICES) < 2:
+            return DialogAudioResult(audio_url="", provider="openai")
+        voice_a, voice_b = sample(list(OPENAI_TTS_VOICES), 2)
+
     silence = b"\x00\x00" * int(OPENAI_TTS_SAMPLE_RATE * 0.12)
     pcm_chunks: list[bytes] = []
     futures: list[tuple[int, str, Future[bytes | None]]] = []
@@ -400,7 +614,10 @@ def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "ge
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for index, line in enumerate(cleaned_lines):
             voice = voice_a if index % 2 == 0 else voice_b
-            futures.append((index, voice, executor.submit(_openai_tts_pcm, line, voice)))
+            if use_elevenlabs:
+                futures.append((index, voice, executor.submit(_elevenlabs_tts_pcm, line, voice, target_language)))
+            else:
+                futures.append((index, voice, executor.submit(_openai_tts_pcm, line, voice, target_language)))
 
         for index, voice, future in futures:
             pcm = future.result()
@@ -411,7 +628,11 @@ def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "ge
             pcm_chunks.append(silence)
 
     if not pcm_chunks:
-        return ""
+        return DialogAudioResult(
+            audio_url="",
+            provider="elevenlabs" if use_elevenlabs else "openai",
+            voices=(voice_a, voice_b),
+        )
 
     filename = f"dialog-{uuid4().hex[:12]}.wav"
 
@@ -424,20 +645,37 @@ def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "ge
             wav_file.writeframes(b"".join(pcm_chunks))
     except Exception:
         logger.warning("content.audio.dialog.failed filename=%s", filename)
-        return ""
+        return DialogAudioResult(
+            audio_url="",
+            provider="elevenlabs" if use_elevenlabs else "openai",
+            voices=(voice_a, voice_b),
+        )
 
     audio_url = _store_audio_bytes(filename, audio_buffer.getvalue(), content_type="audio/wav")
     if not audio_url:
         logger.warning("content.audio.dialog.failed_store filename=%s", filename)
-        return ""
+        return DialogAudioResult(
+            audio_url="",
+            provider="elevenlabs" if use_elevenlabs else "openai",
+            voices=(voice_a, voice_b),
+        )
     logger.info(
-        "content.audio.dialog.created filename=%s voices=%s,%s target_language=%s",
+        "content.audio.dialog.created filename=%s voices=%s,%s target_language=%s provider=%s",
         filename,
         voice_a,
         voice_b,
         target_language,
+        "elevenlabs" if use_elevenlabs else "openai",
     )
-    return audio_url
+    return DialogAudioResult(
+        audio_url=audio_url,
+        provider="elevenlabs" if use_elevenlabs else "openai",
+        voices=(voice_a, voice_b),
+    )
+
+
+def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "german") -> str:
+    return create_dialog_audio(dialog_lines, target_language=target_language).audio_url
 
 
 def save_dialog(
@@ -461,12 +699,13 @@ def save_dialog(
     )
 
 
-def save_dialog_turns(dialog: SavedDialog, turns: list[dict[str, str]]) -> list[DialogTurn]:
+def save_dialog_turns(dialog: SavedDialog, turns: list[dict[str, str]], speaker_voice_ids: tuple[str, str] | None = None) -> list[DialogTurn]:
     created_turns: list[DialogTurn] = []
     for index, turn in enumerate(turns):
         source_text = str(turn.get("source_text", "")).strip()
         target_text = str(turn.get("target_text", "")).strip()
-        audio_url = create_audio_file(target_text, "phrase", target_language=dialog.target_language) if target_text else ""
+        voice_id = speaker_voice_ids[index % 2] if speaker_voice_ids else ""
+        audio_url = create_audio_file(target_text, "phrase", target_language=dialog.target_language, voice_id=voice_id) if target_text else ""
         created_turns.append(
             DialogTurn.objects.create(
                 dialog=dialog,

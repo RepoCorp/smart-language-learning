@@ -10,7 +10,7 @@ from ...auth import get_request_user
 from ...serializers import ContentConfirmSerializer, ContentTopicSerializer
 from .core import (
     ContentCandidate,
-    create_dialog_audio_file,
+    create_dialog_audio,
     create_phrase_if_missing,
     generate_conversation_with_chatgpt,
     save_dialog,
@@ -103,7 +103,7 @@ class ContentConfirmView(APIView):
         )
         dialog_turns_raw = serializer.validated_data.get("dialog_turns", [])
         selected_turn_indexes_raw = serializer.validated_data.get("selected_turn_indexes")
-        create_dialog_audio = serializer.validated_data.get("create_dialog_audio", False)
+        should_create_dialog_audio = serializer.validated_data.get("create_dialog_audio", False)
         dialog_turns = _dialog_turns_for_save(dialog_turns_raw)
         if not dialog_turns:
             return Response({"detail": "dialog_turns are required"}, status=400)
@@ -121,12 +121,16 @@ class ContentConfirmView(APIView):
             topic,
             len(dialog_turns),
             len(selected_turns),
-            create_dialog_audio,
+            should_create_dialog_audio,
         )
         dialog_audio_url = ""
-        if create_dialog_audio:
+        dialog_speaker_voice_ids = None
+        if should_create_dialog_audio:
             dialog_lines = [turn["target_text"] for turn in dialog_turns if turn.get("target_text", "").strip()]
-            dialog_audio_url = create_dialog_audio_file(dialog_lines, target_language=target_language)
+            dialog_audio = create_dialog_audio(dialog_lines, target_language=target_language)
+            dialog_audio_url = dialog_audio.audio_url
+            if dialog_audio.provider == "elevenlabs":
+                dialog_speaker_voice_ids = dialog_audio.voices
         saved_dialog = save_dialog(
             user=user,
             topic=topic,
@@ -136,7 +140,7 @@ class ContentConfirmView(APIView):
             turns=dialog_turns,
             audio_url=dialog_audio_url,
         )
-        created_turns = save_dialog_turns(saved_dialog, dialog_turns)
+        created_turns = save_dialog_turns(saved_dialog, dialog_turns, speaker_voice_ids=dialog_speaker_voice_ids)
         created_sentence_count = 0
         existing_sentence_count = 0
         for turn in selected_turns:
