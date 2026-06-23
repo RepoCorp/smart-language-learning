@@ -1450,11 +1450,6 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
                     <p>
                       <strong>{t("newItem.dialogContext")}:</strong> {dialog.context || t("newItem.dialogNoContext")}
                     </p>
-                    {dialog.audio_url && (
-                      <audio controls src={dialog.audio_url}>
-                        {t("newItem.noAudioSupport")}
-                      </audio>
-                    )}
                     {!!dialog.turns.length && (
                       <>
                         <p><strong>{t("newItem.dialogTurns")}:</strong></p>

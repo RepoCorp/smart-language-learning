@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
 
 echo "Waiting for services to be ready..."
 

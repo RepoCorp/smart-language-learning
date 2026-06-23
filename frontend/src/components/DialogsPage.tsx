@@ -117,19 +117,6 @@ export default function DialogsPage(): JSX.Element {
     setExpandedDialogId(dialogId);
   };
 
-  const handleDialogAudioPlay = (dialogId: number): void => {
-    setPlayingDialogId(dialogId);
-    setPlayingTurn(null);
-    openAndFocusDialog(dialogId);
-  };
-
-  const clearManualDialogPlayback = (dialogId: number): void => {
-    if (playingAll) {
-      return;
-    }
-    setPlayingDialogId((current) => (current === dialogId ? null : current));
-  };
-
   const stopCurrentPlayback = (): void => {
     playbackRunRef.current += 1;
     if (activeAudioRef.current) {
@@ -394,10 +381,9 @@ export default function DialogsPage(): JSX.Element {
     }
   };
 
-  const dialogHasAllTurnAudio = (dialog: ContentDialogRecord): boolean =>
-    Boolean(dialog.turns?.length) && dialog.turns.every((turn) => Boolean(turn.phrase_audio_url));
+  const dialogHasTurns = (dialog: ContentDialogRecord): boolean => Boolean(dialog.turn_count || dialog.turns?.length);
 
-  const dialogIsPlayable = (dialog: ContentDialogRecord): boolean => Boolean(dialog.audio_url) || dialogHasAllTurnAudio(dialog);
+  const dialogIsPlayable = (dialog: ContentDialogRecord): boolean => dialogHasTurns(dialog);
 
   const playDialogWithFocusedTurns = async (dialog: ContentDialogRecord, runId: number): Promise<void> => {
     const detailedDialog = await ensureDialogDetail(dialog.dialog_id);
@@ -405,7 +391,7 @@ export default function DialogsPage(): JSX.Element {
       return;
     }
     setPlayingDialogId(detailedDialog.dialog_id);
-    if (dialogHasAllTurnAudio(detailedDialog)) {
+    if (detailedDialog.turns?.length) {
       for (let index = 0; index < detailedDialog.turns.length; index += 1) {
         if (runId !== playbackRunRef.current) {
           break;
@@ -417,10 +403,20 @@ export default function DialogsPage(): JSX.Element {
       }
       return;
     }
+  };
 
-    setPlayingTurn(null);
-    openAndFocusDialog(detailedDialog.dialog_id);
-    await playAudioUrl(detailedDialog.audio_url, runId);
+  const playSingleDialog = async (dialog: ContentDialogRecord): Promise<void> => {
+    if (!dialogIsPlayable(dialog)) {
+      return;
+    }
+    stopCurrentPlayback();
+    playbackRunRef.current += 1;
+    const runId = playbackRunRef.current;
+    await playDialogWithFocusedTurns(dialog, runId);
+    if (runId === playbackRunRef.current) {
+      setPlayingDialogId(null);
+      setPlayingTurn(null);
+    }
   };
 
   const playAllDialogs = async (): Promise<void> => {
@@ -509,15 +505,15 @@ export default function DialogsPage(): JSX.Element {
                     )}
                   </div>
                   <div className="dialog-list-controls">
-                    {dialog.audio_url ? (
-                      <audio
-                        controls
-                        src={dialog.audio_url}
-                        preload="none"
-                        onPlay={() => handleDialogAudioPlay(dialog.dialog_id)}
-                        onPause={() => clearManualDialogPlayback(dialog.dialog_id)}
-                        onEnded={() => clearManualDialogPlayback(dialog.dialog_id)}
-                      />
+                    {dialogHasTurns(dialog) ? (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void playSingleDialog(dialog)}
+                        disabled={loadingDialogId === dialog.dialog_id}
+                      >
+                        {playingDialogId === dialog.dialog_id ? t("dialogs.nowPlaying") : t("dialogs.playDialog")}
+                      </button>
                     ) : (
                       <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
                     )}

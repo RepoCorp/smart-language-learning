@@ -97,10 +97,6 @@ class ContentTopicSerializer(serializers.Serializer):
 
 
 class ContentConfirmSerializer(ContentTopicSerializer):
-    create_dialog_audio = serializers.BooleanField(
-        required=False,
-        default=True,
-    )
     dialog_turns = serializers.ListField(
         child=serializers.DictField(),
         required=True,

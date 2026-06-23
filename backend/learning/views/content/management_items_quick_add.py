@@ -18,10 +18,12 @@ from .management import (
     apply_user_scope,
     create_phrase_if_missing,
     create_word_if_missing,
+    DialogTurn,
     get_request_user,
     item_exists,
     normalize_word_type,
     status,
+    SavedDialog,
 )
 
 
@@ -133,6 +135,41 @@ def _helper_note(*, source_text: str) -> str:
     )[:255]
 
 
+def _normalized_dialog_text(value: str) -> str:
+    return " ".join((value or "").split()).strip().casefold()
+
+
+def _whole_turn_audio_url_for_phrase(
+    *,
+    user,
+    source_text: str,
+    target_text: str,
+    dialog_id_raw,
+    turn_index_raw,
+) -> str:
+    try:
+        dialog_id = int(dialog_id_raw)
+        turn_index = int(turn_index_raw)
+    except (TypeError, ValueError):
+        return ""
+
+    dialog = apply_user_scope(SavedDialog.objects, user).filter(id=dialog_id).first()
+    if not dialog:
+        return ""
+    turn = DialogTurn.objects.filter(dialog=dialog, turn_index=turn_index).first()
+    if not turn:
+        return ""
+    if _normalized_dialog_text(turn.source_text) != _normalized_dialog_text(source_text):
+        return ""
+    if _normalized_dialog_text(turn.target_text) != _normalized_dialog_text(target_text):
+        return ""
+    return turn.audio_url or _ensure_audio_for_dialog_turn(
+        user=user,
+        dialog_id_raw=dialog_id,
+        turn_index_raw=turn_index,
+    )
+
+
 def _phrase_quick_add_response(
     *,
     user,
@@ -204,12 +241,20 @@ def _phrase_quick_add_response(
         exists=False,
         notes=notes,
     )
+    audio_url_override = _whole_turn_audio_url_for_phrase(
+        user=user,
+        source_text=source_text,
+        target_text=target_text,
+        dialog_id_raw=dialog_id_raw,
+        turn_index_raw=turn_index_raw,
+    )
     created = create_phrase_if_missing(
         user=user,
         candidate=candidate,
         topic="conversation-click",
         source_language=source_language,
         target_language=target_language,
+        audio_url_override=audio_url_override,
     )
     if created is None:
         existing = (

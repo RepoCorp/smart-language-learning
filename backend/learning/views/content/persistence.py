@@ -5,7 +5,7 @@ import re
 
 from ...auth import apply_user_scope
 from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
-from .audio import DialogAudioResult, create_audio_file, create_dialog_audio, create_dialog_audio_file
+from .audio import create_audio_file
 from .selection import word_selection_id
 from .types import ContentCandidate, ContentPlan
 
@@ -74,6 +74,7 @@ def create_phrase_if_missing(
     topic: str,
     source_language: str = "spanish",
     target_language: str = "german",
+    audio_url_override: str = "",
 ) -> Item | None:
     if item_exists(
         user=user,
@@ -85,11 +86,13 @@ def create_phrase_if_missing(
     ):
         logger.info("content.create.phrase.skipped_exists topic=%s spanish=%s", topic, candidate.spanish_text)
         return None
-    try:
-        audio_url = create_audio_file(candidate.german_text, "phrase", target_language=target_language)
-    except TypeError:
-        # Backward compatibility for tests/mocks that still accept only (text, prefix).
-        audio_url = create_audio_file(candidate.german_text, "phrase")
+    audio_url = audio_url_override.strip()
+    if not audio_url:
+        try:
+            audio_url = create_audio_file(candidate.german_text, "phrase", target_language=target_language)
+        except TypeError:
+            # Backward compatibility for tests/mocks that still accept only (text, prefix).
+            audio_url = create_audio_file(candidate.german_text, "phrase")
     item = Item.objects.create(
         user=user,
         item_type=Item.ItemType.PHRASE,

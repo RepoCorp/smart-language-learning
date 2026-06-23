@@ -10,12 +10,12 @@ from ...auth import get_request_user
 from ...serializers import ContentConfirmSerializer, ContentTopicSerializer
 from .core import (
     ContentCandidate,
-    create_dialog_audio,
     create_phrase_if_missing,
     generate_conversation_with_chatgpt,
     save_dialog,
     save_phrase_dialog_occurrences,
     save_dialog_turns,
+    select_dialog_speaker_voice_ids,
 )
 from .topics import save_topic
 
@@ -103,7 +103,6 @@ class ContentConfirmView(APIView):
         )
         dialog_turns_raw = serializer.validated_data.get("dialog_turns", [])
         selected_turn_indexes_raw = serializer.validated_data.get("selected_turn_indexes")
-        should_create_dialog_audio = serializer.validated_data.get("create_dialog_audio", False)
         dialog_turns = _dialog_turns_for_save(dialog_turns_raw)
         if not dialog_turns:
             return Response({"detail": "dialog_turns are required"}, status=400)
@@ -117,20 +116,12 @@ class ContentConfirmView(APIView):
             turn for index, turn in enumerate(dialog_turns) if index in selected_turn_indexes
         ]
         logger.info(
-            "content.confirm.started topic=%s turns=%d selected_turns=%d create_dialog_audio=%s",
+            "content.confirm.started topic=%s turns=%d selected_turns=%d",
             topic,
             len(dialog_turns),
             len(selected_turns),
-            should_create_dialog_audio,
         )
-        dialog_audio_url = ""
-        dialog_speaker_voice_ids = None
-        if should_create_dialog_audio:
-            dialog_lines = [turn["target_text"] for turn in dialog_turns if turn.get("target_text", "").strip()]
-            dialog_audio = create_dialog_audio(dialog_lines, target_language=target_language)
-            dialog_audio_url = dialog_audio.audio_url
-            if dialog_audio.provider == "elevenlabs":
-                dialog_speaker_voice_ids = dialog_audio.voices
+        dialog_speaker_voice_ids = select_dialog_speaker_voice_ids(target_language)
         saved_dialog = save_dialog(
             user=user,
             topic=topic,
@@ -138,7 +129,7 @@ class ContentConfirmView(APIView):
             source_language=source_language,
             target_language=target_language,
             turns=dialog_turns,
-            audio_url=dialog_audio_url,
+            audio_url="",
         )
         created_turns = save_dialog_turns(saved_dialog, dialog_turns, speaker_voice_ids=dialog_speaker_voice_ids)
         created_sentence_count = 0
@@ -173,11 +164,10 @@ class ContentConfirmView(APIView):
             target_language=target_language,
         )
         logger.info(
-            "content.confirm.completed topic=%s dialog_id=%s turns=%d dialog_audio=%s sentences_created=%d sentences_existing=%d phrase_occurrences=%d",
+            "content.confirm.completed topic=%s dialog_id=%s turns=%d sentences_created=%d sentences_existing=%d phrase_occurrences=%d",
             topic,
             saved_dialog.id,
             len(created_turns),
-            bool(dialog_audio_url),
             created_sentence_count,
             existing_sentence_count,
             phrase_occurrences,
@@ -197,7 +187,6 @@ class ContentConfirmView(APIView):
                     for turn in created_turns
                     if turn.turn_index < len(dialog_turns)
                 ],
-                "dialog_audio_url": dialog_audio_url,
                 "created_sentence_count": created_sentence_count,
                 "existing_sentence_count": existing_sentence_count,
             }

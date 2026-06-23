@@ -39,10 +39,9 @@ export default function ContentCreatePage(): JSX.Element {
   const [error, setError] = useState<string>("");
   const [preview, setPreview] = useState<ContentPreviewResponse | null>(null);
   const [result, setResult] = useState<string>("");
-  const [dialogAudioUrl, setDialogAudioUrl] = useState<string>("");
   const [savedDialogId, setSavedDialogId] = useState<number | null>(null);
   const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string }>>([]);
-  const [selectedPreviewTurnIndexes, setSelectedPreviewTurnIndexes] = useState<number[]>([]);
+  const [playingSavedDialog, setPlayingSavedDialog] = useState<boolean>(false);
   const [phraseActionStatus, setPhraseActionStatus] = useState<Record<string, PhraseActionStatus>>({});
   const [phraseActionError, setPhraseActionError] = useState<Record<string, string>>({});
   const [phraseSelection, setPhraseSelection] = useState<PhraseSelection | null>(null);
@@ -86,10 +85,9 @@ export default function ContentCreatePage(): JSX.Element {
         setDialogLength("standard");
         setPreview(null);
         setResult("");
-        setDialogAudioUrl("");
         setSavedDialogTurns([]);
         setSavedDialogId(null);
-        setSelectedPreviewTurnIndexes([]);
+        setPlayingSavedDialog(false);
         setPhraseActionStatus({});
         setPhraseActionError({});
         setPhraseSelection(null);
@@ -111,10 +109,9 @@ export default function ContentCreatePage(): JSX.Element {
           setDialogLength("standard");
           setPreview(null);
           setResult("");
-          setDialogAudioUrl("");
           setSavedDialogTurns([]);
           setSavedDialogId(null);
-          setSelectedPreviewTurnIndexes([]);
+          setPlayingSavedDialog(false);
           setPhraseActionStatus({});
           setPhraseActionError({});
           setPhraseSelection(null);
@@ -177,10 +174,9 @@ export default function ContentCreatePage(): JSX.Element {
   const onGeneratePreview = async (): Promise<void> => {
     setError("");
     setResult("");
-    setDialogAudioUrl("");
     setSavedDialogTurns([]);
     setSavedDialogId(null);
-    setSelectedPreviewTurnIndexes([]);
+    setPlayingSavedDialog(false);
     setPhraseActionStatus({});
     setPhraseActionError({});
     setPhraseSelection(null);
@@ -208,7 +204,6 @@ export default function ContentCreatePage(): JSX.Element {
         targetLanguage,
       );
       setPreview(data);
-      setSelectedPreviewTurnIndexes([]);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
@@ -232,15 +227,12 @@ export default function ContentCreatePage(): JSX.Element {
         preview.context || "",
         preview.source_language || sourceLanguage,
         preview.target_language || targetLanguage,
-        true,
-        selectedPreviewTurnIndexes,
+        [],
       );
       setResult(t("content.result.dialogAccepted"));
-      setDialogAudioUrl(response.dialog_audio_url || "");
       setSavedDialogTurns(response.saved_dialog_turns || []);
       setSavedDialogId(response.saved_dialog_id || null);
       setPreview(null);
-      setSelectedPreviewTurnIndexes([]);
       setPhraseActionStatus({});
       setPhraseActionError({});
       setPhraseSelection(null);
@@ -260,6 +252,33 @@ export default function ContentCreatePage(): JSX.Element {
     }
     const audio = new Audio(audioUrl);
     void audio.play().catch(() => undefined);
+  };
+
+  const playAudioUrlAndWait = (audioUrl?: string): Promise<void> =>
+    new Promise((resolve) => {
+      if (!audioUrl) {
+        resolve();
+        return;
+      }
+      const audio = new Audio(audioUrl);
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      void audio.play().catch(() => resolve());
+    });
+
+  const playSavedDialogTurns = async (): Promise<void> => {
+    const audioUrls = savedDialogTurns.map((turn) => turn.phrase_audio_url || "").filter(Boolean);
+    if (!audioUrls.length || playingSavedDialog) {
+      return;
+    }
+    setPlayingSavedDialog(true);
+    try {
+      for (const audioUrl of audioUrls) {
+        await playAudioUrlAndWait(audioUrl);
+      }
+    } finally {
+      setPlayingSavedDialog(false);
+    }
   };
 
   const requestAddWordFromDialogToken = async (
@@ -378,6 +397,8 @@ export default function ContentCreatePage(): JSX.Element {
 
   const phraseSelectionKey = (turnIndex: number): string => `saved-${turnIndex}-phrase`;
 
+  const wholeTurnPhraseKey = (turnIndex: number): string => `saved-${turnIndex}-whole-phrase`;
+
   const isSelectingPhraseForTurn = (turnIndex: number): boolean => phraseSelection?.turnIndex === turnIndex;
 
   const selectedPhraseTargetText = (selection: PhraseSelection): string => {
@@ -415,6 +436,37 @@ export default function ContentCreatePage(): JSX.Element {
       targetLine,
       tokenIndexes: [],
     });
+  };
+
+  const openPhraseItem = async (itemId: number): Promise<void> => {
+    setLoadingLinkedWord(true);
+    try {
+      const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
+      setOpenedLinkedWord({
+        id: detail.id,
+        item_type: detail.item_type,
+        spanish_text: detail.spanish_text,
+        german_text: detail.german_text,
+        example_sentence: detail.example_sentence || "",
+        notes: detail.notes || "",
+        word_type: detail.word_type || "",
+        audio_url: detail.audio_url || "",
+        exercise_phrases: detail.exercise_phrases || {},
+        mode: "new",
+        direction: null,
+        options: [],
+        dialog_phrase_answer: detail.dialog_phrase_answer || "",
+        dialog_phrase_scene: detail.dialog_phrase_scene || "",
+        dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+        dialog_phrase_options: detail.dialog_phrase_options || [],
+        dialog_phrase_turns: detail.dialog_phrase_turns || [],
+        dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
+        related_dialogs: detail.related_dialogs || [],
+        item_questions: detail.item_questions || [],
+      });
+    } finally {
+      setLoadingLinkedWord(false);
+    }
   };
 
   const togglePhraseSelectionToken = (
@@ -519,38 +571,46 @@ export default function ContentCreatePage(): JSX.Element {
         pending.targetLine,
       );
       if (resultPayload.id) {
-        setLoadingLinkedWord(true);
-        try {
-          const detail = await fetchContentItemDetail(resultPayload.id, sourceLanguage, targetLanguage);
-          setOpenedLinkedWord({
-            id: detail.id,
-            item_type: detail.item_type,
-            spanish_text: detail.spanish_text,
-            german_text: detail.german_text,
-            example_sentence: detail.example_sentence || "",
-            notes: detail.notes || "",
-            word_type: detail.word_type || "",
-            audio_url: detail.audio_url || "",
-            exercise_phrases: detail.exercise_phrases || {},
-            mode: "new",
-            direction: null,
-            options: [],
-            dialog_phrase_answer: detail.dialog_phrase_answer || "",
-            dialog_phrase_scene: detail.dialog_phrase_scene || "",
-            dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
-            dialog_phrase_options: detail.dialog_phrase_options || [],
-            dialog_phrase_turns: detail.dialog_phrase_turns || [],
-            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
-            related_dialogs: detail.related_dialogs || [],
-            item_questions: detail.item_questions || [],
-          });
-        } finally {
-          setLoadingLinkedWord(false);
-        }
+        await openPhraseItem(resultPayload.id);
       }
       setPhraseActionStatus((current) => ({ ...current, [statusKey]: resultPayload.created ? "added" : "exists" }));
       setPhraseSelection(null);
       setPendingPhraseAdd(null);
+    } catch (error) {
+      setPhraseActionStatus((current) => ({ ...current, [statusKey]: "error" }));
+      setPhraseActionError((current) => ({
+        ...current,
+        [statusKey]: error instanceof Error && error.message ? error.message : t("newItem.sentenceAddError"),
+      }));
+    }
+  };
+
+  const addWholeTurnPhraseFromDialog = async (
+    turn: { source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string },
+    turnIndex: number,
+  ): Promise<void> => {
+    if (!savedDialogId || !turn.source_text.trim() || !turn.target_text.trim()) {
+      return;
+    }
+    const statusKey = wholeTurnPhraseKey(turnIndex);
+    setPhraseActionStatus((current) => ({ ...current, [statusKey]: "saving" }));
+    setPhraseActionError((current) => ({ ...current, [statusKey]: "" }));
+    try {
+      const resultPayload = await quickAddPhraseFromConversation(
+        turn.source_text,
+        turn.target_text,
+        sourceLanguage,
+        targetLanguage,
+        false,
+        savedDialogId,
+        turnIndex,
+        turn.source_text,
+        turn.target_text,
+      );
+      if (resultPayload.id) {
+        await openPhraseItem(resultPayload.id);
+      }
+      setPhraseActionStatus((current) => ({ ...current, [statusKey]: resultPayload.created ? "added" : "exists" }));
     } catch (error) {
       setPhraseActionStatus((current) => ({ ...current, [statusKey]: "error" }));
       setPhraseActionError((current) => ({
@@ -752,50 +812,14 @@ export default function ContentCreatePage(): JSX.Element {
       {preview && (
         <section className="card">
           <h2>{t("content.preview.title")}</h2>
-          <div className="actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setSelectedPreviewTurnIndexes(preview.dialog_turns.map((_, index) => index))}
-              disabled={saving || loading}
-            >
-              {t("content.preview.selectAllPhrases")}
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setSelectedPreviewTurnIndexes([])}
-              disabled={saving || loading}
-            >
-              {t("content.preview.unselectAllPhrases")}
-            </button>
-          </div>
           <ul className="conversation-preview-list">
             {preview.dialog_turns.map((turn, index) => {
               const speaker = speakerForTurn(turn.speaker, index);
-              const selected = selectedPreviewTurnIndexes.includes(index);
               return (
                 <li
                   key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
                   className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
                 >
-                  <label className="word-preview-label">
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={(event) => {
-                        const shouldSelect = event.target.checked;
-                        setSelectedPreviewTurnIndexes((current) => {
-                          if (shouldSelect) {
-                            return current.includes(index) ? current : [...current, index].sort((a, b) => a - b);
-                          }
-                          return current.filter((value) => value !== index);
-                        });
-                      }}
-                      disabled={saving || loading}
-                    />
-                    <span>{t("content.preview.savePhrase")}</span>
-                  </label>
                   <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
                   <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
                   <p className="conversation-line">{turn.source_text}</p>
@@ -810,7 +834,6 @@ export default function ContentCreatePage(): JSX.Element {
             <button
               onClick={() => {
                 setPreview(null);
-                setSelectedPreviewTurnIndexes([]);
               }}
               disabled={saving || loading}
             >
@@ -820,15 +843,16 @@ export default function ContentCreatePage(): JSX.Element {
         </section>
       )}
 
-      {(savedDialogTurns.length > 0 || dialogAudioUrl) && (
+      {savedDialogTurns.length > 0 && (
         <section className="card">
           <p><strong>{t("content.result.dialogTitle")}</strong></p>
           <p className="hint">{t("content.result.dialogWordHint")}</p>
-          {dialogAudioUrl && (
-            <>
-              <p><strong>{t("content.result.dialogAudio")}</strong></p>
-              <audio controls src={dialogAudioUrl} preload="none" />
-            </>
+          {!!savedDialogTurns.some((turn) => turn.phrase_audio_url) && (
+            <div className="actions">
+              <button type="button" className="secondary-button" onClick={() => void playSavedDialogTurns()} disabled={playingSavedDialog}>
+                {playingSavedDialog ? t("dialogs.nowPlaying") : t("dialogs.playDialog")}
+              </button>
+            </div>
           )}
           {savedDialogTurns.length > 0 && (
             <ul className="conversation-preview-list">
@@ -854,6 +878,16 @@ export default function ContentCreatePage(): JSX.Element {
                     )}
                     <p className="conversation-line">{turn.source_text}</p>
                     <div className="actions turn-action-row">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void addWholeTurnPhraseFromDialog(turn, index)}
+                        disabled={!savedDialogId || phraseActionStatus[wholeTurnPhraseKey(index)] === "saving"}
+                      >
+                        {phraseActionStatus[wholeTurnPhraseKey(index)] === "saving"
+                          ? t("newItem.sentenceAddSaving")
+                          : t("content.preview.savePhrase")}
+                      </button>
                       {isSelectingPhraseForTurn(index) ? (
                         <>
                           <button
@@ -886,6 +920,17 @@ export default function ContentCreatePage(): JSX.Element {
                         >
                           {t("dialogs.selectPhraseWords")}
                         </button>
+                      )}
+                      {phraseActionStatus[wholeTurnPhraseKey(index)] === "added" && (
+                        <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
+                      )}
+                      {phraseActionStatus[wholeTurnPhraseKey(index)] === "exists" && (
+                        <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
+                      )}
+                      {phraseActionStatus[wholeTurnPhraseKey(index)] === "error" && (
+                        <span className="turn-token-status">
+                          {phraseActionError[wholeTurnPhraseKey(index)] || t("newItem.sentenceAddError")}
+                        </span>
                       )}
                       {phraseActionStatus[phraseSelectionKey(index)] === "added" && (
                         <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>

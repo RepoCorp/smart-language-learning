@@ -9,8 +9,6 @@ from .generation import (
 )
 from .persistence import (
     count_new_items,
-    create_dialog_audio,
-    create_dialog_audio_file,
     create_audio_file,
     create_phrase_if_missing,
     create_word_if_missing,
@@ -24,6 +22,7 @@ from .persistence import (
     save_word_dialog_occurrences,
     serialize_candidate,
 )
+from .audio import select_dialog_speaker_voice_ids
 from .planning import build_content_plan
 from .selection import (
     german_word_has_article,
@@ -43,8 +42,6 @@ __all__ = [
     "build_content_plan",
     "call_openai_json",
     "count_new_items",
-    "create_dialog_audio",
-    "create_dialog_audio_file",
     "create_audio_file",
     "create_phrase_if_missing",
     "create_word_if_missing",
@@ -61,6 +58,7 @@ __all__ = [
     "item_exists",
     "save_dialog",
     "save_dialog_turns",
+    "select_dialog_speaker_voice_ids",
     "save_phrase_dialog_occurrences",
     "save_word_dialog_occurrences",
     "normalize_topic",

@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import logging
 import os
 import re
-import wave
-from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
 from pathlib import Path
 from random import sample
 from uuid import uuid4
@@ -44,32 +40,8 @@ TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE = {
     "italian": "it",
     "portuguese": "pt",
 }
-OPENAI_TTS_VOICES = (
-    "alloy",
-    "ash",
-    "ballad",
-    "coral",
-    "echo",
-    "fable",
-    "onyx",
-    "nova",
-    "sage",
-    "shimmer",
-    "verse",
-    "marin",
-    "cedar",
-)
-OPENAI_TTS_SAMPLE_RATE = 24000
-OPENAI_TTS_DEFAULT_SPEED = 1.5
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
 OPENAI_TTS_PHRASE_DEFAULT_SPEED = 1.25
-
-
-@dataclass(frozen=True)
-class DialogAudioResult:
-    audio_url: str
-    provider: str
-    voices: tuple[str, str] | None = None
 
 
 def _tts_language_instruction(target_language: str) -> str:
@@ -79,20 +51,6 @@ def _tts_language_instruction(target_language: str) -> str:
         f"Every word, syllable, abbreviation, article, and phrase must be pronounced with {language_label} phonetics and accent. "
         f"If a token looks like English or another language, still pronounce it as {language_label} text. "
         "Do not translate, switch languages, infer an English pronunciation, or reinterpret words as another language."
-    )
-
-
-def _tts_dialog_instruction(target_language: str) -> str:
-    accent = str(getattr(settings, "OPENAI_TTS_DIALOG_ACCENT", "")).strip()
-    accent_instruction = (
-        f" Use a natural {accent} accent and pronunciation."
-        if accent
-        else " Use a natural native-speaker accent and pronunciation."
-    )
-    return (
-        f"{_tts_language_instruction(target_language)}"
-        f"{accent_instruction} "
-        "Keep the exact words from the input; do not add slang, rewrite, or change the wording."
     )
 
 
@@ -155,6 +113,23 @@ def _elevenlabs_dialog_voice_ids(target_language: str) -> list[str]:
     if len(voice_ids) >= 2:
         return voice_ids
     return _elevenlabs_voice_ids(target_language=target_language)
+
+
+def select_dialog_speaker_voice_ids(target_language: str) -> tuple[str, str] | None:
+    if _configured_tts_provider() != "elevenlabs":
+        return None
+    dialog_voices = _elevenlabs_dialog_voice_ids(target_language)
+    logger.info(
+        "content.audio.dialog_voices.provider_check provider=elevenlabs elevenlabs_key=%s elevenlabs_dialog_voice_count=%d target_language=%s",
+        bool(str(getattr(settings, "ELEVENLABS_API_KEY", "")).strip()),
+        len(dialog_voices),
+        target_language,
+    )
+    if len(dialog_voices) < 2:
+        logger.warning("content.audio.dialog_voices.elevenlabs_missing_voices target_language=%s", target_language)
+        return None
+    voice_a, voice_b = sample(dialog_voices, 2)
+    return voice_a, voice_b
 
 
 def _build_local_audio_url(filename: str) -> str:
@@ -397,120 +372,3 @@ def _item_tts_audio_bytes(*, text: str, prefix: str, target_language: str, defau
         ),
         f"openai:{voice}",
     )
-
-
-def _openai_tts_pcm(text: str, voice: str, target_language: str) -> bytes | None:
-    return _openai_tts_audio(
-        text=text,
-        voice=voice,
-        speed=float(getattr(settings, "OPENAI_TTS_SPEED", OPENAI_TTS_DEFAULT_SPEED)),
-        response_format="pcm",
-        instructions=_tts_dialog_instruction(target_language),
-    )
-
-
-def _elevenlabs_tts_pcm(text: str, voice_id: str, target_language: str) -> bytes | None:
-    return _elevenlabs_tts_audio(
-        text=text,
-        voice_id=voice_id,
-        target_language=target_language,
-        output_format=str(getattr(settings, "ELEVENLABS_PCM_OUTPUT_FORMAT", "pcm_24000")),
-    )
-
-
-def create_dialog_audio(dialog_lines: list[str], target_language: str = "german") -> DialogAudioResult:
-    cleaned_lines = [line.strip() for line in dialog_lines if line and line.strip()]
-    if len(cleaned_lines) < 2:
-        return DialogAudioResult(audio_url="", provider=_configured_tts_provider())
-    provider = _configured_tts_provider()
-    use_elevenlabs = provider == "elevenlabs"
-    logger.info(
-        "content.audio.dialog.provider_check provider=%s elevenlabs_key=%s elevenlabs_dialog_voice_count=%d target_language=%s",
-        provider,
-        bool(str(getattr(settings, "ELEVENLABS_API_KEY", "")).strip()),
-        len(_elevenlabs_dialog_voice_ids(target_language)),
-        target_language,
-    )
-    if use_elevenlabs:
-        dialog_voices = _elevenlabs_dialog_voice_ids(target_language)
-        if len(dialog_voices) < 2:
-            logger.warning("content.audio.dialog.elevenlabs_missing_voices target_language=%s", target_language)
-            use_elevenlabs = False
-
-    if use_elevenlabs:
-        voice_a, voice_b = sample(dialog_voices, 2)
-    else:
-        if len(OPENAI_TTS_VOICES) < 2:
-            return DialogAudioResult(audio_url="", provider="openai")
-        voice_a, voice_b = sample(list(OPENAI_TTS_VOICES), 2)
-
-    silence = b"\x00\x00" * int(OPENAI_TTS_SAMPLE_RATE * 0.12)
-    pcm_chunks: list[bytes] = []
-    futures: list[tuple[int, str, Future[bytes | None]]] = []
-    max_workers = min(6, len(cleaned_lines))
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for index, line in enumerate(cleaned_lines):
-            voice = voice_a if index % 2 == 0 else voice_b
-            if use_elevenlabs:
-                futures.append((index, voice, executor.submit(_elevenlabs_tts_pcm, line, voice, target_language)))
-            else:
-                futures.append((index, voice, executor.submit(_openai_tts_pcm, line, voice, target_language)))
-
-        for index, voice, future in futures:
-            pcm = future.result()
-            if not pcm:
-                logger.warning("content.audio.dialog.turn_failed line_index=%d voice=%s", index, voice)
-                continue
-            pcm_chunks.append(pcm)
-            pcm_chunks.append(silence)
-
-    if not pcm_chunks:
-        return DialogAudioResult(
-            audio_url="",
-            provider="elevenlabs" if use_elevenlabs else "openai",
-            voices=(voice_a, voice_b),
-        )
-
-    filename = f"dialog-{uuid4().hex[:12]}.wav"
-
-    try:
-        audio_buffer = io.BytesIO()
-        with wave.open(audio_buffer, "wb") as wav_file:
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(OPENAI_TTS_SAMPLE_RATE)
-            wav_file.writeframes(b"".join(pcm_chunks))
-    except Exception:
-        logger.warning("content.audio.dialog.failed filename=%s", filename)
-        return DialogAudioResult(
-            audio_url="",
-            provider="elevenlabs" if use_elevenlabs else "openai",
-            voices=(voice_a, voice_b),
-        )
-
-    audio_url = _store_audio_bytes(filename, audio_buffer.getvalue(), content_type="audio/wav")
-    if not audio_url:
-        logger.warning("content.audio.dialog.failed_store filename=%s", filename)
-        return DialogAudioResult(
-            audio_url="",
-            provider="elevenlabs" if use_elevenlabs else "openai",
-            voices=(voice_a, voice_b),
-        )
-    logger.info(
-        "content.audio.dialog.created filename=%s voices=%s,%s target_language=%s provider=%s",
-        filename,
-        voice_a,
-        voice_b,
-        target_language,
-        "elevenlabs" if use_elevenlabs else "openai",
-    )
-    return DialogAudioResult(
-        audio_url=audio_url,
-        provider="elevenlabs" if use_elevenlabs else "openai",
-        voices=(voice_a, voice_b),
-    )
-
-
-def create_dialog_audio_file(dialog_lines: list[str], target_language: str = "german") -> str:
-    return create_dialog_audio(dialog_lines, target_language=target_language).audio_url

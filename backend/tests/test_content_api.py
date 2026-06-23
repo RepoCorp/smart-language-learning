@@ -16,19 +16,6 @@ def test_tts_instruction_forces_target_language_pronunciation():
     assert "infer an English pronunciation" in instruction
 
 
-def test_tts_dialog_instruction_can_request_accent(settings):
-    from learning.views.content.audio import _tts_dialog_instruction
-
-    settings.OPENAI_TTS_DIALOG_ACCENT = "Berlin German"
-
-    instruction = _tts_dialog_instruction("german")
-
-    assert "Speak only in German" in instruction
-    assert "natural Berlin German accent" in instruction
-    assert "Keep the exact words" in instruction
-    assert "do not add slang" in instruction
-
-
 def test_elevenlabs_item_audio_is_used_when_configured(monkeypatch, settings):
     from learning.views.content import audio as content_audio
 
@@ -81,56 +68,32 @@ def test_elevenlabs_item_audio_falls_back_to_openai_without_audio(monkeypatch, s
     assert voice == "openai:onyx"
 
 
-def test_elevenlabs_dialog_audio_uses_configured_voice_ids(monkeypatch, settings):
+def test_elevenlabs_dialog_speaker_voices_use_configured_voice_ids(monkeypatch, settings):
     from learning.views.content import audio as content_audio
 
-    captured_calls = []
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
     settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = "voice-a, voice-b"
 
     monkeypatch.setattr(content_audio, "sample", lambda values, count: list(values)[:count])
-    monkeypatch.setattr(content_audio, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
 
-    def fake_pcm(text, voice_id, target_language):
-        captured_calls.append((text, voice_id, target_language))
-        return b"\x01\x00\x02\x00"
+    voice_ids = content_audio.select_dialog_speaker_voice_ids("german")
 
-    monkeypatch.setattr(content_audio, "_elevenlabs_tts_pcm", fake_pcm)
-
-    audio_url = content_audio.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
-
-    assert audio_url.startswith("stored://dialog-")
-    assert captured_calls == [
-        ("Hallo.", "voice-a", "german"),
-        ("Wie geht's?", "voice-b", "german"),
-    ]
+    assert voice_ids == ("voice-a", "voice-b")
 
 
-def test_elevenlabs_dialog_audio_can_use_general_voice_pool(monkeypatch, settings):
+def test_elevenlabs_dialog_speaker_voices_can_use_general_voice_pool(monkeypatch, settings):
     from learning.views.content import audio as content_audio
 
-    captured_calls = []
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
     settings.ELEVENLABS_DIALOG_VOICE_IDS = ""
     settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = ""
     settings.ELEVENLABS_GERMAN_VOICE_IDS = "voice-a, voice-b, voice-c"
 
     monkeypatch.setattr(content_audio, "sample", lambda values, count: list(values)[:count])
-    monkeypatch.setattr(content_audio, "_store_audio_bytes", lambda filename, payload, content_type: f"stored://{filename}")
 
-    def fake_pcm(text, voice_id, target_language):
-        captured_calls.append((text, voice_id, target_language))
-        return b"\x01\x00\x02\x00"
+    voice_ids = content_audio.select_dialog_speaker_voice_ids("german")
 
-    monkeypatch.setattr(content_audio, "_elevenlabs_tts_pcm", fake_pcm)
-
-    audio_url = content_audio.create_dialog_audio_file(["Hallo.", "Wie geht's?"], target_language="german")
-
-    assert audio_url.startswith("stored://dialog-")
-    assert captured_calls == [
-        ("Hallo.", "voice-a", "german"),
-        ("Wie geht's?", "voice-b", "german"),
-    ]
+    assert voice_ids == ("voice-a", "voice-b")
 
 
 @pytest.mark.django_db
@@ -1596,13 +1559,20 @@ def test_content_confirm_saves_dialog_and_returns_turns(monkeypatch):
     client = APIClient()
     response = client.post(
         "/api/content/confirm",
-        {"topic": "help", "selected_words": []},
+        {
+            "topic": "help",
+            "selected_words": [],
+            "dialog_turns": [
+                {"source_text": "Hola.", "target_text": "Hallo.", "speaker": "a"},
+                {"source_text": "Necesito ayuda.", "target_text": "Ich brauche Hilfe.", "speaker": "b"},
+            ],
+        },
         format="json",
     )
     assert response.status_code == 200
 
     payload = response.json()
-    assert payload["dialog_audio_url"] == ""
+    assert "dialog_audio_url" not in payload
     assert len(payload["saved_dialog_turns"]) == 2
     assert isinstance(payload["saved_dialog_id"], int)
 
@@ -1613,38 +1583,17 @@ def test_content_confirm_saves_dialog_and_returns_turns(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_content_confirm_generates_dialog_audio_when_requested(monkeypatch):
+def test_content_confirm_ignores_full_dialog_audio_and_reuses_speaker_voices(monkeypatch):
     from learning.views.content import api as content_api_views
-    from learning.views import content as content_views
     from learning.views.content import persistence as content_persistence
-    from learning.views.content.persistence import DialogAudioResult
 
-    captured_dialog_lines = []
-
-    monkeypatch.setattr(
-        content_views,
-        "generate_conversation_with_chatgpt",
-        lambda topic, context="", **kwargs: [
-            {"spanish_text": "Buenos dias.", "german_text": "Guten Morgen.", "notes": ""},
-            {"spanish_text": "Como estas?", "german_text": "Wie geht es dir?", "notes": ""},
-        ],
-    )
-    monkeypatch.setattr(content_views, "generate_keywords_for_phrase_with_chatgpt", lambda s, g, **kwargs: [])
+    captured_audio_calls = []
     monkeypatch.setattr(
         content_persistence,
         "create_audio_file",
-        lambda text, prefix, **kwargs: f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
+        lambda text, prefix, **kwargs: captured_audio_calls.append((text, prefix, kwargs)) or f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
     )
-
-    def fake_dialog_audio(lines, target_language="german"):
-        captured_dialog_lines.extend(lines)
-        return DialogAudioResult(
-            audio_url="http://localhost:8000/media/audio/dialog-mock.wav",
-            provider="openai",
-            voices=("voice-a", "voice-b"),
-        )
-
-    monkeypatch.setattr(content_api_views, "create_dialog_audio", fake_dialog_audio)
+    monkeypatch.setattr(content_api_views, "select_dialog_speaker_voice_ids", lambda target_language: ("voice-a", "voice-b"))
 
     client = APIClient()
     response = client.post(
@@ -1657,17 +1606,21 @@ def test_content_confirm_generates_dialog_audio_when_requested(monkeypatch):
                 {"source_text": "Buenos dias.", "target_text": "Guten Morgen.", "speaker": "a"},
                 {"source_text": "Como estas?", "target_text": "Wie geht es dir?", "speaker": "b"},
             ],
+            "selected_turn_indexes": [],
         },
         format="json",
     )
     assert response.status_code == 200
 
     payload = response.json()
-    assert payload["dialog_audio_url"] == "http://localhost:8000/media/audio/dialog-mock.wav"
-    assert captured_dialog_lines == ["Guten Morgen.", "Wie geht es dir?"]
+    assert "dialog_audio_url" not in payload
+    assert captured_audio_calls == [
+        ("Guten Morgen.", "phrase", {"target_language": "german", "voice_id": "voice-a"}),
+        ("Wie geht es dir?", "phrase", {"target_language": "german", "voice_id": "voice-b"}),
+    ]
 
     saved_dialog = SavedDialog.objects.get(id=payload["saved_dialog_id"])
-    assert saved_dialog.audio_url == "http://localhost:8000/media/audio/dialog-mock.wav"
+    assert saved_dialog.audio_url == ""
 
 
 @pytest.mark.django_db
@@ -2687,6 +2640,54 @@ def test_quick_add_phrase_creates_item(monkeypatch):
         source_language="spanish",
         target_language="german",
     ).exists()
+
+
+@pytest.mark.django_db
+def test_quick_add_whole_turn_phrase_reuses_dialog_turn_audio(monkeypatch):
+    from learning.views.content import persistence as persistence_views
+
+    def fail_audio_generation(*args, **kwargs):
+        raise AssertionError("Whole-turn phrase should reuse dialog turn audio")
+
+    monkeypatch.setattr(persistence_views, "create_audio_file", fail_audio_generation)
+    dialog = SavedDialog.objects.create(
+        topic="travel",
+        context="airport",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Necesito un taxi ahora.", "target_text": "Ich brauche jetzt ein Taxi."}],
+        audio_url="",
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Necesito un taxi ahora.",
+        target_text="Ich brauche jetzt ein Taxi.",
+        audio_url="http://localhost:8000/media/audio/dialog-turn-taxi.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/phrases/add?source_language=spanish&target_language=german",
+        {
+            "source_text": "Necesito un taxi ahora.",
+            "target_text": "Ich brauche jetzt ein Taxi.",
+            "dialog_id": dialog.id,
+            "turn_index": turn.turn_index,
+            "source_line": "Necesito un taxi ahora.",
+            "target_line": "Ich brauche jetzt ein Taxi.",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    phrase = Item.objects.get(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Necesito un taxi ahora.",
+        german_text="Ich brauche jetzt ein Taxi.",
+    )
+    assert phrase.audio_url == turn.audio_url
+    assert ItemDialogOccurrence.objects.filter(item=phrase, dialog=dialog, turn=turn, turn_index=0).exists()
 
 
 @pytest.mark.django_db

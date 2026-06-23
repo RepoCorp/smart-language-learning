@@ -324,7 +324,6 @@ export async function confirmContent(
   context = "",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
-  createDialogAudio = true,
   selectedTurnIndexes?: number[],
 ): Promise<ContentConfirmResponse> {
   const response = await apiFetch(`${API_BASE}/content/confirm`, {
@@ -335,7 +334,6 @@ export async function confirmContent(
       context,
       source_language: sourceLanguage,
       target_language: targetLanguage,
-      create_dialog_audio: createDialogAudio,
       dialog_turns: dialogTurns,
       selected_turn_indexes: selectedTurnIndexes,
     }),
