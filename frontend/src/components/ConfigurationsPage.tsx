@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 
 import { createUserWithPin } from "../api";
+import { useDebugTools } from "../debugTools";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -11,6 +12,7 @@ interface ConfigurationsPageProps {
 
 export default function ConfigurationsPage({ canCreateUsers = false }: ConfigurationsPageProps): JSX.Element {
   const { language, setLanguage, t } = useI18n();
+  const { enabled: debugToolsEnabled, setEnabled: setDebugToolsEnabled } = useDebugTools();
   const { targetPromptMode, setTargetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage, setSourceLanguage, setTargetLanguage, supportedLanguages } = useStudyLanguages();
   const [username, setUsername] = useState("");
@@ -33,6 +35,7 @@ export default function ConfigurationsPage({ canCreateUsers = false }: Configura
     setSourceLanguage("spanish");
     setTargetLanguage("german");
     setTargetPromptMode("text");
+    setDebugToolsEnabled(false);
   };
 
   const handleCreateUser = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -121,6 +124,31 @@ export default function ConfigurationsPage({ canCreateUsers = false }: Configura
                 {t("config.targetPromptModeAudio")}
               </button>
             </div>
+          </div>
+
+          <div className="settings-field">
+            {t("config.debugTools")}
+            <div className="settings-choice-group" role="radiogroup" aria-label={t("config.debugTools")}>
+              <button
+                type="button"
+                className={`settings-choice-button ${debugToolsEnabled ? "settings-choice-button-selected" : ""}`}
+                onClick={() => setDebugToolsEnabled(true)}
+                role="radio"
+                aria-checked={debugToolsEnabled}
+              >
+                {t("config.debugToolsOn")}
+              </button>
+              <button
+                type="button"
+                className={`settings-choice-button ${!debugToolsEnabled ? "settings-choice-button-selected" : ""}`}
+                onClick={() => setDebugToolsEnabled(false)}
+                role="radio"
+                aria-checked={!debugToolsEnabled}
+              >
+                {t("config.debugToolsOff")}
+              </button>
+            </div>
+            <span className="hint">{t("config.debugToolsHint")}</span>
           </div>
         </div>
 

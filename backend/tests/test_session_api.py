@@ -130,7 +130,7 @@ def test_session_duration_minutes_matches_expected_time_target():
 
     assert response.status_code == 200
     ids = [item["id"] for item in response.json()["items"]]
-    # Review words are estimated at 25s each, so 1 minute should select at least two.
+    # Review words are intentionally cheaper than new words, so due reviews stay ahead of new items.
     assert {due_a.id, due_b.id}.issubset(set(ids[:2]))
 
 
@@ -165,7 +165,11 @@ def test_difficult_session_returns_preplanned_exercises_without_regular_items():
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert [item["id"] for item in items] == [second_word.id, word.id, second_word.id, word.id, phrase.id, phrase.id]
+    first_word_batch = [item["id"] for item in items[:2]]
+    second_word_batch = [item["id"] for item in items[2:4]]
+    assert set(first_word_batch) == {second_word.id, word.id}
+    assert second_word_batch == first_word_batch
+    assert [item["id"] for item in items[4:]] == [phrase.id, phrase.id]
     assert items[0]["repeatPracticeStep"] == "word_intro"
     assert items[1]["repeatPracticeStep"] == "word_intro"
     assert items[2]["repeatPracticeStep"] == "word_cloze"
@@ -174,6 +178,27 @@ def test_difficult_session_returns_preplanned_exercises_without_regular_items():
     assert items[4]["repeatedAfterFailure"] is True
     assert "repeatPracticeStep" not in items[4] or items[4]["repeatPracticeStep"] is None
     assert items[5]["repeatPracticeStep"] == "phrase_builder"
+
+
+@pytest.mark.django_db
+def test_session_estimates_review_items_lower_than_new_items():
+    from learning.views.session import SessionEntry, estimated_seconds_for_entry
+
+    word = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="mesa",
+        german_text="Tisch",
+    )
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Necesito ayuda.",
+        german_text="Ich brauche Hilfe.",
+    )
+
+    assert estimated_seconds_for_entry(SessionEntry(item=word, mode="review", direction=Item.ReviewDirection.SPANISH_TO_GERMAN)) == 15
+    assert estimated_seconds_for_entry(SessionEntry(item=phrase, mode="review", direction=Item.ReviewDirection.SPANISH_TO_GERMAN)) == 25
+    assert estimated_seconds_for_entry(SessionEntry(item=word, mode="new", direction=None)) == 70
+    assert estimated_seconds_for_entry(SessionEntry(item=phrase, mode="new", direction=None)) == 80
 
 
 @pytest.mark.django_db

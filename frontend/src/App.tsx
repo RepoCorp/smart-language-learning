@@ -9,6 +9,7 @@ import ConversationPage from "./components/ConversationPage";
 import DialogsPage from "./components/DialogsPage";
 import OverviewStatsBar from "./components/OverviewStatsBar";
 import SessionPage from "./components/SessionPage";
+import { DebugToolsPanel } from "./debugTools";
 
 export default function App(): JSX.Element {
   const location = useLocation();
@@ -206,6 +207,7 @@ export default function App(): JSX.Element {
             <Route path="/configurations" element={<ConfigurationsPage canCreateUsers={Boolean(authUser?.is_superuser)} />} />
             <Route path="*" element={<Navigate to="/session" replace />} />
           </Routes>
+          <DebugToolsPanel />
         </>
       ) : null}
     </>

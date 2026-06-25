@@ -719,6 +719,17 @@ body {
   gap: 10px;
 }
 
+.phrase-builder-audio-prime {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(29, 78, 216, 0.18);
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.78);
+}
+
 .phrase-builder-slots,
 .phrase-builder-bank {
   display: flex;
@@ -2902,4 +2913,51 @@ button.verb-exercise-entry:disabled {
 .auth-bar-error {
   color: #b42318;
   font-size: 0.85rem;
+}
+
+.debug-tools-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1400;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(480px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(42, 50, 63, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 252, 244, 0.96);
+  box-shadow: 0 18px 50px rgba(24, 30, 42, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.debug-tools-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.debug-tools-actions {
+  margin-top: 8px;
+}
+
+.debug-tools-log {
+  max-height: 240px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(32, 36, 44, 0.92);
+  color: #f8f4e8;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  .debug-tools-panel {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+    max-height: 50vh;
+  }
 }

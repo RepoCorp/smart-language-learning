@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import App from "./App";
+import { DebugToolsProvider } from "./debugTools";
 import { I18nProvider } from "./i18n";
 import { PromptPreferencesProvider } from "./promptPreferences";
 import { StudyLanguagesProvider } from "./studyLanguages";
@@ -62,9 +63,11 @@ createRoot(document.getElementById("root") as HTMLElement).render(
     <I18nProvider>
       <StudyLanguagesProvider>
         <PromptPreferencesProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <DebugToolsProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </DebugToolsProvider>
         </PromptPreferencesProvider>
       </StudyLanguagesProvider>
     </I18nProvider>
