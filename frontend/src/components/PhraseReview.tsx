@@ -34,6 +34,14 @@ type DragRect = DragPosition & {
   height: number;
 };
 
+type SpeechDebugLog = (event: string, details?: Record<string, unknown>) => void;
+
+type SpeechDebugEntry = {
+  at: string;
+  event: string;
+  details: Record<string, unknown>;
+};
+
 function phraseTokens(value: string): PhraseToken[] {
   return value
     .trim()
@@ -74,46 +82,124 @@ const speechLangByCode: Record<StudyLanguageCode, string> = {
 };
 
 let speechVoicesReadyPromise: Promise<SpeechSynthesisVoice[]> | null = null;
+const activeSpeechUtterances = new Set<SpeechSynthesisUtterance>();
 
 function speechSynthesisAvailable(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
 }
 
-function loadSpeechSynthesisVoices(timeoutMs = 1200): Promise<SpeechSynthesisVoice[]> {
+function speechSynthesisSnapshot(): Record<string, unknown> {
   if (!speechSynthesisAvailable()) {
+    return { available: false };
+  }
+  return {
+    available: true,
+    speaking: window.speechSynthesis.speaking,
+    pending: window.speechSynthesis.pending,
+    paused: window.speechSynthesis.paused,
+    voices: window.speechSynthesis.getVoices().length,
+  };
+}
+
+function loadSpeechSynthesisVoices(timeoutMs = 1200, debugLog?: SpeechDebugLog): Promise<SpeechSynthesisVoice[]> {
+  if (!speechSynthesisAvailable()) {
+    debugLog?.("voices.unavailable");
     return Promise.resolve([]);
   }
   const speechSynthesis = window.speechSynthesis;
   const loadedVoices = speechSynthesis.getVoices();
+  debugLog?.("voices.initial", { count: loadedVoices.length, ...speechSynthesisSnapshot() });
   if (loadedVoices.length > 0) {
     return Promise.resolve(loadedVoices);
   }
   if (speechVoicesReadyPromise) {
+    debugLog?.("voices.wait_existing");
     return speechVoicesReadyPromise;
   }
   speechVoicesReadyPromise = new Promise((resolve) => {
     let settled = false;
-    const finish = (): void => {
+    const finish = (reason: string): void => {
       if (settled) {
         return;
       }
       settled = true;
       window.clearTimeout(timeout);
-      speechSynthesis.removeEventListener("voiceschanged", finish);
-      resolve(speechSynthesis.getVoices());
+      speechSynthesis.removeEventListener("voiceschanged", onVoicesChanged);
+      const voices = speechSynthesis.getVoices();
+      debugLog?.("voices.ready", { reason, count: voices.length, ...speechSynthesisSnapshot() });
+      resolve(voices);
     };
-    const timeout = window.setTimeout(finish, timeoutMs);
-    speechSynthesis.addEventListener("voiceschanged", finish);
+    const onVoicesChanged = (): void => finish("voiceschanged");
+    const timeout = window.setTimeout(() => finish("timeout"), timeoutMs);
+    speechSynthesis.addEventListener("voiceschanged", onVoicesChanged);
   });
   return speechVoicesReadyPromise;
 }
 
-function warmSpeechSynthesis(): void {
+function warmSpeechSynthesis(debugLog?: SpeechDebugLog): void {
   if (!speechSynthesisAvailable()) {
+    debugLog?.("warm.unavailable");
     return;
   }
-  void loadSpeechSynthesisVoices();
+  debugLog?.("warm.start", speechSynthesisSnapshot());
+  void loadSpeechSynthesisVoices(1200, debugLog);
   window.speechSynthesis.resume();
+  debugLog?.("warm.resume", speechSynthesisSnapshot());
+}
+
+function stopBrowserSpeechSynthesis(debugLog?: SpeechDebugLog): void {
+  if (!speechSynthesisAvailable()) {
+    debugLog?.("stop.unavailable");
+    return;
+  }
+  const speechSynthesis = window.speechSynthesis;
+  debugLog?.("stop.before", speechSynthesisSnapshot());
+  speechSynthesis.cancel();
+  activeSpeechUtterances.clear();
+  speechSynthesis.resume();
+  window.setTimeout(() => {
+    speechSynthesis.cancel();
+    activeSpeechUtterances.clear();
+    debugLog?.("stop.after", speechSynthesisSnapshot());
+  }, 0);
+}
+
+function unlockBrowserSpeechSynthesis(lang: string, preferredVoiceURI: string, debugLog?: SpeechDebugLog): void {
+  if (!speechSynthesisAvailable()) {
+    debugLog?.("unlock.unavailable");
+    return;
+  }
+  const speechSynthesis = window.speechSynthesis;
+  if (speechSynthesis.speaking) {
+    debugLog?.("unlock.skipped_speaking", speechSynthesisSnapshot());
+    return;
+  }
+  const langPrefix = lang.split("-")[0].toLowerCase();
+  const matchingVoices = speechSynthesis
+    .getVoices()
+    .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix));
+  const selectedVoice = matchingVoices.find((voice) => voice.voiceURI === preferredVoiceURI) || matchingVoices[0];
+  debugLog?.("unlock.start", {
+    lang,
+    matchingVoices: matchingVoices.length,
+    selectedVoice: selectedVoice?.voiceURI || "",
+    ...speechSynthesisSnapshot(),
+  });
+  const utterance = new SpeechSynthesisUtterance(".");
+  utterance.lang = lang;
+  utterance.rate = 1;
+  utterance.volume = 0;
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+  }
+  utterance.onend = () => debugLog?.("unlock.onend", speechSynthesisSnapshot());
+  utterance.onerror = (event) => debugLog?.("unlock.onerror", {
+    error: (event as SpeechSynthesisErrorEvent).error,
+    ...speechSynthesisSnapshot(),
+  });
+  speechSynthesis.resume();
+  speechSynthesis.speak(utterance);
+  debugLog?.("unlock.speak_called", speechSynthesisSnapshot());
 }
 
 async function speakBrowserText({
@@ -121,41 +207,54 @@ async function speakBrowserText({
   lang,
   rate,
   preferredVoiceURI,
+  debugLog,
 }: {
   text: string;
   lang: string;
   rate: number;
   preferredVoiceURI: string;
+  debugLog?: SpeechDebugLog;
 }): Promise<string> {
   const trimmedText = text.trim();
   if (!trimmedText || !speechSynthesisAvailable()) {
+    debugLog?.("speak.skipped", { hasText: Boolean(trimmedText), ...speechSynthesisSnapshot() });
     return preferredVoiceURI;
   }
   const speechSynthesis = window.speechSynthesis;
-  const voices = await loadSpeechSynthesisVoices();
+  debugLog?.("speak.start", { text: trimmedText, lang, rate, preferredVoiceURI, ...speechSynthesisSnapshot() });
+  const voices = await loadSpeechSynthesisVoices(1200, debugLog);
   const langPrefix = lang.split("-")[0].toLowerCase();
   const matchingVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix));
   const selectedVoice = matchingVoices.find((voice) => voice.voiceURI === preferredVoiceURI) || matchingVoices[0];
-
-  await new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 0);
+  debugLog?.("speak.voice_selected", {
+    voices: voices.length,
+    matchingVoices: matchingVoices.length,
+    selectedVoice: selectedVoice?.voiceURI || "",
+    selectedLang: selectedVoice?.lang || "",
   });
 
   return new Promise((resolve) => {
     let resolved = false;
     const utterance = new SpeechSynthesisUtterance(trimmedText);
-    const finish = (): void => {
+    activeSpeechUtterances.add(utterance);
+    const finish = (reason: string, forceStop = false): void => {
       if (resolved) {
         return;
       }
       resolved = true;
       window.clearTimeout(fallbackTimeout);
       window.clearInterval(resumeInterval);
+      activeSpeechUtterances.delete(utterance);
+      debugLog?.("speak.finish", { reason, forceStop, ...speechSynthesisSnapshot() });
+      if (forceStop) {
+        stopBrowserSpeechSynthesis(debugLog);
+      }
       resolve(selectedVoice?.voiceURI || preferredVoiceURI);
     };
-    const fallbackTimeout = window.setTimeout(finish, Math.min(6000, Math.max(1800, trimmedText.length * 110)));
+    const fallbackTimeout = window.setTimeout(() => finish("fallback_timeout", true), Math.min(12000, Math.max(3000, trimmedText.length * 180)));
     const resumeInterval = window.setInterval(() => {
       if (speechSynthesis.paused) {
+        debugLog?.("speak.resume_interval", speechSynthesisSnapshot());
         speechSynthesis.resume();
       }
     }, 250);
@@ -166,9 +265,25 @@ async function speakBrowserText({
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     }
-    utterance.onend = finish;
-    utterance.onerror = finish;
-    speechSynthesis.speak(utterance);
+    utterance.onstart = () => debugLog?.("speak.onstart", speechSynthesisSnapshot());
+    utterance.onboundary = (event) => debugLog?.("speak.onboundary", {
+      charIndex: event.charIndex,
+      elapsedTime: event.elapsedTime,
+      name: event.name,
+      ...speechSynthesisSnapshot(),
+    });
+    utterance.onend = () => finish("onend");
+    utterance.onerror = (event) => finish(`onerror:${(event as SpeechSynthesisErrorEvent).error}`, true);
+    try {
+      speechSynthesis.speak(utterance);
+      debugLog?.("speak.speak_called", {
+        retainedUtterances: activeSpeechUtterances.size,
+        ...speechSynthesisSnapshot(),
+      });
+    } catch (error) {
+      finish(error instanceof Error ? `throw:${error.message}` : "throw", true);
+      return;
+    }
     window.setTimeout(() => speechSynthesis.resume(), 120);
   });
 }
@@ -177,6 +292,19 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
+  const speechDebugEnabled = useMemo(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const queryEnabled = new URLSearchParams(window.location.search).get("speechDebug") === "1";
+    let storedEnabled = false;
+    try {
+      storedEnabled = window.localStorage.getItem("speechDebug") === "1";
+    } catch {
+      storedEnabled = false;
+    }
+    return queryEnabled || storedEnabled;
+  }, []);
   const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
     spanish: "study.language.spanish",
     english: "study.language.english",
@@ -195,6 +323,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
   const [draggingPhraseTokenPosition, setDraggingPhraseTokenPosition] = useState<{ left: number; top: number } | null>(null);
   const [activeLatchSlotIndex, setActiveLatchSlotIndex] = useState<number | null>(null);
   const [phraseBuilderComplete, setPhraseBuilderComplete] = useState<boolean>(false);
+  const [speechDebugEntries, setSpeechDebugEntries] = useState<SpeechDebugEntry[]>([]);
+  const [speechDebugStatus, setSpeechDebugStatus] = useState<string>("");
   const draggingPhraseTokenIdRef = useRef<string>("");
   const phraseSlotsRef = useRef<HTMLDivElement | null>(null);
   const placedPhraseTokenCountRef = useRef<number>(0);
@@ -205,6 +335,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
   const activeLatchSlotIndexRef = useRef<number | null>(null);
   const placedTokenVoiceRef = useRef<string>("");
   const placedTokenAudioActiveRef = useRef<boolean>(false);
+  const speechUnlockActiveRef = useRef<boolean>(false);
+  const speechUnlockTimeoutRef = useRef<number | null>(null);
   const completedPhraseShouldReadRef = useRef<boolean>(true);
   const pendingPlacedTokenAudioTimeoutRef = useRef<number | null>(null);
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -227,6 +359,37 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
   const usePhraseBuilder = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_builder" || (!item.repeatPracticeStep && isSpanishToGerman));
   const shouldSuppressPromptAudio = false;
 
+  const logSpeechDebug: SpeechDebugLog = (event, details = {}) => {
+    if (!speechDebugEnabled) {
+      return;
+    }
+    const entry = {
+      at: new Date().toISOString().slice(11, 23),
+      event,
+      details,
+    };
+    // Keep this in console too, because remote Safari debugging can export it.
+    console.debug("[phrase-builder-speech]", entry);
+    setSpeechDebugStatus(`${entry.at} ${event}`);
+    setSpeechDebugEntries((current) => [...current.slice(-79), entry]);
+  };
+
+  const speechDebugLogText = speechDebugEntries
+    .slice()
+    .reverse()
+    .map((entry) => `${entry.at} ${entry.event} ${JSON.stringify(entry.details)}`)
+    .join("\n");
+
+  const copySpeechDebugLog = async (): Promise<void> => {
+    const logText = speechDebugLogText || "(speech debug log is empty)";
+    try {
+      await navigator.clipboard.writeText(logText);
+      setSpeechDebugStatus(`Copied ${speechDebugEntries.length} entries`);
+    } catch {
+      setSpeechDebugStatus("Copy failed; select the log text manually");
+    }
+  };
+
   const playPromptAudio = (): void => {
     if (!allowPromptAudio || !item.audio_url || shouldSuppressPromptAudio) {
       return;
@@ -239,6 +402,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
     if (!item.audio_url) {
       return false;
     }
+    stopBrowserSpeechSynthesis(logSpeechDebug);
     const audio = new Audio(item.audio_url);
     suppressPromptAutoplayForAudio(audio);
     await new Promise<void>((resolve) => {
@@ -252,7 +416,41 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
   };
 
   const isPlacedTokenAudioRunning = (): boolean => {
-    return placedTokenAudioActiveRef.current || (speechSynthesisAvailable() && window.speechSynthesis.speaking);
+    return placedTokenAudioActiveRef.current || (
+      speechSynthesisAvailable()
+      && window.speechSynthesis.speaking
+      && !speechUnlockActiveRef.current
+    );
+  };
+
+  const clearSpeechUnlockState = (): void => {
+    if (speechUnlockActiveRef.current || speechUnlockTimeoutRef.current !== null) {
+      logSpeechDebug("unlock.clear_state", speechSynthesisSnapshot());
+    }
+    speechUnlockActiveRef.current = false;
+    if (speechUnlockTimeoutRef.current !== null) {
+      window.clearTimeout(speechUnlockTimeoutRef.current);
+      speechUnlockTimeoutRef.current = null;
+    }
+  };
+
+  const unlockPlacedTokenAudio = (): void => {
+    if (!speechSynthesisAvailable() || isPlacedTokenAudioRunning()) {
+      logSpeechDebug("unlock.skip", {
+        available: speechSynthesisAvailable(),
+        placedAudioRunning: isPlacedTokenAudioRunning(),
+        ...speechSynthesisSnapshot(),
+      });
+      return;
+    }
+    clearSpeechUnlockState();
+    speechUnlockActiveRef.current = true;
+    unlockBrowserSpeechSynthesis(speechLangByCode[targetLanguage] || "de-DE", placedTokenVoiceRef.current, logSpeechDebug);
+    speechUnlockTimeoutRef.current = window.setTimeout(() => {
+      logSpeechDebug("unlock.timeout_clear", speechSynthesisSnapshot());
+      speechUnlockActiveRef.current = false;
+      speechUnlockTimeoutRef.current = null;
+    }, 650);
   };
 
   const waitForPlacedTokenAudioToFinish = async (): Promise<void> => {
@@ -263,6 +461,10 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
       const startedAt = Date.now();
       const check = (): void => {
         if (!isPlacedTokenAudioRunning() || Date.now() - startedAt > 6500) {
+          logSpeechDebug("wait_audio.finish", {
+            elapsedMs: Date.now() - startedAt,
+            ...speechSynthesisSnapshot(),
+          });
           resolve();
           return;
         }
@@ -277,6 +479,10 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
     if (!trimmedPhraseText) {
       return;
     }
+    if (speechUnlockActiveRef.current) {
+      clearSpeechUnlockState();
+      stopBrowserSpeechSynthesis(logSpeechDebug);
+    }
     placedTokenAudioActiveRef.current = true;
     try {
       placedTokenVoiceRef.current = await speakBrowserText({
@@ -284,6 +490,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
         lang: speechLangByCode[targetLanguage] || "de-DE",
         rate: 0.7,
         preferredVoiceURI: placedTokenVoiceRef.current,
+        debugLog: logSpeechDebug,
       });
     } finally {
       placedTokenAudioActiveRef.current = false;
@@ -295,15 +502,11 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
       window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
       pendingPlacedTokenAudioTimeoutRef.current = null;
     }
-    await new Promise<void>((resolve) => {
-      pendingPlacedTokenAudioTimeoutRef.current = window.setTimeout(() => {
-        pendingPlacedTokenAudioTimeoutRef.current = null;
-        resolve();
-      }, 80);
-    });
     if (isPlacedTokenAudioRunning()) {
+      logSpeechDebug("schedule.skip_running", { phraseText, ...speechSynthesisSnapshot() });
       return false;
     }
+    logSpeechDebug("schedule.play", { phraseText, ...speechSynthesisSnapshot() });
     await playPlacedPhraseTokenAudio(phraseText);
     return true;
   };
@@ -321,6 +524,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
       } else {
         await waitForPlacedTokenAudioToFinish();
       }
+      stopBrowserSpeechSynthesis(logSpeechDebug);
       await playPhraseAudio();
       await onAnswered(true);
     } finally {
@@ -393,6 +597,14 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
     const completedPhrase = nextPlacedTokens.length === expectedPhraseTokens.length;
     const placedPhraseText = nextPlacedTokens.map((placedToken) => placedToken.text).join(" ");
     const shouldReadPlacedPhrase = !isPlacedTokenAudioRunning();
+    logSpeechDebug("drop.correct", {
+      token: token.text,
+      slotIndex,
+      completedPhrase,
+      placedPhraseText,
+      shouldReadPlacedPhrase,
+      ...speechSynthesisSnapshot(),
+    });
     setPlacedPhraseTokens(nextPlacedTokens);
     setWrongPhraseTokenId("");
     if (completedPhrase) {
@@ -469,7 +681,8 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
     if (isSubmittingRef.current || phraseBuilderCompleteRef.current) {
       return;
     }
-    warmSpeechSynthesis();
+    warmSpeechSynthesis(logSpeechDebug);
+    unlockPlacedTokenAudio();
     activePointerIdRef.current = pointerId;
     draggingPhraseTokenIdRef.current = tokenId;
     pointerDragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
@@ -530,7 +743,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
     if (!usePhraseBuilder) {
       return;
     }
-    warmSpeechSynthesis();
+    warmSpeechSynthesis(logSpeechDebug);
   }, [usePhraseBuilder, targetLanguage]);
 
   useEffect(() => {
@@ -557,6 +770,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
     draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     phraseBuilderCompletionAudioPlayedRef.current = false;
     placedTokenAudioActiveRef.current = false;
+    clearSpeechUnlockState();
     completedPhraseShouldReadRef.current = true;
     placedTokenVoiceRef.current = "";
     if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
@@ -564,9 +778,21 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
       pendingPlacedTokenAudioTimeoutRef.current = null;
     }
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+      stopBrowserSpeechSynthesis(logSpeechDebug);
     }
   }, [item.id, item.direction]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
+        window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
+        pendingPlacedTokenAudioTimeoutRef.current = null;
+      }
+      placedTokenAudioActiveRef.current = false;
+      clearSpeechUnlockState();
+      stopBrowserSpeechSynthesis();
+    };
+  }, []);
 
   useEffect(() => {
     if (targetPromptMode !== "audio") {
@@ -673,6 +899,70 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
           </div>
         </div>
         {phraseBuilderComplete && <p className="phrase-builder-success">{t("phrase.builderComplete")}</p>}
+        {speechDebugEnabled && (
+          <details
+            className="speech-debug-panel"
+            open
+            style={{
+              marginTop: "1rem",
+              padding: "0.75rem",
+              border: "1px solid rgba(120, 120, 120, 0.45)",
+              borderRadius: "0.75rem",
+              background: "rgba(0, 0, 0, 0.04)",
+            }}
+          >
+            <summary>Speech debug ({speechDebugEntries.length})</summary>
+            {speechDebugStatus && (
+              <p className="hint" style={{ marginTop: "0.5rem" }}>
+                Last debug action: {speechDebugStatus}
+              </p>
+            )}
+            <div className="actions" style={{ marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setSpeechDebugEntries([]);
+                  setSpeechDebugStatus("Cleared speech log");
+                }}
+              >
+                Clear speech log
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  logSpeechDebug("manual.snapshot", speechSynthesisSnapshot());
+                }}
+              >
+                Snapshot
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  void copySpeechDebugLog();
+                }}
+              >
+                Copy log
+              </button>
+            </div>
+            <pre
+              style={{
+                maxHeight: "16rem",
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+                fontSize: "0.75rem",
+                marginTop: "0.5rem",
+              }}
+            >
+              {speechDebugLogText || "No speech debug entries yet. Tap Snapshot or place a block."}
+            </pre>
+          </details>
+        )}
         <div className="actions">
           {onOpenItem ? (
             <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
