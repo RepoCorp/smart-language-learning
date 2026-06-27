@@ -44,6 +44,29 @@ def mark_item_seen(item: Item) -> Item:
     return item
 
 
+def build_session_restore_state(item: Item) -> dict[str, object]:
+    return {
+        "repetition_count_es_to_de": item.repetition_count_es_to_de,
+        "interval_days_es_to_de": item.interval_days_es_to_de,
+        "last_reviewed_at_es_to_de": item.last_reviewed_at_es_to_de,
+        "due_at_es_to_de": item.due_at_es_to_de,
+        "repetition_count_de_to_es": item.repetition_count_de_to_es,
+        "interval_days_de_to_es": item.interval_days_de_to_es,
+        "last_reviewed_at_de_to_es": item.last_reviewed_at_de_to_es,
+        "due_at_de_to_es": item.due_at_de_to_es,
+        "is_learned": item.is_learned,
+        "is_difficult": item.is_difficult,
+        "difficult_marked_at": item.difficult_marked_at,
+    }
+
+
+def restore_item_session_state(item: Item, state: dict[str, object]) -> Item:
+    for field, value in state.items():
+        setattr(item, field, value)
+    item.save(update_fields=[*state.keys(), "updated_at"])
+    return item
+
+
 def _apply_directional_review_result(item: Item, correct: bool, now, suffix: str) -> Item:
     repetition_count_field = f"repetition_count_{suffix}"
     interval_days_field = f"interval_days_{suffix}"

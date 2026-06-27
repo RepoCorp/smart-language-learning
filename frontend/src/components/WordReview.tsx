@@ -268,14 +268,13 @@ function warmupProgress(value: string, revealedIndexes: Set<number>): string {
 interface WordReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
-  onOpenItem?: (itemId: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 1000;
 const MAX_WRITTEN_WORD_ASSISTANCE_STEPS = 2;
 type FeedbackTone = "neutral" | "success" | "error";
 
-export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewProps): JSX.Element {
+export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -729,22 +728,12 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
         <div className="actions">
           {!answerRevealed ? (
             <>
-              {onOpenItem ? (
-                <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-                  {t("words.openItem")}
-                </button>
-              ) : null}
               <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
                 {t("review.revealAnswer")}
               </button>
             </>
           ) : (
             <>
-              {onOpenItem ? (
-                <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-                  {t("words.openItem")}
-                </button>
-              ) : null}
               <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
                 {t("review.passed")}
               </button>
@@ -843,11 +832,6 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
           </>
         )}
         <div className="actions">
-          {onOpenItem ? (
-            <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-              {t("words.openItem")}
-            </button>
-          ) : null}
           <button
             type="button"
             onMouseDown={(event) => event.preventDefault()}
@@ -917,11 +901,6 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
           </>
         )}
         <div className="actions">
-          {onOpenItem ? (
-            <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-              {t("words.openItem")}
-            </button>
-          ) : null}
           {clozePhrase ? (
             <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
               {t("word.failButton")}
@@ -1035,11 +1014,6 @@ export default function WordReview({ item, onAnswered, onOpenItem }: WordReviewP
       <div className="actions">
         {!awaitingWrongAccept && (
           <>
-            {onOpenItem ? (
-              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-                {t("words.openItem")}
-              </button>
-            ) : null}
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}

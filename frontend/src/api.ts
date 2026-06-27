@@ -16,6 +16,7 @@ import type {
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
+  SessionRestoreState,
   StudyLanguageCode,
 } from "./types";
 
@@ -250,6 +251,28 @@ export async function markSeen(itemId: number): Promise<void> {
 
   if (!response.ok) {
     let detail = "Failed to mark item as seen";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  notifyOverviewStatsUpdated();
+}
+
+export async function restoreSessionItemState(itemId: number, state: SessionRestoreState): Promise<void> {
+  const response = await apiFetch(`${API_BASE}/session/restore-item-state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ item_id: itemId, state }),
+  });
+
+  if (!response.ok) {
+    let detail = "Failed to restore previous session item";
     try {
       const payload = (await response.json()) as { detail?: string };
       if (payload.detail) {

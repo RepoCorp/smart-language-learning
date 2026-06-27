@@ -33,6 +33,7 @@ from .views import (
     HealthView,
     MarkSeenView,
     OverviewStatsView,
+    RestoreSessionItemStateView,
     SessionView,
     SubmitReviewView,
 )
@@ -46,6 +47,7 @@ urlpatterns = [
     path("auth/me", AuthMeView.as_view(), name="auth-me"),
     path("overview-stats", OverviewStatsView.as_view(), name="overview-stats"),
     path("session", SessionView.as_view(), name="session"),
+    path("session/restore-item-state", RestoreSessionItemStateView.as_view(), name="session-restore-item-state"),
     path("review", SubmitReviewView.as_view(), name="review"),
     path("seen", MarkSeenView.as_view(), name="seen"),
     path("difficult-items/complete", CompleteDifficultItemView.as_view(), name="difficult-item-complete"),

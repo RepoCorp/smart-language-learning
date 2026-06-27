@@ -1,5 +1,6 @@
 # Todos
 
+No todos los items estan en manage content
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
 Pareciera que no incluye el historial de las preguntas entonces no tiene contexto
 Ejercicio de escribir la palabra muchas veces, como lo de los treinta minutos. Pero algo que sea rapido: dibujandola sobre preescrita, con letras de teclado que se iluminan, con mover letras…?

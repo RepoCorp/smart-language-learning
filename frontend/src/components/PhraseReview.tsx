@@ -12,7 +12,6 @@ import DangerousButton from "./DangerousButton";
 interface PhraseReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
-  onOpenItem?: (itemId: number) => void;
 }
 
 const FEEDBACK_DELAY_MS = 2000;
@@ -261,7 +260,7 @@ async function speakBrowserText({
   });
 }
 
-export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseReviewProps): JSX.Element {
+export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const debugTools = useDebugTools();
   const { targetPromptMode } = usePromptPreferences();
@@ -975,13 +974,6 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
           </div>
         </div>
         {phraseBuilderComplete && <p className="phrase-builder-success">{t("phrase.builderComplete")}</p>}
-        <div className="actions">
-          {onOpenItem ? (
-            <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-              {t("words.openItem")}
-            </button>
-          ) : null}
-        </div>
       </div>
     );
   }
@@ -1019,22 +1011,12 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
       <div className="actions">
         {!answerRevealed ? (
           <>
-            {onOpenItem ? (
-              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-                {t("words.openItem")}
-              </button>
-            ) : null}
             <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
               {t("review.revealAnswer")}
             </button>
           </>
         ) : (
           <>
-            {onOpenItem ? (
-              <button type="button" className="secondary-button" onClick={() => onOpenItem(item.id)}>
-                {t("words.openItem")}
-              </button>
-            ) : null}
             <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
               {t("review.passed")}
             </button>

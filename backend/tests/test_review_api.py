@@ -164,3 +164,67 @@ def test_late_correct_review_gets_bonus_interval():
     assert response.status_code == 200
     item.refresh_from_db()
     assert item.interval_days_es_to_de >= 20
+
+
+@pytest.mark.django_db
+def test_restore_session_item_state_restores_directional_progress_and_difficult_flag():
+    original_last_reviewed = timezone.now() - timedelta(days=5)
+    original_due_at = timezone.now() + timedelta(days=2)
+    original_difficult_marked_at = timezone.now() - timedelta(days=1)
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="mesa",
+        german_text="Tisch",
+        repetition_count_es_to_de=2,
+        interval_days_es_to_de=6,
+        last_reviewed_at_es_to_de=original_last_reviewed,
+        due_at_es_to_de=original_due_at,
+        repetition_count_de_to_es=1,
+        interval_days_de_to_es=3,
+        is_difficult=True,
+        difficult_marked_at=original_difficult_marked_at,
+    )
+
+    client = APIClient()
+    review_response = client.post(
+        "/api/review",
+        {"item_id": item.id, "correct": False, "direction": Item.ReviewDirection.SPANISH_TO_GERMAN},
+        format="json",
+    )
+    assert review_response.status_code == 200
+
+    restore_response = client.post(
+        "/api/session/restore-item-state",
+        {
+            "item_id": item.id,
+            "state": {
+                "repetition_count_es_to_de": 2,
+                "interval_days_es_to_de": 6,
+                "last_reviewed_at_es_to_de": original_last_reviewed.isoformat(),
+                "due_at_es_to_de": original_due_at.isoformat(),
+                "repetition_count_de_to_es": 1,
+                "interval_days_de_to_es": 3,
+                "last_reviewed_at_de_to_es": None,
+                "due_at_de_to_es": None,
+                "is_learned": False,
+                "is_difficult": True,
+                "difficult_marked_at": original_difficult_marked_at.isoformat(),
+            },
+        },
+        format="json",
+    )
+
+    assert restore_response.status_code == 200
+
+    item.refresh_from_db()
+    assert item.repetition_count_es_to_de == 2
+    assert item.interval_days_es_to_de == 6
+    assert item.last_reviewed_at_es_to_de == original_last_reviewed
+    assert item.due_at_es_to_de == original_due_at
+    assert item.repetition_count_de_to_es == 1
+    assert item.interval_days_de_to_es == 3
+    assert item.last_reviewed_at_de_to_es is None
+    assert item.due_at_de_to_es is None
+    assert item.is_learned is False
+    assert item.is_difficult is True
+    assert item.difficult_marked_at == original_difficult_marked_at

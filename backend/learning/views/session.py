@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from ..auth import apply_user_scope, get_request_user
 from ..models import DialogTurn, Item, ItemDialogOccurrence
 from ..serializers import SessionItemSerializer
+from ..srs import build_session_restore_state
 from .dialog_phrase_match import build_dialog_phrase_match_payload
 
 
@@ -546,6 +547,7 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "dialog_phrase_turns": dialog_phrase_turns_map.get(entry_key(entry), []),
                 "dialog_phrase_odd_index": dialog_phrase_odd_index_map.get(entry_key(entry)),
                 "related_dialogs": related_dialogs_map.get(entry.item.id, []),
+                "session_restore_state": build_session_restore_state(entry.item),
             }
         )
 

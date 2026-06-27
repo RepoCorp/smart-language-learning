@@ -28,6 +28,7 @@ from .overview_stats import OverviewStatsView
 from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
+from .session_state import RestoreSessionItemStateView
 from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
 from .difficult_items import CompleteDifficultItemView
 
@@ -60,6 +61,7 @@ __all__ = [
     "SubmitReviewView",
     "MarkSeenView",
     "SessionView",
+    "RestoreSessionItemStateView",
     "CompleteDifficultItemView",
     "AuthLoginView",
     "AuthLogoutView",

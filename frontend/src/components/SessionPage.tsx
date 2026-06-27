@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import { completeDifficultItem, fetchContentItemDetail, fetchSession, markSeen, setContentItemLearned, submitReview } from "../api";
+import { completeDifficultItem, fetchContentItemDetail, fetchSession, markSeen, restoreSessionItemState, setContentItemLearned, submitReview } from "../api";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
-import type { SessionItem } from "../types";
+import type { SessionItem, SessionRestoreState } from "../types";
 import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
 import WordReview from "./WordReview";
+
+type TestedHistoryEntry = {
+  index: number;
+  itemId: number;
+  restoreState: SessionRestoreState | null;
+};
 
 type StoredSessionState = {
   durationInput: string;
@@ -19,6 +25,7 @@ type StoredSessionState = {
   items: SessionItem[];
   showIncorrectReviewItem: boolean;
   showExtendPrompt: boolean;
+  testedHistory: TestedHistoryEntry[];
 };
 
 type DailyNewItemProgress = {
@@ -54,14 +61,18 @@ export default function SessionPage(): JSX.Element {
   const [showExtendPrompt, setShowExtendPrompt] = useState<boolean>(false);
   const [hasHydratedState, setHasHydratedState] = useState<boolean>(false);
   const [restoredSnapshotHasItems, setRestoredSnapshotHasItems] = useState<boolean>(false);
+  const [testedHistory, setTestedHistory] = useState<TestedHistoryEntry[]>([]);
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
   const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
   const [openedItemError, setOpenedItemError] = useState<string>("");
   const [showNewWordsCelebration, setShowNewWordsCelebration] = useState<boolean>(false);
+  const [restoringPreviousItem, setRestoringPreviousItem] = useState<boolean>(false);
+  const [restorePreviousError, setRestorePreviousError] = useState<string>("");
 
   const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
     setLoading(true);
     setError("");
+    setRestorePreviousError("");
     setShowIncorrectReviewItem(false);
     try {
       const data = await fetchSession(5, sourceLanguage, targetLanguage, durationMinutes);
@@ -96,6 +107,8 @@ export default function SessionPage(): JSX.Element {
       setIndex(typeof parsed.index === "number" ? parsed.index : 0);
       setShowIncorrectReviewItem(Boolean(parsed.showIncorrectReviewItem));
       setShowExtendPrompt(Boolean(parsed.showExtendPrompt));
+      setTestedHistory(Array.isArray(parsed.testedHistory) ? parsed.testedHistory as TestedHistoryEntry[] : []);
+      setRestorePreviousError("");
     } catch {
       window.sessionStorage.removeItem(sessionStorageKey);
     } finally {
@@ -121,6 +134,7 @@ export default function SessionPage(): JSX.Element {
       items,
       showIncorrectReviewItem,
       showExtendPrompt,
+      testedHistory,
     };
     window.sessionStorage.setItem(sessionStorageKey, JSON.stringify(snapshot));
   }, [
@@ -135,6 +149,7 @@ export default function SessionPage(): JSX.Element {
     items,
     showIncorrectReviewItem,
     showExtendPrompt,
+    testedHistory,
   ]);
 
   useEffect(() => {
@@ -183,6 +198,19 @@ export default function SessionPage(): JSX.Element {
 
   const current = items[index];
 
+  const hasPreviousTestedItem = testedHistory.length > 0;
+
+  const rememberTestedItem = useCallback((itemIndex: number, item: SessionItem): void => {
+    setTestedHistory((history) => [
+      ...history,
+      {
+        index: itemIndex,
+        itemId: item.id,
+        restoreState: item.session_restore_state || null,
+      },
+    ]);
+  }, []);
+
   const advance = (): void => {
     setWaitingNext(true);
     setTimeout(() => {
@@ -190,7 +218,7 @@ export default function SessionPage(): JSX.Element {
         const nextIndex = value + 1;
         if (nextIndex >= items.length) {
           setSessionOutcome("completed");
-          return 0;
+          return Math.max(0, items.length - 1);
         }
         return nextIndex;
       });
@@ -240,6 +268,7 @@ export default function SessionPage(): JSX.Element {
     const reviewedItem = current;
     if (reviewedItem.repeatedAfterFailure) {
       await completeCurrentDifficultItemIfFinished(reviewedItem.id);
+      rememberTestedItem(index, reviewedItem);
       advance();
       return;
     }
@@ -253,9 +282,11 @@ export default function SessionPage(): JSX.Element {
       throw error;
     }
     if (correct) {
+      rememberTestedItem(index, reviewedItem);
       advance();
       return;
     }
+    rememberTestedItem(index, reviewedItem);
     advance();
   };
 
@@ -290,6 +321,7 @@ export default function SessionPage(): JSX.Element {
         setShowNewWordsCelebration(true);
       }
     }
+    rememberTestedItem(index, current);
     advance();
   };
 
@@ -306,8 +338,33 @@ export default function SessionPage(): JSX.Element {
       }
       throw error;
     }
+    rememberTestedItem(index, current);
     advance();
   };
+
+  const goToPreviousTestedItem = useCallback(async (): Promise<void> => {
+    const previousEntry = testedHistory[testedHistory.length - 1];
+    if (!previousEntry) {
+      return;
+    }
+    setRestoringPreviousItem(true);
+    setRestorePreviousError("");
+    try {
+      if (previousEntry.restoreState) {
+        await restoreSessionItemState(previousEntry.itemId, previousEntry.restoreState);
+      }
+      setTestedHistory((history) => history.slice(0, -1));
+      setSessionOutcome(null);
+      setShowExtendPrompt(false);
+      setShowIncorrectReviewItem(false);
+      setWaitingNext(false);
+      setIndex(previousEntry.index);
+    } catch {
+      setRestorePreviousError(t("session.restorePreviousFailed"));
+    } finally {
+      setRestoringPreviousItem(false);
+    }
+  }, [t, testedHistory]);
 
   const openItemModal = async (itemId: number): Promise<void> => {
     setLoadingOpenedItem(true);
@@ -377,10 +434,12 @@ export default function SessionPage(): JSX.Element {
       return;
     }
     setError("");
+    setRestorePreviousError("");
     setSessionOutcome(null);
     setShowNewWordsCelebration(false);
     setShowExtendPrompt(false);
     setRestoredSnapshotHasItems(false);
+    setTestedHistory([]);
     setRemainingSeconds(parsed * 60);
     setSessionEndsAtMs(Date.now() + parsed * 60 * 1000);
     setSessionDurationMinutes(parsed);
@@ -395,10 +454,13 @@ export default function SessionPage(): JSX.Element {
     setItems([]);
     setIndex(0);
     setError("");
+    setRestorePreviousError("");
     setShowIncorrectReviewItem(false);
     setWaitingNext(false);
     setRestoredSnapshotHasItems(false);
     setShowNewWordsCelebration(false);
+    setTestedHistory([]);
+    setRestoringPreviousItem(false);
   };
 
   const minutes = Math.floor(remainingSeconds / 60);
@@ -522,7 +584,13 @@ export default function SessionPage(): JSX.Element {
               <p>{t("session.completedMessage")}</p>
             </>
           )}
+          {restorePreviousError && <p className="error">{t("session.error", { message: restorePreviousError })}</p>}
           <div className="actions">
+            {hasPreviousTestedItem && (
+              <button type="button" className="secondary-button" onClick={() => void goToPreviousTestedItem()} disabled={restoringPreviousItem}>
+                {t("session.previousTestedItem")}
+              </button>
+            )}
             <button onClick={resetToSessionStart}>{t("session.startAnother")}</button>
           </div>
         </section>
@@ -589,11 +657,30 @@ export default function SessionPage(): JSX.Element {
         <p>
           {t("session.itemProgress", { current: index + 1, total: items.length })}
         </p>
+        {restorePreviousError && <p className="error">{t("session.error", { message: restorePreviousError })}</p>}
         <p data-testid="session-countdown">{t("session.timeRemaining", { time: formattedRemaining })}</p>
         <div className="actions session-header-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void openItemModal(current.id)}
+            disabled={loadingOpenedItem}
+          >
+            {t("words.openItem")}
+          </button>
           <button className="secondary-button" onClick={resetToSessionStart}>
             {t("session.restart")}
           </button>
+          {hasPreviousTestedItem && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => void goToPreviousTestedItem()}
+              disabled={waitingNext || restoringPreviousItem}
+            >
+              {t("session.previousTestedItem")}
+            </button>
+          )}
         </div>
         <section className="card">
           {showIncorrectReviewItem ? (
@@ -609,14 +696,12 @@ export default function SessionPage(): JSX.Element {
               key={currentRenderKey}
               item={current}
               onAnswered={register}
-              onOpenItem={(itemId) => void openItemModal(itemId)}
             />
           ) : (
             <PhraseReview
               key={currentRenderKey}
               item={current}
               onAnswered={register}
-              onOpenItem={(itemId) => void openItemModal(itemId)}
             />
           )}
         </section>

@@ -26,6 +26,20 @@ export interface DialogPhraseTurn {
   phrase_audio_url?: string;
 }
 
+export interface SessionRestoreState {
+  repetition_count_es_to_de: number;
+  interval_days_es_to_de: number;
+  last_reviewed_at_es_to_de: string | null;
+  due_at_es_to_de: string | null;
+  repetition_count_de_to_es: number;
+  interval_days_de_to_es: number;
+  last_reviewed_at_de_to_es: string | null;
+  due_at_de_to_es: string | null;
+  is_learned: boolean;
+  is_difficult: boolean;
+  difficult_marked_at: string | null;
+}
+
 export interface SessionItem {
   id: number;
   item_type: ItemType;
@@ -73,6 +87,7 @@ export interface SessionItem {
     }>;
   }>;
   item_questions?: ItemQuestionExchange[];
+  session_restore_state?: SessionRestoreState;
 }
 
 export type ItemQuestionType = "grammar_explanation" | "more_examples" | "common_mistakes" | "custom_related";

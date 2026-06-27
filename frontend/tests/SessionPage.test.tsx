@@ -16,11 +16,12 @@ vi.mock("../src/api", () => ({
   fetchOverviewStats: vi.fn().mockResolvedValue({ ready_to_review: 0, future_reviews: 0, word_items: 0, not_started: 0, difficult_items: 0 }),
   fetchSession: vi.fn(),
   markSeen: vi.fn().mockResolvedValue(undefined),
+  restoreSessionItemState: vi.fn().mockResolvedValue(undefined),
   setContentItemLearned: vi.fn().mockResolvedValue(undefined),
   submitReview: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { completeDifficultItem, fetchContentItemDetail, fetchOverviewStats, fetchSession, markSeen, submitReview } from "../src/api";
+import { completeDifficultItem, fetchContentItemDetail, fetchOverviewStats, fetchSession, markSeen, restoreSessionItemState, submitReview } from "../src/api";
 
 async function renderSessionPageAndStart(): Promise<void> {
   render(
@@ -64,6 +65,19 @@ describe("SessionPage", () => {
           notes: "saludo",
           audio_url: "https://example.com/a.mp3",
           options: [],
+          session_restore_state: {
+            repetition_count_es_to_de: 0,
+            interval_days_es_to_de: 1,
+            last_reviewed_at_es_to_de: null,
+            due_at_es_to_de: null,
+            repetition_count_de_to_es: 0,
+            interval_days_de_to_es: 1,
+            last_reviewed_at_de_to_es: null,
+            due_at_de_to_es: null,
+            is_learned: false,
+            is_difficult: false,
+            difficult_marked_at: null,
+          },
         },
       ],
     });
@@ -198,6 +212,67 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
     expect(await screen.findByText("New word")).toBeInTheDocument();
     expect(fetchSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("goes back to the previous tested item and restores its original state before retesting", async () => {
+    const firstRestoreState = {
+      repetition_count_es_to_de: 2,
+      interval_days_es_to_de: 4,
+      last_reviewed_at_es_to_de: "2026-06-20T10:00:00Z",
+      due_at_es_to_de: "2026-06-24T10:00:00Z",
+      repetition_count_de_to_es: 0,
+      interval_days_de_to_es: 1,
+      last_reviewed_at_de_to_es: null,
+      due_at_de_to_es: null,
+      is_learned: false,
+      is_difficult: false,
+      difficult_marked_at: null,
+    };
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 51,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "casa",
+          german_text: "Haus",
+          direction: "de_to_es",
+          options: ["casa", "perro", "gato"],
+          session_restore_state: firstRestoreState,
+        },
+        {
+          id: 52,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "perro",
+          german_text: "Hund",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    await screen.findByText(/What is the correct Spanish translation\?/);
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    await userEvent.click(screen.getByRole("button", { name: "Passed" }));
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(51, true, "de_to_es"));
+
+    await screen.findByText(/Item 2 of 2/);
+    await userEvent.click(screen.getByRole("button", { name: "Previous tested item" }));
+
+    await waitFor(() => expect(restoreSessionItemState).toHaveBeenCalledWith(51, firstRestoreState));
+    expect(await screen.findByText(/Item 1 of 2/)).toBeInTheDocument();
+    expect(screen.getByText("Haus")).toBeInTheDocument();
+    const headerButtons = screen.getAllByRole("button", { name: /Open item|Restart session|Previous tested item/ }).map((button) => button.textContent);
+    expect(headerButtons.slice(0, 3)).toEqual(["Open item", "Restart session", "Previous tested item"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    const failedButton = screen.getByRole("button", { name: "Failed" });
+    await userEvent.click(failedButton);
+    await userEvent.click(failedButton);
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(51, false, "de_to_es"));
   });
 
   it("allows hint in word review", async () => {
@@ -599,7 +674,6 @@ describe("SessionPage", () => {
     expect(await screen.findByText(/What is the correct Spanish translation\?/)).toBeInTheDocument();
     expect(screen.getByText("haus")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /casa/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     expect(screen.getByText(/Answer:/)).toBeInTheDocument();
     expect(screen.getByText(/casa/)).toBeInTheDocument();
@@ -713,7 +787,6 @@ describe("SessionPage", () => {
     expect(await screen.findByText(/What is the correct Spanish translation\?/)).toBeInTheDocument();
     expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "No entiendo" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     expect(screen.getByText(/Answer:/)).toBeInTheDocument();
     expect(screen.getByText(/No entiendo/)).toBeInTheDocument();
@@ -778,7 +851,6 @@ describe("SessionPage", () => {
     await screen.findByText(/What is the correct Spanish translation\?/);
     expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open item: Hola" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     expect(screen.getByTestId("session-page")).toBeInTheDocument();
     expect(submitReview).not.toHaveBeenCalled();
   });
@@ -833,11 +905,11 @@ describe("SessionPage", () => {
 
     await screen.findByText(/Write in German/);
     expect(screen.getByText("casa")).toBeInTheDocument();
+    const headerButtons = screen.getAllByRole("button", { name: /Open item|Restart session/ }).map((button) => button.textContent);
+    expect(headerButtons.slice(0, 2)).toEqual(["Open item", "Restart session"]);
     const actionButtons = screen.getAllByRole("button").map((button) => button.textContent);
-    expect(actionButtons).toEqual(expect.arrayContaining(["Hint", "Open item", "Fail"]));
-    expect(actionButtons.indexOf("Open item")).toBeLessThan(actionButtons.indexOf("Hint"));
-    expect(actionButtons.indexOf("Open item")).toBeLessThan(actionButtons.indexOf("Fail"));
-    await userEvent.click(screen.getByRole("button", { name: "Open item" }));
+    expect(actionButtons).toEqual(expect.arrayContaining(["Hint", "Fail"]));
+    await userEvent.click(screen.getAllByRole("button", { name: "Open item" })[0]);
 
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toBeInTheDocument();

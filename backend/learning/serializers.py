@@ -5,6 +5,20 @@ from rest_framework import serializers
 from .models import STUDY_LANGUAGE_CHOICES, Item
 
 
+class SessionRestoreStateSerializer(serializers.Serializer):
+    repetition_count_es_to_de = serializers.IntegerField(min_value=0)
+    interval_days_es_to_de = serializers.IntegerField(min_value=0)
+    last_reviewed_at_es_to_de = serializers.DateTimeField(allow_null=True)
+    due_at_es_to_de = serializers.DateTimeField(allow_null=True)
+    repetition_count_de_to_es = serializers.IntegerField(min_value=0)
+    interval_days_de_to_es = serializers.IntegerField(min_value=0)
+    last_reviewed_at_de_to_es = serializers.DateTimeField(allow_null=True)
+    due_at_de_to_es = serializers.DateTimeField(allow_null=True)
+    is_learned = serializers.BooleanField()
+    is_difficult = serializers.BooleanField()
+    difficult_marked_at = serializers.DateTimeField(allow_null=True)
+
+
 class SessionItemSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     item_type = serializers.ChoiceField(choices=Item.ItemType.choices)
@@ -36,6 +50,7 @@ class SessionItemSerializer(serializers.Serializer):
     dialog_phrase_turns = serializers.ListField(child=serializers.DictField(), required=False)
     dialog_phrase_odd_index = serializers.IntegerField(required=False, allow_null=True)
     related_dialogs = serializers.ListField(child=serializers.DictField(), required=False)
+    session_restore_state = SessionRestoreStateSerializer(required=False)
 
 
 class SubmitReviewSerializer(serializers.Serializer):
@@ -50,6 +65,11 @@ class MarkSeenSerializer(serializers.Serializer):
 
 class CompleteDifficultItemSerializer(serializers.Serializer):
     item_id = serializers.IntegerField()
+
+
+class RestoreSessionItemStateSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField()
+    state = SessionRestoreStateSerializer()
 
 
 class ContentTopicSerializer(serializers.Serializer):
