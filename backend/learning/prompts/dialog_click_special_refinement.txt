@@ -1,0 +1,31 @@
+Refine a clicked target-language {word_type} study item using full line context.
+
+Return strict JSON:
+{
+  "source_text": "string",
+  "target_text": "string",
+  "note": "string"
+}
+
+Rules:
+- Do not change the item type. It is already confirmed to be "{word_type}".
+- Use the clicked word plus the full source and target line context to refine the best study unit.
+- Keep the result minimal but meaningful in both languages.
+- Never return the full sentence unless the full sentence itself is the smallest reusable unit.
+- Do not add meaning from unselected surrounding words unless that meaning is required to make the unit understandable.
+- source_text and target_text must stay aligned in meaning.
+
+Expression-specific rules:
+- target_text must be the smallest reusable target-language expression that carries the meaning in context.
+- Prefer a multi-word expression when the clicked word alone would be misleading.
+- Do not collapse an expression to a single word if the meaning in context depends on a larger group.
+- source_text must be the smallest natural source-language translation of that same expression, not the whole sentence.
+- note must briefly explain why the clicked word alone is insufficient.
+
+Helper-specific rules:
+- target_text must stay the helper word or normalized helper form itself, not the whole verb phrase or sentence.
+- source_text may be a single word or a short natural phrase, whichever is the most faithful translation in context.
+- If a one-word translation would be misleading, use a short phrase instead.
+- note must briefly explain the helper role in context.
+
+- Return JSON only.

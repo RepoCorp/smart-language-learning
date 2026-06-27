@@ -2,29 +2,30 @@ from __future__ import annotations
 
 from .management import (
     APIView,
-    ContentCandidate,
-    Item,
     Request,
     Response,
     _call_openai_json_logged,
-    _ensure_audio_for_dialog_turn,
     _language_display_name,
-    _link_phrase_to_dialog_turn,
-    _link_word_to_dialog_turn,
     _normalized_pair,
-    _normalize_word_metadata,
-    normalize_word_pair_for_item_save,
-    _resolve_dialog_click_word_pair,
     apply_user_scope,
+    get_request_user,
+    status,
+)
+from .dialog_click_resolution import resolve_dialog_click_word_pair as _resolve_dialog_click_word_pair
+from .dialog_item_context import (
+    ensure_audio_for_dialog_turn,
+    link_item_to_dialog_turn,
+)
+from .core import (
     create_phrase_if_missing,
     create_word_if_missing,
-    DialogTurn,
-    get_request_user,
     item_exists,
+    normalize_word_pair_for_item_save,
     normalize_word_type,
-    status,
-    SavedDialog,
 )
+from .types import ContentCandidate
+from .word_metadata import normalize_word_metadata as _normalize_word_metadata
+from ...models import DialogTurn, Item, SavedDialog
 
 
 def _without_first_word(value: str) -> str:
@@ -163,7 +164,7 @@ def _whole_turn_audio_url_for_phrase(
         return ""
     if _normalized_dialog_text(turn.target_text) != _normalized_dialog_text(target_text):
         return ""
-    return turn.audio_url or _ensure_audio_for_dialog_turn(
+    return turn.audio_url or ensure_audio_for_dialog_turn(
         user=user,
         dialog_id_raw=dialog_id,
         turn_index_raw=turn_index,
@@ -204,7 +205,7 @@ def _phrase_quick_add_response(
             .first()
         )
         if existing:
-            _link_phrase_to_dialog_turn(
+            link_item_to_dialog_turn(
                 user=user,
                 item=existing,
                 dialog_id_raw=dialog_id_raw,
@@ -269,7 +270,7 @@ def _phrase_quick_add_response(
             .first()
         )
         if existing:
-            _link_phrase_to_dialog_turn(
+            link_item_to_dialog_turn(
                 user=user,
                 item=existing,
                 dialog_id_raw=dialog_id_raw,
@@ -287,7 +288,7 @@ def _phrase_quick_add_response(
                 }
             )
 
-    _link_phrase_to_dialog_turn(
+    link_item_to_dialog_turn(
         user=user,
         item=created,
         dialog_id_raw=dialog_id_raw,
@@ -402,7 +403,7 @@ class ContentWordQuickAddView(APIView):
         if existing:
             response_word_type = existing.word_type if existing.word_type else word_type
             if existing:
-                _link_word_to_dialog_turn(
+                link_item_to_dialog_turn(
                     user=user,
                     item=existing,
                     dialog_id_raw=dialog_id_raw,
@@ -420,7 +421,7 @@ class ContentWordQuickAddView(APIView):
                         "notes": existing.notes or final_notes,
                     }
                 )
-            _ensure_audio_for_dialog_turn(
+            ensure_audio_for_dialog_turn(
                 user=user,
                 dialog_id_raw=dialog_id_raw,
                 turn_index_raw=turn_index_raw,
@@ -474,13 +475,13 @@ class ContentWordQuickAddView(APIView):
                 word_type=word_type,
             )
             if existing:
-                _link_word_to_dialog_turn(
+                link_item_to_dialog_turn(
                     user=user,
                     item=existing,
                     dialog_id_raw=dialog_id_raw,
                     turn_index_raw=turn_index_raw,
                 )
-                _ensure_audio_for_dialog_turn(
+                ensure_audio_for_dialog_turn(
                     user=user,
                     dialog_id_raw=dialog_id_raw,
                     turn_index_raw=turn_index_raw,
@@ -499,13 +500,13 @@ class ContentWordQuickAddView(APIView):
                 }
             )
 
-        _link_word_to_dialog_turn(
+        link_item_to_dialog_turn(
             user=user,
             item=created,
             dialog_id_raw=dialog_id_raw,
             turn_index_raw=turn_index_raw,
         )
-        _ensure_audio_for_dialog_turn(
+        ensure_audio_for_dialog_turn(
             user=user,
             dialog_id_raw=dialog_id_raw,
             turn_index_raw=turn_index_raw,

@@ -5,11 +5,13 @@ from .management import (
     Request,
     Response,
     SavedDialog,
-    _dialog_turns_with_phrase_audio,
-    _ensure_audio_for_dialog_turn,
     _normalized_pair,
     apply_user_scope,
     get_request_user,
+)
+from .dialog_item_context import (
+    dialog_turns_with_phrase_audio,
+    ensure_audio_for_dialog_turn,
 )
 
 DEFAULT_DIALOGS_PAGE_SIZE = 20
@@ -94,7 +96,7 @@ class ContentDialogDetailView(APIView):
                 "audio_url": dialog.audio_url,
                 "created_at": dialog.created_at,
                 "turn_count": _dialog_turn_count(dialog),
-                "turns": _dialog_turns_with_phrase_audio(dialog, user=user),
+                "turns": dialog_turns_with_phrase_audio(dialog, user=user),
             }
         )
 
@@ -110,7 +112,7 @@ class ContentDialogTurnAudioView(APIView):
         )
         if not dialog:
             return Response({"detail": "Dialog not found"}, status=404)
-        audio_url = _ensure_audio_for_dialog_turn(user=user, dialog_id_raw=dialog_id, turn_index_raw=turn_index)
+        audio_url = ensure_audio_for_dialog_turn(user=user, dialog_id_raw=dialog_id, turn_index_raw=turn_index)
         if not audio_url:
             return Response({"detail": "Audio generation failed"}, status=503)
         return Response({"audio_url": audio_url})

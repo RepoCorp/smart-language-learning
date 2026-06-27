@@ -1,0 +1,6 @@
+- Return the helper word/form in target_text.
+- Normalize conjugations to a single study form.
+- source_text may be a single word or a short natural phrase when that is the most faithful translation of the helper in context.
+- Keep source_text concise; do not turn it into a full clause or sentence.
+- Do not include the main verb phrase, object, subject, sentence, or clause it supports.
+- Keep this as a helper, not a normal verb.

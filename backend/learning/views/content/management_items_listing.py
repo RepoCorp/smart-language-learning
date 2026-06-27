@@ -10,28 +10,27 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
+from django.db.models import Q
 
 from .management import (
     APIView,
-    ContentCandidate,
-    Item,
-    Q,
     Request,
     Response,
-    _basic_word_metadata,
     _next_review_days,
     _normalized_pair,
-    _related_dialogs_by_item_ids,
     apply_user_scope,
-    create_audio_file,
     get_request_user,
     status,
     timezone,
 )
+from .dialog_item_context import related_dialogs_by_item_ids
 from .item_questions import item_question_history
-from ...models import DialogTurn, ItemDialogOccurrence, SavedDialog
+from .types import ContentCandidate
+from .word_metadata import basic_word_metadata as _basic_word_metadata
+from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
 from ..dialog_phrase_match import build_dialog_phrase_match_payload
 from .core import (
+    create_audio_file,
     generate_funny_image_exercise_phrase_with_chatgpt,
     generate_word_exercise_phrases_with_chatgpt,
     normalize_word_type,
@@ -119,7 +118,7 @@ class ContentWordsView(APIView):
             )[:1000]
         )
         item_ids = [word["id"] for word in words]
-        related_dialogs_map = _related_dialogs_by_item_ids(item_ids, user=user)
+        related_dialogs_map = related_dialogs_by_item_ids(item_ids, user=user)
         for word in words:
             word["related_dialogs"] = related_dialogs_map.get(word["id"], [])
         return Response({"words": words})
@@ -137,7 +136,7 @@ class ContentItemDetailView(APIView):
         if not item:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
+        related_dialogs_map = related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
         dialog_phrase_payload = _dialog_phrase_options_for_item(item, user=user)
         return Response(
             {
@@ -342,7 +341,7 @@ class ContentItemRefreshWordView(APIView):
         item.exercise_phrases = cleaned
         item.save(update_fields=["exercise_phrases", "updated_at"])
 
-        related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
+        related_dialogs_map = related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
         return Response(
             {
                 "ok": True,

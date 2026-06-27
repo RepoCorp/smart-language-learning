@@ -1,0 +1,3 @@
+- Return the infinitive or dictionary verb form in both languages.
+- Do not include the subject, object, auxiliary, main verb phrase, sentence, or clause.
+- Keep this as a normal verb, not a helper.

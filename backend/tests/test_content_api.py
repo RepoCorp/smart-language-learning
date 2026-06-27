@@ -4,6 +4,18 @@ from rest_framework.test import APIClient
 from learning.models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
 
 
+def _patch_dialog_click_call(monkeypatch, fake_call_openai_json) -> None:
+    from learning.views.content import dialog_click_resolution
+
+    monkeypatch.setattr(dialog_click_resolution, "call_openai_json", fake_call_openai_json)
+
+
+def _patch_word_metadata_call(monkeypatch, fake_call_openai_json) -> None:
+    from learning.views.content import word_metadata
+
+    monkeypatch.setattr(word_metadata, "call_openai_json", fake_call_openai_json)
+
+
 def test_tts_instruction_forces_target_language_pronunciation():
     from learning.views.content.audio import _tts_language_instruction
 
@@ -147,7 +159,7 @@ def test_elevenlabs_voice_pool_reads_language_specific_env(monkeypatch, settings
 
 
 def test_basic_word_metadata_prompt_requires_noun_articles_in_both_languages(monkeypatch):
-    from learning.views.content import management as management_views
+    from learning.views.content import word_metadata
 
     captured_prompts = []
 
@@ -159,9 +171,9 @@ def test_basic_word_metadata_prompt_requires_noun_articles_in_both_languages(mon
             return {"source_text": "el recibo", "target_text": "der Kassenbon"}
         return None
 
-    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
 
-    source_text, target_text, word_type = management_views._basic_word_metadata(
+    source_text, target_text, word_type = word_metadata.basic_word_metadata(
         source_text="recibo",
         target_text="der Kassenbon",
         source_language="spanish",
@@ -172,7 +184,7 @@ def test_basic_word_metadata_prompt_requires_noun_articles_in_both_languages(mon
 
 
 def test_basic_word_metadata_refines_expression_beyond_single_word(monkeypatch):
-    from learning.views.content import management as management_views
+    from learning.views.content import word_metadata
 
     captured_prompts = []
 
@@ -190,9 +202,10 @@ def test_basic_word_metadata_refines_expression_beyond_single_word(monkeypatch):
             return {"source_text": "opinar sobre algo", "target_text": "von etwas halten"}
         return None
 
-    monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
 
-    source_text, target_text, word_type = management_views._basic_word_metadata(
+    source_text, target_text, word_type = word_metadata.basic_word_metadata(
         source_text="hältst",
         target_text="hältst",
         source_language="spanish",
@@ -1506,6 +1519,8 @@ def test_quick_add_word_uses_contextual_translation_for_existing_item(monkeypatc
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
 
     client = APIClient()
     response = client.post(
@@ -1561,6 +1576,8 @@ def test_quick_add_word_creates_item_with_contextual_translation(monkeypatch):
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
     monkeypatch.setattr(
         content_views,
         "create_audio_file",
@@ -1607,6 +1624,8 @@ def test_quick_add_word_saves_basic_form_and_word_type(monkeypatch):
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
     monkeypatch.setattr(
         content_views,
         "create_audio_file",
@@ -1726,6 +1745,8 @@ def test_quick_add_existing_unknown_word_adds_type_and_returns_item(monkeypatch)
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
 
     client = APIClient()
     response = client.post(
@@ -1752,7 +1773,7 @@ def test_quick_add_existing_unknown_word_adds_type_and_returns_item(monkeypatch)
 
 @pytest.mark.django_db
 def test_quick_add_word_from_unselected_dialog_turn_creates_phrase_audio_context(monkeypatch):
-    from learning.views.content import management as management_views
+    from learning.views.content import dialog_item_context
     from learning.views.content import management_items_quick_add as quick_add_views
     from learning.views.content import persistence as persistence_views
 
@@ -1798,7 +1819,7 @@ def test_quick_add_word_from_unselected_dialog_turn_creates_phrase_audio_context
     def fake_audio(text, prefix, target_language="german"):
         return f"http://localhost:8000/media/audio/{prefix}-{text[:6]}.mp3"
 
-    monkeypatch.setattr(management_views, "create_audio_file", fake_audio)
+    monkeypatch.setattr(dialog_item_context, "create_audio_file", fake_audio)
     monkeypatch.setattr(persistence_views, "create_audio_file", fake_audio)
 
     client = APIClient()
@@ -1874,6 +1895,8 @@ def test_quick_add_existing_noun_missing_articles_opens_existing_item(monkeypatc
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
 
     client = APIClient()
     response = client.post(
@@ -1935,6 +1958,8 @@ def test_quick_add_helper_fails_when_metadata_returns_full_phrase(monkeypatch):
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
 
     client = APIClient()
     response = client.post(
@@ -1984,6 +2009,8 @@ def test_quick_add_helper_fails_when_source_translation_matches_target(monkeypat
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
 
     client = APIClient()
     response = client.post(
@@ -2045,6 +2072,8 @@ def test_quick_add_helper_allows_short_phrase_translation_and_adds_note(monkeypa
         return None
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
     monkeypatch.setattr(
         content_views,
         "create_audio_file",
@@ -2075,7 +2104,10 @@ def test_quick_add_helper_allows_short_phrase_translation_and_adds_note(monkeypa
 def test_quick_add_word_fails_when_resolution_model_returns_nothing(monkeypatch):
     from learning.views.content import management as management_views
 
-    monkeypatch.setattr(management_views, "call_openai_json", lambda *args, **kwargs: None)
+    no_metadata = lambda *args, **kwargs: None
+    monkeypatch.setattr(management_views, "call_openai_json", no_metadata)
+    _patch_word_metadata_call(monkeypatch, no_metadata)
+    _patch_dialog_click_call(monkeypatch, no_metadata)
 
     client = APIClient()
     response = client.post(
@@ -2112,11 +2144,14 @@ def test_quick_add_word_fails_when_metadata_model_returns_incomplete_payload(mon
         source_text="Está justo a la vuelta de la esquina.",
         target_text="Es ist gleich um die Ecke.",
     )
+    incomplete_payload = lambda *args, **kwargs: {"source_text": "Ecke", "target_text": "Ecke"}
     monkeypatch.setattr(
         management_views,
         "call_openai_json",
-        lambda *args, **kwargs: {"source_text": "Ecke", "target_text": "Ecke"},
+        incomplete_payload,
     )
+    _patch_word_metadata_call(monkeypatch, incomplete_payload)
+    _patch_dialog_click_call(monkeypatch, incomplete_payload)
 
     client = APIClient()
     response = client.post(
@@ -2395,6 +2430,8 @@ def test_quick_add_word_expression_creates_phrase_item(monkeypatch):
         raise AssertionError(f"Unexpected label: {label}")
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
     monkeypatch.setattr(quick_add_views, "_call_openai_json_logged", fake_call_openai_json_logged)
 
     dialog = SavedDialog.objects.create(
@@ -2476,6 +2513,8 @@ def test_quick_add_word_expression_check_only_returns_phrase_span(monkeypatch):
         raise AssertionError(f"Unexpected label: {label}")
 
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
+    _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
+    _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
     monkeypatch.setattr(quick_add_views, "_call_openai_json_logged", fake_call_openai_json_logged)
 
     client = APIClient()

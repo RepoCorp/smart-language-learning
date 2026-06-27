@@ -1,0 +1,2 @@
+- Return the base adverb form in both languages.
+- Do not include a whole phrase or clause.

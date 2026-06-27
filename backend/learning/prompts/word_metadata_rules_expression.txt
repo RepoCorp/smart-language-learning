@@ -1,0 +1,7 @@
+- Return the shortest stable expression that carries the contextual meaning.
+- Keep the expression in both languages, but do not return a full sentence unless the expression itself is a sentence-level idiom.
+- If the selected target text is only one word but the target-language context shows it belongs to a fixed expression, separable verb, idiom, collocation, grammatical construction, or multi-word unit, expand target_text to the smallest reusable expression that carries that meaning.
+- Prefer dictionary-style placeholders like "etwas" or "jemanden" over copying concrete sentence words.
+- Do not include the full sentence unless the full sentence itself is a fixed expression.
+- Do not include articles, possessives, adjectives, objects, or nearby context unless they are part of the expression's non-literal meaning.
+- Return the translation of the whole expression, not a standalone translation of the clicked word.

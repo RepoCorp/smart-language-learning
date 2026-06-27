@@ -15,9 +15,9 @@ from .management import (
     _normalized_pair,
     _openai_transcribe_audio_upload,
     _parse_item_conversation_history,
-    create_audio_file,
     status,
 )
+from .core import create_audio_file
 
 class ContentTopicConversationStartView(APIView):
     def post(self, request: Request) -> Response:

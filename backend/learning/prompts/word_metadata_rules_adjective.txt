@@ -1,0 +1,6 @@
+- Return the base adjective form in both languages.
+- Do not include noun endings caused by gender, case, or number.
+- Only remove inflectional endings. Do not split, shorten, or reduce compound/derived adjectives into a different root word.
+- Preserve the whole adjective when the whole word has its own meaning.
+- Example: "großartige" can normalize to "großartig", but "großartig" must not normalize to "groß"; "großartig" means excellent/great, not simply big.
+- Do not include a whole noun phrase.

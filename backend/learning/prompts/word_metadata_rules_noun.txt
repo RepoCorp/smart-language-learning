@@ -1,0 +1,7 @@
+- Return singular dictionary forms.
+- Return singular with article in both source_text and target_text when {source_name} or {target_name} uses articles.
+- Use the correct article independently for each language. Do not transfer or infer one language's grammatical gender from the other.
+- For target_text, return nominative singular with article when the target language has nominative case.
+- For source_text, return the natural singular dictionary form with article when that language uses articles.
+- Only return a noun with an article when the contextual word is clearly used as a noun.
+- Do not classify a capitalized word as a noun only because it is capitalized.

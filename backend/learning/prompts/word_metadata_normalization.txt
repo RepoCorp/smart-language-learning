@@ -1,0 +1,19 @@
+Normalize a {word_type} study entry for a language learner.
+
+The contextual meaning and word type have already been chosen. Do not change word_type.
+
+Return strict JSON:
+{
+  "source_text": "string",
+  "target_text": "string"
+}
+
+Rules for this {word_type}:
+{rules}
+
+General rules:
+- Avoid duplicate study items caused by conjugation, plural forms, case variations, or grammatical variants.
+- Use only the selected target text and target-language context to normalize the already-selected word, not to choose a new meaning.
+- source_text must be the best source-language translation of the normalized target study entry.
+- Do not return markdown, numbering, quotes, explanations, or extra fields.
+- JSON only.

@@ -1,0 +1,32 @@
+Given a clicked target-language word and target-language context, return the clicked word's contextual translation and word type.
+
+Return strict JSON:
+{
+  "source_text": "string",
+  "target_text": "string",
+  "word_type": "noun|verb|adjective|adverb|helper|expression|other"
+}
+
+Rules:
+- Use only the clicked target word and target-language context to identify the clicked word's actual meaning and word_type.
+- First decide whether translating the clicked word alone would be misleading in THIS context.
+- Expand beyond the clicked word only when the clicked word's standalone translation would be wrong or misleading.
+- If expansion is necessary because the meaning comes from a fixed expression, separable verb, idiom, collocation, grammatical construction, or multi-word unit, return the smallest reusable expression that carries the meaning.
+- The expression must be reusable as a study item. Prefer dictionary-style placeholders like "etwas" or "jemanden" over copying concrete sentence words.
+- Never return the full sentence unless the full sentence itself is a fixed expression.
+- Do not expand just to include articles, possessives, adjectives, objects, or nearby context when the clicked word has a clear standalone meaning.
+- For a clicked noun with a clear standalone meaning, return the noun itself here. Do not return a noun phrase like "sein Freund" unless the entire phrase has a non-literal expression meaning.
+- Never guess a standalone translation if it would be misleading. Prefer returning a larger expression only when necessary.
+- For expressions, target_text must be the target-language expression, source_text must be the translation of that expression, and word_type must be "expression".
+- If the clicked word works as a standalone study item in THIS context, return that standalone unit.
+- Do not normalize inflection, case, number, or article in this step.
+- Do not decompose compound or derived words into a smaller root when that changes the meaning.
+- Example: clicked "großartig" means "excelente/estupendo"; do not return "groß" or "grande".
+- Use type "helper" for modal verbs, auxiliary verbs, and grammar-helper forms only when the phrase uses them that way.
+- If a word can be both a normal verb and a helper, use the phrase context to choose one type.
+- Use type "expression" only for multi-word expressions or meanings that cannot be understood word-by-word.
+- Do not return a whole sentence or clause.
+- Example: in "Was hältst du von der neuen Serie?", clicked "hältst" should become target_text "von etwas halten", source_text like "opinar sobre algo", word_type "expression".
+- Example: in "Ich halte das Buch in der Hand.", clicked "halte" can become target_text "halten", source_text like "sostener", word_type "verb".
+- Example: in "Mir gefällt mehr sein Freund.", clicked "Freund" should become target_text "Freund", source_text like "amigo", word_type "noun", not "sein Freund".
+- JSON only.

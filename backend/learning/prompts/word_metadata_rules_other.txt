@@ -1,0 +1,2 @@
+- Return the shortest dictionary-style study form in both languages.
+- Do not include a whole sentence or unrelated surrounding words.
