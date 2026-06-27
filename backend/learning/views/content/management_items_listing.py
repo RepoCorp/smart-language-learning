@@ -39,6 +39,20 @@ from .core import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MANAGE_PAGE_SIZE = 25
+MAX_MANAGE_PAGE_SIZE = 100
+
+
+def _safe_positive_int(raw_value, default: int, *, minimum: int = 1, maximum: int | None = None) -> int:
+    try:
+        parsed = int(str(raw_value))
+    except (TypeError, ValueError):
+        return default
+    parsed = max(minimum, parsed)
+    if maximum is not None:
+        parsed = min(maximum, parsed)
+    return parsed
+
 
 def _deterministic_hash(*parts: object) -> str:
     normalized = "||".join(str(part).strip().lower() for part in parts)
@@ -70,10 +84,26 @@ class ContentItemsView(APIView):
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         now = timezone.now()
-        rows = list(
-            apply_user_scope(Item.objects, user).filter(source_language=source_language, target_language=target_language)
-            .order_by("-created_at", "-id")[:200]
+        section = (request.query_params.get("section", "all") or "all").strip().lower()
+        query = (request.query_params.get("q", "") or "").strip()
+        page = _safe_positive_int(request.query_params.get("page"), 1)
+        page_size = _safe_positive_int(request.query_params.get("page_size"), DEFAULT_MANAGE_PAGE_SIZE, maximum=MAX_MANAGE_PAGE_SIZE)
+        offset = (page - 1) * page_size
+
+        queryset = apply_user_scope(Item.objects, user).filter(
+            source_language=source_language,
+            target_language=target_language,
         )
+        if section == "words":
+            queryset = queryset.filter(item_type=Item.ItemType.WORD)
+        elif section == "phrases":
+            queryset = queryset.filter(item_type=Item.ItemType.PHRASE)
+        if query:
+            queryset = queryset.filter(Q(spanish_text__icontains=query) | Q(german_text__icontains=query))
+
+        rows = list(queryset.order_by("-created_at", "-id")[offset : offset + page_size + 1])
+        has_more = len(rows) > page_size
+        rows = rows[:page_size]
         items = [
             {
                 "id": item.id,
@@ -87,7 +117,15 @@ class ContentItemsView(APIView):
             }
             for item in rows
         ]
-        return Response({"items": items})
+        return Response({
+            "items": items,
+            "page": page,
+            "page_size": page_size,
+            "has_more": has_more,
+            "next_page": page + 1 if has_more else None,
+            "section": section,
+            "query": query,
+        })
 
 
 class ContentWordsView(APIView):

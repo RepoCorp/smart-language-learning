@@ -9,6 +9,20 @@ from rest_framework.views import APIView
 from ...auth import apply_user_scope, get_request_user
 from ...models import SavedTopic, SavedTopicContext
 
+DEFAULT_TOPICS_PAGE_SIZE = 25
+MAX_TOPICS_PAGE_SIZE = 100
+
+
+def _safe_positive_int(raw_value, default: int, *, minimum: int = 1, maximum: int | None = None) -> int:
+    try:
+        parsed = int(str(raw_value))
+    except (TypeError, ValueError):
+        return default
+    parsed = max(minimum, parsed)
+    if maximum is not None:
+        parsed = min(maximum, parsed)
+    return parsed
+
 
 def save_topic(
     *,
@@ -60,15 +74,29 @@ class ContentTopicsView(APIView):
         user = get_request_user(request)
         source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
         target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
-        topics = list(
-            apply_user_scope(SavedTopic.objects, user).filter(
-                source_language=source_language,
-                target_language=target_language,
-            )
-            .order_by("-last_used_at")
-            .values_list("topic", flat=True)[:20]
+        query = (request.query_params.get("q", "") or "").strip()
+        page = _safe_positive_int(request.query_params.get("page"), 1)
+        page_size = _safe_positive_int(request.query_params.get("page_size"), DEFAULT_TOPICS_PAGE_SIZE, maximum=MAX_TOPICS_PAGE_SIZE)
+        offset = (page - 1) * page_size
+        queryset = apply_user_scope(SavedTopic.objects, user).filter(
+            source_language=source_language,
+            target_language=target_language,
         )
-        return Response({"topics": topics})
+        if query:
+            queryset = queryset.filter(topic__icontains=query)
+        rows = list(
+            queryset.order_by("-last_used_at", "-id").values_list("topic", flat=True)[offset : offset + page_size + 1]
+        )
+        has_more = len(rows) > page_size
+        topics = rows[:page_size]
+        return Response({
+            "topics": topics,
+            "page": page,
+            "page_size": page_size,
+            "has_more": has_more,
+            "next_page": page + 1 if has_more else None,
+            "query": query,
+        })
 
 
 class ContentTopicContextsView(APIView):

@@ -368,11 +368,19 @@ export async function confirmContent(
 export async function fetchContentTopics(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  page = 1,
+  pageSize = 25,
+  query = "",
 ): Promise<ContentTopicsResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
+    page: String(page),
+    page_size: String(pageSize),
   });
+  if (query.trim()) {
+    params.set("q", query.trim());
+  }
   const response = await apiFetch(`${API_BASE}/content/topics?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load previous topics");
@@ -383,11 +391,21 @@ export async function fetchContentTopics(
 export async function fetchContentItems(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  section = "all",
+  page = 1,
+  pageSize = 25,
+  query = "",
 ): Promise<ContentItemsResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
+    section,
+    page: String(page),
+    page_size: String(pageSize),
   });
+  if (query.trim()) {
+    params.set("q", query.trim());
+  }
   const response = await apiFetch(`${API_BASE}/content/items?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load saved items");

@@ -133,6 +133,11 @@ export interface ContentConfirmResponse {
 
 export interface ContentTopicsResponse {
   topics: string[];
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
+  next_page?: number | null;
+  query?: string;
 }
 
 export interface ContentDialogRecord {
@@ -172,6 +177,12 @@ export interface ContentItemRecord {
 
 export interface ContentItemsResponse {
   items: ContentItemRecord[];
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
+  next_page?: number | null;
+  section?: string;
+  query?: string;
 }
 
 export interface ContentItemDetailResponse {

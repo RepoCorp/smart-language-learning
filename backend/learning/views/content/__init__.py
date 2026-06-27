@@ -1,22 +1,25 @@
 from .api import ContentConfirmView, ContentPreviewView
 from .core import *  # noqa: F401,F403
 from .management import (
-    ContentItemDetailView,
-    ContentItemMarkLearnedView,
-    ContentItemQuestionView,
-    ContentItemRefreshWordView,
-    ContentItemsView,
-    ContentPhraseQuickAddView,
     ContentTopicConversationStartView,
     ContentTopicConversationHelpView,
     ContentTopicConversationTurnView,
     ContentTopicConversationUserCorrectionView,
     ContentTopicConversationUserTranslationView,
     ContentTopicDeleteView,
+)
+from .management_items import (
+    ContentItemDetailView,
+    ContentItemExercisesView,
+    ContentItemFunnyImageExerciseView,
+    ContentItemMarkLearnedView,
+    ContentItemQuestionView,
+    ContentItemRefreshWordView,
+    ContentItemsView,
+    ContentPhraseQuickAddView,
     ContentWordQuickAddView,
     ContentWordsView,
 )
-from .management_items import ContentItemExercisesView, ContentItemFunnyImageExerciseView
 from .management_dialogs_listing import ContentDialogDetailView, ContentDialogsView, ContentDialogTurnAudioView
 from .topics import ContentTopicContextsView, ContentTopicsView, save_topic
 

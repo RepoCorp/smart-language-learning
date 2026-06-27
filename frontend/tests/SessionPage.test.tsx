@@ -265,8 +265,9 @@ describe("SessionPage", () => {
     await waitFor(() => expect(restoreSessionItemState).toHaveBeenCalledWith(51, firstRestoreState));
     expect(await screen.findByText(/Item 1 of 2/)).toBeInTheDocument();
     expect(screen.getByText("Haus")).toBeInTheDocument();
-    const headerButtons = screen.getAllByRole("button", { name: /Open item|Restart session|Previous tested item/ }).map((button) => button.textContent);
-    expect(headerButtons.slice(0, 3)).toEqual(["Open item", "Restart session", "Previous tested item"]);
+    const headerButtons = screen.getAllByRole("button", { name: /Open item|Restart session/ }).map((button) => button.textContent);
+    expect(headerButtons.slice(0, 2)).toEqual(["Open item", "Restart session"]);
+    expect(screen.queryByRole("button", { name: "Previous tested item" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });

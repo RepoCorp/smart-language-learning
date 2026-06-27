@@ -1,12 +1,28 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { deleteContentItem, deleteContentTopic, fetchContentItemDetail, fetchContentItems, fetchContentTopics, regenerateContentItemAudio, setContentItemLearned } from "../api";
+import {
+  deleteContentItem,
+  deleteContentTopic,
+  fetchContentItemDetail,
+  fetchContentItems,
+  fetchContentTopics,
+  regenerateContentItemAudio,
+  setContentItemLearned,
+} from "../api";
 import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentItemRecord, SessionItem } from "../types";
+
+type ManageSection = "topics" | "words" | "phrases";
+
+const PAGE_SIZE = 25;
+
+function isManageSection(value: string | null): value is ManageSection {
+  return value === "topics" || value === "words" || value === "phrases";
+}
 
 export default function ContentManagePage(): JSX.Element {
   const { t } = useI18n();
@@ -24,48 +40,98 @@ export default function ContentManagePage(): JSX.Element {
   const [selectedItems, setSelectedItems] = useState<Record<number, boolean>>({});
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
   const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const sectionParam = searchParams.get("section");
+  const currentSection: ManageSection = isManageSection(sectionParam) ? sectionParam : "topics";
   const filterQuery = searchParams.get("filter") || "";
   const openedItemParam = searchParams.get("item") || "";
+  const pageParam = Number.parseInt(searchParams.get("page") || "1", 10);
 
-  const normalizedFilter = filterQuery.trim().toLowerCase();
-  const filteredTopics = topics.filter((topic) => topic.toLowerCase().includes(normalizedFilter));
-  const wordItems = items.filter((item) => item.item_type === "word");
-  const phraseItems = items.filter((item) => item.item_type === "phrase");
-  const filteredWordItems = wordItems.filter(
-    (item) =>
-      `${item.spanish_text} ${item.german_text}`.toLowerCase().includes(normalizedFilter),
-  );
-  const filteredPhraseItems = phraseItems.filter(
-    (item) =>
-      `${item.spanish_text} ${item.german_text}`.toLowerCase().includes(normalizedFilter),
-  );
+  useEffect(() => {
+    const nextPage = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+    setPage(nextPage);
+  }, [pageParam]);
 
-  const load = async (): Promise<void> => {
-    setLoading(true);
-    setError("");
-    try {
-      const [topicsResponse, itemsResponse] = await Promise.all([
-        fetchContentTopics(sourceLanguage, targetLanguage),
-        fetchContentItems(sourceLanguage, targetLanguage),
-      ]);
-      setTopics(topicsResponse.topics || []);
-      setItems(itemsResponse.items || []);
-      setSelectedTopics({});
-      setSelectedItems({});
-    } catch {
-      setError(t("manage.error.load"));
-      setTopics([]);
-      setItems([]);
-      setSelectedTopics({});
-      setSelectedItems({});
-    } finally {
-      setLoading(false);
+  const busy = Boolean(deletingTopic)
+    || deletingItemId !== null
+    || regeneratingAudioItemId !== null
+    || markingLearnedItemId !== null;
+
+  const updateSearchParams = (updates: Record<string, string | null>, resetPage = false): void => {
+    const nextParams = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null || value === "") {
+        nextParams.delete(key);
+      } else {
+        nextParams.set(key, value);
+      }
     }
+    if (resetPage) {
+      nextParams.delete("page");
+    }
+    setSearchParams(nextParams);
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      setLoading(true);
+      setError("");
+      try {
+        if (currentSection === "topics") {
+          const topicsResponse = await fetchContentTopics(
+            sourceLanguage,
+            targetLanguage,
+            page,
+            PAGE_SIZE,
+            filterQuery,
+          );
+          if (cancelled) {
+            return;
+          }
+          setTopics(topicsResponse.topics || []);
+          setItems([]);
+          setHasMore(Boolean(topicsResponse.has_more));
+          setSelectedTopics({});
+        } else {
+          const itemsResponse = await fetchContentItems(
+            sourceLanguage,
+            targetLanguage,
+            currentSection,
+            page,
+            PAGE_SIZE,
+            filterQuery,
+          );
+          if (cancelled) {
+            return;
+          }
+          setItems(itemsResponse.items || []);
+          setTopics([]);
+          setHasMore(Boolean(itemsResponse.has_more));
+          setSelectedItems({});
+        }
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        setError(t("manage.error.load"));
+        setTopics([]);
+        setItems([]);
+        setHasMore(false);
+        setSelectedTopics({});
+        setSelectedItems({});
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
     void load();
-  }, [sourceLanguage, targetLanguage]);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSection, filterQuery, page, sourceLanguage, targetLanguage, t]);
 
   useEffect(() => {
     const itemId = Number.parseInt(openedItemParam, 10);
@@ -119,24 +185,20 @@ export default function ContentManagePage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [openedItemParam, sourceLanguage, targetLanguage]);
+  }, [openedItemParam, sourceLanguage, targetLanguage, t]);
 
   const openItemModal = (itemId: number): void => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("item", String(itemId));
-    setSearchParams(nextParams);
+    updateSearchParams({ item: String(itemId) });
   };
 
   const closeItemModal = (): void => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete("item");
-    setSearchParams(nextParams);
+    updateSearchParams({ item: null });
     setOpenedItem(null);
     setLoadingOpenedItem(false);
   };
 
   const removeSelectedTopics = async (): Promise<void> => {
-    if (deletingTopic || deletingItemId !== null || regeneratingAudioItemId !== null || markingLearnedItemId !== null) {
+    if (busy) {
       return;
     }
     const topicsToDelete = topics.filter((topic) => selectedTopics[topic]);
@@ -149,7 +211,8 @@ export default function ContentManagePage(): JSX.Element {
       await Promise.all(
         topicsToDelete.map((topic) => deleteContentTopic(topic, sourceLanguage, targetLanguage)),
       );
-      setTopics((current) => current.filter((value) => !selectedTopics[value]));
+      const deletedSet = new Set(topicsToDelete);
+      setTopics((current) => current.filter((topic) => !deletedSet.has(topic)));
       setSelectedTopics({});
     } catch {
       setError(t("manage.error.deleteTopic"));
@@ -158,11 +221,11 @@ export default function ContentManagePage(): JSX.Element {
     }
   };
 
-  const removeSelectedItems = async (itemIdsScope: number[]): Promise<void> => {
-    if (deletingTopic || deletingItemId !== null || regeneratingAudioItemId !== null || markingLearnedItemId !== null) {
+  const removeSelectedItems = async (): Promise<void> => {
+    if (busy) {
       return;
     }
-    const itemIdsToDelete = itemIdsScope.filter((itemId) => selectedItems[itemId]);
+    const itemIdsToDelete = items.filter((item) => selectedItems[item.id]).map((item) => item.id);
     if (!itemIdsToDelete.length) {
       return;
     }
@@ -174,23 +237,13 @@ export default function ContentManagePage(): JSX.Element {
       );
       const deletedSet = new Set(itemIdsToDelete);
       setItems((current) => current.filter((item) => !deletedSet.has(item.id)));
-      setSelectedItems((current) => {
-        const next = { ...current };
-        for (const itemId of itemIdsToDelete) {
-          delete next[itemId];
-        }
-        return next;
-      });
+      setSelectedItems({});
     } catch {
       setError(t("manage.error.deleteItem"));
     } finally {
       setDeletingItemId(null);
     }
   };
-
-  const allTopicsSelected = filteredTopics.length > 0 && filteredTopics.every((topic) => selectedTopics[topic]);
-  const allWordItemsSelected = filteredWordItems.length > 0 && filteredWordItems.every((item) => selectedItems[item.id]);
-  const allPhraseItemsSelected = filteredPhraseItems.length > 0 && filteredPhraseItems.every((item) => selectedItems[item.id]);
 
   const toggleTopicSelection = (topic: string): void => {
     setSelectedTopics((current) => ({ ...current, [topic]: !current[topic] }));
@@ -200,60 +253,35 @@ export default function ContentManagePage(): JSX.Element {
     setSelectedItems((current) => ({ ...current, [itemId]: !current[itemId] }));
   };
 
+  const allTopicsSelected = topics.length > 0 && topics.every((topic) => selectedTopics[topic]);
+  const allItemsSelected = items.length > 0 && items.every((item) => selectedItems[item.id]);
+
   const toggleAllTopics = (): void => {
     if (allTopicsSelected) {
       setSelectedTopics({});
       return;
     }
     const next: Record<string, boolean> = {};
-    for (const topic of filteredTopics) {
+    for (const topic of topics) {
       next[topic] = true;
     }
     setSelectedTopics(next);
   };
 
-  const toggleAllWordItems = (): void => {
-    if (allWordItemsSelected) {
-      setSelectedItems((current) => {
-        const next = { ...current };
-        for (const item of filteredWordItems) {
-          delete next[item.id];
-        }
-        return next;
-      });
+  const toggleAllItems = (): void => {
+    if (allItemsSelected) {
+      setSelectedItems({});
       return;
     }
-    setSelectedItems((current) => {
-      const next = { ...current };
-      for (const item of filteredWordItems) {
-        next[item.id] = true;
-      }
-      return next;
-    });
-  };
-
-  const toggleAllPhraseItems = (): void => {
-    if (allPhraseItemsSelected) {
-      setSelectedItems((current) => {
-        const next = { ...current };
-        for (const item of filteredPhraseItems) {
-          delete next[item.id];
-        }
-        return next;
-      });
-      return;
+    const next: Record<number, boolean> = {};
+    for (const item of items) {
+      next[item.id] = true;
     }
-    setSelectedItems((current) => {
-      const next = { ...current };
-      for (const item of filteredPhraseItems) {
-        next[item.id] = true;
-      }
-      return next;
-    });
+    setSelectedItems(next);
   };
 
   const regenerateAudio = async (item: ContentItemRecord): Promise<void> => {
-    if (deletingTopic || deletingItemId !== null || regeneratingAudioItemId !== null || markingLearnedItemId !== null) {
+    if (busy) {
       return;
     }
     setRegeneratingAudioItemId(item.id);
@@ -271,7 +299,7 @@ export default function ContentManagePage(): JSX.Element {
   };
 
   const toggleLearned = async (item: ContentItemRecord): Promise<void> => {
-    if (deletingTopic || deletingItemId !== null || regeneratingAudioItemId !== null || markingLearnedItemId !== null) {
+    if (busy) {
       return;
     }
     setMarkingLearnedItemId(item.id);
@@ -289,48 +317,65 @@ export default function ContentManagePage(): JSX.Element {
     }
   };
 
+  const changeSection = (section: ManageSection): void => {
+    updateSearchParams({ section }, true);
+  };
+
+  const goToPreviousPage = (): void => {
+    updateSearchParams({ page: String(Math.max(1, page - 1)) });
+  };
+
+  const goToNextPage = (): void => {
+    updateSearchParams({ page: String(page + 1) });
+  };
+
   return (
     <main className="container">
       <h1>{t("manage.title")}</h1>
+      <section className="card">
+        <label className="prompt">{t("manage.sectionLabel")}</label>
+        <div className="actions">
+          <button
+            type="button"
+            className={currentSection === "topics" ? "secondary-button" : ""}
+            onClick={() => changeSection("topics")}
+            disabled={busy}
+          >
+            {t("manage.sectionTopics")}
+          </button>
+          <button
+            type="button"
+            className={currentSection === "words" ? "secondary-button" : ""}
+            onClick={() => changeSection("words")}
+            disabled={busy}
+          >
+            {t("manage.sectionWords")}
+          </button>
+          <button
+            type="button"
+            className={currentSection === "phrases" ? "secondary-button" : ""}
+            onClick={() => changeSection("phrases")}
+            disabled={busy}
+          >
+            {t("manage.sectionPhrases")}
+          </button>
+        </div>
+      </section>
       <section className="card">
         <label htmlFor="manage-filter" className="prompt">{t("manage.filterLabel")}</label>
         <div className="actions">
           <input
             id="manage-filter"
             value={filterQuery}
-            onChange={(event) => {
-              const nextValue = event.target.value;
-              const nextParams = new URLSearchParams(searchParams);
-              if (nextValue) {
-                nextParams.set("filter", nextValue);
-              } else {
-                nextParams.delete("filter");
-              }
-              setSearchParams(nextParams);
-            }}
+            onChange={(event) => updateSearchParams({ filter: event.target.value || null }, true)}
             placeholder={t("manage.filterPlaceholder")}
-            disabled={
-              Boolean(deletingTopic)
-              || deletingItemId !== null
-              || regeneratingAudioItemId !== null
-              || markingLearnedItemId !== null
-            }
+            disabled={busy}
           />
           <button
             type="button"
             className="secondary-button"
-            onClick={() => {
-              const nextParams = new URLSearchParams(searchParams);
-              nextParams.delete("filter");
-              setSearchParams(nextParams);
-            }}
-            disabled={
-              !filterQuery
-              || Boolean(deletingTopic)
-              || deletingItemId !== null
-              || regeneratingAudioItemId !== null
-              || markingLearnedItemId !== null
-            }
+            onClick={() => updateSearchParams({ filter: null }, true)}
+            disabled={!filterQuery || busy}
           >
             {t("manage.filterClear")}
           </button>
@@ -339,247 +384,138 @@ export default function ContentManagePage(): JSX.Element {
       {loading && <p>{t("session.loading")}</p>}
       {error && <p className="error">{error}</p>}
 
-      {!loading && (
-        <>
-          <section className="card">
-            <h2>{t("manage.topics")}</h2>
-            {!filteredTopics.length && <p>{t("manage.emptyTopics")}</p>}
-            {!!filteredTopics.length && (
-              <ul className="manage-list">
-                <li className="manage-actions-row">
-                  <button
-                    className="manage-toggle-all-button"
-                    onClick={toggleAllTopics}
-                    disabled={
-                      Boolean(deletingTopic)
-                      || deletingItemId !== null
-                      || regeneratingAudioItemId !== null
-                      || markingLearnedItemId !== null
-                    }
-                  >
-                    {allTopicsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
-                  </button>
-                  <DangerousButton
-                    className="dangerous-action-button"
-                    onConfirm={removeSelectedTopics}
-                    disabled={
-                      Boolean(deletingTopic)
-                      || deletingItemId !== null
-                      || regeneratingAudioItemId !== null
-                      || markingLearnedItemId !== null
-                      || !filteredTopics.some((topic) => selectedTopics[topic])
-                    }
-                  >
-                    {deletingTopic ? t("manage.deleting") : t("manage.deleteSelectedTopics")}
-                  </DangerousButton>
+      {!loading && currentSection === "topics" && (
+        <section className="card">
+          <h2>{t("manage.topics")}</h2>
+          {!topics.length && <p>{t("manage.emptyTopics")}</p>}
+          {!!topics.length && (
+            <ul className="manage-list">
+              <li className="manage-actions-row">
+                <button
+                  className="manage-toggle-all-button"
+                  onClick={toggleAllTopics}
+                  disabled={busy}
+                >
+                  {allTopicsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
+                </button>
+                <DangerousButton
+                  className="dangerous-action-button"
+                  onConfirm={removeSelectedTopics}
+                  disabled={busy || !topics.some((topic) => selectedTopics[topic])}
+                >
+                  {deletingTopic ? t("manage.deleting") : t("manage.deleteSelectedTopics")}
+                </DangerousButton>
+              </li>
+              {topics.map((topic) => (
+                <li key={topic} className="manage-row">
+                  <label className="manage-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedTopics[topic])}
+                      onChange={() => toggleTopicSelection(topic)}
+                      disabled={busy}
+                    />
+                    {topic}
+                  </label>
                 </li>
-                {filteredTopics.map((topic) => (
-                  <li key={topic} className="manage-row">
-                    <label className="manage-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(selectedTopics[topic])}
-                        onChange={() => toggleTopicSelection(topic)}
-                        disabled={
-                          Boolean(deletingTopic)
-                          || deletingItemId !== null
-                          || regeneratingAudioItemId !== null
-                          || markingLearnedItemId !== null
-                        }
-                      />
-                      {topic}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="card">
-            <h2>{t("manage.words")}</h2>
-            {!filteredWordItems.length && <p>{t("manage.emptyWords")}</p>}
-            {!!filteredWordItems.length && (
-              <ul className="manage-list">
-                <li className="manage-actions-row">
-                  <button
-                    className="manage-toggle-all-button"
-                    onClick={toggleAllWordItems}
-                    disabled={
-                      Boolean(deletingTopic)
-                      || deletingItemId !== null
-                      || regeneratingAudioItemId !== null
-                      || markingLearnedItemId !== null
-                    }
-                  >
-                    {allWordItemsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
-                  </button>
-                  <DangerousButton
-                    className="dangerous-action-button"
-                    onConfirm={() => removeSelectedItems(filteredWordItems.map((item) => item.id))}
-                    disabled={
-                      Boolean(deletingTopic)
-                      || deletingItemId !== null
-                      || regeneratingAudioItemId !== null
-                      || markingLearnedItemId !== null
-                      || !filteredWordItems.some((item) => selectedItems[item.id])
-                    }
-                  >
-                    {deletingItemId !== null ? t("manage.deleting") : t("manage.deleteSelectedItems")}
-                  </DangerousButton>
-                </li>
-                {filteredWordItems.map((item) => (
-                  <li key={item.id} className="manage-row manage-item-row">
-                    <div className="manage-item-main">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(selectedItems[item.id])}
-                        onChange={() => toggleItemSelection(item.id)}
-                        disabled={
-                          Boolean(deletingTopic)
-                          || deletingItemId !== null
-                          || regeneratingAudioItemId !== null
-                          || markingLearnedItemId !== null
-                        }
-                      />
-                      <div className="manage-item-text">
-                        <button
-                          type="button"
-                          className="word-link-button manage-item-link"
-                          onClick={() => openItemModal(item.id)}
-                        >
-                          {item.german_text} - {item.spanish_text}
-                        </button>
-                        <span className="manage-item-meta">
-                          {item.next_review_days === null || item.next_review_days === undefined
-                            ? t("manage.nextReviewNew")
-                            : t("manage.nextReviewDays", { count: item.next_review_days })}
-                        </span>
-                      </div>
-                    </div>
-                    <DangerousButton
-                      className="secondary-button manage-item-action-button dangerous-action-button"
-                      onConfirm={() => regenerateAudio(item)}
-                      disabled={
-                        Boolean(deletingTopic)
-                        || deletingItemId !== null
-                        || regeneratingAudioItemId !== null
-                        || markingLearnedItemId !== null
-                      }
-                    >
-                      {regeneratingAudioItemId === item.id ? t("manage.regeneratingAudio") : t("manage.regenerateAudio")}
-                    </DangerousButton>
-                    <button
-                      type="button"
-                      className={`manage-item-action-button ${item.is_learned ? "manage-item-action-button-unmark" : "manage-item-action-button-mark"}`}
-                      onClick={() => void toggleLearned(item)}
-                      disabled={
-                        Boolean(deletingTopic)
-                        || deletingItemId !== null
-                        || regeneratingAudioItemId !== null
-                        || markingLearnedItemId !== null
-                      }
-                    >
-                      {item.is_learned ? t("manage.unmarkLearned") : t("manage.markLearned")}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="card">
-            <h2>{t("manage.phrases")}</h2>
-            {!filteredPhraseItems.length && <p>{t("manage.emptyPhrases")}</p>}
-            {!!filteredPhraseItems.length && (
-              <ul className="manage-list">
-                <li className="manage-actions-row">
-                  <button
-                    className="manage-toggle-all-button"
-                    onClick={toggleAllPhraseItems}
-                    disabled={
-                      Boolean(deletingTopic)
-                      || deletingItemId !== null
-                      || regeneratingAudioItemId !== null
-                      || markingLearnedItemId !== null
-                    }
-                  >
-                    {allPhraseItemsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
-                  </button>
-                  <DangerousButton
-                    className="dangerous-action-button"
-                    onConfirm={() => removeSelectedItems(filteredPhraseItems.map((item) => item.id))}
-                    disabled={
-                      Boolean(deletingTopic)
-                      || deletingItemId !== null
-                      || regeneratingAudioItemId !== null
-                      || markingLearnedItemId !== null
-                      || !filteredPhraseItems.some((item) => selectedItems[item.id])
-                    }
-                  >
-                    {deletingItemId !== null ? t("manage.deleting") : t("manage.deleteSelectedItems")}
-                  </DangerousButton>
-                </li>
-                {filteredPhraseItems.map((item) => (
-                  <li key={item.id} className="manage-row manage-item-row">
-                    <div className="manage-item-main">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(selectedItems[item.id])}
-                        onChange={() => toggleItemSelection(item.id)}
-                        disabled={
-                          Boolean(deletingTopic)
-                          || deletingItemId !== null
-                          || regeneratingAudioItemId !== null
-                          || markingLearnedItemId !== null
-                        }
-                      />
-                      <div className="manage-item-text">
-                        <button
-                          type="button"
-                          className="word-link-button manage-item-link"
-                          onClick={() => openItemModal(item.id)}
-                        >
-                          {item.german_text} - {item.spanish_text}
-                        </button>
-                        <span className="manage-item-meta">
-                          {item.next_review_days === null || item.next_review_days === undefined
-                            ? t("manage.nextReviewNew")
-                            : t("manage.nextReviewDays", { count: item.next_review_days })}
-                        </span>
-                      </div>
-                    </div>
-                    <DangerousButton
-                      className="secondary-button manage-item-action-button dangerous-action-button"
-                      onConfirm={() => regenerateAudio(item)}
-                      disabled={
-                        Boolean(deletingTopic)
-                        || deletingItemId !== null
-                        || regeneratingAudioItemId !== null
-                        || markingLearnedItemId !== null
-                      }
-                    >
-                      {regeneratingAudioItemId === item.id ? t("manage.regeneratingAudio") : t("manage.regenerateAudio")}
-                    </DangerousButton>
-                    <button
-                      type="button"
-                      className={`manage-item-action-button ${item.is_learned ? "manage-item-action-button-unmark" : "manage-item-action-button-mark"}`}
-                      onClick={() => void toggleLearned(item)}
-                      disabled={
-                        Boolean(deletingTopic)
-                        || deletingItemId !== null
-                        || regeneratingAudioItemId !== null
-                        || markingLearnedItemId !== null
-                      }
-                    >
-                      {item.is_learned ? t("manage.unmarkLearned") : t("manage.markLearned")}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
+
+      {!loading && currentSection !== "topics" && (
+        <section className="card">
+          <h2>{currentSection === "words" ? t("manage.words") : t("manage.phrases")}</h2>
+          {!items.length && <p>{currentSection === "words" ? t("manage.emptyWords") : t("manage.emptyPhrases")}</p>}
+          {!!items.length && (
+            <ul className="manage-list">
+              <li className="manage-actions-row">
+                <button
+                  className="manage-toggle-all-button"
+                  onClick={toggleAllItems}
+                  disabled={busy}
+                >
+                  {allItemsSelected ? t("manage.unselectAll") : t("manage.selectAll")}
+                </button>
+                <DangerousButton
+                  className="dangerous-action-button"
+                  onConfirm={removeSelectedItems}
+                  disabled={busy || !items.some((item) => selectedItems[item.id])}
+                >
+                  {deletingItemId !== null ? t("manage.deleting") : t("manage.deleteSelectedItems")}
+                </DangerousButton>
+              </li>
+              {items.map((item) => (
+                <li key={item.id} className="manage-row manage-item-row">
+                  <div className="manage-item-main">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedItems[item.id])}
+                      onChange={() => toggleItemSelection(item.id)}
+                      disabled={busy}
+                    />
+                    <div className="manage-item-text">
+                      <button
+                        type="button"
+                        className="word-link-button manage-item-link"
+                        onClick={() => openItemModal(item.id)}
+                      >
+                        {item.german_text} - {item.spanish_text}
+                      </button>
+                      <span className="manage-item-meta">
+                        {item.next_review_days === null || item.next_review_days === undefined
+                          ? t("manage.nextReviewNew")
+                          : t("manage.nextReviewDays", { count: item.next_review_days })}
+                      </span>
+                    </div>
+                  </div>
+                  <DangerousButton
+                    className="secondary-button manage-item-action-button dangerous-action-button"
+                    onConfirm={() => regenerateAudio(item)}
+                    disabled={busy}
+                  >
+                    {regeneratingAudioItemId === item.id ? t("manage.regeneratingAudio") : t("manage.regenerateAudio")}
+                  </DangerousButton>
+                  <button
+                    type="button"
+                    className={`manage-item-action-button ${item.is_learned ? "manage-item-action-button-unmark" : "manage-item-action-button-mark"}`}
+                    onClick={() => void toggleLearned(item)}
+                    disabled={busy}
+                  >
+                    {item.is_learned ? t("manage.unmarkLearned") : t("manage.markLearned")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {!loading && (
+        <section className="card">
+          <div className="actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={goToPreviousPage}
+              disabled={page <= 1 || busy}
+            >
+              {t("manage.previousPage")}
+            </button>
+            <span>{t("manage.pageLabel", { page })}</span>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={goToNextPage}
+              disabled={!hasMore || busy}
+            >
+              {t("manage.nextPage")}
+            </button>
+          </div>
+        </section>
+      )}
+
       {(loadingOpenedItem || openedItem) && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal">
