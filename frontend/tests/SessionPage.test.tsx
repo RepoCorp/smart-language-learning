@@ -294,7 +294,9 @@ describe("SessionPage", () => {
     await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Write in German/)).toBeInTheDocument();
+    expect(screen.getByTestId("word-hint-count")).toHaveTextContent("Failures: 0");
     clickHintButton();
+    expect(screen.getByTestId("word-hint-count")).toHaveTextContent("Failures: 1");
     const suggestions = within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button");
     expect(suggestions).toHaveLength(3);
     expect(suggestions.map((button) => button.textContent)).toContain("d");
@@ -482,7 +484,7 @@ describe("SessionPage", () => {
     clickHintButton();
     await userEvent.type(input, "nke");
 
-    expect(screen.getByText(/more than two hints or mistakes were used/i)).toBeInTheDocument();
+    expect(screen.getByText(/more than two hints or wrong letters were used/i)).toBeInTheDocument();
     expect(submitReview).not.toHaveBeenCalled();
     const accept = screen.getByRole("button", { name: "Accept" });
     await waitFor(() => expect(accept).toBeEnabled());
@@ -537,6 +539,36 @@ describe("SessionPage", () => {
     await userEvent.type(input, "e");
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(115, true, "es_to_de"));
     expect(screen.queryByText(/too many hints were used/i)).not.toBeInTheDocument();
+  });
+
+  it("counts repeated wrong attempts on the same letter only once", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 116,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "gracias",
+          german_text: "danke",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    const input = await screen.findByTestId("word-input");
+    await userEvent.type(input, "x");
+    expect(screen.getByTestId("word-hint-count")).toHaveTextContent("Failures: 1");
+    await userEvent.type(input, "x");
+    expect(screen.getByTestId("word-hint-count")).toHaveTextContent("Failures: 1");
+    clickHintButton();
+    expect(screen.getByTestId("word-hint-count")).toHaveTextContent("Failures: 1");
+    await userEvent.type(input, "danke");
+
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(116, true, "es_to_de"));
+    expect(screen.queryByText(/more than two hints or wrong letters were used/i)).not.toBeInTheDocument();
   });
 
   it("does not submit or hint with Enter shortcuts", async () => {

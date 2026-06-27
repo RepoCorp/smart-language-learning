@@ -290,7 +290,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const [feedback, setFeedback] = useState<string>("");
   const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>("neutral");
   const [hintLetter, setHintLetter] = useState<string>("");
-  const [writtenWordAssistanceSteps, setWrittenWordAssistanceSteps] = useState<number>(0);
+  const [writtenWordAssistanceIndexes, setWrittenWordAssistanceIndexes] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
@@ -339,8 +339,8 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
 
   const hint = hintLetter;
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
-
-  const hasExceededWrittenWordAssistanceLimit = (): boolean => writtenWordAssistanceSteps > MAX_WRITTEN_WORD_ASSISTANCE_STEPS;
+  const totalWrittenWordAssistanceSteps = writtenWordAssistanceIndexes.length;
+  const hasExceededWrittenWordAssistanceLimit = (): boolean => totalWrittenWordAssistanceSteps > MAX_WRITTEN_WORD_ASSISTANCE_STEPS;
 
   const waitForPreviewPaint = async (): Promise<void> => {
     if (typeof window === "undefined") {
@@ -465,13 +465,10 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     const nextSuggestions = nextHintLetter
       ? nextLetterSuggestions(nextHintLetter, prefixLen)
       : [];
-    const isNewHintStep = Boolean(nextHintLetter)
-      && nextHintLetter !== hintLetter
-      && nextSuggestions.join("|") !== letterSuggestions.join("|");
     setHintLetter("");
     setLetterSuggestions(nextSuggestions);
-    if (isNewHintStep) {
-      setWrittenWordAssistanceSteps((value) => value + 1);
+    if (nextHintLetter) {
+      setWrittenWordAssistanceIndexes((current) => (current.includes(prefixLen) ? current : [...current, prefixLen]));
     }
   };
 
@@ -504,12 +501,21 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
       const fallbackAnswer = provisionalBaseAnswerRef.current && acceptedAnswer.startsWith(provisionalBaseAnswerRef.current)
         ? provisionalBaseAnswerRef.current
         : acceptedAnswer;
+      const maxCompareLength = Math.min(value.length, expectedAnswer.length);
+      let mismatchIndex = 0;
+      while (mismatchIndex < maxCompareLength && value.charAt(mismatchIndex) === expectedAnswer.charAt(mismatchIndex)) {
+        mismatchIndex += 1;
+      }
+      if (mismatchIndex >= maxCompareLength) {
+        mismatchIndex = fallbackAnswer.length;
+      }
       const wrongText = value.slice(acceptedAnswer.length) || value.slice(fallbackAnswer.length) || value.slice(-1);
       setAnswer(fallbackAnswer);
       setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
       setFeedbackTone("error");
       setLetterSuggestions([]);
       setHintLetter("");
+      setWrittenWordAssistanceIndexes((current) => (current.includes(mismatchIndex) ? current : [...current, mismatchIndex]));
       return;
     }
 
@@ -661,7 +667,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     setFeedback("");
     setFeedbackTone("neutral");
     setHintLetter("");
-    setWrittenWordAssistanceSteps(0);
+    setWrittenWordAssistanceIndexes([]);
     setAwaitingWrongAccept(false);
     setAnswerRevealed(false);
     setLetterSuggestions([]);
@@ -1011,6 +1017,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
         </div>
       )}
       <p className="hint">{hint ? t("word.hint", { letter: hint }) : "\u00a0"}</p>
+      <p className="hint" data-testid="word-hint-count">{t("word.hintCount", { count: totalWrittenWordAssistanceSteps })}</p>
       <div className="actions">
         {!awaitingWrongAccept && (
           <>
