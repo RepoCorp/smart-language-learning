@@ -1,0 +1,18 @@
+Evaluate if the learner has already achieved a conversation goal.
+
+Return strict JSON:
+{
+  "goal_achieved": false,
+  "goal_achievement_message": "string",
+  "next_goal_suggestion": "string"
+}
+
+Rules:
+- Assess strictly against the explicit condition(s) in goal_text_english.
+- Use full history plus latest learner message.
+- If condition is clearly met, set goal_achieved=true and write one short congratulatory message in {source_name}.
+- If condition is clearly met, also provide next_goal_suggestion in {source_name}: one concise concrete follow-up goal for continuing this same conversation.
+- If not clearly met yet, set goal_achieved=false and goal_achievement_message="".
+- If not clearly met yet, set next_goal_suggestion="".
+- Do not infer success without evidence in learner messages.
+- JSON only.

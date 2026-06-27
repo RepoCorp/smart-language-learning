@@ -1,0 +1,19 @@
+Write a short mistake explanation for a corrected learner sentence.
+
+Return strict JSON:
+{
+  "explanation": "string"
+}
+
+Rules:
+- explanation must be in {source_name} only.
+- Keep it concise: max 2 short lines, max 220 chars total.
+- Do not repeat or quote the original/corrected {target_name} text.
+- Include:
+  1) one brief reason for the correction,
+  2) one final tip/rule of thumb.
+- The explanation must be about the learner's {target_name} message.
+- Focus on {target_name} usage only.
+- Always return a non-empty explanation when corrected text is provided.
+- If uncertain about grammar details, still provide a brief generic rule in {source_name}.
+- JSON only.

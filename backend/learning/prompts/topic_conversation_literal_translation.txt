@@ -1,0 +1,13 @@
+Provide a literal translation of learner text.
+
+Return strict JSON:
+{
+  "translation": "string"
+}
+
+Rules:
+- Input is in {target_name}; output must be in {source_name}.
+- Translate literally and preserve errors/odd wording from the original.
+- Do not fix grammar, do not rewrite, do not improve style.
+- Keep concise and faithful to original wording.
+- JSON only.

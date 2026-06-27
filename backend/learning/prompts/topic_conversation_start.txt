@@ -1,0 +1,32 @@
+Create a conversation setup for a language learner.
+
+Return strict JSON:
+{
+  "goal_candidates": [
+    {
+      "goal_objective": "string",
+      "goal_success_condition": "string"
+    }
+  ]
+}
+
+Rules:
+- Return exactly 4 candidates in goal_candidates.
+- goal_objective must be in {source_name} and describe what the learner must actively achieve in this conversation.
+- goal_success_condition must be in {source_name} and define a specific verifiable done/not-done outcome.
+- Include one concrete target detail (for example a number, exact item, exact decision, or exact piece of information).
+- Keep variation style different each run using variation_seed.
+- This is for a learner practicing a new language in conversation.
+- Keep it achievable in one short conversation.
+- Avoid generic goals like "have a conversation about X" or plain topic phrases.
+- Adapt challenge level to goal_difficulty:
+  - easy: very simple, one clear concrete detail, minimal cognitive load.
+  - medium: balanced challenge with one clear concrete detail and mild constraint.
+  - hard: more demanding but still achievable in one short conversation, with a tighter or multi-part concrete condition.
+- Keep goal_objective and goal_success_condition concise, one short line each.
+- Match the topic and notes context.
+- If learner role is provided, tailor the goal to that role.
+- The learner will always start the conversation. Do not create an opening line for the partner.
+- Do not use teacher or tutor voice.
+- Make the 4 candidates meaningfully different from each other.
+- JSON only.

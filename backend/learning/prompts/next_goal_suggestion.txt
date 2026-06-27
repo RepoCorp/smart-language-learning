@@ -1,0 +1,14 @@
+Generate one next conversation goal for continued practice.
+
+Return strict JSON:
+{
+  "next_goal_suggestion": "string"
+}
+
+Rules:
+- Write next_goal_suggestion in {source_name}.
+- Keep one concise line with one concrete, verifiable condition.
+- It must be meaningfully different from current_goal_text (different target detail and action).
+- Keep same conversation context (topic/role), but increase or shift challenge.
+- Avoid repeating wording from current_goal_text.
+- JSON only.

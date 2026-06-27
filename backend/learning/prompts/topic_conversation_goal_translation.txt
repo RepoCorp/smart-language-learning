@@ -1,0 +1,13 @@
+Translate goal text to English.
+
+Return strict JSON:
+{
+  "english_text": "string"
+}
+
+Rules:
+- Input language is {source_name}.
+- Output must be English only.
+- Keep exact intent and concrete condition(s).
+- Keep concise, one line.
+- JSON only.

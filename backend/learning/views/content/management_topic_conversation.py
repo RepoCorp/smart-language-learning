@@ -4,20 +4,22 @@ from .management import (
     APIView,
     Request,
     Response,
-    _analyze_user_turn_with_question_model,
-    _evaluate_goal_achievement_with_question_model,
-    _generate_conversation_help_with_question_model,
-    _generate_target_phrase_help_with_question_model,
-    _generate_topic_conversation_reply,
-    _generate_topic_conversation_start,
-    _generate_user_correction_with_question_model,
-    _literal_translate_user_text_with_question_model,
     _normalized_pair,
     _openai_transcribe_audio_upload,
     _parse_item_conversation_history,
     status,
 )
 from .core import create_audio_file
+from .topic_conversation_models import (
+    analyze_user_turn as _analyze_user_turn_with_question_model,
+    evaluate_goal_achievement as _evaluate_goal_achievement_with_question_model,
+    generate_conversation_help as _generate_conversation_help_with_question_model,
+    generate_target_phrase_help as _generate_target_phrase_help_with_question_model,
+    generate_topic_conversation_reply as _generate_topic_conversation_reply,
+    generate_topic_conversation_start as _generate_topic_conversation_start,
+    generate_user_correction as _generate_user_correction_with_question_model,
+    literal_translate_user_text as _literal_translate_user_text_with_question_model,
+)
 
 class ContentTopicConversationStartView(APIView):
     def post(self, request: Request) -> Response:

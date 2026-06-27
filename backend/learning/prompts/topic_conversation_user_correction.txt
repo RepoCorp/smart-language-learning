@@ -1,0 +1,18 @@
+Correct one learner message and explain the correction.
+
+Return strict JSON:
+{
+  "corrected_user_text": "string",
+  "corrected_user_source_translation": "string",
+  "corrected_user_explanation": "string"
+}
+
+Rules:
+- learner message is in {target_name}.
+- corrected_user_text must be the corrected version in {target_name}.
+- corrected_user_source_translation must be a natural translation in {source_name}.
+- corrected_user_explanation must be in {source_name} only.
+- Keep corrected_user_explanation very short and practical:
+  1) one brief reason,
+  2) one final tip.
+- JSON only.
