@@ -19,7 +19,6 @@ from .management import (
     Request,
     Response,
     _basic_word_metadata,
-    _item_question_history,
     _next_review_days,
     _normalized_pair,
     _related_dialogs_by_item_ids,
@@ -29,6 +28,7 @@ from .management import (
     status,
     timezone,
 )
+from .item_questions import item_question_history
 from ...models import DialogTurn, ItemDialogOccurrence, SavedDialog
 from ..dialog_phrase_match import build_dialog_phrase_match_payload
 from .core import (
@@ -158,7 +158,7 @@ class ContentItemDetailView(APIView):
                 "dialog_phrase_turns": dialog_phrase_payload["turns"],
                 "dialog_phrase_odd_index": dialog_phrase_payload["odd_index"],
                 "related_dialogs": related_dialogs_map.get(item.id, []),
-                "item_questions": _item_question_history(item),
+                "item_questions": item_question_history(item),
             }
         )
 
@@ -312,6 +312,14 @@ class ContentItemRefreshWordView(APIView):
                 item.word_type = resolved_word_type
                 word_type_added = True
 
+        if word_type_added or word_text_updated:
+            metadata_update_fields = ["updated_at"]
+            if word_type_added:
+                metadata_update_fields.append("word_type")
+            if word_text_updated:
+                metadata_update_fields.extend(["spanish_text", "german_text"])
+            item.save(update_fields=metadata_update_fields)
+
         dialog_occurrences_created = _scan_all_dialogs_for_word(
             user=user,
             item=item,
@@ -332,12 +340,7 @@ class ContentItemRefreshWordView(APIView):
             return Response({"detail": "Exercise generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         item.exercise_phrases = cleaned
-        update_fields = ["exercise_phrases", "updated_at"]
-        if word_type_added:
-            update_fields.append("word_type")
-        if word_text_updated:
-            update_fields.extend(["spanish_text", "german_text"])
-        item.save(update_fields=update_fields)
+        item.save(update_fields=["exercise_phrases", "updated_at"])
 
         related_dialogs_map = _related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
         return Response(

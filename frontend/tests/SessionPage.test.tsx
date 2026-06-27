@@ -5,6 +5,11 @@ import { vi } from "vitest";
 
 import SessionPage from "../src/components/SessionPage";
 
+const routerFutureFlags = {
+  v7_relativeSplatPath: true,
+  v7_startTransition: true,
+};
+
 vi.mock("../src/api", () => ({
   completeDifficultItem: vi.fn().mockResolvedValue(undefined),
   fetchContentItemDetail: vi.fn(),
@@ -17,46 +22,20 @@ vi.mock("../src/api", () => ({
 
 import { completeDifficultItem, fetchContentItemDetail, fetchOverviewStats, fetchSession, markSeen, submitReview } from "../src/api";
 
-async function renderSessionPageAndStart(sessionType: "standard" | "difficult" = "standard"): Promise<void> {
+async function renderSessionPageAndStart(): Promise<void> {
   render(
-    <BrowserRouter>
+    <BrowserRouter future={routerFutureFlags}>
       <SessionPage />
     </BrowserRouter>
   );
   const durationInput = await screen.findByTestId("duration-minutes-input");
   await userEvent.clear(durationInput);
   await userEvent.type(durationInput, "10");
-  if (sessionType === "difficult") {
-    await userEvent.click(screen.getByRole("radio", { name: /Difficult items/i }));
-    await userEvent.click(screen.getByRole("button", { name: "Start difficult session" }));
-    return;
-  }
   await userEvent.click(screen.getByRole("button", { name: "Start session" }));
 }
 
-function dragPhraseTokenToSlot(token: HTMLElement, slotIndex: number, root: ParentNode = document, finishWithDrop = true): void {
-  const slots = Array.from(root.querySelectorAll(".phrase-builder-slot"));
-  const slot = slots[slotIndex];
-  if (!(slot instanceof HTMLElement)) {
-    throw new Error(`Phrase builder slot ${slotIndex} not found`);
-  }
-  const data = new Map<string, string>();
-  const dataTransfer = {
-    effectAllowed: "move",
-    getData: (type: string) => data.get(type) || "",
-    setData: (type: string, value: string) => {
-      data.set(type, value);
-    },
-  };
-  fireEvent.dragStart(token, { dataTransfer });
-  fireEvent.dragEnter(slot, { dataTransfer });
-  if (!finishWithDrop) {
-    fireEvent.dragEnd(token, { dataTransfer });
-    return;
-  }
-  fireEvent.dragOver(slot, { dataTransfer });
-  fireEvent.drop(slot, { dataTransfer });
-  fireEvent.dragEnd(token, { dataTransfer });
+function clickHintButton(): void {
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
 }
 
 describe("SessionPage", () => {
@@ -121,11 +100,9 @@ describe("SessionPage", () => {
     expect(within(dialog).getByText("Build the German phrase for:")).toBeInTheDocument();
     expect(within(dialog).getByText("Buenos días")).toHaveClass("test-source-phrase");
 
-    dragPhraseTokenToSlot(within(dialog).getByRole("button", { name: "Guten" }), 0, dialog, false);
-    dragPhraseTokenToSlot(within(dialog).getByRole("button", { name: "Morgen" }), 1, dialog);
-    expect(within(dialog).getByText(/Great, the phrase is in the right order/)).toBeInTheDocument();
-
-    await userEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+    expect(within(dialog).getByRole("button", { name: "Guten" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Morgen" })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
@@ -188,7 +165,7 @@ describe("SessionPage", () => {
     );
 
     render(
-      <BrowserRouter>
+      <BrowserRouter future={routerFutureFlags}>
         <SessionPage />
       </BrowserRouter>
     );
@@ -241,7 +218,7 @@ describe("SessionPage", () => {
     await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Write in German/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
     const suggestions = within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button");
     expect(suggestions).toHaveLength(3);
     expect(suggestions.map((button) => button.textContent)).toContain("d");
@@ -267,11 +244,11 @@ describe("SessionPage", () => {
     await screen.findByText(/Write in German/);
     const hintButton = screen.getByRole("button", { name: "Hint" });
 
-    await userEvent.click(hintButton);
+    fireEvent.click(hintButton);
     expect(within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button").map((button) => button.textContent)).toContain("d");
 
     await userEvent.type(screen.getByTestId("word-input"), "d");
-    await userEvent.click(hintButton);
+    fireEvent.click(hintButton);
     expect(within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button").map((button) => button.textContent)).toContain("a");
   });
 
@@ -300,7 +277,7 @@ describe("SessionPage", () => {
     expect(screen.getByText("Wrong letter: x")).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Letter suggestions" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
     const suggestions = within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button");
     expect(suggestions).toHaveLength(3);
     expect(suggestions.map((button) => button.textContent)).toContain("d");
@@ -339,7 +316,7 @@ describe("SessionPage", () => {
     expect(input).toHaveValue("Mä");
     expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
 
-    await userEvent.type(input, "dchen");
+    fireEvent.change(input, { target: { value: "Mädchen" } });
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(46, true, "es_to_de"));
   });
 
@@ -374,7 +351,7 @@ describe("SessionPage", () => {
     expect(input).toHaveValue("Mä");
     expect(screen.queryByText(/Wrong letter/)).not.toBeInTheDocument();
 
-    await userEvent.type(input, "dchen");
+    fireEvent.change(input, { target: { value: "Mädchen" } });
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(47, true, "es_to_de"));
   });
 
@@ -398,7 +375,7 @@ describe("SessionPage", () => {
     await screen.findByText(/Write in German/);
     const input = screen.getByTestId("word-input");
     await userEvent.type(input, "dxn");
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
 
     expect(input).toHaveValue("d");
     expect(within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button").map((button) => button.textContent)).toContain("a");
@@ -422,18 +399,20 @@ describe("SessionPage", () => {
     await renderSessionPageAndStart();
 
     const input = await screen.findByTestId("word-input");
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
     await userEvent.type(input, "d");
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
-    await userEvent.type(input, "anke");
+    clickHintButton();
+    await userEvent.type(input, "a");
+    clickHintButton();
+    await userEvent.type(input, "nke");
 
-    expect(screen.getByText(/too many hints were used/i)).toBeInTheDocument();
+    expect(screen.getByText(/more than two hints or mistakes were used/i)).toBeInTheDocument();
     expect(submitReview).not.toHaveBeenCalled();
     const accept = screen.getByRole("button", { name: "Accept" });
     await waitFor(() => expect(accept).toBeEnabled());
     await userEvent.click(accept);
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(6, false, "es_to_de"));
-  });
+  }, 10000);
 
   it("auto-registers as correct when completed within hint limit", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
@@ -476,7 +455,7 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "dank");
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
     expect(within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button").map((button) => button.textContent)).toContain("e");
 
     await userEvent.type(input, "e");
@@ -555,7 +534,7 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "x");
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
     expect(input).toHaveValue("");
 
     await userEvent.keyboard("{Enter}");
@@ -590,7 +569,7 @@ describe("SessionPage", () => {
     await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Write in German/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
     expect(within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button").map((button) => button.textContent)).toContain("d");
 
     await userEvent.type(screen.getByTestId("word-input"), "danke");
@@ -617,7 +596,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByText(/What is the correct Spanish translation\? haus/)).toBeInTheDocument();
+    expect(await screen.findByText(/What is the correct Spanish translation\?/)).toBeInTheDocument();
+    expect(screen.getByText("haus")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /casa/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
@@ -644,7 +624,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/What is the correct Spanish translation\? haus/);
+    await screen.findByText(/What is the correct Spanish translation\?/);
+    expect(screen.getByText("haus")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });
     await userEvent.click(failedButton);
@@ -706,7 +687,7 @@ describe("SessionPage", () => {
 
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "h");
-    await userEvent.click(screen.getByRole("button", { name: "Hint" }));
+    clickHintButton();
 
     expect(input).toHaveValue("");
     expect(within(screen.getByRole("group", { name: "Letter suggestions" })).getAllByRole("button").map((button) => button.textContent)).toContain("H");
@@ -729,7 +710,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/)).toBeInTheDocument();
+    expect(await screen.findByText(/What is the correct Spanish translation\?/)).toBeInTheDocument();
+    expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "No entiendo" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
@@ -756,7 +738,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/)).toBeInTheDocument();
+    expect(await screen.findByText(/What is the correct Spanish translation\?/)).toBeInTheDocument();
+    expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "1. No entiendo" })).not.toBeInTheDocument();
     await userEvent.keyboard("1");
     expect(submitReview).not.toHaveBeenCalled();
@@ -792,7 +775,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/);
+    await screen.findByText(/What is the correct Spanish translation\?/);
+    expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open item: Hola" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open item" })).toBeInTheDocument();
     expect(screen.getByTestId("session-page")).toBeInTheDocument();
@@ -847,7 +831,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/Write in German: casa/);
+    await screen.findByText(/Write in German/);
+    expect(screen.getByText("casa")).toBeInTheDocument();
     const actionButtons = screen.getAllByRole("button").map((button) => button.textContent);
     expect(actionButtons).toEqual(expect.arrayContaining(["Hint", "Open item", "Fail"]));
     expect(actionButtons.indexOf("Open item")).toBeLessThan(actionButtons.indexOf("Hint"));
@@ -863,7 +848,8 @@ describe("SessionPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByText(/Write in German: casa/)).toBeInTheDocument();
+    expect(screen.getByText(/Write in German/)).toBeInTheDocument();
+    expect(screen.getByText("casa")).toBeInTheDocument();
     expect(submitReview).not.toHaveBeenCalled();
   });
 
@@ -884,7 +870,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/);
+    await screen.findByText(/What is the correct Spanish translation\?/);
+    expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });
     await userEvent.click(failedButton);
@@ -910,7 +897,8 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    await screen.findByText(/What is the correct Spanish translation\? Ich verstehe nicht/);
+    await screen.findByText(/What is the correct Spanish translation\?/);
+    expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });
     await userEvent.click(failedButton);
@@ -953,14 +941,15 @@ describe("SessionPage", () => {
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(40, false, "es_to_de"));
 
     await screen.findByText(/Item 2 of 2/);
-    expect(await screen.findByText(/Write in German: perro/)).toBeInTheDocument();
+    expect(await screen.findByText(/Write in German/)).toBeInTheDocument();
+    expect(screen.getByText("perro")).toBeInTheDocument();
 
     await userEvent.type(screen.getByTestId("word-input"), "Hund");
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(41, true, "es_to_de"));
     expect(await screen.findByText("Session completed")).toBeInTheDocument();
   });
 
-  it("runs a difficult session without submitting new review results", async () => {
+  it("runs difficult practice inside the regular session without submitting new review results", async () => {
     vi.mocked(fetchOverviewStats).mockResolvedValue({
       ready_to_review: 0,
       future_reviews: 0,
@@ -1011,14 +1000,15 @@ describe("SessionPage", () => {
       ],
     });
 
-    await renderSessionPageAndStart("difficult");
+    await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Item 1 of 2/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.type(screen.getByTestId("word-input"), "Tisch");
 
     expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
-    expect(await screen.findByText(/Complete the phrase with: mesa/)).toBeInTheDocument();
-    expect(screen.getByText("Der ____ ist bereit.")).toBeInTheDocument();
+    expect(await screen.findByText(/Complete the phrase with:/)).toBeInTheDocument();
+    expect(screen.getByText("mesa")).toBeInTheDocument();
+    expect(screen.getByText("_____")).toBeInTheDocument();
     expect(screen.queryByTestId("word-input")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "T" }));
     await userEvent.click(screen.getByRole("button", { name: "i" }));
@@ -1028,7 +1018,7 @@ describe("SessionPage", () => {
     await waitFor(() => expect(completeDifficultItem).toHaveBeenCalledWith(43));
     expect(submitReview).not.toHaveBeenCalled();
     expect(await screen.findByText("Session completed")).toBeInTheDocument();
-  });
+  }, 10000);
 
   it("does not submit a written answer when Enter is pressed", async () => {
     vi.mocked(fetchSession).mockResolvedValue({

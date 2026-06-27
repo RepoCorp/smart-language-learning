@@ -135,24 +135,29 @@ def test_session_duration_minutes_matches_expected_time_target():
 
 
 @pytest.mark.django_db
-def test_difficult_session_returns_preplanned_exercises_without_regular_items():
+def test_regular_session_includes_ready_difficult_item_exercises():
+    now = timezone.now()
+    yesterday = now - timedelta(days=1)
     word = Item.objects.create(
         item_type=Item.ItemType.WORD,
         spanish_text="casa",
         german_text="Haus",
         is_difficult=True,
+        difficult_marked_at=yesterday,
     )
     second_word = Item.objects.create(
         item_type=Item.ItemType.WORD,
         spanish_text="mesa",
         german_text="Tisch",
         is_difficult=True,
+        difficult_marked_at=yesterday,
     )
     phrase = Item.objects.create(
         item_type=Item.ItemType.PHRASE,
         spanish_text="No entiendo",
         german_text="Ich verstehe nicht",
         is_difficult=True,
+        difficult_marked_at=yesterday,
     )
     Item.objects.create(
         item_type=Item.ItemType.WORD,
@@ -161,7 +166,7 @@ def test_difficult_session_returns_preplanned_exercises_without_regular_items():
     )
 
     client = APIClient()
-    response = client.get("/api/session", {"session_type": "difficult", "duration_minutes": 5})
+    response = client.get("/api/session", {"duration_minutes": 5})
 
     assert response.status_code == 200
     items = response.json()["items"]
@@ -169,7 +174,7 @@ def test_difficult_session_returns_preplanned_exercises_without_regular_items():
     second_word_batch = [item["id"] for item in items[2:4]]
     assert set(first_word_batch) == {second_word.id, word.id}
     assert second_word_batch == first_word_batch
-    assert [item["id"] for item in items[4:]] == [phrase.id, phrase.id]
+    assert [item["id"] for item in items[4:6]] == [phrase.id, phrase.id]
     assert items[0]["repeatPracticeStep"] == "word_intro"
     assert items[1]["repeatPracticeStep"] == "word_intro"
     assert items[2]["repeatPracticeStep"] == "word_cloze"
@@ -178,6 +183,34 @@ def test_difficult_session_returns_preplanned_exercises_without_regular_items():
     assert items[4]["repeatedAfterFailure"] is True
     assert "repeatPracticeStep" not in items[4] or items[4]["repeatPracticeStep"] is None
     assert items[5]["repeatPracticeStep"] == "phrase_builder"
+
+
+@pytest.mark.django_db
+def test_regular_session_delays_same_day_difficult_items_until_tomorrow():
+    now = timezone.now()
+    difficult_today = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="casa",
+        german_text="Haus",
+        is_difficult=True,
+        difficult_marked_at=now,
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+    )
+    new_item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="mesa",
+        german_text="Tisch",
+    )
+
+    client = APIClient()
+    response = client.get("/api/session", {"duration_minutes": 2})
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert difficult_today.id not in [item["id"] for item in items]
+    assert all(not item["repeatedAfterFailure"] for item in items)
+    assert any(item["id"] == new_item.id for item in items)
 
 
 @pytest.mark.django_db

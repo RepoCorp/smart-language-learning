@@ -58,13 +58,18 @@ function installMobileInputZoomReset(): void {
 
 installMobileInputZoomReset();
 
+const routerFutureFlags = {
+  v7_relativeSplatPath: true,
+  v7_startTransition: true,
+};
+
 createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <I18nProvider>
       <StudyLanguagesProvider>
         <PromptPreferencesProvider>
           <DebugToolsProvider>
-            <BrowserRouter>
+            <BrowserRouter future={routerFutureFlags}>
               <App />
             </BrowserRouter>
           </DebugToolsProvider>

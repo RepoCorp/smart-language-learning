@@ -8,6 +8,7 @@ def _load(name: str) -> str:
 
 
 CONVERSATION_GENERATION_PROMPT = _load("conversation_generation.txt")
+ITEM_QUESTION_DECISION_PROMPT = _load("item_question_decision.txt")
 PHRASE_KEYWORDS_PROMPT = _load("phrase_keywords.txt")
 WORD_EXERCISES_ADJECTIVE_PROMPT = _load("word_exercises_adjective.txt")
 WORD_EXERCISES_ADVERB_PROMPT = _load("word_exercises_adverb.txt")

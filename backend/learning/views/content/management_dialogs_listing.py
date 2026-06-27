@@ -16,6 +16,13 @@ DEFAULT_DIALOGS_PAGE_SIZE = 20
 MAX_DIALOGS_PAGE_SIZE = 50
 
 
+def _dialog_turn_count(dialog: SavedDialog) -> int:
+    related_turns = getattr(dialog, "dialog_turns", None)
+    if related_turns is not None:
+        return related_turns.count()
+    return len(dialog.turns) if isinstance(dialog.turns, list) else 0
+
+
 class ContentDialogsView(APIView):
     def get(self, request: Request) -> Response:
         user = get_request_user(request)
@@ -39,6 +46,7 @@ class ContentDialogsView(APIView):
             queryset = queryset.filter(topic__icontains=topic_query)
         rows = list(
             queryset
+            .prefetch_related("dialog_turns")
             .order_by("-created_at", "-id")[offset : offset + page_size + 1]
         )
         has_more = len(rows) > page_size
@@ -50,7 +58,7 @@ class ContentDialogsView(APIView):
                 "context": dialog.context,
                 "audio_url": dialog.audio_url,
                 "created_at": dialog.created_at,
-                "turn_count": len(dialog.turns) if isinstance(dialog.turns, list) else 0,
+                "turn_count": _dialog_turn_count(dialog),
                 "turns": [],
             }
             for dialog in rows
@@ -85,7 +93,7 @@ class ContentDialogDetailView(APIView):
                 "context": dialog.context,
                 "audio_url": dialog.audio_url,
                 "created_at": dialog.created_at,
-                "turn_count": len(dialog.turns) if isinstance(dialog.turns, list) else 0,
+                "turn_count": _dialog_turn_count(dialog),
                 "turns": _dialog_turns_with_phrase_audio(dialog, user=user),
             }
         )

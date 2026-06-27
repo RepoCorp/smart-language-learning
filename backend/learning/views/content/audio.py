@@ -14,6 +14,8 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
+from ...languages import language_display_name
+
 logger = logging.getLogger(__name__)
 
 OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE = {
@@ -23,14 +25,6 @@ OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE = {
     "french": "shimmer",
     "italian": "echo",
     "portuguese": "fable",
-}
-OPENAI_TTS_LANGUAGE_LABEL_BY_STUDY_LANGUAGE = {
-    "spanish": "Spanish",
-    "english": "English",
-    "german": "German",
-    "french": "French",
-    "italian": "Italian",
-    "portuguese": "Portuguese",
 }
 TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE = {
     "spanish": "es",
@@ -45,7 +39,7 @@ OPENAI_TTS_PHRASE_DEFAULT_SPEED = 1.25
 
 
 def _tts_language_instruction(target_language: str) -> str:
-    language_label = OPENAI_TTS_LANGUAGE_LABEL_BY_STUDY_LANGUAGE.get(target_language, target_language.capitalize())
+    language_label = language_display_name(target_language)
     return (
         f"Speak only in {language_label}. "
         f"Every word, syllable, abbreviation, article, and phrase must be pronounced with {language_label} phonetics and accent. "

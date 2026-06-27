@@ -286,6 +286,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
   const [phraseBuilderComplete, setPhraseBuilderComplete] = useState<boolean>(false);
   const [phraseBuilderSpeechPrimed, setPhraseBuilderSpeechPrimed] = useState<boolean>(false);
   const [phraseBuilderSpeechPriming, setPhraseBuilderSpeechPriming] = useState<boolean>(false);
+  const [phraseBuilderSpeechPrimeAvailable, setPhraseBuilderSpeechPrimeAvailable] = useState<boolean>(false);
   const draggingPhraseTokenIdRef = useRef<string>("");
   const phraseSlotsRef = useRef<HTMLDivElement | null>(null);
   const placedPhraseTokenCountRef = useRef<number>(0);
@@ -318,7 +319,7 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const useRepeatPlaceholder = Boolean(item.repeatedAfterFailure);
   const usePhraseBuilder = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_builder" || (!item.repeatPracticeStep && isSpanishToGerman));
-  const shouldOfferPhraseBuilderSpeechPrime = usePhraseBuilder && isLikelyIOSDevice() && speechSynthesisAvailable() && !phraseBuilderSpeechPrimed;
+  const shouldOfferPhraseBuilderSpeechPrime = usePhraseBuilder && phraseBuilderSpeechPrimeAvailable && !phraseBuilderSpeechPrimed;
   const shouldSuppressPromptAudio = false;
 
   const logSpeechDebug: SpeechDebugLog = (event, details = {}) => {
@@ -763,10 +764,39 @@ export default function PhraseReview({ item, onAnswered, onOpenItem }: PhraseRev
 
   useEffect(() => {
     if (!usePhraseBuilder) {
+      setPhraseBuilderSpeechPrimeAvailable(false);
       return;
     }
+    let cancelled = false;
+    const timeoutIds: number[] = [];
+    const refreshPrimeAvailability = (reason: string): void => {
+      if (cancelled) {
+        return;
+      }
+      const available = isLikelyIOSDevice() && speechSynthesisAvailable();
+      setPhraseBuilderSpeechPrimeAvailable(available);
+      logSpeechDebug("prime_control.availability", { reason, available, ...speechSynthesisSnapshot() });
+    };
+
     setPhraseBuilderSpeechPrimed(false);
     setPhraseBuilderSpeechPriming(false);
+    refreshPrimeAvailability("phrase_builder_start");
+    [0, 250, 1000].forEach((delayMs) => {
+      timeoutIds.push(window.setTimeout(() => refreshPrimeAvailability(`delay_${delayMs}`), delayMs));
+    });
+    if (!speechSynthesisAvailable()) {
+      return () => {
+        cancelled = true;
+        timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      };
+    }
+    const handleVoicesChanged = (): void => refreshPrimeAvailability("voiceschanged");
+    window.speechSynthesis.addEventListener("voiceschanged", handleVoicesChanged);
+    return () => {
+      cancelled = true;
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      window.speechSynthesis.removeEventListener("voiceschanged", handleVoicesChanged);
+    };
   }, [usePhraseBuilder, item.id, item.direction, expectedAnswer]);
 
   useEffect(() => {

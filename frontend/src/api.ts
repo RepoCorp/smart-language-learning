@@ -16,7 +16,6 @@ import type {
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
-  SessionType,
   StudyLanguageCode,
 } from "./types";
 
@@ -199,13 +198,11 @@ export async function fetchSession(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   durationMinutes?: number,
-  sessionType: SessionType = "standard",
 ): Promise<SessionResponse> {
   const params = new URLSearchParams({
     size: String(size),
     source_language: sourceLanguage,
     target_language: targetLanguage,
-    session_type: sessionType,
   });
   if (durationMinutes !== undefined) {
     params.set("duration_minutes", String(durationMinutes));

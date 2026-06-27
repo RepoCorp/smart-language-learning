@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 
+from ...languages import language_display_name
 from ...prompts import (
     PHRASE_KEYWORDS_PROMPT,
     WORD_EXERCISES_ADJECTIVE_PROMPT,
@@ -15,14 +16,6 @@ from ...prompts import (
 )
 
 logger = logging.getLogger(__name__)
-STUDY_LANGUAGE_LABELS = {
-    "spanish": "Spanish",
-    "english": "English",
-    "german": "German",
-    "french": "French",
-    "italian": "Italian",
-    "portuguese": "Portuguese",
-}
 MAX_EXERCISE_WORDS_PER_PHRASE = 8
 MAX_EXERCISE_PHRASES = 30
 MAX_TARGET_CONTEXTS = 1
@@ -85,7 +78,7 @@ FUNNY_IMAGE_INSTRUCTIONS_BY_WORD_TYPE = {
 
 
 def _language_label(code: str) -> str:
-    return STUDY_LANGUAGE_LABELS.get(code, code.capitalize())
+    return language_display_name(code)
 
 
 def _word_count(value: str) -> int:

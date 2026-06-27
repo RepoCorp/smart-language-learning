@@ -5,7 +5,9 @@ import logging
 import re
 from uuid import uuid4
 
+from ...languages import language_display_name
 from ...prompts import CONVERSATION_GENERATION_PROMPT
+from ...text import normalize_text_for_matching
 
 logger = logging.getLogger(__name__)
 STYLE_SEEDS = ("casual", "polite", "urgent", "friendly", "problem-solving", "small-talk")
@@ -15,20 +17,6 @@ COMMON_WORDS = {
     "por", "que", "se", "si", "sie", "the", "to", "tu", "und", "una", "uno", "wir", "y", "yo",
 }
 GREETING_HINTS = {"greeting", "greetings", "saludo", "saludos", "hello", "hola", "reunion", "reunión"}
-STUDY_LANGUAGE_LABELS = {
-    "spanish": "Spanish",
-    "english": "English",
-    "german": "German",
-    "french": "French",
-    "italian": "Italian",
-    "portuguese": "Portuguese",
-}
-
-
-def _normalize_text(value: str) -> str:
-    lowered = value.lower()
-    cleaned = re.sub(r"[^\w\s]", " ", lowered, flags=re.UNICODE)
-    return " ".join(cleaned.split())
 
 
 def _normalize_speaker(value) -> str:
@@ -41,11 +29,11 @@ def _normalize_speaker(value) -> str:
 
 
 def _language_label(code: str) -> str:
-    return STUDY_LANGUAGE_LABELS.get(code, code.capitalize())
+    return language_display_name(code)
 
 
 def _extract_keywords(text: str) -> list[str]:
-    normalized = _normalize_text(text)
+    normalized = normalize_text_for_matching(text)
     if not normalized:
         return []
     words = [token for token in normalized.split() if len(token) > 2 and token not in COMMON_WORDS]
@@ -144,7 +132,7 @@ Rules:
 
 
 def _allows_greeting(topic: str, context: str) -> bool:
-    merged = _normalize_text(f"{topic} {context}")
+    merged = normalize_text_for_matching(f"{topic} {context}")
     words = set(merged.split())
     return bool(words.intersection(GREETING_HINTS))
 
@@ -164,7 +152,7 @@ def _is_monotonous(phrases: list[dict[str, str]]) -> bool:
         return False
     starters = []
     for phrase in phrases:
-        normalized = _normalize_text(phrase["spanish_text"])
+        normalized = normalize_text_for_matching(phrase["spanish_text"])
         starters.append(" ".join(normalized.split()[:2]))
     repeated = len(starters) - len(set(starters))
     return repeated >= len(phrases) // 2
@@ -177,7 +165,7 @@ def _validate_conversation(
 ) -> tuple[bool, str]:
     if not phrases:
         return False, "empty"
-    first_line = _normalize_text(phrases[0]["spanish_text"]) if phrases else ""
+    first_line = normalize_text_for_matching(phrases[0]["spanish_text"]) if phrases else ""
     if first_line.startswith("hola como estas") and not _allows_greeting(topic, context):
         return False, "overused_greeting_start"
     if _has_consecutive_lexical_repetition(phrases):
@@ -288,7 +276,7 @@ Rules:
         scenario = str(value or "").strip()
         if not scenario:
             continue
-        normalized = _normalize_text(scenario)
+        normalized = normalize_text_for_matching(scenario)
         if not normalized or normalized in seen:
             continue
         seen.add(normalized)

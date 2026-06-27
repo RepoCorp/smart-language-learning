@@ -15,8 +15,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ...auth import apply_user_scope, get_request_user
-from ...models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
+from ...languages import language_display_name
+from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog, SavedTopic
 from ...serializers import ContentTopicSerializer
+from ...text import normalize_text_for_matching
 from .core import (
     ContentCandidate,
     call_openai_json,
@@ -1368,14 +1370,17 @@ General rules:
     if word_type == "helper":
         if len(normalized_target.split()) != 1:
             raise RuntimeError("Word metadata generation returned invalid helper data")
-        if source_language != target_language and _normalize_text(normalized_source) == _normalize_text(normalized_target):
+        if (
+            source_language != target_language
+            and normalize_text_for_matching(normalized_source) == normalize_text_for_matching(normalized_target)
+        ):
             raise RuntimeError("Word metadata generation returned invalid helper translation")
     return normalized_source[:255], normalized_target[:255], word_type
 
 
 def _is_over_reduced_adjective(normalized_target: str, original_target: str) -> bool:
-    normalized = _normalize_text(normalized_target)
-    original = _normalize_text(original_target)
+    normalized = normalize_text_for_matching(normalized_target)
+    original = normalize_text_for_matching(original_target)
     if not normalized or not original or normalized == original:
         return False
     if " " in normalized or " " in original:
@@ -1513,202 +1518,8 @@ def _normalize_dialog_speaker(value, index: int) -> str:
     return "a" if index % 2 == 0 else "b"
 
 
-def _language_display_name(language_code: str) -> str:
-    names = {
-        "spanish": "Spanish",
-        "english": "English",
-        "german": "German",
-        "french": "French",
-        "italian": "Italian",
-        "portuguese": "Portuguese",
-    }
-    return names.get(language_code, language_code.capitalize())
+_language_display_name = language_display_name
 
-
-def _normalize_text(value: str) -> str:
-    lowered = value.lower()
-    return " ".join("".join(ch if ch.isalnum() or ch.isspace() else " " for ch in lowered).split())
-
-
-def _looks_clearly_unrelated(normalized_question: str) -> bool:
-    unrelated_terms = {
-        "world cup",
-        "president",
-        "election",
-        "stock",
-        "bitcoin",
-        "crypto",
-        "weather",
-        "recipe",
-        "movie",
-        "netflix",
-        "politics",
-        "programming",
-        "python code",
-        "bug fix",
-    }
-    for term in unrelated_terms:
-        if term in normalized_question:
-            return True
-    return False
-
-
-def _model_answer_or_reject_item_question(
-    *,
-    item: Item,
-    question_text: str,
-    source_language: str,
-    target_language: str,
-    conversation_history: list[dict] | None = None,
-) -> dict:
-    normalized_question = _normalize_text(question_text)
-    if not normalized_question:
-        return {"related": False, "code": "EMPTY_QUESTION", "answer": ""}
-
-    # Single model request: decide relatedness and answer if related.
-    item_source_norm = _normalize_text(item.spanish_text)
-    item_target_norm = _normalize_text(item.german_text)
-    question_norm = _normalize_text(question_text)
-    direct_item_overlap = bool(item_source_norm and item_source_norm in question_norm) or bool(
-        item_target_norm and item_target_norm in question_norm
-    )
-
-    history_rows = list(item.question_exchanges.order_by("created_at", "id"))
-    merged_history: list[tuple[str, str]] = []
-    seen_pairs: set[tuple[str, str]] = set()
-    for row in history_rows:
-        question = str(row.question_text or "").strip()
-        answer = str(row.answer_text or "").strip()
-        if not question and not answer:
-            continue
-        pair = (question, answer)
-        if pair in seen_pairs:
-            continue
-        seen_pairs.add(pair)
-        merged_history.append(pair)
-    for entry in conversation_history or []:
-        if not isinstance(entry, dict):
-            continue
-        question = str(entry.get("question_text", "")).strip()
-        answer = str(entry.get("answer_text", "")).strip()
-        if not question and not answer:
-            continue
-        pair = (question, answer)
-        if pair in seen_pairs:
-            continue
-        seen_pairs.add(pair)
-        merged_history.append(pair)
-    history_lines: list[str] = []
-    for idx, (question, answer) in enumerate(merged_history, start=1):
-        history_lines.append(f"{idx}. Learner: {question}")
-        history_lines.append(f"{idx}. Tutor: {answer}")
-    history_text = "\n".join(history_lines) if history_lines else "(no previous conversation)"
-
-    question_model = _require_question_model()
-
-    source_name = _language_display_name(source_language)
-    target_name = _language_display_name(target_language)
-    parsed = _call_openai_json_logged(
-        label="model_answer_or_reject_item_question",
-        system_prompt=f"""
-Decide if a learner question is related to learning a specific item.
-If related, answer it. If not related, return a rejection code.
-
-Return strict JSON:
-{{
-  "related": true,
-  "result_code": "RELATED_OK",
-  "answer": "string",
-  "reason": "string"
-}}
-
-Rules:
-- If question is related to learning/using/understanding this item, set:
-  related=true, result_code="RELATED_OK", and provide concise answer (3 to 6 short lines, A1-A2), reason="".
-- If question is NOT related to this item, set:
-  related=false, result_code="UNRELATED_QUESTION", answer="", and provide a short reason.
-- Treat the question intent as about {target_name} by default.
-- Even when question text is in {source_name}, interpret it as a request about {target_name} usage.
-- Do not reinterpret the question as source-language learning content.
-- Be permissive with typos, misspellings, partial matches, and paraphrases.
-- If the question could reasonably be about this item, treat it as related.
-- Questions about words/phrases in either study language can still be related to this item
-  when asked in the communicative context of the item.
-- Do not assume language from spelling alone. A token may exist in both languages.
-- If the learner asks about a word "in {target_name}" or within the item context, treat it as related.
-- Only mark unrelated when it is clearly about a different domain/topic.
-- Do not answer unrelated questions.
-- Use full conversation history for context and continuity.
-- Keep all explanations/comments focused on {target_name} usage (meaning, grammar, form, pronunciation, and context).
-- If examples or forms are included, they should describe {target_name} usage.
-- Do not include source-language teaching/explanations as the main topic.
-- The answer text itself must be written in {source_name} (never in {target_name}).
-- Interpret every related question through {target_name} meaning/usage, even when the question text is in {source_name}.
-- Hard constraint: answer content topic must be {target_name}; answer language must be {source_name}.
-- If a draft answer drifts to source-language-focused teaching, rewrite it before returning.
-- Before returning, verify your answer satisfies the previous 5 rules exactly.
-- JSON only.
-""".strip(),
-        user_input=(
-            f"Question: {question_text}\n"
-            f"Study pair: source={source_name}, target={target_name}\n"
-            f"Item being asked about: {item.german_text} ({target_name})"
-            f" / {item.spanish_text} ({source_name})\n"
-            f"Item source text ({source_name}): {item.spanish_text}\n"
-            f"Item target text ({target_name}): {item.german_text}\n"
-            f"Item notes: {item.notes}\n"
-            f"Item example: {item.example_sentence}\n"
-            f"Conversation history (oldest to newest):\n{history_text}\n"
-        ),
-        timeout_seconds=8,
-        model=question_model,
-        temperature=0.0,
-        top_p=1.0,
-        presence_penalty=0.0,
-    )
-    logger.info(
-        "content.item_question.decision item_id=%s direct_overlap=%s model_payload=%r",
-        item.id,
-        direct_item_overlap,
-        parsed if isinstance(parsed, dict) else None,
-    )
-
-    if isinstance(parsed, dict):
-        related = bool(parsed.get("related"))
-        result_code = str(parsed.get("result_code", "")).strip()
-        answer = str(parsed.get("answer", "")).strip()
-        reason = str(parsed.get("reason", "")).strip()
-        if not result_code:
-            raise RuntimeError("Question model request failed")
-        if related:
-            if not answer:
-                raise RuntimeError("Question model request failed")
-            return {
-                "related": True,
-                "code": result_code,
-                "answer": answer[:3000],
-                "reason": reason,
-            }
-        return {"related": False, "code": result_code, "answer": "", "reason": reason}
-
-    raise RuntimeError("Question model request failed")
-
-
-def _serialize_question_exchange(exchange: ItemQuestionExchange) -> dict:
-    return {
-        "id": exchange.id,
-        "question_type": exchange.question_type,
-        "question_text": exchange.question_text,
-        "answer_text": exchange.answer_text,
-        "created_at": exchange.created_at.isoformat(),
-    }
-
-
-def _item_question_history(item: Item) -> list[dict]:
-    rows = list(
-        item.question_exchanges.order_by("-created_at", "-id")[:120]
-    )
-    return [_serialize_question_exchange(row) for row in rows]
 
 from .management_items import (
     ContentItemDetailView,

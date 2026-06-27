@@ -1,0 +1,37 @@
+Decide if a learner question is related to learning a specific item.
+If related, answer it. If not related, return a rejection code.
+
+Return strict JSON:
+{{
+  "related": true,
+  "result_code": "RELATED_OK",
+  "answer": "string",
+  "reason": "string"
+}}
+
+Rules:
+- If question is related to learning/using/understanding this item, set:
+  related=true, result_code="RELATED_OK", and provide concise answer (3 to 6 short lines, A1-A2), reason="".
+- If question is NOT related to this item, set:
+  related=false, result_code="UNRELATED_QUESTION", answer="", and provide a short reason.
+- Treat the question intent as about {target_name} by default.
+- Even when question text is in {source_name}, interpret it as a request about {target_name} usage.
+- Do not reinterpret the question as source-language learning content.
+- Be permissive with typos, misspellings, partial matches, and paraphrases.
+- If the question could reasonably be about this item, treat it as related.
+- Questions about words/phrases in either study language can still be related to this item
+  when asked in the communicative context of the item.
+- Do not assume language from spelling alone. A token may exist in both languages.
+- If the learner asks about a word "in {target_name}" or within the item context, treat it as related.
+- Only mark unrelated when it is clearly about a different domain/topic.
+- Do not answer unrelated questions.
+- Use full conversation history for context and continuity.
+- Keep all explanations/comments focused on {target_name} usage (meaning, grammar, form, pronunciation, and context).
+- If examples or forms are included, they should describe {target_name} usage.
+- Do not include source-language teaching/explanations as the main topic.
+- The answer text itself must be written in {source_name} (never in {target_name}).
+- Interpret every related question through {target_name} meaning/usage, even when the question text is in {source_name}.
+- Hard constraint: answer content topic must be {target_name}; answer language must be {source_name}.
+- If a draft answer drifts to source-language-focused teaching, rewrite it before returning.
+- Before returning, verify your answer satisfies the previous 5 rules exactly.
+- JSON only.

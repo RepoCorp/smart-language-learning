@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
-import { completeDifficultItem, fetchContentItemDetail, fetchOverviewStats, fetchSession, markSeen, setContentItemLearned, submitReview } from "../api";
+import { completeDifficultItem, fetchContentItemDetail, fetchSession, markSeen, setContentItemLearned, submitReview } from "../api";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
-import type { SessionItem, SessionType } from "../types";
+import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
@@ -11,8 +11,6 @@ import WordReview from "./WordReview";
 
 type StoredSessionState = {
   durationInput: string;
-  selectedSessionType: SessionType;
-  activeSessionType: SessionType | null;
   sessionDurationMinutes: number | null;
   sessionEndsAtMs: number | null;
   remainingSeconds: number;
@@ -46,8 +44,6 @@ export default function SessionPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [durationInput, setDurationInput] = useState<string>("10");
-  const [selectedSessionType, setSelectedSessionType] = useState<SessionType>("standard");
-  const [activeSessionType, setActiveSessionType] = useState<SessionType | null>(null);
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState<number | null>(null);
   const [sessionEndsAtMs, setSessionEndsAtMs] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
@@ -62,23 +58,13 @@ export default function SessionPage(): JSX.Element {
   const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
   const [openedItemError, setOpenedItemError] = useState<string>("");
   const [showNewWordsCelebration, setShowNewWordsCelebration] = useState<boolean>(false);
-  const [difficultItemCount, setDifficultItemCount] = useState<number>(0);
 
-  const refreshDifficultItemCount = useCallback(async (): Promise<void> => {
-    try {
-      const data = await fetchOverviewStats(sourceLanguage, targetLanguage);
-      setDifficultItemCount(data.difficult_items || 0);
-    } catch {
-      setDifficultItemCount(0);
-    }
-  }, [sourceLanguage, targetLanguage]);
-
-  const loadSession = useCallback(async (durationMinutes: number, sessionType: SessionType): Promise<void> => {
+  const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
     setLoading(true);
     setError("");
     setShowIncorrectReviewItem(false);
     try {
-      const data = await fetchSession(5, sourceLanguage, targetLanguage, durationMinutes, sessionType);
+      const data = await fetchSession(5, sourceLanguage, targetLanguage, durationMinutes);
       const loadedItems = data.items || [];
       setItems(loadedItems);
       setIndex(0);
@@ -88,10 +74,6 @@ export default function SessionPage(): JSX.Element {
       setLoading(false);
     }
   }, [t, sourceLanguage, targetLanguage]);
-
-  useEffect(() => {
-    void refreshDifficultItemCount();
-  }, [refreshDifficultItemCount]);
 
   useEffect(() => {
     setHasHydratedState(false);
@@ -104,8 +86,6 @@ export default function SessionPage(): JSX.Element {
     try {
       const parsed = JSON.parse(raw) as Partial<StoredSessionState>;
       setDurationInput(typeof parsed.durationInput === "string" ? parsed.durationInput : "10");
-      setSelectedSessionType(parsed.selectedSessionType === "difficult" ? "difficult" : "standard");
-      setActiveSessionType(parsed.activeSessionType === "difficult" || parsed.activeSessionType === "standard" ? parsed.activeSessionType : null);
       setSessionDurationMinutes(typeof parsed.sessionDurationMinutes === "number" ? parsed.sessionDurationMinutes : null);
       setSessionEndsAtMs(typeof parsed.sessionEndsAtMs === "number" ? parsed.sessionEndsAtMs : null);
       setRemainingSeconds(typeof parsed.remainingSeconds === "number" ? parsed.remainingSeconds : 0);
@@ -127,14 +107,12 @@ export default function SessionPage(): JSX.Element {
     if (!hasHydratedState) {
       return;
     }
-    if (sessionDurationMinutes === null || activeSessionType === null) {
+    if (sessionDurationMinutes === null) {
       window.sessionStorage.removeItem(sessionStorageKey);
       return;
     }
     const snapshot: StoredSessionState = {
       durationInput,
-      selectedSessionType,
-      activeSessionType,
       sessionDurationMinutes,
       sessionEndsAtMs,
       remainingSeconds,
@@ -149,8 +127,6 @@ export default function SessionPage(): JSX.Element {
     hasHydratedState,
     sessionStorageKey,
     durationInput,
-    selectedSessionType,
-    activeSessionType,
     sessionDurationMinutes,
     sessionEndsAtMs,
     remainingSeconds,
@@ -162,7 +138,7 @@ export default function SessionPage(): JSX.Element {
   ]);
 
   useEffect(() => {
-    if (!hasHydratedState || sessionDurationMinutes === null || activeSessionType === null) {
+    if (!hasHydratedState || sessionDurationMinutes === null) {
       return;
     }
     if (restoredSnapshotHasItems) {
@@ -171,8 +147,8 @@ export default function SessionPage(): JSX.Element {
     if (items.length > 0) {
       return;
     }
-    void loadSession(sessionDurationMinutes, activeSessionType);
-  }, [hasHydratedState, restoredSnapshotHasItems, loadSession, sessionDurationMinutes, activeSessionType, items.length]);
+    void loadSession(sessionDurationMinutes);
+  }, [hasHydratedState, restoredSnapshotHasItems, loadSession, sessionDurationMinutes, items.length]);
 
   useEffect(() => {
     if (sessionEndsAtMs === null || sessionOutcome !== null || showExtendPrompt) {
@@ -206,7 +182,6 @@ export default function SessionPage(): JSX.Element {
   }, [hasHydratedState, index, items.length]);
 
   const current = items[index];
-  const isDifficultSession = activeSessionType === "difficult";
 
   const advance = (): void => {
     setWaitingNext(true);
@@ -252,27 +227,18 @@ export default function SessionPage(): JSX.Element {
   };
 
   const completeCurrentDifficultItemIfFinished = useCallback(async (itemId: number): Promise<void> => {
-    if (!isDifficultSession) {
-      return;
-    }
-    const hasLaterStep = items.slice(index + 1).some((entry) => entry.id === itemId);
+    const hasLaterStep = items.slice(index + 1).some((entry) => entry.id === itemId && entry.repeatedAfterFailure);
     if (!hasLaterStep) {
       await completeDifficultItem(itemId);
-      await refreshDifficultItemCount();
     }
-  }, [index, isDifficultSession, items, refreshDifficultItemCount]);
+  }, [index, items]);
 
   const register = async (correct: boolean): Promise<void> => {
     if (!current || sessionOutcome !== null || showExtendPrompt) {
       return;
     }
     const reviewedItem = current;
-    if (reviewedItem.repeatPracticeStep === "word_intro" || reviewedItem.repeatPracticeStep === "phrase_builder") {
-      await completeCurrentDifficultItemIfFinished(reviewedItem.id);
-      advance();
-      return;
-    }
-    if (isDifficultSession) {
+    if (reviewedItem.repeatedAfterFailure) {
       await completeCurrentDifficultItemIfFinished(reviewedItem.id);
       advance();
       return;
@@ -290,7 +256,6 @@ export default function SessionPage(): JSX.Element {
       advance();
       return;
     }
-    void refreshDifficultItemCount();
     advance();
   };
 
@@ -298,16 +263,14 @@ export default function SessionPage(): JSX.Element {
     if (!current || sessionOutcome !== null || showExtendPrompt) {
       return;
     }
-    if (!isDifficultSession) {
-      try {
-        await markSeen(current.id);
-      } catch (error) {
-        if (isMissingItemError(error)) {
-          handleMissingCurrentItem();
-          return;
-        }
-        throw error;
+    try {
+      await markSeen(current.id);
+    } catch (error) {
+      if (isMissingItemError(error)) {
+        handleMissingCurrentItem();
+        return;
       }
+      throw error;
     }
     if (current.mode === "new") {
       const today = todayKey();
@@ -421,11 +384,9 @@ export default function SessionPage(): JSX.Element {
     setRemainingSeconds(parsed * 60);
     setSessionEndsAtMs(Date.now() + parsed * 60 * 1000);
     setSessionDurationMinutes(parsed);
-    setActiveSessionType(selectedSessionType);
   };
 
   const resetToSessionStart = (): void => {
-    setActiveSessionType(null);
     setSessionDurationMinutes(null);
     setSessionEndsAtMs(null);
     setSessionOutcome(null);
@@ -511,7 +472,7 @@ export default function SessionPage(): JSX.Element {
     </div>
   ) : null;
 
-  if (sessionDurationMinutes === null || activeSessionType === null) {
+  if (sessionDurationMinutes === null) {
     return (
       <main className="container session-start-page" data-testid="session-start-form">
         <section className="card session-start-card">
@@ -520,44 +481,6 @@ export default function SessionPage(): JSX.Element {
             <h1>{t("session.durationPrompt")}</h1>
           </div>
           <form className="session-start-form" onSubmit={startSession}>
-            <fieldset className="session-type-fieldset">
-              <legend>{t("session.typeLabel")}</legend>
-              <div className="session-type-grid">
-                <label className={`session-type-option${selectedSessionType === "standard" ? " session-type-option-selected" : ""}`}>
-                  <input
-                    type="radio"
-                    name="session-type"
-                    value="standard"
-                    checked={selectedSessionType === "standard"}
-                    onChange={() => setSelectedSessionType("standard")}
-                  />
-                  <span className="session-type-option-header">
-                    <span className="session-type-option-title">{t("session.typeStandard")}</span>
-                    <span className="session-type-option-badge">{t("session.typeStandardBadge")}</span>
-                  </span>
-                  <span className="session-type-option-copy">
-                    {t("session.typeStandardDescription")}
-                  </span>
-                </label>
-                <label className={`session-type-option${selectedSessionType === "difficult" ? " session-type-option-selected" : ""}${difficultItemCount === 0 ? " session-type-option-disabled" : ""}`}>
-                  <input
-                    type="radio"
-                    name="session-type"
-                    value="difficult"
-                    checked={selectedSessionType === "difficult"}
-                    onChange={() => setSelectedSessionType("difficult")}
-                  />
-                  <span className="session-type-option-header">
-                    <span className="session-type-option-title">{t("session.typeDifficult", { count: difficultItemCount })}</span>
-                    <span className="session-type-option-badge session-type-option-badge-warm">{difficultItemCount}</span>
-                  </span>
-                  <span className="session-type-option-copy">
-                    {t("session.typeDifficultDescription")}
-                  </span>
-                </label>
-              </div>
-            </fieldset>
-
             <div className="session-start-controls">
               <label className="session-duration-field" htmlFor="duration-minutes">
                 <span>{t("session.durationLabel")}</span>
@@ -575,9 +498,7 @@ export default function SessionPage(): JSX.Element {
 
             {error && <p className="error">{t("session.error", { message: error })}</p>}
             <div className="actions session-start-actions">
-              <button type="submit" disabled={selectedSessionType === "difficult" && difficultItemCount === 0}>
-                {selectedSessionType === "difficult" ? t("session.startDifficultButton") : t("session.startButton")}
-              </button>
+              <button type="submit">{t("session.startButton")}</button>
             </div>
           </form>
         </section>
@@ -664,7 +585,7 @@ export default function SessionPage(): JSX.Element {
     <>
       <main className="container" data-testid="session-page">
         <h1>{t("session.title")}</h1>
-        <p>{activeSessionType === "difficult" ? t("session.typeDifficultActive") : t("session.typeStandardActive")}</p>
+        <p>{t("session.typeStandardActive")}</p>
         <p>
           {t("session.itemProgress", { current: index + 1, total: items.length })}
         </p>

@@ -1,7 +1,6 @@
 # Todos
 
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
-For word retry test no haga lo mismo que en el primer test si no que deje un input libre, sin ninguna validacion, y va mostrando en otra parte la palabra inicialmente escondida con placeholders para cada letra y va revelando letras aleatoriamente pero no la primera
 Pareciera que no incluye el historial de las preguntas entonces no tiene contexto
 Ejercicio de escribir la palabra muchas veces, como lo de los treinta minutos. Pero algo que sea rapido: dibujandola sobre preescrita, con letras de teclado que se iluminan, con mover letras…?
 Back button para revisar palabra anterior en test, o de pronto incluso para cambiar el fallo/no fallo

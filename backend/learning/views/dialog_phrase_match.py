@@ -49,7 +49,31 @@ def _phrase_audio_by_pair(*, dialog, user, source_target_pairs: set[tuple[str, s
     }
 
 
-def build_dialog_phrase_match_payload(item: Item, *, user) -> dict:
+def _neighboring_source_answer(item: Item, *, user) -> str:
+    occurrence = (
+        apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
+        .filter(item=item)
+        .select_related("dialog")
+        .order_by("dialog_id", "turn_index", "id")
+        .first()
+    )
+    if not occurrence:
+        return item.spanish_text
+    raw_turns = occurrence.dialog.turns if isinstance(occurrence.dialog.turns, list) else []
+    neighbor_indexes = (occurrence.turn_index + 1, occurrence.turn_index - 1)
+    for neighbor_index in neighbor_indexes:
+        if neighbor_index < 0 or neighbor_index >= len(raw_turns):
+            continue
+        raw_turn = raw_turns[neighbor_index]
+        if not isinstance(raw_turn, dict):
+            continue
+        source_text = str(raw_turn.get("source_text", "")).strip()
+        if source_text:
+            return source_text
+    return item.spanish_text
+
+
+def build_dialog_phrase_match_payload(item: Item, *, user, direction: str | None = None) -> dict:
     empty_payload = {
         "answer": "",
         "scene": "",
@@ -60,6 +84,11 @@ def build_dialog_phrase_match_payload(item: Item, *, user) -> dict:
     }
     if item.item_type != Item.ItemType.PHRASE:
         return empty_payload
+    replacement_text = (
+        _neighboring_source_answer(item, user=user)
+        if direction == Item.ReviewDirection.GERMAN_TO_SPANISH
+        else item.german_text
+    )
 
     origin_dialog_ids = set(
         apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
@@ -133,7 +162,7 @@ def build_dialog_phrase_match_payload(item: Item, *, user) -> dict:
     for index, turn in enumerate(selected_window["turns"]):
         displayed_turn = {
             "source_text": turn["source_text"],
-            "target_text": item.german_text if index == odd_index else turn["target_text"],
+            "target_text": replacement_text if index == odd_index else turn["target_text"],
             "speaker": turn["speaker"],
             "phrase_audio_url": str(item.audio_url or "").strip() if index == odd_index else turn["phrase_audio_url"],
         }
@@ -143,7 +172,7 @@ def build_dialog_phrase_match_payload(item: Item, *, user) -> dict:
             scene_audio_urls.append(displayed_turn["phrase_audio_url"])
 
     return {
-        "answer": item.german_text,
+        "answer": replacement_text,
         "scene": "\n".join(turn["target_text"] for turn in displayed_turns),
         "scene_audio_urls": scene_audio_urls,
         "options": option_lines,

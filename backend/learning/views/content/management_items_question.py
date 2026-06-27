@@ -3,17 +3,19 @@ from __future__ import annotations
 from .management import (
     APIView,
     Item,
-    ItemQuestionExchange,
     Request,
     Response,
-    _item_question_history,
-    _model_answer_or_reject_item_question,
     _normalized_pair,
-    _serialize_question_exchange,
     apply_user_scope,
     get_request_user,
     logger,
     status,
+)
+from ...models import ItemQuestionExchange
+from .item_questions import (
+    item_question_history,
+    model_answer_or_reject_item_question,
+    serialize_question_exchange,
 )
 
 
@@ -45,7 +47,7 @@ class ContentItemQuestionView(APIView):
             return Response({"detail": "question_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            decision = _model_answer_or_reject_item_question(
+            decision = model_answer_or_reject_item_question(
                 item=item,
                 question_text=question_text,
                 source_language=source_language,
@@ -86,10 +88,10 @@ class ContentItemQuestionView(APIView):
             question_text=question_text,
             answer_text=answer_text,
         )
-        conversation = _item_question_history(item)
+        conversation = item_question_history(item)
         return Response(
             {
-                "exchange": _serialize_question_exchange(exchange),
+                "exchange": serialize_question_exchange(exchange),
                 "conversation": conversation,
             },
             status=status.HTTP_201_CREATED,

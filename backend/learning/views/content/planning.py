@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-import re
 
+from ...text import normalize_text_for_matching
 from ...models import Item
 from .generation import (
     generate_content_with_chatgpt,
@@ -58,9 +58,7 @@ def _generate_content(
 
 
 def _normalize_for_phrase_match(value: str) -> str:
-    lowered = value.lower()
-    cleaned = re.sub(r"[^\w\s]", " ", lowered, flags=re.UNICODE)
-    return " ".join(cleaned.split())
+    return normalize_text_for_matching(value)
 
 
 def _strip_german_article(german_keyword: str) -> str:

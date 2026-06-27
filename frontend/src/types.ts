@@ -1,6 +1,5 @@
 export type ItemType = "word" | "phrase";
 export type SessionMode = "new" | "review";
-export type SessionType = "standard" | "difficult";
 export type ReviewDirection = "es_to_de" | "de_to_es";
 export type StudyLanguageCode = "spanish" | "english" | "german" | "french" | "italian" | "portuguese";
 
