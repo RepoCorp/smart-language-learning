@@ -161,6 +161,8 @@ export interface ContentDialogsResponse {
   page_size?: number;
   has_more?: boolean;
   next_page?: number | null;
+  topic?: string;
+  context?: string;
 }
 
 export interface ContentItemRecord {

@@ -419,6 +419,7 @@ export async function fetchContentDialogs(
   page = 1,
   pageSize = 20,
   topic = "",
+  context = "",
 ): Promise<ContentDialogsResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
@@ -428,6 +429,9 @@ export async function fetchContentDialogs(
   });
   if (topic.trim()) {
     params.set("topic", topic.trim());
+  }
+  if (context.trim()) {
+    params.set("context", context.trim());
   }
   const response = await apiFetch(`${API_BASE}/content/dialogs?${params.toString()}`);
   if (!response.ok) {

@@ -86,11 +86,10 @@ def test_elevenlabs_dialog_speaker_voices_use_configured_voice_ids(monkeypatch, 
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
     settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = "voice-a, voice-b"
 
-    monkeypatch.setattr(content_audio, "sample", lambda values, count: list(values)[:count])
-
     voice_ids = content_audio.select_dialog_speaker_voice_ids("german")
 
-    assert voice_ids == ("voice-a", "voice-b")
+    assert voice_ids is not None
+    assert set(voice_ids) == {"voice-a", "voice-b"}
 
 
 def test_elevenlabs_dialog_speaker_voices_can_use_general_voice_pool(monkeypatch, settings):
@@ -101,11 +100,67 @@ def test_elevenlabs_dialog_speaker_voices_can_use_general_voice_pool(monkeypatch
     settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = ""
     settings.ELEVENLABS_GERMAN_VOICE_IDS = "voice-a, voice-b, voice-c"
 
-    monkeypatch.setattr(content_audio, "sample", lambda values, count: list(values)[:count])
-
     voice_ids = content_audio.select_dialog_speaker_voice_ids("german")
 
-    assert voice_ids == ("voice-a", "voice-b")
+    assert voice_ids is not None
+    assert len(set(voice_ids)) == 2
+    assert set(voice_ids).issubset({"voice-a", "voice-b", "voice-c"})
+
+
+def test_dialog_speaker_voice_ids_are_stable_for_seed(settings):
+    from learning.views.content import audio as content_audio
+
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    settings.ELEVENLABS_GERMAN_DIALOG_VOICE_IDS = "voice-a,voice-b,voice-c"
+
+    first = content_audio.select_dialog_speaker_voice_ids("german", seed="dialog:42")
+    second = content_audio.select_dialog_speaker_voice_ids("german", seed="dialog:42")
+    third = content_audio.select_dialog_speaker_voice_ids("german", seed="dialog:99")
+
+    assert first == second
+    assert first is not None
+    assert len(set(first)) == 2
+    assert third is not None
+
+
+@pytest.mark.django_db
+def test_ensure_dialog_turn_audio_reuses_stable_dialog_speaker_voice(monkeypatch, settings):
+    from learning.views.content import dialog_item_context
+
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    dialog = SavedDialog.objects.create(
+        topic="greetings",
+        context="",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {"source_text": "Hola.", "target_text": "Hallo.", "speaker": "a"},
+            {"source_text": "Bien.", "target_text": "Gut.", "speaker": "b"},
+        ],
+    )
+    first_turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Hola.",
+        target_text="Hallo.",
+        audio_url="",
+    )
+
+    monkeypatch.setattr(dialog_item_context, "select_dialog_speaker_voice_ids", lambda target_language, seed="": ("voice-a", "voice-b"))
+    captured_calls = []
+
+    def fake_create_audio_file(text, prefix, target_language="german", voice_id=""):
+        captured_calls.append((text, prefix, target_language, voice_id))
+        return "audio://voice-a/hallo"
+
+    monkeypatch.setattr(dialog_item_context, "create_audio_file", fake_create_audio_file)
+
+    audio_url = dialog_item_context.ensure_audio_for_dialog_turn(user=None, dialog_id_raw=dialog.id, turn_index_raw=0)
+
+    assert audio_url == "audio://voice-a/hallo"
+    first_turn.refresh_from_db()
+    assert first_turn.audio_url == "audio://voice-a/hallo"
+    assert captured_calls == [("Hallo.", "phrase", "german", "voice-a")]
 
 
 @pytest.mark.django_db
@@ -1129,7 +1184,11 @@ def test_content_confirm_ignores_full_dialog_audio_and_reuses_speaker_voices(mon
         "create_audio_file",
         lambda text, prefix, **kwargs: captured_audio_calls.append((text, prefix, kwargs)) or f"http://localhost:8000/media/audio/{prefix}-mock.mp3",
     )
-    monkeypatch.setattr(content_api_views, "select_dialog_speaker_voice_ids", lambda target_language: ("voice-a", "voice-b"))
+    monkeypatch.setattr(
+        content_api_views,
+        "select_dialog_speaker_voice_ids",
+        lambda target_language, seed="": ("voice-a", "voice-b"),
+    )
 
     client = APIClient()
     response = client.post(
@@ -1816,7 +1875,7 @@ def test_quick_add_word_from_unselected_dialog_turn_creates_phrase_audio_context
         "_normalize_word_metadata",
         lambda **kwargs: ("la tienda", "der Laden", "noun"),
     )
-    def fake_audio(text, prefix, target_language="german"):
+    def fake_audio(text, prefix, target_language="german", voice_id=""):
         return f"http://localhost:8000/media/audio/{prefix}-{text[:6]}.mp3"
 
     monkeypatch.setattr(dialog_item_context, "create_audio_file", fake_audio)

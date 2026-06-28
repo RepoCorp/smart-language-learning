@@ -121,7 +121,6 @@ class ContentConfirmView(APIView):
             len(dialog_turns),
             len(selected_turns),
         )
-        dialog_speaker_voice_ids = select_dialog_speaker_voice_ids(target_language)
         saved_dialog = save_dialog(
             user=user,
             topic=topic,
@@ -131,6 +130,7 @@ class ContentConfirmView(APIView):
             turns=dialog_turns,
             audio_url="",
         )
+        dialog_speaker_voice_ids = select_dialog_speaker_voice_ids(target_language, seed=f"dialog:{saved_dialog.id}")
         created_turns = save_dialog_turns(saved_dialog, dialog_turns, speaker_voice_ids=dialog_speaker_voice_ids)
         created_sentence_count = 0
         existing_sentence_count = 0

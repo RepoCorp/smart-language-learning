@@ -40,12 +40,15 @@ class ContentDialogsView(APIView):
         page_size = min(MAX_DIALOGS_PAGE_SIZE, max(1, page_size))
         offset = (page - 1) * page_size
         topic_query = (request.query_params.get("topic", "") or "").strip()
+        context_query = (request.query_params.get("context", "") or "").strip()
         queryset = apply_user_scope(SavedDialog.objects, user).filter(
             source_language=source_language,
             target_language=target_language,
         )
         if topic_query:
             queryset = queryset.filter(topic__icontains=topic_query)
+        if context_query:
+            queryset = queryset.filter(context__icontains=context_query)
         rows = list(
             queryset
             .prefetch_related("dialog_turns")
@@ -72,6 +75,8 @@ class ContentDialogsView(APIView):
                 "page_size": page_size,
                 "has_more": has_more,
                 "next_page": page + 1 if has_more else None,
+                "topic": topic_query,
+                "context": context_query,
             }
         )
 

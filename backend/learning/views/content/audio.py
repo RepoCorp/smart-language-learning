@@ -6,7 +6,6 @@ import logging
 import os
 import re
 from pathlib import Path
-from random import sample
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -109,7 +108,7 @@ def _elevenlabs_dialog_voice_ids(target_language: str) -> list[str]:
     return _elevenlabs_voice_ids(target_language=target_language)
 
 
-def select_dialog_speaker_voice_ids(target_language: str) -> tuple[str, str] | None:
+def select_dialog_speaker_voice_ids(target_language: str, seed: str = "") -> tuple[str, str] | None:
     if _configured_tts_provider() != "elevenlabs":
         return None
     dialog_voices = _elevenlabs_dialog_voice_ids(target_language)
@@ -122,7 +121,12 @@ def select_dialog_speaker_voice_ids(target_language: str) -> tuple[str, str] | N
     if len(dialog_voices) < 2:
         logger.warning("content.audio.dialog_voices.elevenlabs_missing_voices target_language=%s", target_language)
         return None
-    voice_a, voice_b = sample(dialog_voices, 2)
+    effective_seed = seed or f"{target_language}:dialog"
+    first_index = _deterministic_index(f"{effective_seed}:a", len(dialog_voices))
+    second_index = _deterministic_index(f"{effective_seed}:b", len(dialog_voices) - 1)
+    remaining_voices = [voice for index, voice in enumerate(dialog_voices) if index != first_index]
+    voice_a = dialog_voices[first_index]
+    voice_b = remaining_voices[second_index]
     return voice_a, voice_b
 
 

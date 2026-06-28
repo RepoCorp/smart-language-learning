@@ -4,6 +4,7 @@ from django.db.models import Q
 
 from ...auth import apply_user_scope
 from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
+from .audio import select_dialog_speaker_voice_ids
 from .core import create_audio_file
 
 
@@ -26,14 +27,16 @@ def ensure_audio_for_dialog_turn(*, user, dialog_id_raw, turn_index_raw) -> str:
     resolved = _resolve_dialog_turn(user=user, dialog_id_raw=dialog_id_raw, turn_index_raw=turn_index_raw)
     if not resolved:
         return ""
-    dialog, turn, _turn_index = resolved
+    dialog, turn, turn_index = resolved
     target_text = str(turn.target_text or "").strip()
     if not target_text:
         return ""
     if turn.audio_url:
         return turn.audio_url
 
-    audio_url = create_audio_file(target_text, "phrase", target_language=dialog.target_language)
+    speaker_voice_ids = select_dialog_speaker_voice_ids(dialog.target_language, seed=f"dialog:{dialog.id}")
+    voice_id = speaker_voice_ids[turn_index % 2] if speaker_voice_ids else ""
+    audio_url = create_audio_file(target_text, "phrase", target_language=dialog.target_language, voice_id=voice_id)
     if not audio_url:
         return ""
     turn.audio_url = audio_url

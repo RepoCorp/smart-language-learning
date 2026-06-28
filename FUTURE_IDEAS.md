@@ -1,14 +1,9 @@
 # Todos
 
-No todos los items estan en manage content
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
-Pareciera que no incluye el historial de las preguntas entonces no tiene contexto
 Ejercicio de escribir la palabra muchas veces, como lo de los treinta minutos. Pero algo que sea rapido: dibujandola sobre preescrita, con letras de teclado que se iluminan, con mover letras…?
-Back button para revisar palabra anterior en test, o de pronto incluso para cambiar el fallo/no fallo
-No hay boton para reproducir dialogo en el modal que se abre desde el item view ni de la pagina de dialogos
 Ponga pa practicar cuando se equivoca en el articulo
 Añadir mucha más Metadata a las palabras (desde la gramática) y usarla en ejercicios
-Que autoprograme las difíciles para el siguiente dia
 
 
 

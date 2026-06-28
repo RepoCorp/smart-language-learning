@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 
-import { fetchContentDialogDetail, fetchContentDialogs, fetchContentItemDetail, generateContentDialogTurnAudio, quickAddWordFromDialog } from "../api";
+import {
+  fetchContentDialogDetail,
+  fetchContentDialogs,
+  fetchContentItemDetail,
+  fetchContentTopicContexts,
+  fetchContentTopics,
+  generateContentDialogTurnAudio,
+  quickAddWordFromDialog,
+} from "../api";
 import { useI18n } from "../i18n";
+import { usePromptPreferences } from "../promptPreferences";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentDialogRecord, SessionItem } from "../types";
 import DialogTurnText from "./DialogTurnText";
@@ -27,16 +36,23 @@ type PlayingTurn = {
 };
 
 const DIALOGS_PAGE_SIZE = 20;
+const ALL_TOPICS_OPTION = "";
+const ALL_CONTEXTS_OPTION = "";
 
 export default function DialogsPage(): JSX.Element {
   const { t } = useI18n();
+  const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const [dialogs, setDialogs] = useState<ContentDialogRecord[]>([]);
+  const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+  const [availableContexts, setAvailableContexts] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadingMore, setLoadingMore] = useState<boolean>(false);
-  const [nextPage, setNextPage] = useState<number | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [topicFilter, setTopicFilter] = useState<string>("");
+  const [contextFilter, setContextFilter] = useState<string>("");
+  const [showDialogText, setShowDialogText] = useState<boolean>(targetPromptMode === "text");
   const [playingAll, setPlayingAll] = useState<boolean>(false);
   const [playingDialogId, setPlayingDialogId] = useState<number | null>(null);
   const [playingTurn, setPlayingTurn] = useState<PlayingTurn | null>(null);
@@ -55,6 +71,103 @@ export default function DialogsPage(): JSX.Element {
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
   const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
     speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
+  const hideDialogText = targetPromptMode === "audio" && !showDialogText;
+
+  useEffect(() => {
+    setShowDialogText(targetPromptMode === "text");
+  }, [targetPromptMode]);
+
+  useEffect(() => {
+    let active = true;
+    const loadTopics = async (): Promise<void> => {
+      try {
+        const payload = await fetchContentTopics(sourceLanguage, targetLanguage);
+        if (!active) {
+          return;
+        }
+        setAvailableTopics(payload.topics || []);
+      } catch {
+        if (!active) {
+          return;
+        }
+        setAvailableTopics([]);
+      }
+    };
+    void loadTopics();
+    return () => {
+      active = false;
+    };
+  }, [sourceLanguage, targetLanguage]);
+
+  useEffect(() => {
+    let active = true;
+    const loadContexts = async (): Promise<void> => {
+      if (!topicFilter) {
+        setAvailableContexts([]);
+        setContextFilter(ALL_CONTEXTS_OPTION);
+        return;
+      }
+      try {
+        const payload = await fetchContentTopicContexts(topicFilter, sourceLanguage, targetLanguage);
+        if (!active) {
+          return;
+        }
+        setAvailableContexts(payload.contexts || []);
+      } catch {
+        if (!active) {
+          return;
+        }
+        setAvailableContexts([]);
+      }
+    };
+    void loadContexts();
+    return () => {
+      active = false;
+    };
+  }, [topicFilter, sourceLanguage, targetLanguage]);
+
+  const fetchDialogsPage = async (pageNumber: number): Promise<void> => {
+    const payload = await fetchContentDialogs(
+      sourceLanguage,
+      targetLanguage,
+      pageNumber,
+      DIALOGS_PAGE_SIZE,
+      topicFilter,
+      contextFilter,
+    );
+    setDialogs(payload.dialogs || []);
+    setHasMore(Boolean(payload.has_more));
+  };
+
+  const fetchAllFilteredDialogs = async (): Promise<ContentDialogRecord[]> => {
+    const allDialogs: ContentDialogRecord[] = [];
+    let currentPage = 1;
+    let hasMorePages = true;
+    while (hasMorePages) {
+      const payload = await fetchContentDialogs(
+        sourceLanguage,
+        targetLanguage,
+        currentPage,
+        DIALOGS_PAGE_SIZE,
+        topicFilter,
+        contextFilter,
+      );
+      allDialogs.push(...(payload.dialogs || []));
+      hasMorePages = Boolean(payload.has_more);
+      currentPage = payload.next_page || (currentPage + 1);
+    }
+    return allDialogs;
+  };
+
+  const upsertVisibleDialog = (dialog: ContentDialogRecord): void => {
+    setDialogs((current) => {
+      const existingIndex = current.findIndex((entry) => entry.dialog_id === dialog.dialog_id);
+      if (existingIndex >= 0) {
+        return current.map((entry, index) => (index === existingIndex ? { ...entry, ...dialog } : entry));
+      }
+      return [dialog, ...current];
+    });
+  };
 
   const focusDialog = (dialogId: number): void => {
     window.setTimeout(() => {
@@ -87,7 +200,13 @@ export default function DialogsPage(): JSX.Element {
     }, 0);
   };
 
-  const ensureDialogDetail = async (dialogId: number): Promise<ContentDialogRecord | null> => {
+  const ensureDialogDetail = async (
+    dialogId: number,
+    initialDialog: ContentDialogRecord | null = null,
+  ): Promise<ContentDialogRecord | null> => {
+    if (initialDialog) {
+      upsertVisibleDialog(initialDialog);
+    }
     const existing = dialogs.find((dialog) => dialog.dialog_id === dialogId);
     if (existing?.turns?.length) {
       return existing;
@@ -95,7 +214,7 @@ export default function DialogsPage(): JSX.Element {
     setLoadingDialogId(dialogId);
     try {
       const detail = await fetchContentDialogDetail(dialogId, sourceLanguage, targetLanguage);
-      setDialogs((current) => current.map((dialog) => (dialog.dialog_id === dialogId ? { ...dialog, ...detail } : dialog)));
+      upsertVisibleDialog(detail);
       return detail;
     } catch {
       setError(t("dialogs.error.load"));
@@ -170,16 +289,14 @@ export default function DialogsPage(): JSX.Element {
       setPendingWordAdd(null);
       stopCurrentPlayback();
       try {
-        const payload = await fetchContentDialogs(sourceLanguage, targetLanguage, 1, DIALOGS_PAGE_SIZE, topicFilter);
+        await fetchDialogsPage(page);
         if (!active) {
           return;
         }
-        setDialogs(payload.dialogs || []);
-        setNextPage(payload.has_more ? payload.next_page || 2 : null);
       } catch {
         if (active) {
           setDialogs([]);
-          setNextPage(null);
+          setHasMore(false);
           setError(t("dialogs.error.load"));
         }
       } finally {
@@ -193,24 +310,7 @@ export default function DialogsPage(): JSX.Element {
       active = false;
       stopCurrentPlayback();
     };
-  }, [sourceLanguage, targetLanguage, topicFilter]);
-
-  const loadMoreDialogs = async (): Promise<void> => {
-    if (!nextPage || loadingMore) {
-      return;
-    }
-    setLoadingMore(true);
-    setError("");
-    try {
-      const payload = await fetchContentDialogs(sourceLanguage, targetLanguage, nextPage, DIALOGS_PAGE_SIZE, topicFilter);
-      setDialogs((current) => [...current, ...(payload.dialogs || [])]);
-      setNextPage(payload.has_more ? payload.next_page || nextPage + 1 : null);
-    } catch {
-      setError(t("dialogs.error.load"));
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  }, [sourceLanguage, targetLanguage, topicFilter, contextFilter, page]);
 
   const requestAddWordFromDialogToken = async (
     key: string,
@@ -386,7 +486,9 @@ export default function DialogsPage(): JSX.Element {
   const dialogIsPlayable = (dialog: ContentDialogRecord): boolean => dialogHasTurns(dialog);
 
   const playDialogWithFocusedTurns = async (dialog: ContentDialogRecord, runId: number): Promise<void> => {
-    const detailedDialog = await ensureDialogDetail(dialog.dialog_id);
+    upsertVisibleDialog(dialog);
+    focusDialog(dialog.dialog_id);
+    const detailedDialog = await ensureDialogDetail(dialog.dialog_id, dialog);
     if (!detailedDialog || runId !== playbackRunRef.current) {
       return;
     }
@@ -420,31 +522,38 @@ export default function DialogsPage(): JSX.Element {
   };
 
   const playAllDialogs = async (): Promise<void> => {
-    const playableDialogs = dialogs.filter(dialogIsPlayable);
-    if (!playableDialogs.length) {
-      return;
-    }
-    const shuffledDialogs = [...playableDialogs];
-    for (let index = shuffledDialogs.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(Math.random() * (index + 1));
-      [shuffledDialogs[index], shuffledDialogs[swapIndex]] = [shuffledDialogs[swapIndex], shuffledDialogs[index]];
-    }
     stopCurrentPlayback();
     playbackRunRef.current += 1;
     const runId = playbackRunRef.current;
     setPlayingAll(true);
+    setError("");
 
-    for (const dialog of shuffledDialogs) {
-      if (runId !== playbackRunRef.current) {
-        break;
+    try {
+      const allFilteredDialogs = await fetchAllFilteredDialogs();
+      const playableDialogs = allFilteredDialogs.filter(dialogIsPlayable);
+      if (!playableDialogs.length || runId !== playbackRunRef.current) {
+        return;
       }
-      await playDialogWithFocusedTurns(dialog, runId);
-    }
+      const shuffledDialogs = [...playableDialogs];
+      for (let index = shuffledDialogs.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [shuffledDialogs[index], shuffledDialogs[swapIndex]] = [shuffledDialogs[swapIndex], shuffledDialogs[index]];
+      }
 
-    if (runId === playbackRunRef.current) {
-      setPlayingAll(false);
-      setPlayingDialogId(null);
-      setPlayingTurn(null);
+      for (const dialog of shuffledDialogs) {
+        if (runId !== playbackRunRef.current) {
+          break;
+        }
+        await playDialogWithFocusedTurns(dialog, runId);
+      }
+    } catch {
+      setError(t("dialogs.error.load"));
+    } finally {
+      if (runId === playbackRunRef.current) {
+        setPlayingAll(false);
+        setPlayingDialogId(null);
+        setPlayingTurn(null);
+      }
     }
   };
 
@@ -457,15 +566,47 @@ export default function DialogsPage(): JSX.Element {
       <section className="card">
         <label className="form-field">
           <span>{t("dialogs.topicFilter")}</span>
-          <input
-            type="search"
+          <select
             value={topicFilter}
-            onChange={(event) => setTopicFilter(event.target.value)}
-            placeholder={t("dialogs.topicFilterPlaceholder")}
+            onChange={(event) => {
+              setTopicFilter(event.target.value);
+              setContextFilter(ALL_CONTEXTS_OPTION);
+              setPage(1);
+            }}
             disabled={loading}
-          />
+          >
+            <option value={ALL_TOPICS_OPTION}>{t("dialogs.topicFilterPlaceholder")}</option>
+            {availableTopics.map((topic) => (
+              <option key={topic} value={topic}>{topic}</option>
+            ))}
+          </select>
+        </label>
+        <label className="form-field">
+          <span>{t("dialogs.contextFilter")}</span>
+          <select
+            value={contextFilter}
+            onChange={(event) => {
+              setContextFilter(event.target.value);
+              setPage(1);
+            }}
+            disabled={loading || !topicFilter}
+          >
+            <option value={ALL_CONTEXTS_OPTION}>{t("dialogs.contextFilterPlaceholder")}</option>
+            {availableContexts.map((context) => (
+              <option key={context} value={context}>{context}</option>
+            ))}
+          </select>
         </label>
         <div className="actions">
+          {targetPromptMode === "audio" && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setShowDialogText((value) => !value)}
+            >
+              {showDialogText ? t("prompt.hideText") : t("prompt.showText")}
+            </button>
+          )}
           {!playingAll ? (
             <button type="button" onClick={() => void playAllDialogs()} disabled={loading || !hasPlayableDialogs}>
               {t("dialogs.playAll")}
@@ -564,12 +705,13 @@ export default function DialogsPage(): JSX.Element {
                                     sourceText={turn.source_text}
                                     targetText={turn.target_text}
                                     sourceLanguage={sourceLanguage}
-                                    targetLanguage={targetLanguage}
-                                    tokenStatus={wordActionStatus}
-                                    statusKeyPrefix={`dialog-${dialog.dialog_id}-turn-${index}-target`}
-                                    onOpenItem={openLinkedWordItem}
-                                    onTokenClick={(statusKey, token) => void requestAddWordFromDialogToken(
-                                      statusKey,
+                                  targetLanguage={targetLanguage}
+                                  tokenStatus={wordActionStatus}
+                                  statusKeyPrefix={`dialog-${dialog.dialog_id}-turn-${index}-target`}
+                                  hideTargetText={hideDialogText}
+                                  onOpenItem={openLinkedWordItem}
+                                  onTokenClick={(statusKey, token) => void requestAddWordFromDialogToken(
+                                    statusKey,
                                       dialog.dialog_id,
                                       index,
                                       turn.source_text,
@@ -586,7 +728,11 @@ export default function DialogsPage(): JSX.Element {
                                     {loadingTurnAudioKey === `${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
                                   </button>
                                 </div>
-                                <p className="conversation-line">{turn.source_text}</p>
+                                <p className="conversation-line">
+                                  {hideDialogText
+                                    ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
+                                    : turn.source_text}
+                                </p>
                               </li>
                             );
                           })}
@@ -603,13 +749,25 @@ export default function DialogsPage(): JSX.Element {
               </li>
             ))}
           </ul>
-          {nextPage && (
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={() => void loadMoreDialogs()} disabled={loadingMore}>
-                {loadingMore ? t("dialogs.loadingMore") : t("dialogs.loadMore")}
-              </button>
-            </div>
-          )}
+          <div className="actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1 || loading}
+            >
+              {t("dialogs.previousPage")}
+            </button>
+            <span>{t("dialogs.pageLabel", { page })}</span>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setPage((current) => current + 1)}
+              disabled={!hasMore || loading}
+            >
+              {t("dialogs.nextPage")}
+            </button>
+          </div>
         </section>
       )}
 
