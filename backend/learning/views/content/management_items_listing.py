@@ -79,6 +79,23 @@ ARTICLES_BY_LANGUAGE = {
 }
 
 
+def _word_refresh_model() -> str:
+    configured = str(getattr(settings, "OPENAI_WORD_REFRESH_MODEL", "")).strip()
+    if configured:
+        return configured
+    question_model = str(getattr(settings, "OPENAI_QUESTION_MODEL", "")).strip()
+    if question_model:
+        return question_model
+    return str(getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")).strip() or "gpt-4o-mini"
+
+
+def _word_refresh_reasoning_effort() -> str:
+    configured = str(getattr(settings, "OPENAI_WORD_REFRESH_REASONING_EFFORT", "")).strip()
+    if configured:
+        return configured
+    return str(getattr(settings, "OPENAI_REASONING_EFFORT", "")).strip()
+
+
 class ContentItemsView(APIView):
     def get(self, request: Request) -> Response:
         user = get_request_user(request)
@@ -295,63 +312,45 @@ class ContentItemRefreshWordView(APIView):
         word_type_added = False
         word_text_updated = False
         normalized_word_type = normalize_word_type(item.word_type)
-        should_refresh_metadata = (
-            not normalized_word_type
-            or (
-                normalized_word_type == "noun"
-                and (
-                    not _text_has_article(item.spanish_text, source_language)
-                    or not _text_has_article(item.german_text, target_language)
-                )
+        refresh_model = _word_refresh_model()
+        refresh_reasoning_effort = _word_refresh_reasoning_effort()
+        try:
+            resolved_source, resolved_target, resolved_word_type = _basic_word_metadata(
+                source_text="",
+                target_text=_refresh_target_clicked_token(item.german_text, target_language),
+                source_language=source_language,
+                target_language=target_language,
+                source_line="",
+                target_line=item.example_sentence or "",
+                model=refresh_model,
+                reasoning_effort=refresh_reasoning_effort,
             )
-        )
-        if should_refresh_metadata:
-            try:
-                resolved_source, resolved_target, resolved_word_type = _basic_word_metadata(
-                    source_text=item.spanish_text,
-                    target_text=item.german_text,
-                    source_language=source_language,
-                    target_language=target_language,
-                    source_line="",
-                    target_line=item.example_sentence or "",
-                )
-            except RuntimeError:
-                return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            resolved_word_type = normalize_word_type(resolved_word_type)
-            if not resolved_word_type:
-                return Response({"detail": "Word metadata is incomplete"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            if normalized_word_type and resolved_word_type != normalized_word_type:
-                return Response({"detail": "Word metadata type mismatch"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            if resolved_word_type == "noun":
-                normalized_source = _normalize_spacing(resolved_source)
-                normalized_target = _normalize_spacing(resolved_target)
-                source_needs_article = not _text_has_article(item.spanish_text, source_language)
-                target_needs_article = not _text_has_article(item.german_text, target_language)
-                if source_needs_article and not _text_has_article(normalized_source, source_language):
-                    return Response({"detail": "Word metadata is missing source article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-                if target_needs_article and not _text_has_article(normalized_target, target_language):
-                    return Response({"detail": "Word metadata is missing target article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-                if (
-                    normalized_source
-                    and _text_has_article(normalized_source, source_language)
-                    and normalized_source != item.spanish_text
-                ):
-                    item.spanish_text = normalized_source
-                    word_text_updated = True
-                if (
-                    normalized_target
-                    and _text_has_article(normalized_target, target_language)
-                    and normalized_target != item.german_text
-                ):
-                    item.german_text = normalized_target
-                    word_text_updated = True
-            if not normalized_word_type:
-                item.word_type = resolved_word_type
-                word_type_added = True
+        except RuntimeError:
+            return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        resolved_word_type = normalize_word_type(resolved_word_type)
+        if not resolved_word_type:
+            return Response({"detail": "Word metadata is incomplete"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        normalized_source = _normalize_spacing(resolved_source)
+        normalized_target = _normalize_spacing(resolved_target)
+        if resolved_word_type == "noun":
+            if not _text_has_article(normalized_source, source_language):
+                return Response({"detail": "Word metadata is missing source article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            if not _text_has_article(normalized_target, target_language):
+                return Response({"detail": "Word metadata is missing target article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        if normalized_source and normalized_source != item.spanish_text:
+            item.spanish_text = normalized_source
+            word_text_updated = True
+        if normalized_target and normalized_target != item.german_text:
+            item.german_text = normalized_target
+            word_text_updated = True
+        word_type_updated = item.word_type != resolved_word_type
+        if item.word_type != resolved_word_type:
+            word_type_added = not normalized_word_type
+            item.word_type = resolved_word_type
 
-        if word_type_added or word_text_updated:
+        if word_type_added or word_type_updated or word_text_updated:
             metadata_update_fields = ["updated_at"]
-            if word_type_added:
+            if word_type_added or word_type_updated:
                 metadata_update_fields.append("word_type")
             if word_text_updated:
                 metadata_update_fields.extend(["spanish_text", "german_text"])
@@ -371,6 +370,8 @@ class ContentItemRefreshWordView(APIView):
             source_language=source_language,
             target_language=target_language,
             target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
+            model=refresh_model,
+            reasoning_effort=refresh_reasoning_effort,
         )
         cleaned = _sanitize_exercise_payload(generated)
         if not cleaned["phrases"]:
@@ -402,6 +403,16 @@ def _text_has_article(text: str, language: str) -> bool:
 
 def _normalize_spacing(text: str) -> str:
     return " ".join((text or "").split()).strip()
+
+
+def _refresh_target_clicked_token(text: str, language: str) -> str:
+    normalized = _normalize_spacing(text)
+    if not normalized:
+        return ""
+    parts = normalized.split(" ", 1)
+    if parts[0].lower() in ARTICLES_BY_LANGUAGE.get(language, set()):
+        return parts[1].strip() if len(parts) == 2 else ""
+    return normalized
 
 
 def _scan_all_dialogs_for_word(

@@ -22,6 +22,7 @@ def call_openai_json(
     timeout_seconds: int = 10,
     *,
     model: str | None = None,
+    reasoning_effort: str | None = None,
     temperature: float = 0.2,
     top_p: float = 1.0,
     presence_penalty: float = 0.0,
@@ -45,6 +46,9 @@ def call_openai_json(
         "top_p": top_p,
         "presence_penalty": presence_penalty,
     }
+    normalized_reasoning_effort = str(reasoning_effort or "").strip()
+    if normalized_reasoning_effort:
+        body["reasoning_effort"] = normalized_reasoning_effort
 
     request = UrlRequest(
         "https://api.openai.com/v1/chat/completions",
@@ -144,7 +148,19 @@ def generate_word_exercise_phrases_with_chatgpt(
     source_language: str = "spanish",
     target_language: str = "german",
     target_contexts: list[str] | None = None,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict:
+    def call_openai_json_with_model(system_prompt: str, user_input: str, timeout_seconds: int = 10, **kwargs) -> dict | None:
+        return call_openai_json(
+            system_prompt,
+            user_input,
+            timeout_seconds=timeout_seconds,
+            model=model,
+            reasoning_effort=reasoning_effort,
+            **kwargs,
+        )
+
     return _words.generate_word_exercise_phrases_with_chatgpt(
         spanish_word,
         german_word,
@@ -153,7 +169,7 @@ def generate_word_exercise_phrases_with_chatgpt(
         source_language=source_language,
         target_language=target_language,
         target_contexts=target_contexts,
-        call_openai_json_fn=call_openai_json,
+        call_openai_json_fn=call_openai_json_with_model if model else call_openai_json,
     )
 
 

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from rest_framework.test import APIClient
 
@@ -1067,6 +1069,177 @@ def test_content_item_refresh_word_adds_missing_articles_for_noun(monkeypatch):
     item.refresh_from_db()
     assert item.spanish_text == "el libro"
     assert item.german_text == "das Buch"
+
+
+@pytest.mark.django_db
+def test_content_item_refresh_word_always_refreshes_metadata_using_target_token_and_context(monkeypatch):
+    from learning.views.content import management_items_listing as listing_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="el libro",
+        german_text="das Buch",
+        source_language="spanish",
+        target_language="german",
+        word_type="noun",
+        example_sentence="Ich lese das Buch jeden Abend.",
+        exercise_phrases={},
+    )
+    captured_metadata_kwargs = {}
+
+    def fake_basic_word_metadata(**kwargs):
+        captured_metadata_kwargs.update(kwargs)
+        return ("el libro", "das Buch", "noun")
+
+    monkeypatch.setattr(listing_views, "_basic_word_metadata", fake_basic_word_metadata)
+    monkeypatch.setattr(
+        listing_views,
+        "generate_word_exercise_phrases_with_chatgpt",
+        lambda *args, **kwargs: {
+            "phrases": [
+                {"label": "example", "source_text": "Leo el libro.", "target_text": "Ich lese das Buch."},
+            ],
+        },
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert captured_metadata_kwargs["source_text"] == ""
+    assert captured_metadata_kwargs["target_text"] == "Buch"
+    assert captured_metadata_kwargs["source_line"] == ""
+    assert captured_metadata_kwargs["target_line"] == "Ich lese das Buch jeden Abend."
+
+
+@pytest.mark.django_db
+def test_content_item_refresh_word_uses_dedicated_refresh_model(monkeypatch, settings):
+    from learning.views.content import management_items_listing as listing_views
+
+    settings.OPENAI_WORD_REFRESH_MODEL = "gpt-refresh-test"
+    settings.OPENAI_WORD_REFRESH_REASONING_EFFORT = "high"
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="ayudar",
+        german_text="helfen",
+        source_language="spanish",
+        target_language="german",
+        word_type="",
+        exercise_phrases={},
+    )
+    captured_metadata_model = {}
+    captured_exercise_model = {}
+
+    def fake_basic_word_metadata(**kwargs):
+        captured_metadata_model["model"] = kwargs.get("model")
+        captured_metadata_model["reasoning_effort"] = kwargs.get("reasoning_effort")
+        return ("ayudar", "helfen", "verb")
+
+    def fake_generate(spanish_word, german_word, **kwargs):
+        captured_exercise_model["model"] = kwargs.get("model")
+        captured_exercise_model["reasoning_effort"] = kwargs.get("reasoning_effort")
+        return {
+            "phrases": [
+                {"label": "present-1s", "source_text": "Yo ayudo.", "target_text": "Ich helfe."},
+            ],
+        }
+
+    monkeypatch.setattr(listing_views, "_basic_word_metadata", fake_basic_word_metadata)
+    monkeypatch.setattr(listing_views, "generate_word_exercise_phrases_with_chatgpt", fake_generate)
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert captured_metadata_model["model"] == "gpt-refresh-test"
+    assert captured_metadata_model["reasoning_effort"] == "high"
+    assert captured_exercise_model["model"] == "gpt-refresh-test"
+    assert captured_exercise_model["reasoning_effort"] == "high"
+
+
+@pytest.mark.django_db
+def test_content_item_refresh_word_replaces_existing_type_with_regenerated_type(monkeypatch):
+    from learning.views.content import management_items_listing as listing_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="ayudar",
+        german_text="helfen",
+        source_language="spanish",
+        target_language="german",
+        word_type="noun",
+        exercise_phrases={},
+    )
+
+    monkeypatch.setattr(
+        listing_views,
+        "_basic_word_metadata",
+        lambda **kwargs: ("ayudar", "helfen", "verb"),
+    )
+    monkeypatch.setattr(
+        listing_views,
+        "generate_word_exercise_phrases_with_chatgpt",
+        lambda *args, **kwargs: {
+            "phrases": [
+                {"label": "present-1s", "source_text": "Yo ayudo.", "target_text": "Ich helfe."},
+            ],
+        },
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["word_type"] == "verb"
+    assert payload["word_type_added"] is False
+
+    item.refresh_from_db()
+    assert item.word_type == "verb"
+
+
+def test_call_openai_json_includes_reasoning_effort(monkeypatch, settings):
+    from learning.views.content import generation
+
+    settings.OPENAI_API_KEY = "test-key"
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"{\\"ok\\": true}"}}]}'
+
+    def fake_urlopen(request, timeout=0):
+        captured["timeout"] = timeout
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.setattr(generation, "urlopen", fake_urlopen)
+
+    parsed = generation.call_openai_json(
+        "system",
+        "user",
+        model="gpt-test",
+        reasoning_effort="high",
+    )
+
+    assert parsed == {"ok": True}
+    assert captured["body"]["model"] == "gpt-test"
+    assert captured["body"]["reasoning_effort"] == "high"
 
 
 @pytest.mark.django_db

@@ -23,6 +23,8 @@ def basic_word_metadata(
     target_language: str,
     source_line: str = "",
     target_line: str = "",
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, str, str]:
     source_name = language_display_name(source_language)
     target_name = language_display_name(target_language)
@@ -36,6 +38,8 @@ def basic_word_metadata(
             target_name=target_name,
             clicked_word=clicked_word,
             target_context=target_context,
+            model=model,
+            reasoning_effort=reasoning_effort,
         )
     )
     if word_type in {"helper", "expression"}:
@@ -58,6 +62,8 @@ def basic_word_metadata(
         target_language=target_language,
         source_line=source_line,
         target_line=target_line,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
 
 
@@ -70,6 +76,8 @@ def normalize_word_metadata(
     target_language: str,
     source_line: str = "",
     target_line: str = "",
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, str, str]:
     source_name = language_display_name(source_language)
     target_name = language_display_name(target_language)
@@ -94,6 +102,8 @@ def normalize_word_metadata(
         timeout_seconds=8,
         temperature=0.0,
         top_p=1.0,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
     if not isinstance(parsed, dict):
         raise RuntimeError("Word metadata generation failed")
@@ -122,6 +132,8 @@ def _request_contextual_word_metadata(
     target_name: str,
     clicked_word: str,
     target_context: str,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict | None:
     return _call_openai_json_logged(
         label="contextual_word_metadata",
@@ -135,6 +147,8 @@ def _request_contextual_word_metadata(
         timeout_seconds=8,
         temperature=0.1,
         top_p=0.95,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
 
 
@@ -182,6 +196,8 @@ def _call_openai_json_logged(
     temperature: float = 0.2,
     top_p: float = 1.0,
     presence_penalty: float = 0.0,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict | None:
     logger.info(
         "content.word_metadata.model.request label=%s system_prompt=%s user_input=%s",
@@ -193,6 +209,8 @@ def _call_openai_json_logged(
         system_prompt,
         user_input,
         timeout_seconds=timeout_seconds,
+        model=model,
+        reasoning_effort=reasoning_effort,
         temperature=temperature,
         top_p=top_p,
         presence_penalty=presence_penalty,
