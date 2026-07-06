@@ -43,7 +43,7 @@ export default function ContentManagePage(): JSX.Element {
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
   const sectionParam = searchParams.get("section");
-  const currentSection: ManageSection = isManageSection(sectionParam) ? sectionParam : "topics";
+  const currentSection: ManageSection = isManageSection(sectionParam) ? sectionParam : "words";
   const filterQuery = searchParams.get("filter") || "";
   const openedItemParam = searchParams.get("item") || "";
   const pageParam = Number.parseInt(searchParams.get("page") || "1", 10);
@@ -337,14 +337,6 @@ export default function ContentManagePage(): JSX.Element {
         <div className="actions">
           <button
             type="button"
-            className={currentSection === "topics" ? "secondary-button" : ""}
-            onClick={() => changeSection("topics")}
-            disabled={busy}
-          >
-            {t("manage.sectionTopics")}
-          </button>
-          <button
-            type="button"
             className={currentSection === "words" ? "secondary-button" : ""}
             onClick={() => changeSection("words")}
             disabled={busy}
@@ -358,6 +350,14 @@ export default function ContentManagePage(): JSX.Element {
             disabled={busy}
           >
             {t("manage.sectionPhrases")}
+          </button>
+          <button
+            type="button"
+            className={currentSection === "topics" ? "secondary-button" : ""}
+            onClick={() => changeSection("topics")}
+            disabled={busy}
+          >
+            {t("manage.sectionTopics")}
           </button>
         </div>
       </section>

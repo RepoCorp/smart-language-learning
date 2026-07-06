@@ -1,5 +1,6 @@
 from .content import (
     ContentConfirmView,
+    ContentDialogAudioRegenerateView,
     ContentDialogDetailView,
     ContentDialogTurnAudioView,
     ContentDialogsView,
@@ -34,6 +35,7 @@ from .difficult_items import CompleteDifficultItemView
 
 __all__ = [
     "ContentConfirmView",
+    "ContentDialogAudioRegenerateView",
     "ContentDialogDetailView",
     "ContentDialogTurnAudioView",
     "ContentDialogsView",

@@ -20,7 +20,12 @@ from .management_items import (
     ContentWordQuickAddView,
     ContentWordsView,
 )
-from .management_dialogs_listing import ContentDialogDetailView, ContentDialogsView, ContentDialogTurnAudioView
+from .management_dialogs_listing import (
+    ContentDialogAudioRegenerateView,
+    ContentDialogDetailView,
+    ContentDialogsView,
+    ContentDialogTurnAudioView,
+)
 from .topics import ContentTopicContextsView, ContentTopicsView, save_topic
 
 __all__ = [
@@ -30,6 +35,7 @@ __all__ = [
     "ContentItemFunnyImageExerciseView",
     "ContentDialogsView",
     "ContentDialogDetailView",
+    "ContentDialogAudioRegenerateView",
     "ContentDialogTurnAudioView",
     "ContentItemMarkLearnedView",
     "ContentItemQuestionView",

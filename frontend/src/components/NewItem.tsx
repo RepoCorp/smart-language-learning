@@ -23,6 +23,8 @@ import WordReview from "./WordReview";
 interface NewItemProps {
   item: SessionItem;
   onContinue?: () => Promise<void>;
+  continueLabel?: string;
+  autoplayAudioOnMount?: boolean;
   readOnly?: boolean;
   onClose?: () => void;
 }
@@ -230,7 +232,14 @@ const parseVerbExerciseLabel = (label: string): { tense: VerbTenseKey; person: V
   return { tense: match[1] as VerbTenseKey, person };
 };
 
-export default function NewItem({ item, onContinue, readOnly = false, onClose }: NewItemProps): JSX.Element {
+export default function NewItem({
+  item,
+  onContinue,
+  continueLabel,
+  autoplayAudioOnMount = false,
+  readOnly = false,
+  onClose,
+}: NewItemProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -309,6 +318,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
   const questionsHistoryRef = useRef<HTMLDivElement | null>(null);
   const questionInputRef = useRef<HTMLInputElement | null>(null);
   const hideDialogTargetText = targetPromptMode === "audio" && !showDialogTargetText;
+  const autoplayedAudioKeyRef = useRef<string>("");
 
   useEffect(() => {
     setExercisePhrases(item.exercise_phrases || {});
@@ -326,6 +336,18 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
     setDialogPhraseOddIndex(item.dialog_phrase_odd_index ?? null);
     setRelatedDialogs(item.related_dialogs || []);
   }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.dialog_phrase_turns, item.dialog_phrase_odd_index, item.related_dialogs]);
+
+  useEffect(() => {
+    if (!autoplayAudioOnMount || !audioUrl) {
+      return;
+    }
+    const autoplayKey = `${item.id}:${audioUrl}`;
+    if (autoplayedAudioKeyRef.current === autoplayKey) {
+      return;
+    }
+    autoplayedAudioKeyRef.current = autoplayKey;
+    playAudioUrl(audioUrl);
+  }, [autoplayAudioOnMount, audioUrl, item.id]);
 
   const markAsSeen = async (): Promise<void> => {
     if (saving || !onContinue) {
@@ -1513,7 +1535,7 @@ export default function NewItem({ item, onContinue, readOnly = false, onClose }:
       {!readOnly && (
         <div className="actions">
           <button type="button" className="item-got-it-button" onClick={markAsSeen} disabled={saving}>
-            {saving ? t("newItem.saving") : t("newItem.gotIt")}
+            {saving ? t("newItem.saving") : (continueLabel || t("newItem.gotIt"))}
           </button>
         </div>
       )}

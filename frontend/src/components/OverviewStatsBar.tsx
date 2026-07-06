@@ -8,9 +8,15 @@ import type { OverviewStatsResponse } from "../types";
 
 interface OverviewStatsBarProps {
   topBarControl?: ReactNode;
+  showFutureReviews?: boolean;
+  showWordCount?: boolean;
 }
 
-export default function OverviewStatsBar({ topBarControl }: OverviewStatsBarProps): JSX.Element {
+export default function OverviewStatsBar({
+  topBarControl,
+  showFutureReviews = true,
+  showWordCount = true,
+}: OverviewStatsBarProps): JSX.Element {
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -49,9 +55,9 @@ export default function OverviewStatsBar({ topBarControl }: OverviewStatsBarProp
       <div className="overview-stats-content">
         <div className="overview-stats-metrics">
           <span>{t("stats.ready", { count: stats?.ready_to_review ?? "-" })}</span>
-          <span>{t("stats.future", { count: stats?.future_reviews ?? "-" })}</span>
+          {showFutureReviews ? <span>{t("stats.future", { count: stats?.future_reviews ?? "-" })}</span> : null}
           <span>{t("stats.notStarted", { count: stats?.not_started ?? "-" })}</span>
-          <span className="overview-stats-word-count">{t("stats.words", { count: stats?.word_items ?? "-" })}</span>
+          {showWordCount ? <span className="overview-stats-word-count">{t("stats.words", { count: stats?.word_items ?? "-" })}</span> : null}
           {topBarControl ? <div className="overview-stats-top-control">{topBarControl}</div> : null}
         </div>
       </div>

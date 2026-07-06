@@ -1560,6 +1560,62 @@ def test_content_item_regenerate_audio_updates_audio_url(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_dialog_regenerate_audio_updates_turn_audio_urls(monkeypatch):
+    from learning.views.content import management_dialogs_listing as dialog_listing_views
+
+    dialog = SavedDialog.objects.create(
+        topic="travel",
+        context="station",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {"source_text": "Hola.", "target_text": "Hallo.", "speaker": "a"},
+            {"source_text": "Adios.", "target_text": "Tschuss.", "speaker": "b"},
+        ],
+    )
+    first_turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Hola.",
+        target_text="Hallo.",
+        audio_url="http://localhost:8000/media/audio/old-0.mp3",
+    )
+    second_turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=1,
+        source_text="Adios.",
+        target_text="Tschuss.",
+        audio_url="http://localhost:8000/media/audio/old-1.mp3",
+    )
+
+    monkeypatch.setattr(
+        dialog_listing_views,
+        "select_dialog_speaker_voice_ids",
+        lambda target_language, seed="": ("voice-a", "voice-b"),
+    )
+    monkeypatch.setattr(
+        dialog_listing_views,
+        "create_audio_file",
+        lambda text, prefix, **kwargs: f"http://localhost:8000/media/audio/{kwargs.get('voice_id', 'default')}-{text}.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/dialogs/{dialog.id}/audio?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["turns"][0]["phrase_audio_url"] == "http://localhost:8000/media/audio/voice-a-Hallo..mp3"
+    assert payload["turns"][1]["phrase_audio_url"] == "http://localhost:8000/media/audio/voice-b-Tschuss..mp3"
+    first_turn.refresh_from_db()
+    second_turn.refresh_from_db()
+    assert first_turn.audio_url == "http://localhost:8000/media/audio/voice-a-Hallo..mp3"
+    assert second_turn.audio_url == "http://localhost:8000/media/audio/voice-b-Tschuss..mp3"
+
+
+@pytest.mark.django_db
 def test_content_item_question_saves_conversation(monkeypatch):
     from learning.views.content import item_questions as item_question_views
 

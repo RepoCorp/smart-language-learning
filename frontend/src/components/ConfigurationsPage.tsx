@@ -1,20 +1,30 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
-import { createUserWithPin } from "../api";
+import { createUserWithPin, fetchOverviewStats, getOverviewStatsUpdatedEventName, type AuthUser } from "../api";
 import { useDebugTools } from "../debugTools";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
+import type { OverviewStatsResponse } from "../types";
 
 interface ConfigurationsPageProps {
   canCreateUsers?: boolean;
+  authUser?: AuthUser | null;
+  authBusy?: boolean;
+  onLogout?: () => Promise<void>;
 }
 
-export default function ConfigurationsPage({ canCreateUsers = false }: ConfigurationsPageProps): JSX.Element {
+export default function ConfigurationsPage({
+  canCreateUsers = false,
+  authUser = null,
+  authBusy = false,
+  onLogout,
+}: ConfigurationsPageProps): JSX.Element {
   const { language, setLanguage, t } = useI18n();
   const { enabled: debugToolsEnabled, setEnabled: setDebugToolsEnabled } = useDebugTools();
   const { targetPromptMode, setTargetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage, setSourceLanguage, setTargetLanguage, supportedLanguages } = useStudyLanguages();
+  const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
@@ -29,6 +39,34 @@ export default function ConfigurationsPage({ canCreateUsers = false }: Configura
     italian: "study.language.italian",
     portuguese: "study.language.portuguese",
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const updateEvent = getOverviewStatsUpdatedEventName();
+
+    const loadStats = async (): Promise<void> => {
+      try {
+        const data = await fetchOverviewStats(sourceLanguage, targetLanguage);
+        if (mounted) {
+          setStats(data);
+        }
+      } catch {
+        if (mounted) {
+          setStats(null);
+        }
+      }
+    };
+
+    void loadStats();
+    const onStatsUpdated = (): void => {
+      void loadStats();
+    };
+    window.addEventListener(updateEvent, onStatsUpdated);
+    return () => {
+      mounted = false;
+      window.removeEventListener(updateEvent, onStatsUpdated);
+    };
+  }, [sourceLanguage, targetLanguage]);
 
   const resetDefaults = (): void => {
     setLanguage("en");
@@ -59,6 +97,29 @@ export default function ConfigurationsPage({ canCreateUsers = false }: Configura
 
   return (
     <main className="container">
+      <section className="card settings-card">
+        <h2 className="settings-title">{t("config.accountTitle")}</h2>
+        <div className="settings-grid">
+          <div className="settings-field">
+            {t("config.currentUser")}
+            <strong>{authUser?.email || authUser?.username || t("config.noCurrentUser")}</strong>
+          </div>
+          <div className="settings-field">
+            {t("config.accountTitle")}
+            <div className="settings-stats-list">
+              <span>{t("stats.future", { count: stats?.future_reviews ?? "-" })}</span>
+              <span>{t("stats.words", { count: stats?.word_items ?? "-" })}</span>
+            </div>
+          </div>
+        </div>
+        {onLogout ? (
+          <div className="actions">
+            <button type="button" className="secondary-button" onClick={() => void onLogout()} disabled={authBusy}>
+              {authBusy ? t("config.loggingOut") : t("config.logOut")}
+            </button>
+          </div>
+        ) : null}
+      </section>
       <section className="card settings-card">
         <h2 className="settings-title">{t("config.title")}</h2>
         <p className="settings-subtitle">{t("config.subtitle")}</p>

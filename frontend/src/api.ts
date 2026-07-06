@@ -476,6 +476,24 @@ export async function generateContentDialogTurnAudio(
   return payload.audio_url || "";
 }
 
+export async function regenerateContentDialogAudio(
+  dialogId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentDialogRecord> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/dialogs/${dialogId}/audio?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to regenerate dialog audio");
+  }
+  return (await response.json()) as ContentDialogRecord;
+}
+
 export async function fetchContentTopicContexts(
   topic: string,
   sourceLanguage: StudyLanguageCode = "spanish",

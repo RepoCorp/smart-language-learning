@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from .audio import select_dialog_speaker_voice_ids
+from .core import create_audio_file
 from .management import (
     APIView,
     Request,
     Response,
+    DialogTurn,
+    status,
     SavedDialog,
     _normalized_pair,
     apply_user_scope,
@@ -121,6 +125,57 @@ class ContentDialogTurnAudioView(APIView):
         if not audio_url:
             return Response({"detail": "Audio generation failed"}, status=503)
         return Response({"audio_url": audio_url})
+
+
+class ContentDialogAudioRegenerateView(APIView):
+    def post(self, request: Request, dialog_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        dialog = (
+            apply_user_scope(SavedDialog.objects, user)
+            .filter(id=dialog_id, source_language=source_language, target_language=target_language)
+            .prefetch_related("dialog_turns")
+            .first()
+        )
+        if not dialog:
+            return Response({"detail": "Dialog not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        speaker_voice_ids = select_dialog_speaker_voice_ids(dialog.target_language, seed=f"dialog:{dialog.id}")
+        turns = list(dialog.dialog_turns.all().order_by("turn_index", "id"))
+        updated_turns: list[dict[str, str]] = []
+        for turn in turns:
+            target_text = str(turn.target_text or "").strip()
+            voice_id = speaker_voice_ids[turn.turn_index % 2] if speaker_voice_ids else ""
+            audio_url = create_audio_file(
+                target_text,
+                "phrase",
+                target_language=dialog.target_language,
+                voice_id=voice_id,
+            ) if target_text else ""
+            if not audio_url:
+                return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            turn.audio_url = audio_url
+            turn.save(update_fields=["audio_url"])
+            updated_turns.append(
+                {
+                    "source_text": turn.source_text,
+                    "target_text": turn.target_text,
+                    "speaker": _speaker_for_index(dialog, turn.turn_index),
+                    "phrase_audio_url": audio_url,
+                }
+            )
+
+        return Response(
+            {
+                "dialog_id": dialog.id,
+                "topic": dialog.topic,
+                "context": dialog.context,
+                "audio_url": dialog.audio_url,
+                "created_at": dialog.created_at,
+                "turn_count": _dialog_turn_count(dialog),
+                "turns": updated_turns,
+            }
+        )
 
 
 def _speaker_for_index(dialog: SavedDialog, turn_index: int) -> str:

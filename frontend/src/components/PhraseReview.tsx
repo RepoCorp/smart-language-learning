@@ -12,6 +12,26 @@ import DangerousButton from "./DangerousButton";
 interface PhraseReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
+  reviewComplete?: boolean;
+  onNextItem?: () => Promise<void>;
+}
+
+function RevealedReviewSummary({
+  answer,
+  phrase,
+  phraseTranslation,
+}: {
+  answer: string;
+  phrase: string;
+  phraseTranslation: string;
+}): JSX.Element {
+  return (
+    <div className="revealed-answer">
+      <p className="revealed-answer-main">{answer}</p>
+      <p className="revealed-answer-phrase">{phrase}</p>
+      <p className="revealed-answer-translation">{phraseTranslation || "\u2014"}</p>
+    </div>
+  );
 }
 
 const FEEDBACK_DELAY_MS = 2000;
@@ -260,7 +280,12 @@ async function speakBrowserText({
   });
 }
 
-export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): JSX.Element {
+export default function PhraseReview({
+  item,
+  onAnswered,
+  reviewComplete = false,
+  onNextItem,
+}: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const debugTools = useDebugTools();
   const { targetPromptMode } = usePromptPreferences();
@@ -1004,9 +1029,11 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
         </>
       )}
       {answerRevealed && (
-        <p className="revealed-answer">
-          <span>{t("review.answerLabel")}</span> {expectedAnswer}
-        </p>
+        <RevealedReviewSummary
+          answer={expectedAnswer}
+          phrase={expectedAnswer}
+          phraseTranslation={promptText}
+        />
       )}
       <div className="actions">
         {!answerRevealed ? (
@@ -1017,12 +1044,15 @@ export default function PhraseReview({ item, onAnswered }: PhraseReviewProps): J
           </>
         ) : (
           <>
-            <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
+            <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting || reviewComplete}>
               {t("review.passed")}
             </button>
-            <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting}>
+            <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting || reviewComplete}>
               {t("review.failed")}
             </DangerousButton>
+            <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
+              {t("session.nextItem")}
+            </button>
           </>
         )}
       </div>

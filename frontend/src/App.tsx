@@ -26,6 +26,7 @@ export default function App(): JSX.Element {
   const [registerError, setRegisterError] = useState("");
   const [registerBusy, setRegisterBusy] = useState(false);
   const [canPublicRegister, setCanPublicRegister] = useState(false);
+  const [showPageMenu, setShowPageMenu] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -40,6 +41,10 @@ export default function App(): JSX.Element {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    setShowPageMenu(false);
+  }, [location.pathname]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -103,13 +108,9 @@ export default function App(): JSX.Element {
 
   return (
     <>
-      <header className="auth-bar">
-        <div className="auth-bar-title">Session User</div>
-        {authUser ? (
-          <div className="auth-bar-session">
-            <span>{authUser.email || authUser.username}</span>
-          </div>
-        ) : (
+      {!authUser ? (
+        <header className="auth-bar">
+          <div className="auth-bar-title">Session User</div>
           <div className="auth-bar-guest">
             <form className="auth-bar-form" onSubmit={handleLogin}>
               <input
@@ -138,63 +139,79 @@ export default function App(): JSX.Element {
               ) : null}
             </form>
           </div>
-        )}
-        {showRegister && !authUser && canPublicRegister ? (
-          <form className="register-form" onSubmit={handleRegister}>
-            <input
-              type="text"
-              value={registerUsername}
-              onChange={(event) => setRegisterUsername(event.target.value)}
-              placeholder="Username"
-              autoComplete="username"
-              required
-            />
-            <input
-              type="email"
-              value={registerEmail}
-              onChange={(event) => setRegisterEmail(event.target.value)}
-              placeholder="Email"
-              autoComplete="email"
-              required
-            />
-            <input
-              type="password"
-              value={registerPin}
-              onChange={(event) => setRegisterPin(event.target.value)}
-              placeholder="PIN"
-              autoComplete="new-password"
-              required
-            />
-            <button type="submit" disabled={registerBusy}>
-              {registerBusy ? "Creating..." : "Create"}
-            </button>
-          </form>
-        ) : null}
-        {authError ? <div className="auth-bar-error">{authError}</div> : null}
-        {registerError ? <div className="auth-bar-error">{registerError}</div> : null}
-      </header>
+          {showRegister && canPublicRegister ? (
+            <form className="register-form" onSubmit={handleRegister}>
+              <input
+                type="text"
+                value={registerUsername}
+                onChange={(event) => setRegisterUsername(event.target.value)}
+                placeholder="Username"
+                autoComplete="username"
+                required
+              />
+              <input
+                type="email"
+                value={registerEmail}
+                onChange={(event) => setRegisterEmail(event.target.value)}
+                placeholder="Email"
+                autoComplete="email"
+                required
+              />
+              <input
+                type="password"
+                value={registerPin}
+                onChange={(event) => setRegisterPin(event.target.value)}
+                placeholder="PIN"
+                autoComplete="new-password"
+                required
+              />
+              <button type="submit" disabled={registerBusy}>
+                {registerBusy ? "Creating..." : "Create"}
+              </button>
+            </form>
+          ) : null}
+          {authError ? <div className="auth-bar-error">{authError}</div> : null}
+          {registerError ? <div className="auth-bar-error">{registerError}</div> : null}
+        </header>
+      ) : null}
       {authUser ? (
         <>
           <OverviewStatsBar
+            showFutureReviews={false}
+            showWordCount={false}
             topBarControl={(
               <div className="top-nav">
-                <div className="top-nav-pages" role="tablist" aria-label="Pages">
-                  {pageOptions.map((option) => (
-                    <button
-                      key={option.path}
-                      type="button"
-                      className={`top-nav-page-button ${selectedPagePath === option.path ? "active" : ""}`}
-                      onClick={() => navigate(option.path)}
-                      role="tab"
-                      aria-selected={selectedPagePath === option.path}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                <button type="button" className="secondary-button top-nav-logout" onClick={handleLogout} disabled={authBusy}>
-                  {authBusy ? "Logging out..." : "Log out"}
+                <button
+                  type="button"
+                  className="top-nav-menu-button"
+                  onClick={() => setShowPageMenu((value) => !value)}
+                  aria-expanded={showPageMenu}
+                  aria-haspopup="menu"
+                  aria-label="Open page menu"
+                >
+                  <span className="top-nav-menu-label">Menu</span>
+                  <span className="top-nav-menu-icon" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
                 </button>
+                {showPageMenu ? (
+                  <div className="top-nav-menu" role="menu" aria-label="Pages">
+                    {pageOptions.map((option) => (
+                      <button
+                        key={option.path}
+                        type="button"
+                        className={`top-nav-menu-item ${selectedPagePath === option.path ? "active" : ""}`}
+                        onClick={() => navigate(option.path)}
+                        role="menuitem"
+                        aria-current={selectedPagePath === option.path ? "page" : undefined}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
           />
@@ -204,7 +221,17 @@ export default function App(): JSX.Element {
             <Route path="/content/manage" element={<ContentManagePage />} />
             <Route path="/dialogs" element={<DialogsPage />} />
             <Route path="/conversation" element={<ConversationPage />} />
-            <Route path="/configurations" element={<ConfigurationsPage canCreateUsers={Boolean(authUser?.is_superuser)} />} />
+            <Route
+              path="/configurations"
+              element={(
+                <ConfigurationsPage
+                  canCreateUsers={Boolean(authUser?.is_superuser)}
+                  authUser={authUser}
+                  authBusy={authBusy}
+                  onLogout={handleLogout}
+                />
+              )}
+            />
             <Route path="*" element={<Navigate to="/session" replace />} />
           </Routes>
           <DebugToolsPanel />

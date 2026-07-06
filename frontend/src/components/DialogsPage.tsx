@@ -8,11 +8,13 @@ import {
   fetchContentTopics,
   generateContentDialogTurnAudio,
   quickAddWordFromDialog,
+  regenerateContentDialogAudio,
 } from "../api";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentDialogRecord, SessionItem } from "../types";
+import DangerousButton from "./DangerousButton";
 import DialogTurnText from "./DialogTurnText";
 import NewItem from "./NewItem";
 
@@ -39,6 +41,56 @@ const DIALOGS_PAGE_SIZE = 20;
 const ALL_TOPICS_OPTION = "";
 const ALL_CONTEXTS_OPTION = "";
 
+type DialogActionIconName = "play" | "stop" | "refresh" | "text" | "dialog";
+
+function DialogActionIcon({ name }: { name: DialogActionIconName }): JSX.Element {
+  const commonProps = {
+    className: "item-action-icon",
+    viewBox: "0 0 24 24",
+    "aria-hidden": true,
+  };
+
+  if (name === "play") {
+    return (
+      <svg {...commonProps}>
+        <path d="M8 6v12l10-6-10-6Z" />
+      </svg>
+    );
+  }
+  if (name === "stop") {
+    return (
+      <svg {...commonProps}>
+        <rect x="7" y="7" width="10" height="10" rx="1.5" />
+      </svg>
+    );
+  }
+  if (name === "refresh") {
+    return (
+      <svg {...commonProps}>
+        <path d="M20 12a8 8 0 0 1-13.7 5.7" />
+        <path d="M4 12A8 8 0 0 1 17.7 6.3" />
+        <path d="M17 3v4h4" />
+        <path d="M7 21v-4H3" />
+      </svg>
+    );
+  }
+  if (name === "text") {
+    return (
+      <svg {...commonProps}>
+        <path d="M5 7h14" />
+        <path d="M12 7v10" />
+        <path d="M8 17h8" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...commonProps}>
+      <path d="M4 5h11v8H8l-4 4V5Z" />
+      <path d="M13 11h7v7l-3-3h-4" />
+    </svg>
+  );
+}
+
 export default function DialogsPage(): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
@@ -53,11 +105,13 @@ export default function DialogsPage(): JSX.Element {
   const [topicFilter, setTopicFilter] = useState<string>("");
   const [contextFilter, setContextFilter] = useState<string>("");
   const [showDialogText, setShowDialogText] = useState<boolean>(targetPromptMode === "text");
+  const [selectedDialogId, setSelectedDialogId] = useState<number | null>(null);
   const [playingAll, setPlayingAll] = useState<boolean>(false);
   const [playingDialogId, setPlayingDialogId] = useState<number | null>(null);
   const [playingTurn, setPlayingTurn] = useState<PlayingTurn | null>(null);
   const [expandedDialogId, setExpandedDialogId] = useState<number | null>(null);
   const [loadingDialogId, setLoadingDialogId] = useState<number | null>(null);
+  const [regeneratingAudioDialogId, setRegeneratingAudioDialogId] = useState<number | null>(null);
   const [loadingTurnAudioKey, setLoadingTurnAudioKey] = useState<string>("");
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, WordActionStatus>>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<PendingWordAdd | null>(null);
@@ -135,7 +189,14 @@ export default function DialogsPage(): JSX.Element {
       topicFilter,
       contextFilter,
     );
-    setDialogs(payload.dialogs || []);
+    const nextDialogs = payload.dialogs || [];
+    setDialogs(nextDialogs);
+    setSelectedDialogId((current) => {
+      if (current !== null && nextDialogs.some((dialog) => dialog.dialog_id === current)) {
+        return current;
+      }
+      return nextDialogs[0]?.dialog_id ?? null;
+    });
     setHasMore(Boolean(payload.has_more));
   };
 
@@ -472,6 +533,7 @@ export default function DialogsPage(): JSX.Element {
     }
     playbackRunRef.current += 1;
     const runId = playbackRunRef.current;
+    setSelectedDialogId(dialogId);
     setPlayingDialogId(dialogId);
     setPlayingTurn({ dialogId, turnIndex });
     await playAudioUrl(audioUrl, runId);
@@ -492,6 +554,7 @@ export default function DialogsPage(): JSX.Element {
     if (!detailedDialog || runId !== playbackRunRef.current) {
       return;
     }
+    setSelectedDialogId(detailedDialog.dialog_id);
     setPlayingDialogId(detailedDialog.dialog_id);
     if (detailedDialog.turns?.length) {
       for (let index = 0; index < detailedDialog.turns.length; index += 1) {
@@ -518,6 +581,23 @@ export default function DialogsPage(): JSX.Element {
     if (runId === playbackRunRef.current) {
       setPlayingDialogId(null);
       setPlayingTurn(null);
+    }
+  };
+
+  const regenerateDialogAudio = async (dialog: ContentDialogRecord): Promise<void> => {
+    if (regeneratingAudioDialogId !== null) {
+      return;
+    }
+    setRegeneratingAudioDialogId(dialog.dialog_id);
+    setError("");
+    try {
+      const refreshedDialog = await regenerateContentDialogAudio(dialog.dialog_id, sourceLanguage, targetLanguage);
+      upsertVisibleDialog(refreshedDialog);
+      setExpandedDialogId(dialog.dialog_id);
+    } catch {
+      setError(t("manage.error.regenerateAudio"));
+    } finally {
+      setRegeneratingAudioDialogId(null);
     }
   };
 
@@ -558,6 +638,75 @@ export default function DialogsPage(): JSX.Element {
   };
 
   const hasPlayableDialogs = dialogs.some(dialogIsPlayable);
+  const selectedDialog = selectedDialogId === null
+    ? null
+    : dialogs.find((dialog) => dialog.dialog_id === selectedDialogId) || null;
+
+  const renderDialogActionButtons = (dialog: ContentDialogRecord): JSX.Element => (
+    <>
+      {dialogHasTurns(dialog) ? (
+        <button
+          type="button"
+          className="secondary-button exercise-action-icon-button dialog-list-action-button"
+          onClick={() => {
+            if (playingDialogId === dialog.dialog_id) {
+              stopCurrentPlayback();
+              return;
+            }
+            void playSingleDialog(dialog);
+          }}
+          disabled={loadingDialogId === dialog.dialog_id}
+          aria-label={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
+          title={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
+        >
+          <DialogActionIcon name={playingDialogId === dialog.dialog_id ? "stop" : "play"} />
+        </button>
+      ) : (
+        <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
+      )}
+      {targetPromptMode === "audio" && !!(dialog.turn_count || dialog.turns?.length) && (
+        <button
+          type="button"
+          className="secondary-button exercise-action-icon-button dialog-list-action-button"
+          onClick={() => setShowDialogText((value) => !value)}
+          aria-label={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
+          title={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
+          aria-pressed={showDialogText}
+        >
+          <DialogActionIcon name="text" />
+        </button>
+      )}
+      {!!(dialog.turn_count || dialog.turns?.length) && (
+        <button
+          type="button"
+          className="secondary-button exercise-action-icon-button dialog-list-action-button"
+          onClick={() => void toggleDialogExpanded(dialog.dialog_id)}
+          disabled={loadingDialogId === dialog.dialog_id}
+          aria-label={loadingDialogId === dialog.dialog_id
+            ? t("dialogs.loading")
+            : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
+          title={loadingDialogId === dialog.dialog_id
+            ? t("dialogs.loading")
+            : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
+          aria-pressed={expandedDialogId === dialog.dialog_id}
+        >
+          <DialogActionIcon name="dialog" />
+        </button>
+      )}
+      {!!(dialog.turn_count || dialog.turns?.length) && (
+        <DangerousButton
+          type="button"
+          className="secondary-button exercise-action-icon-button dialog-list-action-button"
+          onConfirm={() => regenerateDialogAudio(dialog)}
+          disabled={regeneratingAudioDialogId === dialog.dialog_id}
+          aria-label={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
+          title={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
+        >
+          <DialogActionIcon name="refresh" />
+        </DangerousButton>
+      )}
+    </>
+  );
 
   return (
     <main className="container" data-testid="dialogs-page">
@@ -598,15 +747,6 @@ export default function DialogsPage(): JSX.Element {
           </select>
         </label>
         <div className="actions">
-          {targetPromptMode === "audio" && (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setShowDialogText((value) => !value)}
-            >
-              {showDialogText ? t("prompt.hideText") : t("prompt.showText")}
-            </button>
-          )}
           {!playingAll ? (
             <button type="button" onClick={() => void playAllDialogs()} disabled={loading || !hasPlayableDialogs}>
               {t("dialogs.playAll")}
@@ -618,6 +758,20 @@ export default function DialogsPage(): JSX.Element {
           )}
         </div>
       </section>
+      {selectedDialog && (
+        <section className="card dialog-global-controls-card">
+          <div className="dialog-global-controls-header">
+            <strong className="dialog-list-topic">{selectedDialog.topic}</strong>
+            <span className="dialog-list-context">{selectedDialog.context || t("dialogs.noContext")}</span>
+            {playingDialogId === selectedDialog.dialog_id && (
+              <span className="manage-item-meta">{t("dialogs.nowPlaying")}</span>
+            )}
+          </div>
+          <div className="dialog-list-controls dialog-global-controls-row">
+            {renderDialogActionButtons(selectedDialog)}
+          </div>
+        </section>
+      )}
       {loading && <p className="hint">{t("dialogs.loading")}</p>}
       {error && <p className="error">{error}</p>}
       {!loading && !error && dialogs.length === 0 && <p className="hint">{t("dialogs.empty")}</p>}
@@ -639,36 +793,18 @@ export default function DialogsPage(): JSX.Element {
               >
                 <div className="dialog-list-row">
                   <div className="dialog-list-main">
+                    <label className="dialog-select-control">
+                      <input
+                        type="radio"
+                        name="active-dialog"
+                        checked={selectedDialogId === dialog.dialog_id}
+                        onChange={() => setSelectedDialogId(dialog.dialog_id)}
+                      />
+                    </label>
                     <strong className="dialog-list-topic">{dialog.topic}</strong>
                     <span className="dialog-list-context">{dialog.context || t("dialogs.noContext")}</span>
                     {playingAll && playingDialogId === dialog.dialog_id && (
                       <span className="manage-item-meta">{t("dialogs.nowPlaying")}</span>
-                    )}
-                  </div>
-                  <div className="dialog-list-controls">
-                    {dialogHasTurns(dialog) ? (
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => void playSingleDialog(dialog)}
-                        disabled={loadingDialogId === dialog.dialog_id}
-                      >
-                        {playingDialogId === dialog.dialog_id ? t("dialogs.nowPlaying") : t("dialogs.playDialog")}
-                      </button>
-                    ) : (
-                      <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
-                    )}
-                    {!!(dialog.turn_count || dialog.turns?.length) && (
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => void toggleDialogExpanded(dialog.dialog_id)}
-                        disabled={loadingDialogId === dialog.dialog_id}
-                      >
-                        {loadingDialogId === dialog.dialog_id
-                          ? t("dialogs.loading")
-                          : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
-                      </button>
                     )}
                   </div>
                 </div>

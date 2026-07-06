@@ -131,10 +131,10 @@ function targetWordSearchTerms(value: string): string[] {
   return Array.from(new Set([normalizedValue, ...terms].filter(Boolean)));
 }
 
-function completionPhraseForItem(item: SessionItem): { text: string; audioUrl: string } {
+function completionPhraseForItem(item: SessionItem): { text: string; sourceText: string; audioUrl: string } {
   const targetTerms = targetWordSearchTerms(item.german_text);
   if (!targetTerms.length) {
-    return { text: "", audioUrl: "" };
+    return { text: "", sourceText: "", audioUrl: "" };
   }
 
   const containsTargetWord = (targetText: string): boolean => {
@@ -145,25 +145,27 @@ function completionPhraseForItem(item: SessionItem): { text: string; audioUrl: s
   };
   const dialogTurnCandidates = (item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => ({
     target: turn.target_text,
+    source: turn.source_text,
     audioUrl: turn.phrase_audio_url || "",
   })));
   const matchedAudioTurn = (item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => {
     const relatedTurn = dialog.turns.find((entry, index) => index === turn.turn_index);
     return {
       target: relatedTurn?.target_text || turn.target_text || "",
+      source: relatedTurn?.source_text || turn.source_text || "",
       audioUrl: relatedTurn?.phrase_audio_url || "",
     };
   })).find((candidate) => candidate.audioUrl && containsTargetWord(candidate.target));
   if (matchedAudioTurn) {
-    return { text: matchedAudioTurn.target, audioUrl: matchedAudioTurn.audioUrl };
+    return { text: matchedAudioTurn.target, sourceText: matchedAudioTurn.source, audioUrl: matchedAudioTurn.audioUrl };
   }
 
   const containingAudioTurn = dialogTurnCandidates.find((candidate) => candidate.audioUrl && containsTargetWord(candidate.target));
   if (containingAudioTurn) {
-    return { text: containingAudioTurn.target, audioUrl: containingAudioTurn.audioUrl };
+    return { text: containingAudioTurn.target, sourceText: containingAudioTurn.source, audioUrl: containingAudioTurn.audioUrl };
   }
 
-  return { text: "", audioUrl: "" };
+  return { text: "", sourceText: "", audioUrl: "" };
 }
 
 function warmupContextPairForItem(item: SessionItem): { target: string; source: string } {
@@ -268,13 +270,38 @@ function warmupProgress(value: string, revealedIndexes: Set<number>): string {
 interface WordReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
+  reviewComplete?: boolean;
+  onNextItem?: () => Promise<void>;
+}
+
+function RevealedReviewSummary({
+  answer,
+  phrase,
+  phraseTranslation,
+}: {
+  answer: string;
+  phrase?: string;
+  phraseTranslation?: string;
+}): JSX.Element {
+  return (
+    <div className="revealed-answer">
+      <p className="revealed-answer-main">{answer}</p>
+      <p className="revealed-answer-phrase">{phrase || answer}</p>
+      <p className="revealed-answer-translation">{phraseTranslation || "\u2014"}</p>
+    </div>
+  );
 }
 
 const FEEDBACK_DELAY_MS = 1000;
 const MAX_WRITTEN_WORD_ASSISTANCE_STEPS = 2;
 type FeedbackTone = "neutral" | "success" | "error";
 
-export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.Element {
+export default function WordReview({
+  item,
+  onAnswered,
+  reviewComplete = false,
+  onNextItem,
+}: WordReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
@@ -292,12 +319,11 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
   const [hintLetter, setHintLetter] = useState<string>("");
   const [writtenWordAssistanceIndexes, setWrittenWordAssistanceIndexes] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [awaitingWrongAccept, setAwaitingWrongAccept] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
   const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
   const [letterSuggestions, setLetterSuggestions] = useState<string[]>([]);
   const [warmupRevealCount, setWarmupRevealCount] = useState<number>(0);
-  const [completionPreview, setCompletionPreview] = useState<{ word: string; phrase: string } | null>(null);
+  const [completionPreview, setCompletionPreview] = useState<{ word: string; phrase: string; phraseTranslation: string } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const completionAudioRef = useRef<HTMLAudioElement | null>(null);
   const composingAnswerRef = useRef<boolean>(false);
@@ -394,6 +420,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     setCompletionPreview({
       word: targetWordText,
       phrase: completionPhrase.text,
+      phraseTranslation: completionPhrase.sourceText,
     });
     return true;
   };
@@ -415,12 +442,6 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const requireWrongAccept = (message: string): void => {
-    setFeedback(message);
-    setFeedbackTone("error");
-    setAwaitingWrongAccept(true);
   };
 
   const markSelfGradedAnswer = async (correct: boolean): Promise<void> => {
@@ -495,7 +516,6 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
         setFeedbackTone("neutral");
         setLetterSuggestions([]);
         setHintLetter("");
-        setAwaitingWrongAccept(false);
         return;
       }
       const fallbackAnswer = provisionalBaseAnswerRef.current && acceptedAnswer.startsWith(provisionalBaseAnswerRef.current)
@@ -525,44 +545,20 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     setFeedbackTone("neutral");
     setLetterSuggestions([]);
     setHintLetter("");
-    setAwaitingWrongAccept(false);
 
     if (normalize(value) !== normalize(expectedAnswer)) {
       return;
     }
 
     if (hasExceededWrittenWordAssistanceLimit()) {
-      requireWrongAccept(
-        t("word.feedback.tooManyHints", { answer: expectedAnswer }),
-      );
+      void submitWithFeedback(false, t("word.feedback.tooManyHints", { answer: expectedAnswer }));
       return;
     }
     void submitWithFeedback(true, t("word.feedback.correct"));
   };
 
-  const acceptWrongAnswer = async (): Promise<void> => {
-    if (!awaitingWrongAccept || isSubmitting) {
-      return;
-    }
-    setAwaitingWrongAccept(false);
-    setIsSubmitting(true);
-    try {
-      const showingPreview = showTargetCompletionPreview();
-      if (showingPreview) {
-        await waitForPreviewPaint();
-      }
-      const played = await playCompletionAudio();
-      if (!played) {
-        await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
-      }
-      await onAnswered(false);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const chooseClozeLetter = async (letter: string): Promise<void> => {
-    if (!useClozeRetry || isSubmitting || awaitingWrongAccept) {
+    if (!useClozeRetry || isSubmitting) {
       return;
     }
     if (letter !== clozeNextLetter) {
@@ -605,7 +601,6 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
       setFeedback("");
       setFeedbackTone("neutral");
     }
-    setAwaitingWrongAccept(false);
     if (normalize(value) !== normalize(expectedAnswer)) {
       return;
     }
@@ -668,7 +663,6 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
     setFeedbackTone("neutral");
     setHintLetter("");
     setWrittenWordAssistanceIndexes([]);
-    setAwaitingWrongAccept(false);
     setAnswerRevealed(false);
     setLetterSuggestions([]);
     setWarmupRevealCount(0);
@@ -713,23 +707,11 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
           </>
         )}
         {answerRevealed && (
-          <>
-            <p className="revealed-answer">
-              <span>{t("review.answerLabel")}</span> {expectedAnswer}
-            </p>
-            {completionPreview && (
-              <>
-                <p className="revealed-answer">
-                  <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
-                </p>
-                {completionPreview.phrase && (
-                  <p className="revealed-answer">
-                    <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
-                  </p>
-                )}
-              </>
-            )}
-          </>
+          <RevealedReviewSummary
+            answer={expectedAnswer}
+            phrase={completionPreview?.phrase}
+            phraseTranslation={completionPreview?.phraseTranslation}
+          />
         )}
         <div className="actions">
           {!answerRevealed ? (
@@ -740,12 +722,15 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
             </>
           ) : (
             <>
-              <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting}>
+              <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting || reviewComplete}>
                 {t("review.passed")}
               </button>
-              <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting}>
+              <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting || reviewComplete}>
                 {t("review.failed")}
               </DangerousButton>
+              <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
+                {t("session.nextItem")}
+              </button>
             </>
           )}
         </div>
@@ -826,16 +811,11 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
         />
         {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
         {completionPreview && (
-          <>
-            <p className="revealed-answer">
-              <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
-            </p>
-            {completionPreview.phrase && (
-              <p className="revealed-answer">
-                <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
-              </p>
-            )}
-          </>
+          <RevealedReviewSummary
+            answer={completionPreview.word}
+            phrase={completionPreview.phrase}
+            phraseTranslation={completionPreview.phraseTranslation}
+          />
         )}
         <div className="actions">
           <button
@@ -844,13 +824,16 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
             onPointerDown={(event) => event.preventDefault()}
             onTouchStart={(event) => event.preventDefault()}
             onClick={revealNextWarmupLetter}
-            disabled={isSubmitting || warmupRevealCount >= warmupRevealOrder.length}
+            disabled={isSubmitting || reviewComplete || warmupRevealCount >= warmupRevealOrder.length}
           >
             {t("word.warmupRevealButton")}
           </button>
-          <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
+          <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting || reviewComplete}>
             {t("word.failButton")}
           </DangerousButton>
+          <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
+            {t("session.nextItem")}
+          </button>
         </div>
       </div>
     );
@@ -895,27 +878,25 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
         )}
         {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
         {completionPreview && (
-          <>
-            <p className="revealed-answer">
-              <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
-            </p>
-            {completionPreview.phrase && (
-              <p className="revealed-answer">
-                <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
-              </p>
-            )}
-          </>
+          <RevealedReviewSummary
+            answer={completionPreview.word}
+            phrase={completionPreview.phrase}
+            phraseTranslation={completionPreview.phraseTranslation}
+          />
         )}
         <div className="actions">
           {clozePhrase ? (
-            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
+            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting || reviewComplete}>
               {t("word.failButton")}
             </DangerousButton>
           ) : (
-            <button type="button" onClick={() => void continueSuccessfulRetry()} disabled={isSubmitting}>
+            <button type="button" onClick={() => void continueSuccessfulRetry()} disabled={isSubmitting || reviewComplete}>
               {t("review.continue")}
             </button>
           )}
+          <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
+            {t("session.nextItem")}
+          </button>
         </div>
       </div>
     );
@@ -982,7 +963,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
         }}
         placeholder={t("word.input.placeholder")}
         data-testid="word-input"
-        disabled={isSubmitting || awaitingWrongAccept}
+        disabled={isSubmitting}
         autoFocus
         autoCapitalize="none"
         autoCorrect="off"
@@ -990,16 +971,11 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
       />
       {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
       {completionPreview && (
-        <>
-          <p className="revealed-answer">
-            <span>{t("word.completionWordLabel")}</span> {completionPreview.word}
-          </p>
-          {completionPreview.phrase && (
-            <p className="revealed-answer">
-              <span>{t("word.completionPhraseLabel")}</span> {completionPreview.phrase}
-            </p>
-          )}
-        </>
+        <RevealedReviewSummary
+          answer={completionPreview.word}
+          phrase={completionPreview.phrase}
+          phraseTranslation={completionPreview.phraseTranslation}
+        />
       )}
       {letterSuggestions.length > 0 && (
         <div className="letter-suggestions" role="group" aria-label={t("word.letterSuggestions")}>
@@ -1009,7 +985,7 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
               type="button"
               className="secondary-button letter-suggestion-button"
               onClick={() => handleAnswerChange(answer + letter)}
-              disabled={isSubmitting || awaitingWrongAccept}
+              disabled={isSubmitting}
             >
               {letter}
             </button>
@@ -1019,28 +995,22 @@ export default function WordReview({ item, onAnswered }: WordReviewProps): JSX.E
       <p className="hint">{hint ? t("word.hint", { letter: hint }) : "\u00a0"}</p>
       <p className="hint" data-testid="word-hint-count">{t("word.hintCount", { count: totalWrittenWordAssistanceSteps })}</p>
       <div className="actions">
-        {!awaitingWrongAccept && (
-          <>
-            <button
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onPointerDown={(event) => event.preventDefault()}
-              onTouchStart={(event) => event.preventDefault()}
-              onClick={handleHintButtonPress}
-              disabled={isSubmitting}
-            >
-              {t("word.hintButton")}
-            </button>
-            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting}>
-              {t("word.failButton")}
-            </DangerousButton>
-          </>
-        )}
-        {awaitingWrongAccept && (
-          <button onClick={() => void acceptWrongAnswer()} disabled={isSubmitting}>
-            {t("word.acceptButton")}
-          </button>
-        )}
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onPointerDown={(event) => event.preventDefault()}
+          onTouchStart={(event) => event.preventDefault()}
+          onClick={handleHintButtonPress}
+          disabled={isSubmitting || reviewComplete}
+        >
+          {t("word.hintButton")}
+        </button>
+        <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting || reviewComplete}>
+          {t("word.failButton")}
+        </DangerousButton>
+        <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
+          {t("session.nextItem")}
+        </button>
       </div>
     </div>
   );
