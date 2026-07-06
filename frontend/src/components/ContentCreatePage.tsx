@@ -4,6 +4,8 @@ import { confirmContent, fetchContentItemDetail, fetchContentTopicContexts, fetc
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentPreviewResponse, SessionItem } from "../types";
+import DialogActionIcon from "./DialogActionIcon";
+import DialogTurnsList from "./DialogTurnsList";
 import NewItem from "./NewItem";
 import TargetPhraseText from "./TargetPhraseText";
 
@@ -11,18 +13,6 @@ const CREATE_NEW_OPTION = "__create_new__";
 type DialogLength = "standard" | "short_three";
 type RequiredWordsLanguage = "source" | "target";
 type PhraseActionStatus = "idle" | "saving" | "added" | "exists" | "error";
-
-type PhraseSelection = {
-  turnIndex: number;
-  sourceLine: string;
-  targetLine: string;
-  tokenIndexes: number[];
-};
-
-type PendingPhraseAdd = PhraseSelection & {
-  sourceText: string;
-  targetText: string;
-};
 
 export default function ContentCreatePage(): JSX.Element {
   const { t } = useI18n();
@@ -45,8 +35,6 @@ export default function ContentCreatePage(): JSX.Element {
   const [playingSavedDialog, setPlayingSavedDialog] = useState<boolean>(false);
   const [phraseActionStatus, setPhraseActionStatus] = useState<Record<string, PhraseActionStatus>>({});
   const [phraseActionError, setPhraseActionError] = useState<Record<string, string>>({});
-  const [phraseSelection, setPhraseSelection] = useState<PhraseSelection | null>(null);
-  const [pendingPhraseAdd, setPendingPhraseAdd] = useState<PendingPhraseAdd | null>(null);
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [previousContexts, setPreviousContexts] = useState<string[]>([]);
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
@@ -91,8 +79,6 @@ export default function ContentCreatePage(): JSX.Element {
         setPlayingSavedDialog(false);
         setPhraseActionStatus({});
         setPhraseActionError({});
-        setPhraseSelection(null);
-        setPendingPhraseAdd(null);
         setWordActionStatus({});
         setPendingWordAdd(null);
         setError("");
@@ -115,8 +101,6 @@ export default function ContentCreatePage(): JSX.Element {
           setPlayingSavedDialog(false);
           setPhraseActionStatus({});
           setPhraseActionError({});
-          setPhraseSelection(null);
-          setPendingPhraseAdd(null);
           setWordActionStatus({});
           setPendingWordAdd(null);
           setError("");
@@ -180,8 +164,6 @@ export default function ContentCreatePage(): JSX.Element {
     setPlayingSavedDialog(false);
     setPhraseActionStatus({});
     setPhraseActionError({});
-    setPhraseSelection(null);
-    setPendingPhraseAdd(null);
     setWordActionStatus({});
     setPendingWordAdd(null);
     setPreview(null);
@@ -236,8 +218,6 @@ export default function ContentCreatePage(): JSX.Element {
       setPreview(null);
       setPhraseActionStatus({});
       setPhraseActionError({});
-      setPhraseSelection(null);
-      setPendingPhraseAdd(null);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
@@ -336,6 +316,7 @@ export default function ContentCreatePage(): JSX.Element {
             dialog_phrase_turns: detail.dialog_phrase_turns || [],
             dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
+            compare_words: detail.compare_words || [],
             item_questions: detail.item_questions || [],
           });
           setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
@@ -396,48 +377,7 @@ export default function ContentCreatePage(): JSX.Element {
     }
   };
 
-  const phraseSelectionKey = (turnIndex: number): string => `saved-${turnIndex}-phrase`;
-
   const wholeTurnPhraseKey = (turnIndex: number): string => `saved-${turnIndex}-whole-phrase`;
-
-  const isSelectingPhraseForTurn = (turnIndex: number): boolean => phraseSelection?.turnIndex === turnIndex;
-
-  const selectedPhraseTargetText = (selection: PhraseSelection): string => {
-    const tokens = lineTokens(selection.targetLine);
-    return [...selection.tokenIndexes]
-      .sort((left, right) => left - right)
-      .map((index) => cleanToken(tokens[index] || ""))
-      .filter(Boolean)
-      .join(" ");
-  };
-
-  const selectedPhraseTokenClass = (tokenIndex: number): string => {
-    if (!phraseSelection?.tokenIndexes.includes(tokenIndex)) {
-      return "";
-    }
-    const sortedIndexes = [...phraseSelection.tokenIndexes].sort((left, right) => left - right);
-    const firstIndex = sortedIndexes[0];
-    const lastIndex = sortedIndexes[sortedIndexes.length - 1];
-    if (tokenIndex === firstIndex && tokenIndex === lastIndex) {
-      return "turn-token-button-selected turn-token-button-selected-single";
-    }
-    if (tokenIndex === firstIndex) {
-      return "turn-token-button-selected turn-token-button-selected-start";
-    }
-    if (tokenIndex === lastIndex) {
-      return "turn-token-button-selected turn-token-button-selected-end";
-    }
-    return "turn-token-button-selected turn-token-button-selected-middle";
-  };
-
-  const startPhraseSelection = (turnIndex: number, sourceLine: string, targetLine: string): void => {
-    setPhraseSelection({
-      turnIndex,
-      sourceLine,
-      targetLine,
-      tokenIndexes: [],
-    });
-  };
 
   const openPhraseItem = async (itemId: number): Promise<void> => {
     setLoadingLinkedWord(true);
@@ -463,126 +403,11 @@ export default function ContentCreatePage(): JSX.Element {
         dialog_phrase_turns: detail.dialog_phrase_turns || [],
         dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
         related_dialogs: detail.related_dialogs || [],
+        compare_words: detail.compare_words || [],
         item_questions: detail.item_questions || [],
       });
     } finally {
       setLoadingLinkedWord(false);
-    }
-  };
-
-  const togglePhraseSelectionToken = (
-    turnIndex: number,
-    sourceLine: string,
-    targetLine: string,
-    tokenIndex: number,
-  ): void => {
-    setPhraseSelection((current) => {
-      if (!current || current.turnIndex !== turnIndex) {
-        return {
-          turnIndex,
-          sourceLine,
-          targetLine,
-          tokenIndexes: [tokenIndex],
-        };
-      }
-      const exists = current.tokenIndexes.includes(tokenIndex);
-      const sortedIndexes = [...current.tokenIndexes].sort((left, right) => left - right);
-      const firstIndex = sortedIndexes[0] ?? tokenIndex;
-      const lastIndex = sortedIndexes[sortedIndexes.length - 1] ?? tokenIndex;
-      let nextIndexes: number[];
-      if (exists) {
-        if (tokenIndex === firstIndex) {
-          nextIndexes = sortedIndexes.slice(1);
-        } else if (tokenIndex === lastIndex) {
-          nextIndexes = sortedIndexes.slice(0, -1);
-        } else {
-          nextIndexes = [tokenIndex];
-        }
-      } else {
-        const rangeStart = Math.min(firstIndex, tokenIndex);
-        const rangeEnd = Math.max(lastIndex, tokenIndex);
-        nextIndexes = Array.from({ length: rangeEnd - rangeStart + 1 }, (_, offset) => rangeStart + offset);
-      }
-      return {
-        ...current,
-        sourceLine,
-        targetLine,
-        tokenIndexes: nextIndexes,
-      };
-    });
-  };
-
-  const prepareSelectedPhraseFromDialog = async (): Promise<void> => {
-    const selection = phraseSelection;
-    if (!selection || selection.tokenIndexes.length < 2 || !savedDialogId) {
-      return;
-    }
-    const targetText = selectedPhraseTargetText(selection);
-    if (!targetText) {
-      return;
-    }
-    const statusKey = phraseSelectionKey(selection.turnIndex);
-    setPhraseActionStatus((current) => ({ ...current, [statusKey]: "saving" }));
-    setPhraseActionError((current) => ({ ...current, [statusKey]: "" }));
-    try {
-      const resultPayload = await quickAddPhraseFromConversation(
-        "",
-        targetText,
-        sourceLanguage,
-        targetLanguage,
-        true,
-        savedDialogId,
-        selection.turnIndex,
-        selection.sourceLine,
-        selection.targetLine,
-      );
-      setPendingPhraseAdd({
-        ...selection,
-        sourceText: resultPayload.source_text || "",
-        targetText: resultPayload.target_text || targetText,
-      });
-      setPhraseActionStatus((current) => ({ ...current, [statusKey]: "idle" }));
-    } catch (error) {
-      setPhraseActionStatus((current) => ({ ...current, [statusKey]: "error" }));
-      setPhraseActionError((current) => ({
-        ...current,
-        [statusKey]: error instanceof Error && error.message ? error.message : t("newItem.sentenceAddError"),
-      }));
-    }
-  };
-
-  const addSelectedPhraseFromDialog = async (): Promise<void> => {
-    const pending = pendingPhraseAdd;
-    if (!pending || !pending.targetText || !savedDialogId) {
-      return;
-    }
-    const statusKey = phraseSelectionKey(pending.turnIndex);
-    setPhraseActionStatus((current) => ({ ...current, [statusKey]: "saving" }));
-    setPhraseActionError((current) => ({ ...current, [statusKey]: "" }));
-    try {
-      const resultPayload = await quickAddPhraseFromConversation(
-        pending.sourceText,
-        pending.targetText,
-        sourceLanguage,
-        targetLanguage,
-        false,
-        savedDialogId,
-        pending.turnIndex,
-        pending.sourceLine,
-        pending.targetLine,
-      );
-      if (resultPayload.id) {
-        await openPhraseItem(resultPayload.id);
-      }
-      setPhraseActionStatus((current) => ({ ...current, [statusKey]: resultPayload.created ? "added" : "exists" }));
-      setPhraseSelection(null);
-      setPendingPhraseAdd(null);
-    } catch (error) {
-      setPhraseActionStatus((current) => ({ ...current, [statusKey]: "error" }));
-      setPhraseActionError((current) => ({
-        ...current,
-        [statusKey]: error instanceof Error && error.message ? error.message : t("newItem.sentenceAddError"),
-      }));
     }
   };
 
@@ -619,56 +444,6 @@ export default function ContentCreatePage(): JSX.Element {
         [statusKey]: error instanceof Error && error.message ? error.message : t("newItem.sentenceAddError"),
       }));
     }
-  };
-
-  const renderTargetLineWithWordLinks = (targetText: string, sourceText: string, turnIndex: number): JSX.Element => {
-    const tokens = lineTokens(targetText);
-    if (!tokens.length) {
-      return <>{targetText}</>;
-    }
-
-    return (
-      <>
-        {tokens.map((token, tokenIndex) => {
-          const normalized = cleanToken(token);
-          if (!normalized) {
-            return (
-              <span key={`saved-${turnIndex}-punct-${tokenIndex}`} className="turn-token-wrap">
-                {token}
-                {tokenIndex < tokens.length - 1 ? " " : ""}
-              </span>
-            );
-          }
-          const statusKey = `saved-${turnIndex}-target-${tokenIndex}`;
-          const status = wordActionStatus[statusKey] || "idle";
-          const isSelectingPhrase = isSelectingPhraseForTurn(turnIndex);
-          const selectedClass = isSelectingPhrase ? selectedPhraseTokenClass(tokenIndex) : "";
-          return (
-            <span key={statusKey} className="turn-token-wrap">
-              <button
-                type="button"
-                className={`turn-token-button ${selectedClass}`}
-                onClick={() => {
-                  if (isSelectingPhrase) {
-                    togglePhraseSelectionToken(turnIndex, sourceText, targetText, tokenIndex);
-                    return;
-                  }
-                  void requestAddWordFromDialogToken(statusKey, token, turnIndex, sourceText, targetText);
-                }}
-                disabled={(!isSelectingPhrase && status === "saving") || !savedDialogId}
-              >
-                {token}
-              </button>
-              {tokenIndex < tokens.length - 1 ? " " : ""}
-              {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
-              {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
-              {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
-              {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
-            </span>
-          );
-        })}
-      </>
-    );
   };
 
   return (
@@ -856,102 +631,61 @@ export default function ContentCreatePage(): JSX.Element {
             </div>
           )}
           {savedDialogTurns.length > 0 && (
-            <ul className="conversation-preview-list">
-              {savedDialogTurns.map((turn, index) => {
-                const speaker = speakerForTurn(turn.speaker, index);
+            <DialogTurnsList
+              dialogId={savedDialogId || -1}
+              turns={savedDialogTurns}
+              sourceLanguage={sourceLanguage}
+              targetLanguage={targetLanguage}
+              tokenStatus={wordActionStatus}
+              statusKeyPrefixBase="saved"
+              onOpenItem={openPhraseItem}
+              onTokenClick={(statusKey, token, turnIndex, sourceText, targetText) => void requestAddWordFromDialogToken(
+                statusKey,
+                token,
+                turnIndex,
+                sourceText,
+                targetText,
+              )}
+              renderLeadingAction={(turn) => turn.phrase_audio_url ? (
+                <button
+                  type="button"
+                  className="secondary-button exercise-action-icon-button dialog-inline-action-button"
+                  onClick={() => playAudioUrl(turn.phrase_audio_url)}
+                  aria-label={t("newItem.playTurnAudio")}
+                  title={t("newItem.playTurnAudio")}
+                >
+                  <DialogActionIcon name="play" />
+                </button>
+              ) : null}
+              renderTurnActions={(turn, index) => {
+                const phraseKey = wholeTurnPhraseKey(index);
                 return (
-                  <li
-                    key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
-                    className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
-                  >
-                    <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                    <TargetPhraseText as="p" className="conversation-line" variant="dialog">
-                      {renderTargetLineWithWordLinks(turn.target_text, turn.source_text, index)}
-                    </TargetPhraseText>
-                    {turn.phrase_audio_url && (
-                      <button
-                        type="button"
-                        className="turn-audio-button"
-                        onClick={() => playAudioUrl(turn.phrase_audio_url)}
-                      >
-                        {t("newItem.playTurnAudio")}
-                      </button>
+                  <>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => void addWholeTurnPhraseFromDialog(turn, index)}
+                      disabled={!savedDialogId || phraseActionStatus[phraseKey] === "saving"}
+                    >
+                      {phraseActionStatus[phraseKey] === "saving"
+                        ? t("newItem.sentenceAddSaving")
+                        : t("content.preview.savePhrase")}
+                    </button>
+                    {phraseActionStatus[phraseKey] === "added" && (
+                      <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
                     )}
-                    <p className="conversation-line">{turn.source_text}</p>
-                    <div className="actions turn-action-row">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => void addWholeTurnPhraseFromDialog(turn, index)}
-                        disabled={!savedDialogId || phraseActionStatus[wholeTurnPhraseKey(index)] === "saving"}
-                      >
-                        {phraseActionStatus[wholeTurnPhraseKey(index)] === "saving"
-                          ? t("newItem.sentenceAddSaving")
-                          : t("content.preview.savePhrase")}
-                      </button>
-                      {isSelectingPhraseForTurn(index) ? (
-                        <>
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() => setPhraseSelection(null)}
-                            disabled={phraseActionStatus[phraseSelectionKey(index)] === "saving"}
-                          >
-                            {t("dialogs.cancelPhraseSelection")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void prepareSelectedPhraseFromDialog()}
-                            disabled={
-                              (phraseSelection?.tokenIndexes.length || 0) < 2
-                              || phraseActionStatus[phraseSelectionKey(index)] === "saving"
-                            }
-                          >
-                            {phraseActionStatus[phraseSelectionKey(index)] === "saving"
-                              ? t("newItem.sentenceAddSaving")
-                              : t("dialogs.addSelectedPhrase")}
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() => startPhraseSelection(index, turn.source_text, turn.target_text)}
-                          disabled={!savedDialogId || phraseActionStatus[phraseSelectionKey(index)] === "saving"}
-                        >
-                          {t("dialogs.selectPhraseWords")}
-                        </button>
-                      )}
-                      {phraseActionStatus[wholeTurnPhraseKey(index)] === "added" && (
-                        <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
-                      )}
-                      {phraseActionStatus[wholeTurnPhraseKey(index)] === "exists" && (
-                        <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
-                      )}
-                      {phraseActionStatus[wholeTurnPhraseKey(index)] === "error" && (
-                        <span className="turn-token-status">
-                          {phraseActionError[wholeTurnPhraseKey(index)] || t("newItem.sentenceAddError")}
-                        </span>
-                      )}
-                      {phraseActionStatus[phraseSelectionKey(index)] === "added" && (
-                        <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
-                      )}
-                      {phraseActionStatus[phraseSelectionKey(index)] === "exists" && (
-                        <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
-                      )}
-                      {phraseActionStatus[phraseSelectionKey(index)] === "error" && (
-                        <span className="turn-token-status">
-                          {phraseActionError[phraseSelectionKey(index)] || t("newItem.sentenceAddError")}
-                        </span>
-                      )}
-                    </div>
-                    {isSelectingPhraseForTurn(index) && (
-                      <p className="hint">{t("dialogs.selectedPhraseHint")}</p>
+                    {phraseActionStatus[phraseKey] === "exists" && (
+                      <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
                     )}
-                  </li>
+                    {phraseActionStatus[phraseKey] === "error" && (
+                      <span className="turn-token-status">
+                        {phraseActionError[phraseKey] || t("newItem.sentenceAddError")}
+                      </span>
+                    )}
+                  </>
                 );
-              })}
-            </ul>
+              }}
+            />
           )}
         </section>
       )}
@@ -979,40 +713,6 @@ export default function ContentCreatePage(): JSX.Element {
               </button>
               <button type="button" onClick={() => void confirmAddWordFromDialog()} disabled={addingWord}>
                 {addingWord ? t("newItem.wordAddSaving") : t("newItem.wordAddConfirmButton")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pendingPhraseAdd && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal add-word-modal">
-            <p className="add-word-modal-title">
-              <strong>{t("newItem.sentenceAddTitle")}</strong>
-            </p>
-            <p className="add-word-modal-word">{pendingPhraseAdd.targetText}</p>
-            <p className="add-word-modal-meaning">
-              {t("newItem.sentenceAddTranslation", { translation: pendingPhraseAdd.sourceText })}
-            </p>
-            <p className="hint">{t("dialogs.phraseSelectionConfirmPrompt")}</p>
-            <div className="actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setPendingPhraseAdd(null)}
-                disabled={phraseActionStatus[phraseSelectionKey(pendingPhraseAdd.turnIndex)] === "saving"}
-              >
-                {t("newItem.sentenceAddCancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void addSelectedPhraseFromDialog()}
-                disabled={phraseActionStatus[phraseSelectionKey(pendingPhraseAdd.turnIndex)] === "saving"}
-              >
-                {phraseActionStatus[phraseSelectionKey(pendingPhraseAdd.turnIndex)] === "saving"
-                  ? t("newItem.sentenceAddSaving")
-                  : t("newItem.sentenceAddConfirmButton")}
               </button>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { quickAddPhraseFromConversation } from "../api";
@@ -27,6 +28,8 @@ interface DialogTurnTextProps {
   onOpenItem?: (itemId: number) => Promise<void>;
   wordMatches?: (token: string, word: string) => boolean;
   showPhraseSelection?: boolean;
+  leadingAction?: ReactNode;
+  extraActions?: ReactNode;
 }
 
 const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
@@ -47,6 +50,8 @@ export default function DialogTurnText({
   onOpenItem,
   wordMatches,
   showPhraseSelection = true,
+  leadingAction,
+  extraActions,
 }: DialogTurnTextProps): JSX.Element {
   const { t } = useI18n();
   const [selectingPhrase, setSelectingPhrase] = useState<boolean>(false);
@@ -184,48 +189,56 @@ export default function DialogTurnText({
 
   return (
     <>
-      <TargetPhraseText as="span" hideText={hideTargetText} variant="dialog">
-        <>
-          {tokens.map((token, tokenIndex) => {
-            const normalized = cleanToken(token);
-            if (!normalized) {
+      <div className="dialog-target-line">
+        {leadingAction}
+        <TargetPhraseText as="span" hideText={hideTargetText} variant="dialog">
+          <>
+            {tokens.map((token, tokenIndex) => {
+              const normalized = cleanToken(token);
+              if (!normalized) {
+                return (
+                  <span key={`${prefix}-punct-${tokenIndex}`} className="turn-token-wrap">
+                    {token}
+                    {tokenIndex < tokens.length - 1 ? " " : ""}
+                  </span>
+                );
+              }
+              const statusKey = `${prefix}-${tokenIndex}`;
+              const status = tokenStatus[statusKey] || "idle";
+              const selectedClass = selectingPhrase ? selectedPhraseTokenClass(tokenIndex) : "";
+              const showHighlight = !!highlightWord && wordMatches?.(token, highlightWord);
               return (
-                <span key={`${prefix}-punct-${tokenIndex}`} className="turn-token-wrap">
-                  {token}
+                <span key={statusKey} className="turn-token-wrap">
+                  <button
+                    type="button"
+                    className={`turn-token-button ${showHighlight ? "turn-word-highlight" : ""} ${selectedClass}`}
+                    onClick={() => {
+                      if (selectingPhrase) {
+                        togglePhraseSelectionToken(tokenIndex);
+                        return;
+                      }
+                      onTokenClick?.(statusKey, token, tokenIndex);
+                    }}
+                    disabled={!selectingPhrase && status === "saving"}
+                  >
+                    {token}
+                  </button>
                   {tokenIndex < tokens.length - 1 ? " " : ""}
+                  {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
+                  {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
+                  {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
+                  {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
                 </span>
               );
-            }
-            const statusKey = `${prefix}-${tokenIndex}`;
-            const status = tokenStatus[statusKey] || "idle";
-            const selectedClass = selectingPhrase ? selectedPhraseTokenClass(tokenIndex) : "";
-            const showHighlight = !!highlightWord && wordMatches?.(token, highlightWord);
-            return (
-              <span key={statusKey} className="turn-token-wrap">
-                <button
-                  type="button"
-                  className={`turn-token-button ${showHighlight ? "turn-word-highlight" : ""} ${selectedClass}`}
-                  onClick={() => {
-                    if (selectingPhrase) {
-                      togglePhraseSelectionToken(tokenIndex);
-                      return;
-                    }
-                    onTokenClick?.(statusKey, token, tokenIndex);
-                  }}
-                  disabled={!selectingPhrase && status === "saving"}
-                >
-                  {token}
-                </button>
-                {tokenIndex < tokens.length - 1 ? " " : ""}
-                {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
-                {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
-                {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
-                {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
-              </span>
-            );
-          })}
-        </>
-      </TargetPhraseText>
+            })}
+          </>
+        </TargetPhraseText>
+      </div>
+      <p className="conversation-line">
+        {hideTargetText
+          ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
+          : sourceText}
+      </p>
       {!hideTargetText && showPhraseSelection && (
         <>
           <div className="actions turn-action-row">
@@ -247,6 +260,7 @@ export default function DialogTurnText({
                 {t("dialogs.selectPhraseWords")}
               </button>
             )}
+            {extraActions}
             {phraseStatus === "added" && <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>}
             {phraseStatus === "exists" && <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>}
             {phraseStatus === "error" && <span className="turn-token-status">{phraseError || t("newItem.sentenceAddError")}</span>}
@@ -254,6 +268,11 @@ export default function DialogTurnText({
           {selectingPhrase && <p className="hint">{t("dialogs.selectedPhraseHint")}</p>}
         </>
       )}
+      {(hideTargetText || !showPhraseSelection) && extraActions ? (
+        <div className="actions turn-action-row">
+          {extraActions}
+        </div>
+      ) : null}
       {pendingPhraseAdd && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal add-word-modal">

@@ -79,6 +79,26 @@ ARTICLES_BY_LANGUAGE = {
 }
 
 
+def _compare_words_payload(item: Item) -> list[dict]:
+    if item.item_type != Item.ItemType.WORD:
+        return []
+    linked_words = list(
+        item.confusing_with.filter(item_type=Item.ItemType.WORD)
+        .order_by("german_text", "spanish_text", "id")
+        .values(
+            "id",
+            "item_type",
+            "spanish_text",
+            "german_text",
+            "word_type",
+            "audio_url",
+            "exercise_phrases",
+            "created_at",
+        )
+    )
+    return linked_words
+
+
 def _word_refresh_model() -> str:
     configured = str(getattr(settings, "OPENAI_WORD_REFRESH_MODEL", "")).strip()
     if configured:
@@ -212,6 +232,7 @@ class ContentItemDetailView(APIView):
                 "dialog_phrase_turns": dialog_phrase_payload["turns"],
                 "dialog_phrase_odd_index": dialog_phrase_payload["odd_index"],
                 "related_dialogs": related_dialogs_map.get(item.id, []),
+                "compare_words": _compare_words_payload(item),
                 "item_questions": item_question_history(item),
             }
         )
@@ -258,6 +279,118 @@ class ContentItemDetailView(APIView):
 
 def _dialog_phrase_options_for_item(item: Item, *, user) -> dict:
     return build_dialog_phrase_match_payload(item, user=user)
+
+
+class ContentItemCompareWordsSearchView(APIView):
+    def get(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        query = (request.query_params.get("q", "") or "").strip()
+        page = _safe_positive_int(request.query_params.get("page"), 1)
+        page_size = _safe_positive_int(request.query_params.get("page_size"), 10, maximum=50)
+        offset = (page - 1) * page_size
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        linked_ids = set(item.confusing_with.values_list("id", flat=True))
+        queryset = apply_user_scope(Item.objects, user).filter(
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+        ).exclude(id=item.id)
+        if linked_ids:
+            queryset = queryset.exclude(id__in=linked_ids)
+        if query:
+            queryset = queryset.filter(Q(spanish_text__icontains=query) | Q(german_text__icontains=query))
+
+        rows = list(
+            queryset.order_by("german_text", "spanish_text", "id")
+            .values("id", "item_type", "spanish_text", "german_text", "word_type", "audio_url", "created_at")[offset : offset + page_size + 1]
+        )
+        has_more = len(rows) > page_size
+        rows = rows[:page_size]
+        return Response({
+            "items": rows,
+            "page": page,
+            "page_size": page_size,
+            "has_more": has_more,
+            "next_page": page + 1 if has_more else None,
+            "query": query,
+        })
+
+
+class ContentItemCompareWordsView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        raw_word_ids = request.data.get("word_ids", [])
+        if not isinstance(raw_word_ids, list):
+            return Response({"detail": "word_ids must be a list"}, status=status.HTTP_400_BAD_REQUEST)
+
+        requested_ids: list[int] = []
+        for raw_id in raw_word_ids:
+            try:
+                parsed_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if parsed_id > 0 and parsed_id != item.id and parsed_id not in requested_ids:
+                requested_ids.append(parsed_id)
+
+        if requested_ids:
+            linked_items = list(
+                apply_user_scope(Item.objects, user).filter(
+                    id__in=requested_ids,
+                    item_type=Item.ItemType.WORD,
+                    source_language=source_language,
+                    target_language=target_language,
+                )
+            )
+            item.confusing_with.add(*linked_items)
+
+        item.refresh_from_db()
+        return Response({"compare_words": _compare_words_payload(item)})
+
+
+class ContentItemCompareWordDetailView(APIView):
+    def delete(self, request: Request, item_id: int, linked_item_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        linked_item = apply_user_scope(Item.objects, user).filter(
+            id=linked_item_id,
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not linked_item:
+            return Response({"detail": "Linked item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        item.confusing_with.remove(linked_item)
+        item.refresh_from_db()
+        return Response({"compare_words": _compare_words_payload(item)})
 
 
 def _phrase_audio_url_for_turn(turn: DialogTurn, *, user, fallback_item: Item | None = None) -> str:

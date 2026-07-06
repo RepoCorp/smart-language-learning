@@ -2209,6 +2209,101 @@ def test_quick_add_existing_noun_missing_articles_opens_existing_item(monkeypatc
     assert existing.spanish_text == "el grupo"
     assert existing.german_text == "die Gruppe"
     assert existing.word_type == "noun"
+
+
+@pytest.mark.django_db
+def test_content_item_detail_includes_compare_words():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="pedir",
+        german_text="bitten",
+        source_language="spanish",
+        target_language="german",
+        word_type="verb",
+    )
+    linked = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="preguntar",
+        german_text="fragen",
+        source_language="spanish",
+        target_language="german",
+        word_type="verb",
+    )
+    item.confusing_with.add(linked)
+
+    client = APIClient()
+    response = client.get(f"/api/content/items/{item.id}?source_language=spanish&target_language=german")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["compare_words"]) == 1
+    assert payload["compare_words"][0]["id"] == linked.id
+    assert payload["compare_words"][0]["german_text"] == "fragen"
+
+
+@pytest.mark.django_db
+def test_compare_words_search_add_and_remove():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="pedir",
+        german_text="bitten",
+        source_language="spanish",
+        target_language="german",
+        word_type="verb",
+    )
+    linked = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="preguntar",
+        german_text="fragen",
+        source_language="spanish",
+        target_language="german",
+        word_type="verb",
+    )
+    extra = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="decir",
+        german_text="sagen",
+        source_language="spanish",
+        target_language="german",
+        word_type="verb",
+    )
+
+    client = APIClient()
+    search_response = client.get(
+        f"/api/content/items/{item.id}/compare-words/search?source_language=spanish&target_language=german&q=frag"
+    )
+
+    assert search_response.status_code == 200
+    search_payload = search_response.json()
+    assert [row["id"] for row in search_payload["items"]] == [linked.id]
+
+    add_response = client.post(
+        f"/api/content/items/{item.id}/compare-words?source_language=spanish&target_language=german",
+        {"word_ids": [linked.id, extra.id]},
+        format="json",
+    )
+
+    assert add_response.status_code == 200
+    item.refresh_from_db()
+    linked.refresh_from_db()
+    assert set(item.confusing_with.values_list("id", flat=True)) == {linked.id, extra.id}
+    assert item.id in set(linked.confusing_with.values_list("id", flat=True))
+
+    search_after_add = client.get(
+        f"/api/content/items/{item.id}/compare-words/search?source_language=spanish&target_language=german"
+    )
+    assert search_after_add.status_code == 200
+    assert search_after_add.json()["items"] == []
+
+    remove_response = client.delete(
+        f"/api/content/items/{item.id}/compare-words/{linked.id}?source_language=spanish&target_language=german"
+    )
+
+    assert remove_response.status_code == 200
+    item.refresh_from_db()
+    linked.refresh_from_db()
+    assert set(item.confusing_with.values_list("id", flat=True)) == {extra.id}
+    assert item.id not in set(linked.confusing_with.values_list("id", flat=True))
     assert ItemDialogOccurrence.objects.filter(item=existing, dialog=dialog, turn_index=0).exists()
 
 

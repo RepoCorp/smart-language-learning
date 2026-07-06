@@ -39,6 +39,7 @@ class Item(models.Model):
     word_type = models.CharField(max_length=30, blank=True)
     audio_url = models.URLField(blank=True)
     exercise_phrases = models.JSONField(default=dict, blank=True)
+    confusing_with = models.ManyToManyField("self", blank=True, symmetrical=True)
     is_learned = models.BooleanField(default=False)
     is_difficult = models.BooleanField(default=False)
     difficult_marked_at = models.DateTimeField(null=True, blank=True)

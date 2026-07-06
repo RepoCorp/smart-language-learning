@@ -1,5 +1,9 @@
 # Todos
 
+Prioritarios:
+Play all dialogs is not playing all dialogs
+Still not seeing the tooltips for the dialog control in dialogs controls 
+
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
 Ejercicio de escribir la palabra muchas veces, como lo de los treinta minutos. Pero algo que sea rapido: dibujandola sobre preescrita, con letras de teclado que se iluminan, con mover letras…?
 Ponga pa practicar cuando se equivoca en el articulo
@@ -11,9 +15,7 @@ Ejercicios de expresiones no pueden ser como las frases
 En la sección de calentar palabra que muestre los espacios para cada letra
 Spread items from same phrase considering sides
 Modo no audio en ninguna parte (como cuando uno esta en publico y no puede escuchar)
-Continue en bloques automáticamente
 ejercicio de Ordenar letras
-Mover boton para siguiente palabra a la iquierda
 Que no seleccione el texto del boton en los bloques
 Retome focus after clicking letter option
 Slider para tamaño session, separado para review y para aprender
@@ -22,7 +24,6 @@ Que los ejercicios de un helper sean otros usos del helpee
 Escoger frases pa guardar en donde se guardan las palabras (que solo sea una pantalla para seleccionar todo)
 Generar dialogos con diferentes acentos
 Que los ejercicios de bloques capturen esas reglas de órdenes y grupos de palabras gramaticales
-Conteo de Palabras que sea solo las que ya se empezaron o son aprendidas
 Memorización de reglas, como lo de algunos casos en los que los sustantivos tienen un género en particular (PONS)
 With eleven labs it is sometimes truncating the dialog
 
@@ -35,19 +36,15 @@ ejercicio palabra aleman espanol, en una imagen tocar donde esta el ajo y ahi ap
 Que la imagen asociada a la palabra, o la palabra tenga una especie de carta, tenga un borde con un color dependiendo del tipo de la palabra, y/o una forma diferente de carta para el genero o alguna otra clasificacion
 Secuencia: recuperacion activa (ejercicio dificil o auto evaluacion) si falla un ejerccio de asociasion visual/motriz (auditiva?) y despues otro intento de recuperacion
 Gratificacion: asociada a la palabra, no solo confeti. Por ejemplo arrastrando palabra a la imagen, cuando llegue se encaja con la imagen de una manera satisfactoria, se agranda, suena, un sonido corto de exito, aparece la respuesta, de pronto una fusion de la imagen y la palabra
-en las preguntas botones con las preguntas mas frecuentes
-Que la conversacion de la pregunta mande la historia
 Que mutear en el ejercicio no lo lo silencie  si no que pare donde estaba para continuar en la misma parte si se desmutea
 en las ventanas, como generar contenido, limpiar y que las opciones empiecen colapsadas y solo abra el area si se hace click en ella
 
 De español a ingles no use articulo
 Que en los bloques uno tenga que armar sub bloques para ayudar con la estructura de la frase, o poner de entrada algunas palabras y solo tenga que ubicar en las que se ha equivocado en el pasado
 Verificar que escena siempre reprodusca las dos frases
-Solo mostrar los retries en el sentido que es, si mi error con la frase fue traduciendola al ingles, el ejercico de match frases no tiene sentido
 Que los bloques destino tengan el tamaño de la palabra, si hago lo de solo unas palabras para ubicar pensar si esas tambien tengan el tamaño y sirven de pista si eso ayuda o no
 The other exercise where with the cloze no se que no muestra la palabra en español si no que da la frase y un espacio en el que van apareciendo las letras una a una, en desorden para que el usuario la escriba cuando ya la haya identificado
 Add a "dangerous" button to generate a small, simple, and the cheapest one possible image that represents the word, to the word item views.
-I like the needs attention idea. What would it do with a word that is tagged as that?
 In the create content window, make dialog lenght and language of required words a simple radio
 Que al escoger sesión procure no incluir frases y sus palabras juntas
 Que cuando uno complete los items de la sesion le haga fiesta
@@ -64,7 +61,8 @@ Frases:
 - Una palabra marcada como dificil tiene prioridad para aparecer en las sessiones 
 
 Que la palabra en la imagen sea completa por ejemplo herauskommen y que se muestre
-
+Conversation goals are not fully working fine 
+Cuales son las diferencias entre los dialog windows para ver si se puede unificar mas (botones, scrolling...) (from item, from dialogs, from create content, and even conversation)
 # Trabajando en esto pero todavia no esta completo. Esta shelved lo que llevo. Buscar conversacin en Codex
 Que indefinido sea en sujeto
 Add con diese diesels...

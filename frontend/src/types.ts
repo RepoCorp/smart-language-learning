@@ -26,6 +26,17 @@ export interface DialogPhraseTurn {
   phrase_audio_url?: string;
 }
 
+export interface CompareWordRecord {
+  id: number;
+  item_type: "word";
+  spanish_text: string;
+  german_text: string;
+  word_type?: string;
+  audio_url?: string;
+  exercise_phrases?: ItemExercisePhrases;
+  created_at?: string;
+}
+
 export interface SessionRestoreState {
   repetition_count_es_to_de: number;
   interval_days_es_to_de: number;
@@ -86,6 +97,7 @@ export interface SessionItem {
       target_text: string;
     }>;
   }>;
+  compare_words?: CompareWordRecord[];
   item_questions?: ItemQuestionExchange[];
   session_restore_state?: SessionRestoreState;
 }
@@ -205,6 +217,7 @@ export interface ContentItemDetailResponse {
   dialog_phrase_turns?: DialogPhraseTurn[];
   dialog_phrase_odd_index?: number | null;
   related_dialogs?: SessionItem["related_dialogs"];
+  compare_words?: CompareWordRecord[];
   item_questions?: ItemQuestionExchange[];
 }
 

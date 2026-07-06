@@ -1,5 +1,8 @@
 from .content import (
     ContentConfirmView,
+    ContentItemCompareWordDetailView,
+    ContentItemCompareWordsSearchView,
+    ContentItemCompareWordsView,
     ContentDialogAudioRegenerateView,
     ContentDialogDetailView,
     ContentDialogTurnAudioView,
@@ -35,6 +38,9 @@ from .difficult_items import CompleteDifficultItemView
 
 __all__ = [
     "ContentConfirmView",
+    "ContentItemCompareWordDetailView",
+    "ContentItemCompareWordsSearchView",
+    "ContentItemCompareWordsView",
     "ContentDialogAudioRegenerateView",
     "ContentDialogDetailView",
     "ContentDialogTurnAudioView",

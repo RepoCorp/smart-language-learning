@@ -7,6 +7,7 @@ import {
   fetchContentTopicContexts,
   fetchContentTopics,
   generateContentDialogTurnAudio,
+  quickAddPhraseFromConversation,
   quickAddWordFromDialog,
   regenerateContentDialogAudio,
 } from "../api";
@@ -15,7 +16,8 @@ import { usePromptPreferences } from "../promptPreferences";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentDialogRecord, SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
-import DialogTurnText from "./DialogTurnText";
+import DialogActionIcon from "./DialogActionIcon";
+import DialogTurnsList from "./DialogTurnsList";
 import NewItem from "./NewItem";
 
 type WordActionStatus = "idle" | "saving" | "added" | "exists" | "error";
@@ -41,56 +43,6 @@ const DIALOGS_PAGE_SIZE = 20;
 const ALL_TOPICS_OPTION = "";
 const ALL_CONTEXTS_OPTION = "";
 
-type DialogActionIconName = "play" | "stop" | "refresh" | "text" | "dialog";
-
-function DialogActionIcon({ name }: { name: DialogActionIconName }): JSX.Element {
-  const commonProps = {
-    className: "item-action-icon",
-    viewBox: "0 0 24 24",
-    "aria-hidden": true,
-  };
-
-  if (name === "play") {
-    return (
-      <svg {...commonProps}>
-        <path d="M8 6v12l10-6-10-6Z" />
-      </svg>
-    );
-  }
-  if (name === "stop") {
-    return (
-      <svg {...commonProps}>
-        <rect x="7" y="7" width="10" height="10" rx="1.5" />
-      </svg>
-    );
-  }
-  if (name === "refresh") {
-    return (
-      <svg {...commonProps}>
-        <path d="M20 12a8 8 0 0 1-13.7 5.7" />
-        <path d="M4 12A8 8 0 0 1 17.7 6.3" />
-        <path d="M17 3v4h4" />
-        <path d="M7 21v-4H3" />
-      </svg>
-    );
-  }
-  if (name === "text") {
-    return (
-      <svg {...commonProps}>
-        <path d="M5 7h14" />
-        <path d="M12 7v10" />
-        <path d="M8 17h8" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...commonProps}>
-      <path d="M4 5h11v8H8l-4 4V5Z" />
-      <path d="M13 11h7v7l-3-3h-4" />
-    </svg>
-  );
-}
-
 export default function DialogsPage(): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
@@ -114,6 +66,8 @@ export default function DialogsPage(): JSX.Element {
   const [regeneratingAudioDialogId, setRegeneratingAudioDialogId] = useState<number | null>(null);
   const [loadingTurnAudioKey, setLoadingTurnAudioKey] = useState<string>("");
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, WordActionStatus>>({});
+  const [phraseActionStatus, setPhraseActionStatus] = useState<Record<string, WordActionStatus>>({});
+  const [phraseActionError, setPhraseActionError] = useState<Record<string, string>>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<PendingWordAdd | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
@@ -123,8 +77,6 @@ export default function DialogsPage(): JSX.Element {
   const dialogRefs = useRef<Map<number, HTMLLIElement>>(new Map());
   const turnRefs = useRef<Map<string, HTMLLIElement>>(new Map());
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
-  const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
-    speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
   const hideDialogText = targetPromptMode === "audio" && !showDialogText;
 
   useEffect(() => {
@@ -333,6 +285,7 @@ export default function DialogsPage(): JSX.Element {
         dialog_phrase_turns: detail.dialog_phrase_turns || [],
         dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
         related_dialogs: detail.related_dialogs || [],
+        compare_words: detail.compare_words || [],
         item_questions: detail.item_questions || [],
       });
     } finally {
@@ -347,6 +300,8 @@ export default function DialogsPage(): JSX.Element {
       setError("");
       setExpandedDialogId(null);
       setWordActionStatus({});
+      setPhraseActionStatus({});
+      setPhraseActionError({});
       setPendingWordAdd(null);
       stopCurrentPlayback();
       try {
@@ -466,6 +421,44 @@ export default function DialogsPage(): JSX.Element {
     } finally {
       setAddingWord(false);
       setPendingWordAdd(null);
+    }
+  };
+
+  const wholeTurnPhraseKey = (dialogId: number, turnIndex: number): string => `dialog-${dialogId}-turn-${turnIndex}-whole-phrase`;
+
+  const addWholeTurnPhraseFromDialog = async (
+    dialogId: number,
+    turn: { source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string },
+    turnIndex: number,
+  ): Promise<void> => {
+    if (!turn.source_text.trim() || !turn.target_text.trim()) {
+      return;
+    }
+    const statusKey = wholeTurnPhraseKey(dialogId, turnIndex);
+    setPhraseActionStatus((current) => ({ ...current, [statusKey]: "saving" }));
+    setPhraseActionError((current) => ({ ...current, [statusKey]: "" }));
+    try {
+      const resultPayload = await quickAddPhraseFromConversation(
+        turn.source_text,
+        turn.target_text,
+        sourceLanguage,
+        targetLanguage,
+        false,
+        dialogId,
+        turnIndex,
+        turn.source_text,
+        turn.target_text,
+      );
+      if (resultPayload.id) {
+        await openLinkedWordItem(resultPayload.id);
+      }
+      setPhraseActionStatus((current) => ({ ...current, [statusKey]: resultPayload.created ? "added" : "exists" }));
+    } catch (error) {
+      setPhraseActionStatus((current) => ({ ...current, [statusKey]: "error" }));
+      setPhraseActionError((current) => ({
+        ...current,
+        [statusKey]: error instanceof Error && error.message ? error.message : t("newItem.sentenceAddError"),
+      }));
     }
   };
 
@@ -644,66 +637,70 @@ export default function DialogsPage(): JSX.Element {
 
   const renderDialogActionButtons = (dialog: ContentDialogRecord): JSX.Element => (
     <>
-      {dialogHasTurns(dialog) ? (
-        <button
-          type="button"
-          className="secondary-button exercise-action-icon-button dialog-list-action-button"
-          onClick={() => {
-            if (playingDialogId === dialog.dialog_id) {
-              stopCurrentPlayback();
-              return;
-            }
-            void playSingleDialog(dialog);
-          }}
-          disabled={loadingDialogId === dialog.dialog_id}
-          aria-label={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
-          title={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
-        >
-          <DialogActionIcon name={playingDialogId === dialog.dialog_id ? "stop" : "play"} />
-        </button>
-      ) : (
-        <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
-      )}
-      {targetPromptMode === "audio" && !!(dialog.turn_count || dialog.turns?.length) && (
-        <button
-          type="button"
-          className="secondary-button exercise-action-icon-button dialog-list-action-button"
-          onClick={() => setShowDialogText((value) => !value)}
-          aria-label={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
-          title={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
-          aria-pressed={showDialogText}
-        >
-          <DialogActionIcon name="text" />
-        </button>
-      )}
+      <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
+        {!!(dialog.turn_count || dialog.turns?.length) && (
+          <button
+            type="button"
+            className="secondary-button exercise-action-icon-button dialog-list-action-button"
+            onClick={() => void toggleDialogExpanded(dialog.dialog_id)}
+            disabled={loadingDialogId === dialog.dialog_id}
+            aria-label={loadingDialogId === dialog.dialog_id
+              ? t("dialogs.loading")
+              : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
+            title={loadingDialogId === dialog.dialog_id
+              ? t("dialogs.loading")
+              : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
+            aria-pressed={expandedDialogId === dialog.dialog_id}
+          >
+            <DialogActionIcon name="dialog" />
+          </button>
+        )}
+        {dialogHasTurns(dialog) ? (
+          <button
+            type="button"
+            className="secondary-button exercise-action-icon-button dialog-list-action-button"
+            onClick={() => {
+              if (playingDialogId === dialog.dialog_id) {
+                stopCurrentPlayback();
+                return;
+              }
+              void playSingleDialog(dialog);
+            }}
+            disabled={loadingDialogId === dialog.dialog_id}
+            aria-label={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
+            title={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
+          >
+            <DialogActionIcon name={playingDialogId === dialog.dialog_id ? "stop" : "play"} />
+          </button>
+        ) : (
+          <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
+        )}
+        {targetPromptMode === "audio" && !!(dialog.turn_count || dialog.turns?.length) && (
+          <button
+            type="button"
+            className="secondary-button exercise-action-icon-button dialog-list-action-button"
+            onClick={() => setShowDialogText((value) => !value)}
+            aria-label={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
+            title={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
+            aria-pressed={showDialogText}
+          >
+            <DialogActionIcon name="text" />
+          </button>
+        )}
+      </div>
       {!!(dialog.turn_count || dialog.turns?.length) && (
-        <button
-          type="button"
-          className="secondary-button exercise-action-icon-button dialog-list-action-button"
-          onClick={() => void toggleDialogExpanded(dialog.dialog_id)}
-          disabled={loadingDialogId === dialog.dialog_id}
-          aria-label={loadingDialogId === dialog.dialog_id
-            ? t("dialogs.loading")
-            : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
-          title={loadingDialogId === dialog.dialog_id
-            ? t("dialogs.loading")
-            : expandedDialogId === dialog.dialog_id ? t("dialogs.hideDialog") : t("dialogs.showDialog")}
-          aria-pressed={expandedDialogId === dialog.dialog_id}
-        >
-          <DialogActionIcon name="dialog" />
-        </button>
-      )}
-      {!!(dialog.turn_count || dialog.turns?.length) && (
-        <DangerousButton
-          type="button"
-          className="secondary-button exercise-action-icon-button dialog-list-action-button"
-          onConfirm={() => regenerateDialogAudio(dialog)}
-          disabled={regeneratingAudioDialogId === dialog.dialog_id}
-          aria-label={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
-          title={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
-        >
-          <DialogActionIcon name="refresh" />
-        </DangerousButton>
+        <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
+          <DangerousButton
+            type="button"
+            className="secondary-button exercise-action-icon-button dialog-list-action-button"
+            onConfirm={() => regenerateDialogAudio(dialog)}
+            disabled={regeneratingAudioDialogId === dialog.dialog_id}
+            aria-label={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
+            title={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
+          >
+            <DialogActionIcon name="refresh" />
+          </DangerousButton>
+        </div>
       )}
     </>
   );
@@ -813,66 +810,73 @@ export default function DialogsPage(): JSX.Element {
                     {expandedDialogId === dialog.dialog_id && !!dialog.turns?.length && (
                       <>
                         <p><strong>{t("newItem.dialogTurns")}:</strong></p>
-                        <ul className="conversation-preview-list">
-                          {dialog.turns.map((turn, index) => {
-                            const speaker = speakerForTurn(turn.speaker, index);
-                            const isPlayingTurn = playingTurn?.dialogId === dialog.dialog_id && playingTurn.turnIndex === index;
+                        <DialogTurnsList
+                          dialogId={dialog.dialog_id}
+                          turns={dialog.turns}
+                          sourceLanguage={sourceLanguage}
+                          targetLanguage={targetLanguage}
+                          hideTargetText={hideDialogText}
+                          tokenStatus={wordActionStatus}
+                          statusKeyPrefixBase="dialog"
+                          onOpenItem={openLinkedWordItem}
+                          onTokenClick={(statusKey, token, turnIndex, sourceText, targetText) => void requestAddWordFromDialogToken(
+                            statusKey,
+                            dialog.dialog_id,
+                            turnIndex,
+                            sourceText,
+                            targetText,
+                            token,
+                          )}
+                          getTurnRef={(turnIndex, element) => {
+                            const key = turnRefKey(dialog.dialog_id, turnIndex);
+                            if (element) {
+                              turnRefs.current.set(key, element);
+                            } else {
+                              turnRefs.current.delete(key);
+                            }
+                          }}
+                          highlightedTurnIndex={playingTurn?.dialogId === dialog.dialog_id ? playingTurn.turnIndex : null}
+                          renderLeadingAction={(turn, index) => (
+                            <button
+                              type="button"
+                              className="secondary-button exercise-action-icon-button dialog-inline-action-button"
+                              onClick={() => void playTurn(dialog.dialog_id, index, turn.phrase_audio_url || "")}
+                              disabled={loadingTurnAudioKey === `${dialog.dialog_id}:${index}`}
+                              aria-label={loadingTurnAudioKey === `${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
+                              title={loadingTurnAudioKey === `${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
+                            >
+                              <DialogActionIcon name="play" />
+                            </button>
+                          )}
+                          renderTurnActions={(turn, index) => {
+                            const phraseKey = wholeTurnPhraseKey(dialog.dialog_id, index);
                             return (
-                              <li
-                                key={`${dialog.dialog_id}-turn-${index}`}
-                                ref={(element) => {
-                                  const key = turnRefKey(dialog.dialog_id, index);
-                                  if (element) {
-                                    turnRefs.current.set(key, element);
-                                  } else {
-                                    turnRefs.current.delete(key);
-                                  }
-                                }}
-                                className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"} ${isPlayingTurn ? "turn-highlight" : ""}`}
-                                tabIndex={-1}
-                              >
-                                <p className="conversation-speaker">
-                                  {speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}
-                                </p>
-                                <div className="conversation-line conversation-line-translation">
-                                  <DialogTurnText
-                                    dialogId={dialog.dialog_id}
-                                    turnIndex={index}
-                                    sourceText={turn.source_text}
-                                    targetText={turn.target_text}
-                                    sourceLanguage={sourceLanguage}
-                                  targetLanguage={targetLanguage}
-                                  tokenStatus={wordActionStatus}
-                                  statusKeyPrefix={`dialog-${dialog.dialog_id}-turn-${index}-target`}
-                                  hideTargetText={hideDialogText}
-                                  onOpenItem={openLinkedWordItem}
-                                  onTokenClick={(statusKey, token) => void requestAddWordFromDialogToken(
-                                    statusKey,
-                                      dialog.dialog_id,
-                                      index,
-                                      turn.source_text,
-                                      turn.target_text,
-                                      token,
-                                    )}
-                                  />
-                                  <button
-                                    type="button"
-                                    className="turn-audio-button"
-                                    onClick={() => void playTurn(dialog.dialog_id, index, turn.phrase_audio_url || "")}
-                                    disabled={loadingTurnAudioKey === `${dialog.dialog_id}:${index}`}
-                                  >
-                                    {loadingTurnAudioKey === `${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
-                                  </button>
-                                </div>
-                                <p className="conversation-line">
-                                  {hideDialogText
-                                    ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
-                                    : turn.source_text}
-                                </p>
-                              </li>
+                              <>
+                                <button
+                                  type="button"
+                                  className="secondary-button"
+                                  onClick={() => void addWholeTurnPhraseFromDialog(dialog.dialog_id, turn, index)}
+                                  disabled={phraseActionStatus[phraseKey] === "saving"}
+                                >
+                                  {phraseActionStatus[phraseKey] === "saving"
+                                    ? t("newItem.sentenceAddSaving")
+                                    : t("content.preview.savePhrase")}
+                                </button>
+                                {phraseActionStatus[phraseKey] === "added" && (
+                                  <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
+                                )}
+                                {phraseActionStatus[phraseKey] === "exists" && (
+                                  <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
+                                )}
+                                {phraseActionStatus[phraseKey] === "error" && (
+                                  <span className="turn-token-status">
+                                    {phraseActionError[phraseKey] || t("newItem.sentenceAddError")}
+                                  </span>
+                                )}
+                              </>
                             );
-                          })}
-                        </ul>
+                          }}
+                        />
                         <div className="actions">
                           <button type="button" className="secondary-button" onClick={() => setExpandedDialogId(null)}>
                             {t("dialogs.hideDialog")}

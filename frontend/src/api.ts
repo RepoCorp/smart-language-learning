@@ -8,6 +8,7 @@ import type {
   ContentItemConversationResponse,
   ContentItemQuestionResponse,
   ContentPreviewResponse,
+  CompareWordRecord,
   ContentTopicContextsResponse,
   TopicConversationStartResponse,
   TopicConversationHelpResponse,
@@ -525,6 +526,68 @@ export async function fetchContentItemDetail(
     throw new Error("Failed to load content item detail");
   }
   return (await response.json()) as ContentItemDetailResponse;
+}
+
+export async function searchContentItemCompareWords(
+  itemId: number,
+  query = "",
+  page = 1,
+  pageSize = 10,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{ items: CompareWordRecord[]; page?: number; page_size?: number; has_more?: boolean; next_page?: number | null; query?: string }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+    q: query,
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/compare-words/search?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to search compare words");
+  }
+  return (await response.json()) as { items: CompareWordRecord[]; page?: number; page_size?: number; has_more?: boolean; next_page?: number | null; query?: string };
+}
+
+export async function addContentItemCompareWords(
+  itemId: number,
+  wordIds: number[],
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{ compare_words?: CompareWordRecord[] }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/compare-words?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ word_ids: wordIds }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to add compare words");
+  }
+  return (await response.json()) as { compare_words?: CompareWordRecord[] };
+}
+
+export async function removeContentItemCompareWord(
+  itemId: number,
+  linkedItemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<{ compare_words?: CompareWordRecord[] }> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/compare-words/${linkedItemId}?${params.toString()}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to remove compare word");
+  }
+  return (await response.json()) as { compare_words?: CompareWordRecord[] };
 }
 
 export async function generateContentItemExercises(

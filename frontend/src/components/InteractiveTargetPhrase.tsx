@@ -77,6 +77,7 @@ export default function InteractiveTargetPhrase({
         dialog_phrase_turns: detail.dialog_phrase_turns || [],
         dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
         related_dialogs: detail.related_dialogs || [],
+        compare_words: detail.compare_words || [],
         item_questions: detail.item_questions || [],
       });
     } finally {

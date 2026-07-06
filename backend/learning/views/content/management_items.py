@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from .management_items_listing import (
+    ContentItemCompareWordDetailView,
+    ContentItemCompareWordsSearchView,
+    ContentItemCompareWordsView,
     ContentItemExercisesView,
     ContentItemFunnyImageExerciseView,
     ContentItemDetailView,
@@ -14,6 +17,9 @@ from .management_items_quick_add import ContentPhraseQuickAddView, ContentWordQu
 
 __all__ = [
     "ContentItemDetailView",
+    "ContentItemCompareWordsSearchView",
+    "ContentItemCompareWordsView",
+    "ContentItemCompareWordDetailView",
     "ContentItemExercisesView",
     "ContentItemFunnyImageExerciseView",
     "ContentItemMarkLearnedView",
