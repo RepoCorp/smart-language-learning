@@ -331,6 +331,8 @@ export default function PhraseReview({
   const placedTokenAudioActiveRef = useRef<boolean>(false);
   const completedPhraseShouldReadRef = useRef<boolean>(true);
   const pendingGesturePhraseAudioRef = useRef<{ phraseText: string; completesPhrase: boolean } | null>(null);
+  const placedPhraseAudioTargetRef = useRef<{ tokens: string[]; completesPhrase: boolean } | null>(null);
+  const placedPhraseAudioPlaybackActiveRef = useRef<boolean>(false);
   const waitingForGestureCompletionAudioRef = useRef<boolean>(false);
   const pendingPlacedTokenAudioTimeoutRef = useRef<number | null>(null);
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -498,6 +500,35 @@ export default function PhraseReview({
     }
   };
 
+  const playPlacedPhraseTargetAudio = async (): Promise<void> => {
+    if (placedPhraseAudioPlaybackActiveRef.current) {
+      return;
+    }
+    const initialTarget = placedPhraseAudioTargetRef.current;
+    if (!initialTarget || initialTarget.tokens.length === 0) {
+      return;
+    }
+    placedPhraseAudioPlaybackActiveRef.current = true;
+    let playedCount = 0;
+    try {
+      while (true) {
+        const currentTarget = placedPhraseAudioTargetRef.current;
+        if (!currentTarget || playedCount >= currentTarget.tokens.length) {
+          break;
+        }
+        await playPlacedPhraseTokenAudio(currentTarget.tokens[playedCount] || "");
+        playedCount += 1;
+      }
+      const completedTarget = placedPhraseAudioTargetRef.current;
+      if (completedTarget?.completesPhrase) {
+        waitingForGestureCompletionAudioRef.current = false;
+        await completePhraseBuilder(completedTarget.tokens.join(" "), { skipPlacedAudio: true });
+      }
+    } finally {
+      placedPhraseAudioPlaybackActiveRef.current = false;
+    }
+  };
+
   const schedulePlacedPhraseTokenAudio = async (phraseText: string): Promise<boolean> => {
     if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
       window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
@@ -612,8 +643,25 @@ export default function PhraseReview({
     setWrongPhraseTokenId("");
     if (shouldReadPlacedPhrase) {
       pendingGesturePhraseAudioRef.current = { phraseText: placedPhraseText, completesPhrase: completedPhrase };
+      placedPhraseAudioTargetRef.current = {
+        tokens: nextPlacedTokens.map((placedToken) => placedToken.text),
+        completesPhrase: completedPhrase,
+      };
       waitingForGestureCompletionAudioRef.current = completedPhrase;
       logSpeechDebug("gesture_audio.pending", {
+        phraseText: placedPhraseText,
+        completesPhrase: completedPhrase,
+        ...speechSynthesisSnapshot(),
+      });
+    } else {
+      placedPhraseAudioTargetRef.current = {
+        tokens: nextPlacedTokens.map((placedToken) => placedToken.text),
+        completesPhrase: completedPhrase,
+      };
+      if (completedPhrase) {
+        waitingForGestureCompletionAudioRef.current = true;
+      }
+      logSpeechDebug("gesture_audio.extend", {
         phraseText: placedPhraseText,
         completesPhrase: completedPhrase,
         ...speechSynthesisSnapshot(),
@@ -740,22 +788,14 @@ export default function PhraseReview({
       ...speechSynthesisSnapshot(),
     });
     if (isPlacedTokenAudioRunning()) {
-      logSpeechDebug("gesture_audio.skip_running", {
+      logSpeechDebug("gesture_audio.continue_running", {
         phraseText: pending.phraseText,
         completesPhrase: pending.completesPhrase,
         ...speechSynthesisSnapshot(),
       });
-      if (pending.completesPhrase) {
-        waitingForGestureCompletionAudioRef.current = false;
-        await completePhraseBuilder(pending.phraseText);
-      }
       return;
     }
-    await playPlacedPhraseTokenAudio(pending.phraseText);
-    if (pending.completesPhrase) {
-      waitingForGestureCompletionAudioRef.current = false;
-      await completePhraseBuilder(pending.phraseText, { skipPlacedAudio: true });
-    }
+    await playPlacedPhraseTargetAudio();
   };
 
   useEffect(() => {
@@ -862,8 +902,10 @@ export default function PhraseReview({
     draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     phraseBuilderCompletionAudioPlayedRef.current = false;
     placedTokenAudioActiveRef.current = false;
+    placedPhraseAudioPlaybackActiveRef.current = false;
     completedPhraseShouldReadRef.current = true;
     pendingGesturePhraseAudioRef.current = null;
+    placedPhraseAudioTargetRef.current = null;
     waitingForGestureCompletionAudioRef.current = false;
     placedTokenVoiceRef.current = "";
     if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
@@ -882,7 +924,9 @@ export default function PhraseReview({
         pendingPlacedTokenAudioTimeoutRef.current = null;
       }
       placedTokenAudioActiveRef.current = false;
+      placedPhraseAudioPlaybackActiveRef.current = false;
       pendingGesturePhraseAudioRef.current = null;
+      placedPhraseAudioTargetRef.current = null;
       waitingForGestureCompletionAudioRef.current = false;
       stopBrowserSpeechSynthesis();
     };
@@ -1007,6 +1051,11 @@ export default function PhraseReview({
           </div>
         </div>
         {phraseBuilderComplete && <p className="phrase-builder-success">{t("phrase.builderComplete")}</p>}
+        <div className="actions">
+          <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
+            {t("session.nextItem")}
+          </button>
+        </div>
       </div>
     );
   }
