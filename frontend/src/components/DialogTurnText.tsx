@@ -3,6 +3,7 @@ import { useState } from "react";
 import { quickAddPhraseFromConversation } from "../api";
 import { useI18n } from "../i18n";
 import type { StudyLanguageCode } from "../types";
+import TargetPhraseText from "./TargetPhraseText";
 
 type ActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 
@@ -183,9 +184,7 @@ export default function DialogTurnText({
 
   return (
     <>
-      {hideTargetText ? (
-        <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
-      ) : (
+      <TargetPhraseText as="span" hideText={hideTargetText} variant="dialog">
         <>
           {tokens.map((token, tokenIndex) => {
             const normalized = cleanToken(token);
@@ -226,7 +225,7 @@ export default function DialogTurnText({
             );
           })}
         </>
-      )}
+      </TargetPhraseText>
       {!hideTargetText && showPhraseSelection && (
         <>
           <div className="actions turn-action-row">

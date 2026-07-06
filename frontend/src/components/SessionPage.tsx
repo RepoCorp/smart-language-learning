@@ -498,15 +498,15 @@ export default function SessionPage(): JSX.Element {
   const openedItemModal = (loadingOpenedItem || openedItem || openedItemError) ? (
     <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
       <div className="blocking-modal related-dialogs-modal">
+        {!openedItem && (
+          <button type="button" className="modal-corner-close" aria-label={t("words.close")} onClick={closeItemModal}>
+            ×
+          </button>
+        )}
         {loadingOpenedItem && <p>{t("session.loading")}</p>}
         {!loadingOpenedItem && openedItemError && (
           <>
             <p className="error">{openedItemError}</p>
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={closeItemModal}>
-                {t("words.close")}
-              </button>
-            </div>
           </>
         )}
         {!loadingOpenedItem && openedItem && (

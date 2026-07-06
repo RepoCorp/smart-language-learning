@@ -585,8 +585,7 @@ body {
   margin-top: 4px;
 }
 
-.revealed-answer-main,
-.revealed-answer-phrase {
+.revealed-answer-main {
   color: #102a43;
   font-size: 1rem;
   font-weight: 700;
@@ -1325,11 +1324,37 @@ textarea {
   font-size: 14px;
 }
 
+.target-phrase-text-dialog,
 .conversation-line-translation {
   color: #102a43;
   font-size: 16px;
   font-weight: 700;
+  line-height: 1.35;
+}
+
+.conversation-line-translation {
   margin-top: 2px;
+}
+
+.target-phrase-text-chat {
+  color: inherit;
+  font: inherit;
+}
+
+.revealed-answer-phrase .target-phrase-text {
+  color: #486581;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.revealed-answer-phrase .turn-token-wrap,
+.revealed-answer-phrase .turn-token-button {
+  color: #486581;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
 }
 
 .turn-audio-button {
@@ -2845,6 +2870,12 @@ button.verb-exercise-entry:disabled {
 }
 
 @media (max-width: 640px) {
+  .blocking-modal .item-actions-toolbar {
+    justify-content: flex-start;
+    padding-right: 36px;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .overview-stats-content {
     padding: 10px 16px;
     gap: 6px;

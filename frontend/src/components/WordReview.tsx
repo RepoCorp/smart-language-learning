@@ -7,6 +7,7 @@ import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
+import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
 
 function normalize(value: string): string {
   return value.trim();
@@ -275,10 +276,12 @@ interface WordReviewProps {
 }
 
 function RevealedReviewSummary({
+  itemId,
   answer,
   phrase,
   phraseTranslation,
 }: {
+  itemId: number;
   answer: string;
   phrase?: string;
   phraseTranslation?: string;
@@ -286,14 +289,18 @@ function RevealedReviewSummary({
   return (
     <div className="revealed-answer">
       <p className="revealed-answer-main">{answer}</p>
-      <p className="revealed-answer-phrase">{phrase || answer}</p>
+      <InteractiveTargetPhrase
+        className="conversation-line conversation-line-translation revealed-answer-phrase"
+        sourceText={phraseTranslation || ""}
+        targetText={phrase || answer}
+        statusKeyPrefix={`review-${itemId}-phrase`}
+      />
       <p className="revealed-answer-translation">{phraseTranslation || "\u2014"}</p>
     </div>
   );
 }
 
 const FEEDBACK_DELAY_MS = 1000;
-const MAX_WRITTEN_WORD_ASSISTANCE_STEPS = 2;
 type FeedbackTone = "neutral" | "success" | "error";
 
 export default function WordReview({
@@ -316,6 +323,7 @@ export default function WordReview({
   const [answer, setAnswer] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
   const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>("neutral");
+  const [submittedResultTone, setSubmittedResultTone] = useState<FeedbackTone>("neutral");
   const [hintLetter, setHintLetter] = useState<string>("");
   const [writtenWordAssistanceIndexes, setWrittenWordAssistanceIndexes] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -330,6 +338,7 @@ export default function WordReview({
   const answerBeforeCompositionRef = useRef<string>("");
   const pendingCompositionValidationRef = useRef<boolean>(false);
   const provisionalBaseAnswerRef = useRef<string | null>(null);
+  const pendingRewriteFocusRef = useRef<boolean>(false);
 
   const isSpanishToGerman = item.direction !== "de_to_es";
   const useSelfGradedAnswer = !isSpanishToGerman;
@@ -366,7 +375,12 @@ export default function WordReview({
   const hint = hintLetter;
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const totalWrittenWordAssistanceSteps = writtenWordAssistanceIndexes.length;
-  const hasExceededWrittenWordAssistanceLimit = (): boolean => totalWrittenWordAssistanceSteps > MAX_WRITTEN_WORD_ASSISTANCE_STEPS;
+  const hasWrittenWordMistake = (): boolean => totalWrittenWordAssistanceSteps > 0;
+  const submittedInputClassName = submittedResultTone === "error"
+    ? "word-input-error-progress"
+    : submittedResultTone === "success"
+      ? "word-input-correct-progress"
+      : "";
 
   const waitForPreviewPaint = async (): Promise<void> => {
     if (typeof window === "undefined") {
@@ -425,10 +439,17 @@ export default function WordReview({
     return true;
   };
 
-  const submitWithFeedback = async (correct: boolean, message: string): Promise<void> => {
+  const submitWithFeedback = async (
+    correct: boolean,
+    message: string,
+    options?: { preserveExistingFeedback?: boolean },
+  ): Promise<void> => {
     setIsSubmitting(true);
-    setFeedback(message);
-    setFeedbackTone(correct ? "success" : "error");
+    if (!options?.preserveExistingFeedback) {
+      setFeedback(message);
+      setFeedbackTone(correct ? "success" : "error");
+    }
+    setSubmittedResultTone(correct ? "success" : "error");
     const showingPreview = showTargetCompletionPreview();
     try {
       if (showingPreview) {
@@ -448,14 +469,20 @@ export default function WordReview({
     if (!useSelfGradedAnswer || isSubmitting || !answerRevealed) {
       return;
     }
-    await submitWithFeedback(correct, correct ? t("word.feedback.correct") : t("word.feedback.markedWrong", { answer: expectedAnswer }));
+    await submitWithFeedback(correct, correct ? t("word.feedback.correct") : "");
   };
 
   const failWrittenAnswer = async (): Promise<void> => {
     if (useSelfGradedAnswer || isSubmitting) {
       return;
     }
-    await submitWithFeedback(false, t("word.feedback.markedWrong", { answer: expectedAnswer }));
+    clearAnswerAndRefocus();
+    setHintLetter("");
+    setLetterSuggestions([]);
+    setFeedback(t("word.feedback.rewritePrompt"));
+    setFeedbackTone("neutral");
+    setSubmittedResultTone("error");
+    await submitWithFeedback(false, "", { preserveExistingFeedback: true });
   };
 
   const showInputAwareHint = (): void => {
@@ -500,11 +527,31 @@ export default function WordReview({
     }, 0);
   };
 
+  const clearAnswerAndRefocus = (): void => {
+    setAnswer("");
+    pendingRewriteFocusRef.current = true;
+  };
+
   const handleAnswerChange = (value: string, acceptedAnswer = answer): void => {
     if (useSelfGradedAnswer) {
       return;
     }
     if (isSubmitting) {
+      return;
+    }
+    if (reviewComplete) {
+      setAnswer(value);
+      setHintLetter("");
+      setLetterSuggestions([]);
+      if (normalize(value) === normalize(expectedAnswer)) {
+        setFeedback("");
+        setFeedbackTone("neutral");
+        setSubmittedResultTone("success");
+      } else {
+        setFeedback(t("word.feedback.rewritePrompt"));
+        setFeedbackTone("neutral");
+        setSubmittedResultTone("error");
+      }
       return;
     }
 
@@ -550,8 +597,14 @@ export default function WordReview({
       return;
     }
 
-    if (hasExceededWrittenWordAssistanceLimit()) {
-      void submitWithFeedback(false, t("word.feedback.tooManyHints", { answer: expectedAnswer }));
+    if (hasWrittenWordMistake()) {
+      clearAnswerAndRefocus();
+      setHintLetter("");
+      setLetterSuggestions([]);
+      setFeedback(t("word.feedback.rewritePrompt"));
+      setFeedbackTone("neutral");
+      setSubmittedResultTone("error");
+      void submitWithFeedback(false, "", { preserveExistingFeedback: true });
       return;
     }
     void submitWithFeedback(true, t("word.feedback.correct"));
@@ -640,6 +693,16 @@ export default function WordReview({
   }, [useSelfGradedAnswer]);
 
   useEffect(() => {
+    if (!pendingRewriteFocusRef.current || isSubmitting) {
+      return;
+    }
+    pendingRewriteFocusRef.current = false;
+    window.setTimeout(() => {
+      inputRef.current?.focus({ preventScroll: true });
+    }, 0);
+  }, [isSubmitting]);
+
+  useEffect(() => {
     setShowPromptText(targetPromptMode === "text");
   }, [targetPromptMode]);
 
@@ -661,6 +724,7 @@ export default function WordReview({
     setAnswer("");
     setFeedback("");
     setFeedbackTone("neutral");
+    setSubmittedResultTone("neutral");
     setHintLetter("");
     setWrittenWordAssistanceIndexes([]);
     setAnswerRevealed(false);
@@ -708,6 +772,7 @@ export default function WordReview({
         )}
         {answerRevealed && (
           <RevealedReviewSummary
+            itemId={item.id}
             answer={expectedAnswer}
             phrase={completionPreview?.phrase}
             phraseTranslation={completionPreview?.phraseTranslation}
@@ -770,7 +835,13 @@ export default function WordReview({
         )}
         <input
           ref={inputRef}
-          className={warmupInputIsWrong ? "word-input-error-progress" : warmupInputIsCorrect ? "word-input-correct-progress" : ""}
+          className={submittedResultTone === "error"
+            ? "word-input-error-progress"
+            : submittedResultTone === "success" || warmupInputIsCorrect
+              ? "word-input-correct-progress"
+              : warmupInputIsWrong
+              ? "word-input-error-progress"
+              : ""}
           value={answer}
           onCompositionStart={() => {
             composingAnswerRef.current = true;
@@ -812,6 +883,7 @@ export default function WordReview({
         {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
         {completionPreview && (
           <RevealedReviewSummary
+            itemId={item.id}
             answer={completionPreview.word}
             phrase={completionPreview.phrase}
             phraseTranslation={completionPreview.phraseTranslation}
@@ -879,6 +951,7 @@ export default function WordReview({
         {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
         {completionPreview && (
           <RevealedReviewSummary
+            itemId={item.id}
             answer={completionPreview.word}
             phrase={completionPreview.phrase}
             phraseTranslation={completionPreview.phraseTranslation}
@@ -929,7 +1002,7 @@ export default function WordReview({
       )}
       <input
         ref={inputRef}
-        className={answer ? "word-input-correct-progress" : ""}
+        className={submittedInputClassName}
         value={answer}
         onCompositionStart={() => {
           composingAnswerRef.current = true;
@@ -972,6 +1045,7 @@ export default function WordReview({
       {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
       {completionPreview && (
         <RevealedReviewSummary
+          itemId={item.id}
           answer={completionPreview.word}
           phrase={completionPreview.phrase}
           phraseTranslation={completionPreview.phraseTranslation}

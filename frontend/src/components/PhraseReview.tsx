@@ -8,6 +8,7 @@ import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
+import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
 
 interface PhraseReviewProps {
   item: SessionItem;
@@ -17,10 +18,12 @@ interface PhraseReviewProps {
 }
 
 function RevealedReviewSummary({
+  itemId,
   answer,
   phrase,
   phraseTranslation,
 }: {
+  itemId: number;
   answer: string;
   phrase: string;
   phraseTranslation: string;
@@ -28,7 +31,12 @@ function RevealedReviewSummary({
   return (
     <div className="revealed-answer">
       <p className="revealed-answer-main">{answer}</p>
-      <p className="revealed-answer-phrase">{phrase}</p>
+      <InteractiveTargetPhrase
+        className="conversation-line conversation-line-translation revealed-answer-phrase"
+        sourceText={phraseTranslation || ""}
+        targetText={phrase}
+        statusKeyPrefix={`review-${itemId}-phrase`}
+      />
       <p className="revealed-answer-translation">{phraseTranslation || "\u2014"}</p>
     </div>
   );
@@ -549,7 +557,7 @@ export default function PhraseReview({
     if (isSubmitting || !answerRevealed) {
       return;
     }
-    await submitWithFeedback(correct, correct ? t("phrase.feedback.correct") : t("phrase.feedback.markedWrong", { answer: expectedAnswer }));
+    await submitWithFeedback(correct, correct ? t("phrase.feedback.correct") : "");
   };
 
   const markWrongPhraseToken = (tokenId: string): void => {
@@ -1030,6 +1038,7 @@ export default function PhraseReview({
       )}
       {answerRevealed && (
         <RevealedReviewSummary
+          itemId={item.id}
           answer={expectedAnswer}
           phrase={expectedAnswer}
           phraseTranslation={promptText}

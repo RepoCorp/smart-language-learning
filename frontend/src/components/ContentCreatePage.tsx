@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentPreviewResponse, SessionItem } from "../types";
 import NewItem from "./NewItem";
+import TargetPhraseText from "./TargetPhraseText";
 
 const CREATE_NEW_OPTION = "__create_new__";
 type DialogLength = "standard" | "short_three";
@@ -821,7 +822,7 @@ export default function ContentCreatePage(): JSX.Element {
                   className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
                 >
                   <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                  <p className="conversation-line conversation-line-translation">{turn.target_text}</p>
+                  <TargetPhraseText as="p" className="conversation-line" variant="dialog" text={turn.target_text} />
                   <p className="conversation-line">{turn.source_text}</p>
                 </li>
               );
@@ -864,9 +865,9 @@ export default function ContentCreatePage(): JSX.Element {
                     className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
                   >
                     <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                    <p className="conversation-line conversation-line-translation">
+                    <TargetPhraseText as="p" className="conversation-line" variant="dialog">
                       {renderTargetLineWithWordLinks(turn.target_text, turn.source_text, index)}
-                    </p>
+                    </TargetPhraseText>
                     {turn.phrase_audio_url && (
                       <button
                         type="button"

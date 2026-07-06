@@ -9,6 +9,7 @@ import {
   quickAddWordFromDialog,
   regenerateContentItemAudio,
   refreshContentItemWord,
+  submitReview,
 } from "../api";
 import { deterministicIndex, deterministicNumber, deterministicTake } from "../deterministic";
 import { useI18n } from "../i18n";
@@ -49,6 +50,7 @@ const VERB_PERSONS = [
 type VerbTenseKey = typeof VERB_TENSES[number]["key"];
 type VerbPersonKey = typeof VERB_PERSONS[number]["key"];
 type ItemActionIconName =
+  | "test"
   | "exercise"
   | "warmup"
   | "letters"
@@ -76,6 +78,15 @@ function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
       <svg {...commonProps}>
         <path d="M8 5v14l11-7-11-7Z" />
         <path d="M4 6h1M4 12h1M4 18h1" />
+      </svg>
+    );
+  }
+  if (name === "test") {
+    return (
+      <svg {...commonProps}>
+        <path d="M5 12h6" />
+        <path d="m9 8 4 4-4 4" />
+        <path d="M14 7h5v10h-5" />
       </svg>
     );
   }
@@ -257,6 +268,10 @@ export default function NewItem({
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
+  const [showDirectTestModal, setShowDirectTestModal] = useState<boolean>(false);
+  const [directTestReviewComplete, setDirectTestReviewComplete] = useState<boolean>(false);
+  const [directTestCorrect, setDirectTestCorrect] = useState<boolean | null>(null);
+  const [directTestResetVersion, setDirectTestResetVersion] = useState<number>(0);
   const [showWordIntroPracticeModal, setShowWordIntroPracticeModal] = useState<boolean>(false);
   const [showWordLetterPracticeModal, setShowWordLetterPracticeModal] = useState<boolean>(false);
   const [showPhraseBuilderModal, setShowPhraseBuilderModal] = useState<boolean>(false);
@@ -370,6 +385,7 @@ export default function NewItem({
         showQuestionsModal
         || showDialogsModal
         || showExerciseModal
+        || showDirectTestModal
         || showWordIntroPracticeModal
         || showWordLetterPracticeModal
         || showPhraseBuilderModal
@@ -387,7 +403,7 @@ export default function NewItem({
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showWordIntroPracticeModal, showWordLetterPracticeModal, showPhraseBuilderModal]);
+  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showExerciseModal, showDirectTestModal, showWordIntroPracticeModal, showWordLetterPracticeModal, showPhraseBuilderModal]);
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -986,6 +1002,25 @@ export default function NewItem({
     dialog_phrase_turns: dialogPhraseTurns,
     dialog_phrase_odd_index: dialogPhraseOddIndex,
   };
+  const directTestItem: SessionItem = {
+    ...item,
+    spanish_text: sourceText,
+    german_text: targetText,
+    audio_url: audioUrl,
+    exercise_phrases: exercisePhrases,
+    mode: "review",
+    direction: "es_to_de",
+    repeatedAfterFailure: false,
+    repeatPracticeStep: undefined,
+    options: [],
+    related_dialogs: relatedDialogs,
+    dialog_phrase_answer: dialogPhraseAnswer,
+    dialog_phrase_scene: dialogPhraseScene,
+    dialog_phrase_scene_audio_urls: dialogPhraseSceneAudioUrls,
+    dialog_phrase_options: dialogPhraseOptions,
+    dialog_phrase_turns: dialogPhraseTurns,
+    dialog_phrase_odd_index: dialogPhraseOddIndex,
+  };
   const itemDeterministicKey = `${item.item_type}:${sourceText.trim().toLowerCase()}=>${targetText.trim().toLowerCase()}`;
 
   const deterministicExerciseEntryKeys = (count: number): string[] => {
@@ -1363,6 +1398,28 @@ export default function NewItem({
     setShowPhraseBuilderModal(false);
   };
 
+  const openPrimaryTestModal = (): void => {
+    setDirectTestReviewComplete(false);
+    setDirectTestCorrect(null);
+    setDirectTestResetVersion((value) => value + 1);
+    setShowDirectTestModal(true);
+  };
+
+  const closeDirectTestModal = (): void => {
+    setShowDirectTestModal(false);
+    setDirectTestReviewComplete(false);
+    setDirectTestCorrect(null);
+  };
+
+  const registerDirectTestAnswer = async (correct: boolean): Promise<void> => {
+    if (directTestReviewComplete) {
+      return;
+    }
+    await submitReview(item.id, correct, "es_to_de");
+    setDirectTestCorrect(correct);
+    setDirectTestReviewComplete(true);
+  };
+
   const showItemActionTooltip = (
     event: PointerEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>,
     label: string,
@@ -1381,6 +1438,11 @@ export default function NewItem({
 
   return (
     <div>
+      {readOnly && onClose && (
+        <button type="button" className="modal-corner-close" aria-label={t("words.close")} onClick={onClose}>
+          ×
+        </button>
+      )}
       <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
       <p>
         <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {sourceText}
@@ -1412,6 +1474,7 @@ export default function NewItem({
               onClick={() => void openExerciseModal()}
               disabled={loadingExercises}
               aria-label={t("newItem.openExercises")}
+              title={t("newItem.openExercises")}
               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
@@ -1419,12 +1482,27 @@ export default function NewItem({
             >
               <ItemActionIcon name="exercise" />
             </button>
+            <button
+              type="button"
+              className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
+              onClick={openPrimaryTestModal}
+              disabled={loadingExercises}
+              aria-label={t("newItem.openItemTest")}
+              title={t("newItem.openItemTest")}
+              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openItemTest"))}
+              onPointerLeave={hideItemActionTooltip}
+              onFocus={(event) => showItemActionTooltip(event, t("newItem.openItemTest"))}
+              onBlur={hideItemActionTooltip}
+            >
+              <ItemActionIcon name="test" />
+            </button>
             {item.item_type === "word" && (
               <button
                 type="button"
                 className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
                 onClick={() => setShowWordIntroPracticeModal(true)}
                 aria-label={t("newItem.openWordIntroPractice")}
+                title={t("newItem.openWordIntroPractice")}
                 onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
@@ -1439,6 +1517,7 @@ export default function NewItem({
                 className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
                 onClick={() => setShowWordLetterPracticeModal(true)}
                 aria-label={t("newItem.openWordLetterPractice")}
+                title={t("newItem.openWordLetterPractice")}
                 onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
@@ -1453,6 +1532,7 @@ export default function NewItem({
                 className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
                 onClick={() => setShowPhraseBuilderModal(true)}
                 aria-label={t("newItem.openPhraseBuilder")}
+                title={t("newItem.openPhraseBuilder")}
                 onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
@@ -1468,6 +1548,7 @@ export default function NewItem({
               className="secondary-button item-action-button item-action-button-icon"
               onClick={() => setShowDialogsModal(true)}
               aria-label={t("newItem.openRelatedDialogs")}
+              title={t("newItem.openRelatedDialogs")}
               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
@@ -1480,6 +1561,7 @@ export default function NewItem({
               className="secondary-button item-action-button item-action-button-icon"
               onClick={() => setShowQuestionsModal(true)}
               aria-label={t("newItem.openQuestions")}
+              title={t("newItem.openQuestions")}
               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
@@ -1494,6 +1576,7 @@ export default function NewItem({
               onConfirm={regenerateAudio}
               disabled={regeneratingAudio || refreshingWord}
               aria-label={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
+              title={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
               onPointerEnter={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
@@ -1507,6 +1590,7 @@ export default function NewItem({
                 onConfirm={refreshWordData}
                 disabled={refreshingWord || regeneratingAudio}
                 aria-label={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
+                title={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
                 onPointerEnter={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
@@ -1539,16 +1623,12 @@ export default function NewItem({
           </button>
         </div>
       )}
-      {readOnly && onClose && (
-        <div className="actions">
-          <button type="button" className="secondary-button" onClick={onClose}>
-            {t("words.close")}
-          </button>
-        </div>
-      )}
       {showDialogsModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal">
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={() => setShowDialogsModal(false)}>
+              ×
+            </button>
             <p>
               <strong>{t("newItem.relatedDialogs", { count: relatedDialogs.length })}</strong>
             </p>
@@ -1658,9 +1738,6 @@ export default function NewItem({
                   {showAllDialogs ? t("newItem.hideMoreDialogs") : t("newItem.showMoreDialogs")}
                 </button>
               )}
-              <button type="button" onClick={() => setShowDialogsModal(false)}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
             </div>
           </div>
         </div>
@@ -1679,6 +1756,35 @@ export default function NewItem({
               item={wordIntroPracticeItem}
               onAnswered={async () => closeWordIntroPracticeModal()}
             />
+          </div>
+        </div>
+      )}
+      {showDirectTestModal && (item.item_type === "word" || item.item_type === "phrase") && (
+        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
+          <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closeDirectTestModal}>
+              ×
+            </button>
+            <p>
+              <strong>{t("newItem.openItemTest")}</strong>
+            </p>
+            {item.item_type === "word" ? (
+              <WordReview
+                key={`direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${directTestResetVersion}`}
+                item={directTestItem}
+                onAnswered={registerDirectTestAnswer}
+                reviewComplete={directTestReviewComplete}
+                onNextItem={async () => closeDirectTestModal()}
+              />
+            ) : (
+              <PhraseReview
+                key={`direct-phrase-test-${item.id}-${sourceText}-${targetText}-${directTestResetVersion}`}
+                item={directTestItem}
+                onAnswered={registerDirectTestAnswer}
+                reviewComplete={directTestReviewComplete}
+                onNextItem={async () => closeDirectTestModal()}
+              />
+            )}
           </div>
         </div>
       )}
@@ -1974,23 +2080,29 @@ export default function NewItem({
           <div className="blocking-modal funny-image-modal">
             <button
               type="button"
+              className="modal-corner-close"
+              aria-label={t("newItem.closeRelatedDialogs")}
+              onClick={() => setShowFunnyImageModal(false)}
+            >
+              ×
+            </button>
+            <button
+              type="button"
               className="funny-image-large-button"
               onClick={playFunnyImageWordAudio}
               aria-label={t("newItem.exercisesFunnyImagePlayWord")}
             >
               <img src={funnyImageExerciseEntry.image_url} alt={funnyImageExerciseSelectionEntry.target} />
             </button>
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={() => setShowFunnyImageModal(false)}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
-            </div>
           </div>
         </div>
       )}
       {showQuestionsModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal questions-modal">
+            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={() => setShowQuestionsModal(false)}>
+              ×
+            </button>
             <p>
               <strong>{t("newItem.questionsTitle")}</strong>
             </p>
@@ -2054,11 +2166,6 @@ export default function NewItem({
               </button>
             </form>
             {itemQuestionError && <p className="error">{itemQuestionError}</p>}
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={() => setShowQuestionsModal(false)}>
-                {t("newItem.closeRelatedDialogs")}
-              </button>
-            </div>
           </div>
         </div>
       )}

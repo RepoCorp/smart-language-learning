@@ -16,6 +16,7 @@ import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { ContentItemConversationResponse, SessionItem } from "../types";
 import NewItem from "./NewItem";
+import TargetPhraseText from "./TargetPhraseText";
 
 const CREATE_NEW_OPTION = "__create_new__";
 
@@ -937,15 +938,13 @@ export default function ConversationPage(): JSX.Element {
             <div ref={historyRef} className="item-questions-history item-chat-thread item-conversation-history">
               {openingText && (
                 <div className="item-chat-entry item-chat-message item-chat-assistant">
-                  <p className="item-chat-bubble">
-                    {hideTargetText
-                      ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
-                      : renderTargetLineWithWordLinks({
-                        baseKey: "opening",
-                        sourceText: openingTranslation,
-                        targetText: openingText,
-                      })}
-                  </p>
+                  <TargetPhraseText as="p" className="item-chat-bubble" hideText={hideTargetText} variant="chat">
+                    {renderTargetLineWithWordLinks({
+                      baseKey: "opening",
+                      sourceText: openingTranslation,
+                      targetText: openingText,
+                    })}
+                  </TargetPhraseText>
                   {openingTranslation && showOpeningTranslation && !hideSourceText && (
                     <p className="item-conversation-translation"><strong>{sourceLanguageLabel}:</strong> {openingTranslation}</p>
                   )}
@@ -1055,15 +1054,13 @@ export default function ConversationPage(): JSX.Element {
 
                   <div className="item-chat-message item-chat-assistant">
                     <p className="item-chat-meta">{t("newItem.conversationLabelTutor")}</p>
-                    <p className="item-chat-bubble">
-                      {hideTargetText
-                        ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
-                        : renderTargetLineWithWordLinks({
-                          baseKey: `assistant-${index}`,
-                          sourceText: turn.assistant_translation_text || "",
-                          targetText: turn.assistant_text,
-                        })}
-                    </p>
+                    <TargetPhraseText as="p" className="item-chat-bubble" hideText={hideTargetText} variant="chat">
+                      {renderTargetLineWithWordLinks({
+                        baseKey: `assistant-${index}`,
+                        sourceText: turn.assistant_translation_text || "",
+                        targetText: turn.assistant_text,
+                      })}
+                    </TargetPhraseText>
                     {conversationTranslationVisible[index] && !hideSourceText && (
                       <p className="item-conversation-translation">
                         <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text || t("newItem.conversationNoTranslation")}

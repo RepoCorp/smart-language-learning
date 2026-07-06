@@ -87,7 +87,7 @@ Mas creatividad para la imagen
 En el celular a veces el teclado tapa el input de las preguntas
 Mejorar UI de creacion de contenido
 Mover unselect all, abrir ejercicios y cualquier otro boton que sea el mas usado a la izquierda
-
+el redo the item info using the best model esta funcionando peor que antes
 
 FEATURES
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
