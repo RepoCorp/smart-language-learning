@@ -37,7 +37,6 @@ function RevealedReviewSummary({
         targetText={phrase}
         statusKeyPrefix={`review-${itemId}-phrase`}
       />
-      <p className="revealed-answer-translation">{phraseTranslation || "\u2014"}</p>
     </div>
   );
 }
@@ -1089,8 +1088,8 @@ export default function PhraseReview({
         <RevealedReviewSummary
           itemId={item.id}
           answer={expectedAnswer}
-          phrase={expectedAnswer}
-          phraseTranslation={promptText}
+          phrase={item.german_text}
+          phraseTranslation={item.spanish_text}
         />
       )}
       <div className="actions">

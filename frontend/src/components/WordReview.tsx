@@ -144,26 +144,61 @@ function completionPhraseForItem(item: SessionItem): { text: string; sourceText:
       && !targetTerms.includes(normalizedTarget)
       && targetTerms.some((term) => normalizedTarget.includes(term));
   };
+
+  const isPhraseForTargetWord = (targetText: string): boolean => {
+    return Boolean(blankTargetInPhrase(targetText, item.german_text)) || containsTargetWord(targetText);
+  };
+
   const dialogTurnCandidates = (item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => ({
     target: turn.target_text,
     source: turn.source_text,
     audioUrl: turn.phrase_audio_url || "",
   })));
-  const matchedAudioTurn = (item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => {
+  const matchedTurnCandidates = (item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => {
     const relatedTurn = dialog.turns.find((entry, index) => index === turn.turn_index);
     return {
       target: relatedTurn?.target_text || turn.target_text || "",
       source: relatedTurn?.source_text || turn.source_text || "",
       audioUrl: relatedTurn?.phrase_audio_url || "",
     };
-  })).find((candidate) => candidate.audioUrl && containsTargetWord(candidate.target));
-  if (matchedAudioTurn) {
-    return { text: matchedAudioTurn.target, sourceText: matchedAudioTurn.source, audioUrl: matchedAudioTurn.audioUrl };
-  }
+  }));
+  const exercisePhraseCandidates = [
+    ...((item.exercise_phrases?.phrases || []).map((entry) => ({
+      target: entry.target_text,
+      source: entry.source_text,
+      audioUrl: entry.audio_url || "",
+    }))),
+    ...((item.exercise_phrases?.first_section || []).map((entry) => ({
+      target: entry.target_text,
+      source: entry.source_text,
+      audioUrl: entry.audio_url || "",
+    }))),
+    ...((item.exercise_phrases?.second_section || []).map((entry) => ({
+      target: entry.target_text,
+      source: entry.source_text,
+      audioUrl: entry.audio_url || "",
+    }))),
+    ...(item.exercise_phrases?.funny_image_phrase
+      ? [{
+        target: item.exercise_phrases.funny_image_phrase.target_text,
+        source: item.exercise_phrases.funny_image_phrase.source_text,
+        audioUrl: item.exercise_phrases.funny_image_phrase.audio_url || "",
+      }]
+      : []),
+  ];
 
-  const containingAudioTurn = dialogTurnCandidates.find((candidate) => candidate.audioUrl && containsTargetWord(candidate.target));
-  if (containingAudioTurn) {
-    return { text: containingAudioTurn.target, sourceText: containingAudioTurn.source, audioUrl: containingAudioTurn.audioUrl };
+  const rankedCandidates = [
+    ...matchedTurnCandidates.filter((candidate) => candidate.audioUrl && isPhraseForTargetWord(candidate.target)),
+    ...matchedTurnCandidates.filter((candidate) => isPhraseForTargetWord(candidate.target)),
+    ...dialogTurnCandidates.filter((candidate) => candidate.audioUrl && isPhraseForTargetWord(candidate.target)),
+    ...dialogTurnCandidates.filter((candidate) => isPhraseForTargetWord(candidate.target)),
+    ...exercisePhraseCandidates.filter((candidate) => candidate.audioUrl && isPhraseForTargetWord(candidate.target)),
+    ...exercisePhraseCandidates.filter((candidate) => isPhraseForTargetWord(candidate.target)),
+  ];
+
+  const selectedCandidate = rankedCandidates.find((candidate) => candidate.target.trim() && candidate.source.trim());
+  if (selectedCandidate) {
+    return { text: selectedCandidate.target, sourceText: selectedCandidate.source, audioUrl: selectedCandidate.audioUrl };
   }
 
   return { text: "", sourceText: "", audioUrl: "" };
@@ -280,11 +315,13 @@ function RevealedReviewSummary({
   answer,
   phrase,
   phraseTranslation,
+  fallbackPhrase,
 }: {
   itemId: number;
   answer: string;
   phrase?: string;
   phraseTranslation?: string;
+  fallbackPhrase?: string;
 }): JSX.Element {
   return (
     <div className="revealed-answer">
@@ -292,16 +329,38 @@ function RevealedReviewSummary({
       <InteractiveTargetPhrase
         className="conversation-line conversation-line-translation revealed-answer-phrase"
         sourceText={phraseTranslation || ""}
-        targetText={phrase || answer}
+        targetText={phrase || fallbackPhrase || answer}
         statusKeyPrefix={`review-${itemId}-phrase`}
       />
-      <p className="revealed-answer-translation">{phraseTranslation || "\u2014"}</p>
     </div>
+  );
+}
+
+function HighlightedRewriteWord({
+  value,
+  highlightedIndexes,
+}: {
+  value: string;
+  highlightedIndexes: number[];
+}): JSX.Element {
+  const highlightedIndexSet = new Set(highlightedIndexes);
+  return (
+    <span className="word-rewrite-highlighted-word" aria-label={value}>
+      {value.split("").map((character, index) => (
+        <span
+          key={`${character}-${index}`}
+          className={highlightedIndexSet.has(index) ? "word-rewrite-highlighted-letter" : undefined}
+        >
+          {character}
+        </span>
+      ))}
+    </span>
   );
 }
 
 const FEEDBACK_DELAY_MS = 1000;
 type FeedbackTone = "neutral" | "success" | "error";
+type RewriteStatusTone = "neutral" | "success" | "error" | "warning";
 
 export default function WordReview({
   item,
@@ -332,6 +391,10 @@ export default function WordReview({
   const [letterSuggestions, setLetterSuggestions] = useState<string[]>([]);
   const [warmupRevealCount, setWarmupRevealCount] = useState<number>(0);
   const [completionPreview, setCompletionPreview] = useState<{ word: string; phrase: string; phraseTranslation: string } | null>(null);
+  const [rewriteAttemptHadMistake, setRewriteAttemptHadMistake] = useState<boolean>(false);
+  const [rewriteAttemptMistakeIndexes, setRewriteAttemptMistakeIndexes] = useState<number[]>([]);
+  const [rewriteStatusTone, setRewriteStatusTone] = useState<RewriteStatusTone>("neutral");
+  const [pendingRewriteTakeover, setPendingRewriteTakeover] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const completionAudioRef = useRef<HTMLAudioElement | null>(null);
   const composingAnswerRef = useRef<boolean>(false);
@@ -375,12 +438,21 @@ export default function WordReview({
   const hint = hintLetter;
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const totalWrittenWordAssistanceSteps = writtenWordAssistanceIndexes.length;
-  const hasWrittenWordMistake = (): boolean => totalWrittenWordAssistanceSteps > 0;
-  const submittedInputClassName = submittedResultTone === "error"
-    ? "word-input-error-progress"
-    : submittedResultTone === "success"
-      ? "word-input-correct-progress"
-      : "";
+  const needsWrittenWordRewrite = (): boolean => totalWrittenWordAssistanceSteps > 0;
+  const shouldFailWrittenWordFromAssistance = (): boolean => totalWrittenWordAssistanceSteps > 2;
+  const rewriteInputIsCorrectSoFar = reviewComplete && answer.length > 0 && expectedAnswer.startsWith(answer);
+  const regularWordInputDisabled = isSubmitting && !pendingRewriteTakeover;
+  const submittedInputClassName = reviewComplete
+    ? rewriteStatusTone === "warning"
+      ? "word-input-warning-progress"
+      : rewriteInputIsCorrectSoFar
+        ? "word-input-correct-progress"
+        : "word-input-error-progress"
+    : submittedResultTone === "error"
+      ? "word-input-error-progress"
+      : submittedResultTone === "success"
+        ? "word-input-correct-progress"
+        : "";
 
   const waitForPreviewPaint = async (): Promise<void> => {
     if (typeof window === "undefined") {
@@ -482,6 +554,7 @@ export default function WordReview({
     setFeedback(t("word.feedback.rewritePrompt"));
     setFeedbackTone("neutral");
     setSubmittedResultTone("error");
+    setRewriteStatusTone("error");
     await submitWithFeedback(false, "", { preserveExistingFeedback: true });
   };
 
@@ -540,17 +613,64 @@ export default function WordReview({
       return;
     }
     if (reviewComplete) {
+      if (!expectedAnswer.startsWith(value)) {
+        if (isSingleBaseLetterForNextDiacritic(value, acceptedAnswer, expectedAnswer)) {
+          provisionalBaseAnswerRef.current = acceptedAnswer;
+          setAnswer(value);
+          setFeedback("");
+          setFeedbackTone("neutral");
+          setRewriteStatusTone("neutral");
+          setLetterSuggestions([]);
+          setHintLetter("");
+          return;
+        }
+        const fallbackAnswer = provisionalBaseAnswerRef.current && acceptedAnswer.startsWith(provisionalBaseAnswerRef.current)
+          ? provisionalBaseAnswerRef.current
+          : acceptedAnswer;
+        const maxCompareLength = Math.min(value.length, expectedAnswer.length);
+        let mismatchIndex = 0;
+        while (mismatchIndex < maxCompareLength && value.charAt(mismatchIndex) === expectedAnswer.charAt(mismatchIndex)) {
+          mismatchIndex += 1;
+        }
+        if (mismatchIndex >= maxCompareLength) {
+          mismatchIndex = fallbackAnswer.length;
+        }
+        const wrongText = value.slice(acceptedAnswer.length) || value.slice(fallbackAnswer.length) || value.slice(-1);
+        setRewriteAttemptHadMistake(true);
+        setRewriteAttemptMistakeIndexes((current) => (current.includes(mismatchIndex) ? current : [...current, mismatchIndex]));
+        setAnswer(fallbackAnswer);
+        setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
+        setFeedbackTone("error");
+        setSubmittedResultTone("error");
+        setRewriteStatusTone("error");
+        setLetterSuggestions([]);
+        setHintLetter("");
+        return;
+      }
+      provisionalBaseAnswerRef.current = null;
       setAnswer(value);
       setHintLetter("");
       setLetterSuggestions([]);
       if (normalize(value) === normalize(expectedAnswer)) {
-        setFeedback("");
-        setFeedbackTone("neutral");
-        setSubmittedResultTone("success");
+        if (rewriteAttemptHadMistake) {
+          setRewriteAttemptHadMistake(false);
+          clearAnswerAndRefocus();
+          setFeedback(t("word.feedback.cleanRewriteRequired"));
+          setFeedbackTone("neutral");
+          setSubmittedResultTone("error");
+          setRewriteStatusTone("warning");
+        } else {
+          setFeedback("");
+          setFeedbackTone("neutral");
+          setSubmittedResultTone("success");
+          setRewriteStatusTone("success");
+          setRewriteAttemptMistakeIndexes([]);
+        }
       } else {
         setFeedback(t("word.feedback.rewritePrompt"));
         setFeedbackTone("neutral");
         setSubmittedResultTone("error");
+        setRewriteStatusTone("neutral");
       }
       return;
     }
@@ -597,14 +717,12 @@ export default function WordReview({
       return;
     }
 
-    if (hasWrittenWordMistake()) {
-      clearAnswerAndRefocus();
-      setHintLetter("");
-      setLetterSuggestions([]);
-      setFeedback(t("word.feedback.rewritePrompt"));
-      setFeedbackTone("neutral");
-      setSubmittedResultTone("error");
-      void submitWithFeedback(false, "", { preserveExistingFeedback: true });
+    if (needsWrittenWordRewrite()) {
+      setRewriteAttemptHadMistake(false);
+      setRewriteAttemptMistakeIndexes([]);
+      setSubmittedResultTone(shouldFailWrittenWordFromAssistance() ? "error" : "success");
+      setPendingRewriteTakeover(true);
+      void submitWithFeedback(!shouldFailWrittenWordFromAssistance(), "", { preserveExistingFeedback: true });
       return;
     }
     void submitWithFeedback(true, t("word.feedback.correct"));
@@ -703,6 +821,19 @@ export default function WordReview({
   }, [isSubmitting]);
 
   useEffect(() => {
+    if (!reviewComplete || !pendingRewriteTakeover) {
+      return;
+    }
+    setPendingRewriteTakeover(false);
+    clearAnswerAndRefocus();
+    setHintLetter("");
+    setLetterSuggestions([]);
+    setFeedback(t("word.feedback.rewritePrompt"));
+    setFeedbackTone("neutral");
+    setRewriteStatusTone("error");
+  }, [reviewComplete, pendingRewriteTakeover, t]);
+
+  useEffect(() => {
     setShowPromptText(targetPromptMode === "text");
   }, [targetPromptMode]);
 
@@ -731,6 +862,10 @@ export default function WordReview({
     setLetterSuggestions([]);
     setWarmupRevealCount(0);
     setCompletionPreview(null);
+    setRewriteAttemptHadMistake(false);
+    setRewriteAttemptMistakeIndexes([]);
+    setRewriteStatusTone("neutral");
+    setPendingRewriteTakeover(false);
     composingAnswerRef.current = false;
     pendingCompositionValidationRef.current = false;
     answerBeforeCompositionRef.current = "";
@@ -776,6 +911,7 @@ export default function WordReview({
             answer={expectedAnswer}
             phrase={completionPreview?.phrase}
             phraseTranslation={completionPreview?.phraseTranslation}
+            fallbackPhrase={targetWordText}
           />
         )}
         <div className="actions">
@@ -887,6 +1023,7 @@ export default function WordReview({
             answer={completionPreview.word}
             phrase={completionPreview.phrase}
             phraseTranslation={completionPreview.phraseTranslation}
+            fallbackPhrase={targetWordText}
           />
         )}
         <div className="actions">
@@ -955,6 +1092,7 @@ export default function WordReview({
             answer={completionPreview.word}
             phrase={completionPreview.phrase}
             phraseTranslation={completionPreview.phraseTranslation}
+            fallbackPhrase={targetWordText}
           />
         )}
         <div className="actions">
@@ -1036,19 +1174,30 @@ export default function WordReview({
         }}
         placeholder={t("word.input.placeholder")}
         data-testid="word-input"
-        disabled={isSubmitting}
+        disabled={regularWordInputDisabled}
         autoFocus
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
       />
-      {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
+      {feedback && (
+        <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>
+          <span>{feedback}</span>
+          {rewriteStatusTone === "warning" && rewriteAttemptMistakeIndexes.length > 0 && (
+            <span className="word-rewrite-highlighted-message">
+              {" "}
+              <HighlightedRewriteWord value={expectedAnswer} highlightedIndexes={rewriteAttemptMistakeIndexes} />
+            </span>
+          )}
+        </p>
+      )}
       {completionPreview && (
         <RevealedReviewSummary
           itemId={item.id}
           answer={completionPreview.word}
           phrase={completionPreview.phrase}
           phraseTranslation={completionPreview.phraseTranslation}
+          fallbackPhrase={targetWordText}
         />
       )}
       {letterSuggestions.length > 0 && (

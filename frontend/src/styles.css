@@ -615,6 +615,21 @@ body {
   color: #486581;
 }
 
+.word-rewrite-highlighted-message {
+  display: inline-block;
+  margin-left: 6px;
+}
+
+.word-rewrite-highlighted-word {
+  color: #102a43;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+.word-rewrite-highlighted-letter {
+  font-weight: 800;
+}
+
 .word-input-correct-progress {
   background: #ecfdf5;
   border-color: #22c55e;
