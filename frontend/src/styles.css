@@ -629,6 +629,13 @@ body {
   font-weight: 700;
 }
 
+.word-input-warning-progress {
+  background: #fff7ed;
+  border-color: #f97316;
+  color: #9a3412;
+  font-weight: 700;
+}
+
 .word-cloze-phrase {
   background: #f8fafc;
   border: 1px solid #bcccdc;
