@@ -22,7 +22,7 @@ export default function ConfigurationsPage({
 }: ConfigurationsPageProps): JSX.Element {
   const { language, setLanguage, t } = useI18n();
   const { enabled: debugToolsEnabled, setEnabled: setDebugToolsEnabled } = useDebugTools();
-  const { targetPromptMode, setTargetPromptMode } = usePromptPreferences();
+  const { targetPromptMode, setTargetPromptMode, showMobileActionLabels, setShowMobileActionLabels } = usePromptPreferences();
   const { sourceLanguage, targetLanguage, setSourceLanguage, setTargetLanguage, supportedLanguages } = useStudyLanguages();
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
   const [username, setUsername] = useState("");
@@ -73,6 +73,7 @@ export default function ConfigurationsPage({
     setSourceLanguage("spanish");
     setTargetLanguage("german");
     setTargetPromptMode("text");
+    setShowMobileActionLabels(false);
     setDebugToolsEnabled(false);
   };
 
@@ -210,6 +211,31 @@ export default function ConfigurationsPage({
               </button>
             </div>
             <span className="hint">{t("config.debugToolsHint")}</span>
+          </div>
+
+          <div className="settings-field">
+            {t("config.mobileActionLabels")}
+            <div className="settings-choice-group" role="radiogroup" aria-label={t("config.mobileActionLabels")}>
+              <button
+                type="button"
+                className={`settings-choice-button ${showMobileActionLabels ? "settings-choice-button-selected" : ""}`}
+                onClick={() => setShowMobileActionLabels(true)}
+                role="radio"
+                aria-checked={showMobileActionLabels}
+              >
+                {t("config.mobileActionLabelsOn")}
+              </button>
+              <button
+                type="button"
+                className={`settings-choice-button ${!showMobileActionLabels ? "settings-choice-button-selected" : ""}`}
+                onClick={() => setShowMobileActionLabels(false)}
+                role="radio"
+                aria-checked={!showMobileActionLabels}
+              >
+                {t("config.mobileActionLabelsOff")}
+              </button>
+            </div>
+            <span className="hint">{t("config.mobileActionLabelsHint")}</span>
           </div>
         </div>
 

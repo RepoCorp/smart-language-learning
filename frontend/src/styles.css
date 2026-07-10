@@ -2527,6 +2527,42 @@ textarea {
   height: 18px;
 }
 
+@media (max-width: 768px) {
+  .mobile-action-labels-expanded .item-action-button-icon[data-mobile-label],
+  .mobile-action-labels-expanded .dialog-list-action-button[data-mobile-label] {
+    position: relative;
+    width: auto;
+    min-width: 52px;
+    min-height: 52px;
+    height: auto;
+    padding: 6px 8px;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-action-labels-expanded .item-action-button-icon[data-mobile-label]::after,
+  .mobile-action-labels-expanded .dialog-list-action-button[data-mobile-label]::after {
+    content: attr(data-mobile-label);
+    display: block;
+    max-width: 74px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .mobile-action-labels-expanded .item-action-button-icon[data-mobile-label] .item-action-icon,
+  .mobile-action-labels-expanded .dialog-list-action-button[data-mobile-label] .item-action-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 .exercise-mute-button {
   min-width: 112px;
 }

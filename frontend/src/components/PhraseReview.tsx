@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
+import { selectBestSpeechSynthesisVoice } from "../browserSpeech";
 import { useDebugTools } from "../debugTools";
 import { deterministicSort } from "../deterministic";
 import { useI18n } from "../i18n";
@@ -222,7 +223,7 @@ async function speakBrowserText({
   }
   const langPrefix = lang.split("-")[0].toLowerCase();
   const matchingVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix));
-  const selectedVoice = matchingVoices.find((voice) => voice.voiceURI === preferredVoiceURI) || matchingVoices[0];
+  const selectedVoice = selectBestSpeechSynthesisVoice(matchingVoices.length > 0 ? matchingVoices : voices, lang, preferredVoiceURI);
   debugLog?.("speak.voice_selected", {
     voices: voices.length,
     matchingVoices: matchingVoices.length,
@@ -376,7 +377,7 @@ export default function PhraseReview({
     const langPrefix = lang.split("-")[0].toLowerCase();
     const voices = speechSynthesis.getVoices();
     const matchingVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix));
-    const selectedVoice = matchingVoices.find((voice) => voice.voiceURI === placedTokenVoiceRef.current) || matchingVoices[0] || voices[0];
+    const selectedVoice = selectBestSpeechSynthesisVoice(matchingVoices.length > 0 ? matchingVoices : voices, lang, placedTokenVoiceRef.current);
 
     await new Promise<void>((resolve) => {
       let resolved = false;
@@ -492,7 +493,7 @@ export default function PhraseReview({
       placedTokenVoiceRef.current = await speakBrowserText({
         text: trimmedPhraseText,
         lang: speechLangByCode[targetLanguage] || "de-DE",
-        rate: 0.7,
+        rate: 0.95,
         preferredVoiceURI: placedTokenVoiceRef.current,
         debugLog: logSpeechDebug,
         onStart: markPhraseBuilderSpeechPrimed,

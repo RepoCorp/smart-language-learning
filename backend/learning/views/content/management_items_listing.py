@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+import time
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
@@ -724,10 +725,21 @@ def _save_exercise_image(image_bytes: bytes) -> str:
 def _download_image_url(image_url: str) -> bytes | None:
     if not image_url:
         return None
+    started_at = time.perf_counter()
     try:
         with urlopen(image_url, timeout=int(getattr(settings, "OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS", 120))) as response:
-            return response.read()
+            image_bytes = response.read()
+            logger.info(
+                "content.exercises.image_download_succeeded elapsed_ms=%d bytes=%d",
+                round((time.perf_counter() - started_at) * 1000),
+                len(image_bytes),
+            )
+            return image_bytes
     except (HTTPError, URLError, TimeoutError):
+        logger.warning(
+            "content.exercises.image_download_failed elapsed_ms=%d",
+            round((time.perf_counter() - started_at) * 1000),
+        )
         return None
 
 
@@ -738,9 +750,10 @@ def _generate_openai_image(prompt: str) -> bytes | None:
     body = {
         "model": str(getattr(settings, "OPENAI_IMAGE_MODEL", "gpt-image-1")).strip() or "gpt-image-1",
         "prompt": prompt,
-        "size": str(getattr(settings, "OPENAI_IMAGE_SIZE", "1024x1024")).strip() or "1024x1024",
+        "size": str(getattr(settings, "OPENAI_FUNNY_IMAGE_SIZE", getattr(settings, "OPENAI_IMAGE_SIZE", "1024x1024"))).strip() or "1024x1024",
         "n": 1,
     }
+    attempt_started_at = time.perf_counter()
     request = UrlRequest(
         "https://api.openai.com/v1/images/generations",
         data=json.dumps(body).encode("utf-8"),
@@ -753,8 +766,29 @@ def _generate_openai_image(prompt: str) -> bytes | None:
     try:
         with urlopen(request, timeout=int(getattr(settings, "OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS", 120))) as response:
             payload = json.loads(response.read().decode("utf-8"))
+            logger.info(
+                "content.exercises.image_generation_succeeded model=%s size=%s elapsed_ms=%d",
+                body["model"],
+                body["size"],
+                round((time.perf_counter() - attempt_started_at) * 1000),
+            )
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-        logger.warning("content.exercises.image_generation_failed error=%s", exc.__class__.__name__)
+        error_details: dict[str, object] = {
+            "error_class": exc.__class__.__name__,
+            "model": body["model"],
+            "size": body["size"],
+            "elapsed_ms": round((time.perf_counter() - attempt_started_at) * 1000),
+        }
+        if isinstance(exc, HTTPError):
+            try:
+                error_details["response_body"] = exc.read().decode("utf-8", errors="replace")
+            except Exception:
+                error_details["response_body"] = ""
+            error_details["http_status"] = exc.code
+            error_details["http_reason"] = exc.reason
+        elif isinstance(exc, URLError):
+            error_details["url_error_reason"] = str(getattr(exc, "reason", ""))
+        logger.warning("content.exercises.image_generation_attempt_failed details=%s", json.dumps(error_details, ensure_ascii=False))
         return None
 
     try:
@@ -811,6 +845,7 @@ class ContentItemExercisesView(APIView):
 
 class ContentItemFunnyImageExerciseView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
+        request_started_at = time.perf_counter()
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         item = apply_user_scope(Item.objects, user).filter(
@@ -823,12 +858,7 @@ class ContentItemFunnyImageExerciseView(APIView):
         if item.item_type != Item.ItemType.WORD:
             return Response({"detail": "Image exercises are only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
 
-        _scan_all_dialogs_for_word(
-            user=user,
-            item=item,
-            source_language=source_language,
-            target_language=target_language,
-        )
+        phrase_started_at = time.perf_counter()
         phrase = generate_funny_image_exercise_phrase_with_chatgpt(
             item.spanish_text,
             item.german_text,
@@ -837,6 +867,12 @@ class ContentItemFunnyImageExerciseView(APIView):
             source_language=source_language,
             target_language=target_language,
             target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
+        )
+        logger.info(
+            "content.exercises.funny_image_phrase_finished item_id=%s elapsed_ms=%d success=%s",
+            item.id,
+            round((time.perf_counter() - phrase_started_at) * 1000),
+            bool(phrase),
         )
         if not phrase:
             return Response({"detail": "Funny image phrase generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -848,8 +884,22 @@ class ContentItemFunnyImageExerciseView(APIView):
             "The scene should clearly correspond to the phrase, with a humorous visual implementation of the literal meaning.\n"
             f'Visibly include the exact phrase text in the image: "{target_text}".'
         ).strip()
+        image_started_at = time.perf_counter()
         image_bytes = _generate_openai_image(final_image_prompt)
+        logger.info(
+            "content.exercises.funny_image_generation_finished item_id=%s elapsed_ms=%d bytes=%d",
+            item.id,
+            round((time.perf_counter() - image_started_at) * 1000),
+            len(image_bytes or b""),
+        )
+        save_started_at = time.perf_counter()
         image_url = _save_exercise_image(image_bytes or b"")
+        logger.info(
+            "content.exercises.funny_image_save_finished item_id=%s elapsed_ms=%d success=%s",
+            item.id,
+            round((time.perf_counter() - save_started_at) * 1000),
+            bool(image_url),
+        )
         if not image_url:
             return Response({"detail": "Funny image generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
@@ -864,4 +914,9 @@ class ContentItemFunnyImageExerciseView(APIView):
         exercise_phrases["funny_image_phrase"] = funny_image_phrase
         item.exercise_phrases = exercise_phrases
         item.save(update_fields=["exercise_phrases", "updated_at"])
+        logger.info(
+            "content.exercises.funny_image_request_finished item_id=%s elapsed_ms=%d",
+            item.id,
+            round((time.perf_counter() - request_started_at) * 1000),
+        )
         return Response({"exercise_phrases": exercise_phrases})

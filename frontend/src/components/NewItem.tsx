@@ -16,7 +16,8 @@ import {
   searchContentItemCompareWords,
   submitReview,
 } from "../api";
-import { deterministicIndex, deterministicNumber, deterministicTake } from "../deterministic";
+import { selectBestSpeechSynthesisVoice } from "../browserSpeech";
+import { deterministicIndex, deterministicTake } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
@@ -258,7 +259,7 @@ export default function NewItem({
   onClose,
 }: NewItemProps): JSX.Element {
   const { t } = useI18n();
-  const { targetPromptMode } = usePromptPreferences();
+  const { targetPromptMode, showMobileActionLabels } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
     spanish: "study.language.spanish",
@@ -1555,18 +1556,14 @@ export default function NewItem({
     const lang = speechLangByCode[targetLanguage] || "de-DE";
     const langPrefix = lang.split("-")[0];
     utterance.lang = lang;
-    utterance.rate = 0.65;
+    utterance.rate = 0.95;
 
     const matchingVoices = window.speechSynthesis
       .getVoices()
       .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
-    const selectedVoice = matchingVoices.length
-      ? matchingVoices[deterministicIndex(matchingVoices.length, `${itemDeterministicKey}:funny-image-voice`)]
-      : undefined;
+    const selectedVoice = selectBestSpeechSynthesisVoice(matchingVoices, lang);
     if (selectedVoice) {
       utterance.voice = selectedVoice;
-    } else {
-      utterance.pitch = deterministicNumber(`${itemDeterministicKey}:funny-image-pitch`, 0.85, 1.2);
     }
     window.speechSynthesis.speak(utterance);
   };
@@ -1605,8 +1602,13 @@ export default function NewItem({
             finish();
           }
         }, 50);
-        utterance.lang = speechLangByCode[targetLanguage] || "de-DE";
-        utterance.rate = 0.48;
+        const lang = speechLangByCode[targetLanguage] || "de-DE";
+        utterance.lang = lang;
+        utterance.rate = 0.8;
+        const selectedVoice = selectBestSpeechSynthesisVoice(window.speechSynthesis.getVoices(), lang);
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
         utterance.onend = finish;
         utterance.onerror = finish;
         window.speechSynthesis.speak(utterance);
@@ -1617,7 +1619,7 @@ export default function NewItem({
     }
   };
 
-  const startExercise = (): void => {
+  const startExercise = (overrideLines?: string[]): void => {
     stopExercise();
     const runId = exerciseRunRef.current;
     setExerciseSecondsLeft(30);
@@ -1637,9 +1639,10 @@ export default function NewItem({
     }, 1000);
 
     const phraseExerciseAudioSources = item.item_type === "phrase" && audioUrl ? [audioUrl] : [];
+    const linesToPlay = overrideLines && overrideLines.length > 0 ? overrideLines : exerciseLines;
     const playOnce = phraseExerciseAudioSources.length
       ? () => playAudioSourcesOnce(phraseExerciseAudioSources, runId)
-      : () => speakLinesOnce(exerciseLines, runId);
+      : () => speakLinesOnce(linesToPlay, runId);
 
     const loop = (): void => {
       if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
@@ -1657,6 +1660,14 @@ export default function NewItem({
       });
     };
     loop();
+  };
+
+  const startFunnyImagePhraseExercise = (): void => {
+    if (!funnyImageExerciseSelectionEntry) {
+      return;
+    }
+    setSelectedExerciseKeys([exerciseEntryKey(funnyImageExerciseSelectionEntry)]);
+    startExercise([funnyImageExerciseSelectionEntry.target]);
   };
 
   const closeExerciseModal = (): void => {
@@ -1745,7 +1756,8 @@ export default function NewItem({
         </>
       )}
       {(item.item_type === "word" || item.item_type === "phrase") && (
-        <div className="actions item-actions-toolbar">
+        <div className={showMobileActionLabels ? "mobile-action-labels-expanded" : undefined}>
+          <div className="actions item-actions-toolbar">
           <div className="item-action-group item-action-group-primary" aria-label={t("newItem.actionGroupPractice")}>
             <button
               type="button"
@@ -1754,6 +1766,7 @@ export default function NewItem({
               disabled={loadingExercises}
               aria-label={t("newItem.openExercises")}
               title={t("newItem.openExercises")}
+              data-mobile-label={t("newItem.openExercises")}
               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
@@ -1768,6 +1781,7 @@ export default function NewItem({
               disabled={loadingExercises}
               aria-label={t("newItem.openItemTest")}
               title={t("newItem.openItemTest")}
+              data-mobile-label={t("newItem.openItemTest")}
               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openItemTest"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, t("newItem.openItemTest"))}
@@ -1782,6 +1796,7 @@ export default function NewItem({
                 onClick={() => setShowWordIntroPracticeModal(true)}
                 aria-label={t("newItem.openWordIntroPractice")}
                 title={t("newItem.openWordIntroPractice")}
+                data-mobile-label={t("newItem.openWordIntroPractice")}
                 onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
@@ -1797,6 +1812,7 @@ export default function NewItem({
                 onClick={() => setShowWordLetterPracticeModal(true)}
                 aria-label={t("newItem.openWordLetterPractice")}
                 title={t("newItem.openWordLetterPractice")}
+                data-mobile-label={t("newItem.openWordLetterPractice")}
                 onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
@@ -1812,6 +1828,7 @@ export default function NewItem({
                 onClick={() => setShowPhraseBuilderModal(true)}
                 aria-label={t("newItem.openPhraseBuilder")}
                 title={t("newItem.openPhraseBuilder")}
+                data-mobile-label={t("newItem.openPhraseBuilder")}
                 onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
@@ -1828,6 +1845,7 @@ export default function NewItem({
               onClick={() => setShowDialogsModal(true)}
               aria-label={t("newItem.openRelatedDialogs")}
               title={t("newItem.openRelatedDialogs")}
+              data-mobile-label={t("newItem.openRelatedDialogs")}
               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
@@ -1841,6 +1859,7 @@ export default function NewItem({
               onClick={() => setShowQuestionsModal(true)}
               aria-label={t("newItem.openQuestions")}
               title={t("newItem.openQuestions")}
+              data-mobile-label={t("newItem.openQuestions")}
               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
@@ -1856,6 +1875,7 @@ export default function NewItem({
               disabled={regeneratingAudio || refreshingWord}
               aria-label={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
               title={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
+              data-mobile-label={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
               onPointerEnter={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
               onPointerLeave={hideItemActionTooltip}
               onFocus={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
@@ -1870,6 +1890,7 @@ export default function NewItem({
                 disabled={refreshingWord || regeneratingAudio}
                 aria-label={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
                 title={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
+                data-mobile-label={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
                 onPointerEnter={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
                 onPointerLeave={hideItemActionTooltip}
                 onFocus={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
@@ -1879,6 +1900,7 @@ export default function NewItem({
               </DangerousButton>
             )}
           </div>
+        </div>
         </div>
       )}
       {itemActionTooltip && (
@@ -2546,6 +2568,11 @@ export default function NewItem({
             >
               <img src={funnyImageExerciseEntry.image_url} alt={funnyImageExerciseSelectionEntry.target} />
             </button>
+            <div className="actions">
+              <button type="button" onClick={startFunnyImagePhraseExercise}>
+                {t("newItem.exercisesStart")}
+              </button>
+            </div>
           </div>
         </div>
       )}
