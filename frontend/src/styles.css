@@ -628,6 +628,10 @@ body {
 
 .word-rewrite-highlighted-letter {
   font-weight: 800;
+  color: #c2410c;
+  text-decoration: underline;
+  text-decoration-thickness: 0.14em;
+  text-underline-offset: 0.12em;
 }
 
 .word-input-correct-progress {

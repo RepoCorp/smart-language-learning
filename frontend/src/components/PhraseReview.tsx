@@ -42,6 +42,7 @@ function RevealedReviewSummary({
 }
 
 const FEEDBACK_DELAY_MS = 2000;
+const PHRASE_BUILDER_AUDIO_DEBOUNCE_MS = 180;
 
 type PhraseToken = {
   id: string;
@@ -332,8 +333,10 @@ export default function PhraseReview({
   const pendingGesturePhraseAudioRef = useRef<{ phraseText: string; completesPhrase: boolean } | null>(null);
   const placedPhraseAudioTargetRef = useRef<{ tokens: string[]; completesPhrase: boolean } | null>(null);
   const placedPhraseAudioPlaybackActiveRef = useRef<boolean>(false);
+  const placedPhraseAudioSpokenCountRef = useRef<number>(0);
   const waitingForGestureCompletionAudioRef = useRef<boolean>(false);
   const pendingPlacedTokenAudioTimeoutRef = useRef<number | null>(null);
+  const pendingPlacedTokenAudioResolveRef = useRef<((played: boolean) => void) | null>(null);
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const draggingPhraseTokenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const isSpanishToGerman = item.direction !== "de_to_es";
@@ -479,7 +482,7 @@ export default function PhraseReview({
     });
   };
 
-  const playPlacedPhraseTokenAudio = async (phraseText: string): Promise<void> => {
+  const playPlacedPhraseAudio = async (phraseText: string): Promise<void> => {
     const trimmedPhraseText = phraseText.trim();
     if (!trimmedPhraseText) {
       return;
@@ -508,15 +511,23 @@ export default function PhraseReview({
       return;
     }
     placedPhraseAudioPlaybackActiveRef.current = true;
-    let playedCount = 0;
     try {
       while (true) {
         const currentTarget = placedPhraseAudioTargetRef.current;
-        if (!currentTarget || playedCount >= currentTarget.tokens.length) {
+        if (!currentTarget || currentTarget.tokens.length === 0) {
           break;
         }
-        await playPlacedPhraseTokenAudio(currentTarget.tokens[playedCount] || "");
-        playedCount += 1;
+        const spokenCount = placedPhraseAudioSpokenCountRef.current;
+        if (spokenCount >= currentTarget.tokens.length) {
+          break;
+        }
+        const nextChunkTokens = currentTarget.tokens.slice(spokenCount);
+        const nextChunkText = nextChunkTokens.join(" ").trim();
+        if (!nextChunkText) {
+          break;
+        }
+        await playPlacedPhraseAudio(nextChunkText);
+        placedPhraseAudioSpokenCountRef.current = spokenCount + nextChunkTokens.length;
       }
       const completedTarget = placedPhraseAudioTargetRef.current;
       if (completedTarget?.completesPhrase) {
@@ -532,14 +543,24 @@ export default function PhraseReview({
     if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
       window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
       pendingPlacedTokenAudioTimeoutRef.current = null;
+      pendingPlacedTokenAudioResolveRef.current?.(false);
+      pendingPlacedTokenAudioResolveRef.current = null;
     }
     if (isPlacedTokenAudioRunning()) {
       logSpeechDebug("schedule.skip_running", { phraseText, ...speechSynthesisSnapshot() });
       return false;
     }
-    logSpeechDebug("schedule.play", { phraseText, ...speechSynthesisSnapshot() });
-    await playPlacedPhraseTokenAudio(phraseText);
-    return true;
+    return await new Promise<boolean>((resolve) => {
+      pendingPlacedTokenAudioResolveRef.current = resolve;
+      pendingPlacedTokenAudioTimeoutRef.current = window.setTimeout(() => {
+        pendingPlacedTokenAudioTimeoutRef.current = null;
+        pendingPlacedTokenAudioResolveRef.current = null;
+        logSpeechDebug("schedule.play", { phraseText, ...speechSynthesisSnapshot() });
+        void playPlacedPhraseTargetAudio()
+          .then(() => resolve(true))
+          .catch(() => resolve(false));
+      }, PHRASE_BUILDER_AUDIO_DEBOUNCE_MS);
+    });
   };
 
   const completePhraseBuilder = async (phraseText: string, options: { skipPlacedAudio?: boolean } = {}): Promise<void> => {
@@ -641,6 +662,7 @@ export default function PhraseReview({
     setPlacedPhraseTokens(nextPlacedTokens);
     setWrongPhraseTokenId("");
     if (shouldReadPlacedPhrase) {
+      placedPhraseAudioSpokenCountRef.current = 0;
       pendingGesturePhraseAudioRef.current = { phraseText: placedPhraseText, completesPhrase: completedPhrase };
       placedPhraseAudioTargetRef.current = {
         tokens: nextPlacedTokens.map((placedToken) => placedToken.text),
@@ -794,7 +816,7 @@ export default function PhraseReview({
       });
       return;
     }
-    await playPlacedPhraseTargetAudio();
+    await schedulePlacedPhraseTokenAudio(pending.phraseText);
   };
 
   useEffect(() => {
@@ -902,6 +924,7 @@ export default function PhraseReview({
     phraseBuilderCompletionAudioPlayedRef.current = false;
     placedTokenAudioActiveRef.current = false;
     placedPhraseAudioPlaybackActiveRef.current = false;
+    placedPhraseAudioSpokenCountRef.current = 0;
     completedPhraseShouldReadRef.current = true;
     pendingGesturePhraseAudioRef.current = null;
     placedPhraseAudioTargetRef.current = null;
@@ -910,6 +933,8 @@ export default function PhraseReview({
     if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
       window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
       pendingPlacedTokenAudioTimeoutRef.current = null;
+      pendingPlacedTokenAudioResolveRef.current?.(false);
+      pendingPlacedTokenAudioResolveRef.current = null;
     }
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       stopBrowserSpeechSynthesis(logSpeechDebug);
@@ -921,9 +946,12 @@ export default function PhraseReview({
       if (pendingPlacedTokenAudioTimeoutRef.current !== null) {
         window.clearTimeout(pendingPlacedTokenAudioTimeoutRef.current);
         pendingPlacedTokenAudioTimeoutRef.current = null;
+        pendingPlacedTokenAudioResolveRef.current?.(false);
+        pendingPlacedTokenAudioResolveRef.current = null;
       }
       placedTokenAudioActiveRef.current = false;
       placedPhraseAudioPlaybackActiveRef.current = false;
+      placedPhraseAudioSpokenCountRef.current = 0;
       pendingGesturePhraseAudioRef.current = null;
       placedPhraseAudioTargetRef.current = null;
       waitingForGestureCompletionAudioRef.current = false;

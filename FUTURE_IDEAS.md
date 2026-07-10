@@ -8,6 +8,44 @@ Que no se pueda typear la opcion correcta en error completando la palabra si no 
 Ejercicio de escribir la palabra muchas veces, como lo de los treinta minutos. Pero algo que sea rapido: dibujandola sobre preescrita, con letras de teclado que se iluminan, con mover letras…?
 Ponga pa practicar cuando se equivoca en el articulo
 Añadir mucha más Metadata a las palabras (desde la gramática) y usarla en ejercicios
+en bloques no repetir audio desde el principio si no desde el ppio de la frase, es decir ppio o despues de un punto
+Posibilidad de añadir prefijos, sufijos, reglas...
+En pregunta enter envia y mejorar las respuestas, incluyendo quitar el que dice si esta relacionado
+
+Para liberar espacio, el menu esta quedando por debajo de las stats, reducir longitud de texto depronto
+En los ejercicios de confusing palabras cuando es verbo usar el formato apropiado
+En ejercicios u otra parte tambien poner ejemplos en otros contextos, no solo de donde vino la palabra
+El area post respuesta esta mal en el otro sentido, liked phrase en español
+Revisar otros dialogos de las palabras separado de rehacer palabra
+Cuando se añade turno en cualquier momento, generar el audio con voz estandar, usar siempre voz estandar en otras partes no dialogo
+Uso del espacio en dialogo y el botoncito de play cuando no esta en modo texto (y revisar si puede ser mas pequeno)
+Revisar al usar un hint y que haya que volver a entrarlo. Esta diciendo que fallo
+Que si comete error al re escribir lo tenga que volver a escribir hasta escribirlo bien de corrido
+Generación de imagen está muy lenta
+El focus del re escribir palabra y que no esté rojo todo el tiempo incluso si lo que estoy escribiendo va bien
+a difficult phrase exercise to type the phrase
+Preguntas comunes: descomponer la palabra, y ajustar las preguntas pa que no quiten tanto espacio
+Que la pregunta común llene el input pero permita escribir
+Audio no está autoplay al inicio de test
+Guiones espacios y demás en hints
+Que errores de mayusculas y umlauts y eso los trate como errores
+Recrear audio de un turno en particular que pudo haber quedado regu
+Poder identificar la voz de cada audio para ajustar lo que se usa de 11labs
+Colores en repetición palabras test
+Que palabras confusas pueda preguntarse al modelo que hable sobre sus diferencias
+Test audio usa voces naturales, post answer usa voz estandar
+Parece que hay una voz de mujer que no queda bien, se come letras
+When testing with natural audio and audio only give button to play standard tambien
+Al re entrar palabra bien también mostrar resaltadas las letras que fueron corregidaa
+Correr todos los diálogos y regenerar los que se necesite
+
+
+
+
+El area post respuesta esta mal en el otro sentido, liked phrase en español
+
+
+
 
 
 
@@ -26,7 +64,13 @@ Generar dialogos con diferentes acentos
 Que los ejercicios de bloques capturen esas reglas de órdenes y grupos de palabras gramaticales
 Memorización de reglas, como lo de algunos casos en los que los sustantivos tienen un género en particular (PONS)
 With eleven labs it is sometimes truncating the dialog
-
+Que se pueda explicar algún problema que uno tenga con aprenderse algo y le haga ejercicios acorde
+Audio #de los bloques cuando los está poniendo está todo cortado
+Cómo hacer para que en el ejercicio de bloques sea más entrecomillas fácil equivocarse
+Problema con palabras que toma como.expresion como.bitte y gleichfalls
+En palabras confundidoras que añada la direfencia/relación, como con pregunta y que después del potencial varias preguntas anote la conclusión
+Pronunciacion patterns tambien
+El segundo ejercicio de palabra, el teclado completo, se va pendiendo la tecla qué es y se mueve al puesto como bloque. De pronto que prenda tres opciones pero de un color no verde, y cuando uno toca la que si es se pone verde y después uno la arrastra
 Buscar AI que arregle CSS
 Que el ejercicio aleman-español palabra la palabra sale en aleman y seleccion de varias frases en español de cual esta la palabra. O frases en Aleman toda con una palabra tapada
 Que los dialogos puedan ser A1, A2...

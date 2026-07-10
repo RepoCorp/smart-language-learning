@@ -2586,19 +2586,6 @@ export default function NewItem({
                 ))}
               </div>
             )}
-            <div className="item-question-presets">
-              {quickItemQuestions.map((question) => (
-                <button
-                  key={question}
-                  type="button"
-                  className="secondary-button item-question-preset"
-                  disabled={askingQuestion}
-                  onClick={() => void askPresetItemQuestion(question)}
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
             <form
               className="item-questions-actions"
               onSubmit={(event) => {
@@ -2617,6 +2604,19 @@ export default function NewItem({
                 {askingQuestion ? t("newItem.questionsLoading") : t("newItem.questionsAskButton")}
               </button>
             </form>
+            <div className="item-question-presets">
+              {quickItemQuestions.map((question) => (
+                <button
+                  key={question}
+                  type="button"
+                  className="secondary-button item-question-preset"
+                  disabled={askingQuestion}
+                  onClick={() => void askPresetItemQuestion(question)}
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
             {itemQuestionError && <p className="error">{itemQuestionError}</p>}
           </div>
         </div>

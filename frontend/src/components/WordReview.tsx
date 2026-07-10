@@ -830,8 +830,8 @@ export default function WordReview({
     setLetterSuggestions([]);
     setFeedback(t("word.feedback.rewritePrompt"));
     setFeedbackTone("neutral");
-    setRewriteStatusTone("error");
-  }, [reviewComplete, pendingRewriteTakeover, t]);
+    setRewriteStatusTone(submittedResultTone === "success" ? "warning" : "error");
+  }, [reviewComplete, pendingRewriteTakeover, submittedResultTone, t]);
 
   useEffect(() => {
     setShowPromptText(targetPromptMode === "text");
