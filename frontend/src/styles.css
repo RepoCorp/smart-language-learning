@@ -651,6 +651,116 @@ body {
   border-color: var(--color-accent);
 }
 
+.browser-voice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.browser-voice-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.browser-voice-select-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.browser-voice-select-button-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-surface);
+  color: var(--color-accent-strong);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
+}
+
+.browser-voice-option-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.browser-voice-option-meta {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.browser-voice-preview-button {
+  min-width: 92px;
+}
+
+.elevenlabs-voice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.elevenlabs-voice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.elevenlabs-voice-row-disabled {
+  opacity: 0.72;
+}
+
+.elevenlabs-voice-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.elevenlabs-voice-id {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.elevenlabs-voice-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .elevenlabs-voice-row {
+    grid-template-columns: 1fr;
+  }
+
+  .elevenlabs-voice-actions {
+    width: 100%;
+  }
+
+  .elevenlabs-voice-actions button {
+    flex: 1 1 0;
+  }
+}
+
 .settings-create-user-form {
   margin-top: 8px;
 }
@@ -3269,12 +3379,21 @@ button.verb-exercise-entry:disabled {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: none;
 }
 
 .blocking-modal {
   position: relative;
   min-width: 220px;
   max-width: 90vw;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 10px;

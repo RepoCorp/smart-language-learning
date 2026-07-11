@@ -591,3 +591,52 @@ def test_phrase_target_to_source_uses_neighboring_dialog_line_as_answer():
     displayed_lines = set(payload_item["dialog_phrase_options"])
     assert "Estoy perdido" in displayed_lines
     assert len(displayed_lines & remaining_dialog_lines) == 3
+
+
+@pytest.mark.django_db
+def test_phrase_target_to_source_session_uses_dialog_turn_audio_as_prompt_audio():
+    now = timezone.now()
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="No entiendo",
+        german_text="Ich verstehe nicht",
+        source_language="spanish",
+        target_language="german",
+        audio_url="http://localhost:8000/media/audio/openai-phrase.mp3",
+        last_reviewed_at_de_to_es=now,
+        due_at_de_to_es=now,
+    )
+    dialog = SavedDialog.objects.create(
+        topic="confusion",
+        context="asking for help",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "No entiendo", "target_text": "Ich verstehe nicht"}],
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="No entiendo",
+        target_text="Ich verstehe nicht",
+        audio_url="http://localhost:8000/media/audio/elevenlabs-turn.mp3",
+    )
+    ItemDialogOccurrence.objects.create(
+        item=phrase,
+        dialog=dialog,
+        turn=turn,
+        turn_index=0,
+        side=ItemDialogOccurrence.Side.TARGET,
+        match_score=1,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/session",
+        {"size": 1, "source_language": "spanish", "target_language": "german"},
+    )
+
+    assert response.status_code == 200
+    payload_item = response.json()["items"][0]
+    assert payload_item["id"] == phrase.id
+    assert payload_item["audio_url"] == "http://localhost:8000/media/audio/openai-phrase.mp3"
+    assert payload_item["prompt_audio_url"] == "http://localhost:8000/media/audio/elevenlabs-turn.mp3"

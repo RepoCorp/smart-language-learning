@@ -42,6 +42,15 @@ const NOVELTY_VOICE_KEYWORDS = [
   "hysterical",
 ];
 
+const STRONGLY_AVOID_VOICE_KEYWORDS = [
+  "grandma",
+  "eddy",
+  "flo",
+  "rocko",
+  "sandy",
+  "shelley",
+];
+
 const LANGUAGE_PREFERRED_KEYWORDS: Record<string, string[]> = {
   fr: [
     "france",
@@ -112,6 +121,9 @@ function scoreVoice(
   if (NOVELTY_VOICE_KEYWORDS.some((keyword) => text.includes(keyword))) {
     score -= 300;
   }
+  if (STRONGLY_AVOID_VOICE_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    score -= 220;
+  }
   if ((LANGUAGE_PREFERRED_KEYWORDS[prefix] || []).some((keyword) => text.includes(keyword))) {
     score += 55;
   }
@@ -122,15 +134,45 @@ function scoreVoice(
   return score;
 }
 
-export function selectBestSpeechSynthesisVoice(
+export function rankSpeechSynthesisVoices(
   voices: SpeechSynthesisVoice[],
   lang: string,
   preferredVoiceURI = "",
-): SpeechSynthesisVoice | undefined {
+): SpeechSynthesisVoice[] {
   const prefix = languagePrefix(lang);
   const matchingVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(prefix));
   const candidates = matchingVoices.length > 0 ? matchingVoices : voices;
   return [...candidates].sort((left, right) => (
     scoreVoice(right, lang, preferredVoiceURI) - scoreVoice(left, lang, preferredVoiceURI)
-  ))[0];
+  ));
+}
+
+export function getSpeechSynthesisVoiceSelectionOptions(
+  voices: SpeechSynthesisVoice[],
+  lang: string,
+  preferredVoiceURI = "",
+  maxOptions = 3,
+): SpeechSynthesisVoice[] {
+  const ranked = rankSpeechSynthesisVoices(voices, lang, preferredVoiceURI);
+  if (ranked.length === 0) {
+    return [];
+  }
+  const bestScore = scoreVoice(ranked[0], lang, preferredVoiceURI);
+  const kept = ranked.filter((voice) => {
+    const score = scoreVoice(voice, lang, preferredVoiceURI);
+    if (score < 40) {
+      return false;
+    }
+    return score >= bestScore - 120;
+  });
+  const narrowed = kept.length > 0 ? kept : ranked.slice(0, 1);
+  return narrowed.slice(0, maxOptions);
+}
+
+export function selectBestSpeechSynthesisVoice(
+  voices: SpeechSynthesisVoice[],
+  lang: string,
+  preferredVoiceURI = "",
+): SpeechSynthesisVoice | undefined {
+  return rankSpeechSynthesisVoices(voices, lang, preferredVoiceURI)[0];
 }

@@ -75,6 +75,22 @@ def _setting_or_env(setting_name: str, default: str = "") -> str:
     return os.getenv(setting_name, default).strip()
 
 
+def _disabled_elevenlabs_voice_ids() -> set[str]:
+    from ...models import DisabledElevenLabsVoice
+
+    try:
+        return set(DisabledElevenLabsVoice.objects.values_list("voice_id", flat=True))
+    except Exception:
+        return set()
+
+
+def _exclude_disabled_elevenlabs_voice_ids(voice_ids: list[str]) -> list[str]:
+    disabled_voice_ids = _disabled_elevenlabs_voice_ids()
+    if not disabled_voice_ids:
+        return voice_ids
+    return [voice_id for voice_id in voice_ids if voice_id not in disabled_voice_ids]
+
+
 def _elevenlabs_voice_ids(*, target_language: str, kind: str = "") -> list[str]:
     kind_prefix = f"{kind.upper()}_" if kind else ""
     setting_candidates = [
@@ -88,8 +104,23 @@ def _elevenlabs_voice_ids(*, target_language: str, kind: str = "") -> list[str]:
     for setting_name in setting_candidates:
         voice_ids = _comma_separated_values(_setting_or_env(setting_name))
         if voice_ids:
-            return voice_ids
+            return _exclude_disabled_elevenlabs_voice_ids(voice_ids)
     return []
+
+
+def configured_elevenlabs_voice_ids(target_language: str) -> list[str]:
+    ordered_voice_ids: list[str] = []
+    seen: set[str] = set()
+    for kind in ("", "phrase", "word"):
+        for voice_id in _elevenlabs_voice_ids(target_language=target_language, kind=kind):
+            if voice_id and voice_id not in seen:
+                seen.add(voice_id)
+                ordered_voice_ids.append(voice_id)
+    for voice_id in _elevenlabs_dialog_voice_ids(target_language):
+        if voice_id and voice_id not in seen:
+            seen.add(voice_id)
+            ordered_voice_ids.append(voice_id)
+    return ordered_voice_ids
 
 
 def _elevenlabs_voice_id(*, target_language: str, kind: str = "", seed: str = "") -> str:
@@ -102,7 +133,7 @@ def _elevenlabs_voice_id(*, target_language: str, kind: str = "", seed: str = ""
 def _elevenlabs_dialog_voice_ids(target_language: str) -> list[str]:
     language_specific = _setting_or_env(_language_setting_name("ELEVENLABS", target_language, "DIALOG_VOICE_IDS"))
     configured = language_specific or _setting_or_env("ELEVENLABS_DIALOG_VOICE_IDS")
-    voice_ids = _comma_separated_values(configured)
+    voice_ids = _exclude_disabled_elevenlabs_voice_ids(_comma_separated_values(configured))
     if len(voice_ids) >= 2:
         return voice_ids
     return _elevenlabs_voice_ids(target_language=target_language)
@@ -273,6 +304,65 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german", v
     return audio_url
 
 
+def create_openai_audio_file(text: str, prefix: str, target_language: str = "german") -> str:
+    if not text.strip():
+        logger.warning("content.audio.openai_skipped prefix=%s reason=empty_text", prefix)
+        return ""
+
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    if not slug:
+        slug = "audio"
+    filename = f"{prefix}-{slug[:32]}-{uuid4().hex[:8]}.mp3"
+    default_speed = OPENAI_TTS_PHRASE_DEFAULT_SPEED if prefix == "phrase" else OPENAI_TTS_ITEM_DEFAULT_SPEED
+    voice = OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE.get(target_language, "onyx")
+    audio_bytes = _openai_tts_audio(
+        text=text,
+        voice=voice,
+        speed=default_speed,
+        response_format="mp3",
+        instructions=_tts_language_instruction(target_language),
+    )
+    if not audio_bytes:
+        logger.warning("content.audio.openai_failed prefix=%s filename=%s target_language=%s", prefix, filename, target_language)
+        return ""
+    audio_url = _store_audio_bytes(filename, audio_bytes, content_type="audio/mpeg")
+    if not audio_url:
+        logger.warning("content.audio.openai_failed_store prefix=%s filename=%s", prefix, filename)
+        return ""
+    logger.info(
+        "content.audio.openai_created prefix=%s filename=%s target_language=%s voice=%s",
+        prefix,
+        filename,
+        target_language,
+        f"openai:{voice}",
+    )
+    return audio_url
+
+
+def create_elevenlabs_audio_file(text: str, prefix: str, target_language: str, voice_id: str) -> str:
+    if not text.strip() or not voice_id.strip():
+        return ""
+
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    if not slug:
+        slug = "audio"
+    filename = f"{prefix}-{slug[:32]}-{uuid4().hex[:8]}.mp3"
+    audio_bytes = _elevenlabs_tts_audio(
+        text=text,
+        voice_id=voice_id.strip(),
+        target_language=target_language,
+        output_format=str(getattr(settings, "ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")),
+    )
+    if not audio_bytes:
+        logger.warning("content.audio.elevenlabs.preview_failed prefix=%s target_language=%s voice_id=%s", prefix, target_language, voice_id)
+        return ""
+    audio_url = _store_audio_bytes(filename, audio_bytes, content_type="audio/mpeg")
+    if not audio_url:
+        logger.warning("content.audio.elevenlabs.preview_store_failed prefix=%s filename=%s", prefix, filename)
+        return ""
+    return audio_url
+
+
 def _openai_tts_audio(
     *,
     text: str,
@@ -344,6 +434,28 @@ def _elevenlabs_tts_audio(
             return response.read()
     except (HTTPError, URLError, TimeoutError):
         return None
+
+
+def fetch_elevenlabs_voices() -> list[dict[str, object]]:
+    api_key = str(getattr(settings, "ELEVENLABS_API_KEY", "")).strip()
+    if not api_key:
+        return []
+    request = UrlRequest(
+        "https://api.elevenlabs.io/v1/voices",
+        headers={
+            "xi-api-key": api_key,
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    timeout_seconds = int(getattr(settings, "OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", 40))
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, ValueError):
+        return []
+    voices = payload.get("voices")
+    return voices if isinstance(voices, list) else []
 
 
 def _item_tts_audio_bytes(*, text: str, prefix: str, target_language: str, default_speed: float) -> tuple[bytes | None, str]:

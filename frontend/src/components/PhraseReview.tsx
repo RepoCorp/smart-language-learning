@@ -297,7 +297,7 @@ export default function PhraseReview({
 }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const debugTools = useDebugTools();
-  const { targetPromptMode } = usePromptPreferences();
+  const { targetPromptMode, preferredBrowserVoiceURIByLanguage } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
     spanish: "study.language.spanish",
@@ -342,6 +342,7 @@ export default function PhraseReview({
   const draggingPhraseTokenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const isSpanishToGerman = item.direction !== "de_to_es";
   const allowPromptAudio = !isSpanishToGerman;
+  const promptAudioUrl = item.prompt_audio_url || item.audio_url || "";
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
   const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
   const itemDeterministicKey = `${item.item_type}:${item.spanish_text.trim().toLowerCase()}=>${item.german_text.trim().toLowerCase()}`;
@@ -353,6 +354,7 @@ export default function PhraseReview({
   const languageLabel = isSpanishToGerman
     ? t(languageKeyByCode[targetLanguage])
     : t(languageKeyByCode[sourceLanguage]);
+  const preferredBrowserVoiceURI = preferredBrowserVoiceURIByLanguage[targetLanguage] || "";
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const useRepeatPlaceholder = Boolean(item.repeatedAfterFailure);
   const usePhraseBuilder = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_builder" || (!item.repeatPracticeStep && isSpanishToGerman));
@@ -362,6 +364,12 @@ export default function PhraseReview({
   const logSpeechDebug: SpeechDebugLog = (event, details = {}) => {
     debugTools.log("speech", event, details);
   };
+
+  useEffect(() => {
+    if (!placedTokenVoiceRef.current) {
+      placedTokenVoiceRef.current = preferredBrowserVoiceURI;
+    }
+  }, [preferredBrowserVoiceURI]);
 
   const markPhraseBuilderSpeechPrimed = (): void => {
     setPhraseBuilderSpeechPrimed(true);
@@ -434,19 +442,19 @@ export default function PhraseReview({
   };
 
   const playPromptAudio = (): void => {
-    if (!allowPromptAudio || !item.audio_url || shouldSuppressPromptAudio) {
+    if (!allowPromptAudio || !promptAudioUrl || shouldSuppressPromptAudio) {
       return;
     }
-    const audio = new Audio(item.audio_url);
+    const audio = new Audio(promptAudioUrl);
     void audio.play().catch(() => {});
   };
 
   const playPhraseAudio = async (): Promise<boolean> => {
-    if (!item.audio_url) {
+    if (!promptAudioUrl) {
       return false;
     }
     stopBrowserSpeechSynthesis(logSpeechDebug);
-    const audio = new Audio(item.audio_url);
+    const audio = new Audio(promptAudioUrl);
     suppressPromptAutoplayForAudio(audio);
     await new Promise<void>((resolve) => {
       const finish = (): void => resolve();
@@ -970,12 +978,12 @@ export default function PhraseReview({
     if (shouldSuppressPromptAudio) {
       return;
     }
-    const autoplayKey = `phrase:${item.id}:${item.audio_url || ""}:${targetPromptMode}`;
+    const autoplayKey = `phrase:${item.id}:${promptAudioUrl}:${targetPromptMode}`;
     if (!shouldAutoplayPrompt(autoplayKey)) {
       return;
     }
     playPromptAudio();
-  }, [targetPromptMode, item.id, item.audio_url, allowPromptAudio, shouldSuppressPromptAudio]);
+  }, [targetPromptMode, item.id, promptAudioUrl, allowPromptAudio, shouldSuppressPromptAudio]);
 
   if (usePhraseBuilder) {
     const placedIds = new Set(placedPhraseTokens.map((token) => token.id));
@@ -1099,7 +1107,7 @@ export default function PhraseReview({
             type="button"
             className="secondary-button"
             onClick={playPromptAudio}
-            disabled={!allowPromptAudio || !item.audio_url}
+            disabled={!allowPromptAudio || !promptAudioUrl}
           >
             {t("prompt.playAudio")}
           </button>

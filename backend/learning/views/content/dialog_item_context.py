@@ -201,9 +201,9 @@ def _dialog_turn_audio_payloads(
             "source_text": turn["source_text"],
             "target_text": turn["target_text"],
             "speaker": turn["speaker"],
-            "phrase_audio_url": phrase_audio_by_key.get(
-                (turn["source_text"].lower(), turn["target_text"].lower()),
-                turn_audio_by_index.get(turn["turn_index"], ""),
+            "phrase_audio_url": turn_audio_by_index.get(
+                turn["turn_index"],
+                phrase_audio_by_key.get((turn["source_text"].lower(), turn["target_text"].lower()), ""),
             ),
         }
         for turn in normalized_turns

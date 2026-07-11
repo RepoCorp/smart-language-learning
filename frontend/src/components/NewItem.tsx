@@ -259,7 +259,7 @@ export default function NewItem({
   onClose,
 }: NewItemProps): JSX.Element {
   const { t } = useI18n();
-  const { targetPromptMode, showMobileActionLabels } = usePromptPreferences();
+  const { targetPromptMode, showMobileActionLabels, preferredBrowserVoiceURIByLanguage } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
     spanish: "study.language.spanish",
@@ -271,6 +271,7 @@ export default function NewItem({
   };
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
   const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
+  const preferredBrowserVoiceURI = preferredBrowserVoiceURIByLanguage[targetLanguage] || "";
   const [saving, setSaving] = useState<boolean>(false);
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
@@ -1561,7 +1562,7 @@ export default function NewItem({
     const matchingVoices = window.speechSynthesis
       .getVoices()
       .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
-    const selectedVoice = selectBestSpeechSynthesisVoice(matchingVoices, lang);
+    const selectedVoice = selectBestSpeechSynthesisVoice(matchingVoices, lang, preferredBrowserVoiceURI);
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     }
@@ -1605,7 +1606,7 @@ export default function NewItem({
         const lang = speechLangByCode[targetLanguage] || "de-DE";
         utterance.lang = lang;
         utterance.rate = 0.8;
-        const selectedVoice = selectBestSpeechSynthesisVoice(window.speechSynthesis.getVoices(), lang);
+        const selectedVoice = selectBestSpeechSynthesisVoice(window.speechSynthesis.getVoices(), lang, preferredBrowserVoiceURI);
         if (selectedVoice) {
           utterance.voice = selectedVoice;
         }
@@ -1740,23 +1741,8 @@ export default function NewItem({
             <h2 className="item-view-title">{targetText || sourceText}</h2>
             <p className="item-view-subtitle">{sourceText}</p>
           </div>
-          {item.item_type === "word" && (
-            <div className="item-view-hero-pill">
-              <span className="item-view-hero-target">{targetText}</span>
-              <span className="item-view-hero-separator" aria-hidden="true" />
-              <span className="item-view-hero-source">{sourceText}</span>
-            </div>
-          )}
         </div>
         <div className="item-view-meta-grid">
-          <div className="item-view-meta-card">
-            <span className="item-view-meta-label">{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</span>
-            <strong className="item-view-meta-value">{sourceText}</strong>
-          </div>
-          <div className="item-view-meta-card">
-            <span className="item-view-meta-label">{t("newItem.targetLabel", { language: targetLanguageLabel })}</span>
-            <strong className="item-view-meta-value">{targetText}</strong>
-          </div>
           {item.item_type === "word" && (
             <div className="item-view-meta-card">
               <span className="item-view-meta-label">{t("newItem.wordTypeLabel")}</span>

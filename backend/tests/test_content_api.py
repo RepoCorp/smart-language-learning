@@ -1,9 +1,10 @@
+from django.contrib.auth import get_user_model
 import json
 
 import pytest
 from rest_framework.test import APIClient
 
-from learning.models import DialogTurn, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic
+from learning.models import DialogTurn, DisabledElevenLabsVoice, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic, UserAuthToken
 
 
 def _patch_dialog_click_call(monkeypatch, fake_call_openai_json) -> None:
@@ -213,6 +214,169 @@ def test_elevenlabs_voice_pool_reads_language_specific_env(monkeypatch, settings
     voice_ids = content_audio._elevenlabs_voice_ids(target_language="german", kind="phrase")
 
     assert voice_ids == ["env-voice-a", "env-voice-b"]
+
+
+@pytest.mark.django_db
+def test_elevenlabs_voice_pool_excludes_disabled_voice_ids(settings):
+    from learning.views.content import audio as content_audio
+
+    settings.ELEVENLABS_GERMAN_PHRASE_VOICE_IDS = "voice-a, voice-b, voice-c"
+    DisabledElevenLabsVoice.objects.create(voice_id="voice-b", voice_name="Voice B")
+
+    voice_ids = content_audio._elevenlabs_voice_ids(target_language="german", kind="phrase")
+
+    assert voice_ids == ["voice-a", "voice-c"]
+
+
+@pytest.mark.django_db
+def test_saved_phrase_items_use_openai_audio_even_when_elevenlabs_is_enabled(monkeypatch, settings):
+    from learning.views.content import persistence as content_persistence
+    from learning.views.content.types import ContentCandidate
+
+    settings.AUDIO_TTS_PROVIDER = "elevenlabs"
+    captured_openai_calls = []
+    captured_general_calls = []
+
+    def fake_create_openai_audio_file(text, prefix, target_language="german"):
+        captured_openai_calls.append((text, prefix, target_language))
+        return "http://localhost:8000/media/audio/openai-phrase.mp3"
+
+    def fake_create_audio_file(text, prefix, target_language="german", voice_id=""):
+        captured_general_calls.append((text, prefix, target_language, voice_id))
+        return "http://localhost:8000/media/audio/general.mp3"
+
+    monkeypatch.setattr(content_persistence, "create_openai_audio_file", fake_create_openai_audio_file)
+    monkeypatch.setattr(content_persistence, "create_audio_file", fake_create_audio_file)
+
+    item = content_persistence.create_phrase_if_missing(
+        user=None,
+        candidate=ContentCandidate(
+            spanish_text="Buenos dias.",
+            german_text="Guten Morgen.",
+            exists=False,
+            notes="",
+        ),
+        topic="greetings",
+        source_language="spanish",
+        target_language="german",
+        audio_url_override="http://localhost:8000/media/audio/dialog-turn.mp3",
+    )
+
+    assert item is not None
+    assert item.audio_url == "http://localhost:8000/media/audio/openai-phrase.mp3"
+    assert captured_openai_calls == [("Guten Morgen.", "phrase", "german")]
+    assert captured_general_calls == []
+
+
+@pytest.mark.django_db
+def test_elevenlabs_voices_endpoint_is_admin_only():
+    client = APIClient()
+
+    response = client.get("/api/config/elevenlabs-voices")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_elevenlabs_voices_endpoint_returns_disabled_state(monkeypatch):
+    from learning.views import configuration as configuration_views
+
+    User = get_user_model()
+    admin = User.objects.create_superuser(username="admin", email="admin@example.com", password="1234")
+    token = UserAuthToken.objects.create(user=admin)
+    DisabledElevenLabsVoice.objects.create(voice_id="voice-b", voice_name="Voice B")
+    monkeypatch.setattr(
+        configuration_views,
+        "fetch_elevenlabs_voices",
+        lambda: [
+            {"voice_id": "voice-a", "name": "Voice A", "category": "generated"},
+            {"voice_id": "voice-b", "name": "Voice B", "category": "generated"},
+        ],
+    )
+    client = APIClient()
+
+    response = client.get("/api/config/elevenlabs-voices?target_language=german", HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["target_language"] == "german"
+    assert payload["voices"] == [
+        {
+            "voice_id": "voice-a",
+            "name": "Voice A",
+            "category": "generated",
+            "description": "",
+            "preview_url": "",
+            "labels": {},
+            "disabled": False,
+        },
+        {
+            "voice_id": "voice-b",
+            "name": "Voice B",
+            "category": "generated",
+            "description": "",
+            "preview_url": "",
+            "labels": {},
+            "disabled": True,
+        },
+    ]
+
+
+@pytest.mark.django_db
+def test_elevenlabs_voices_endpoint_falls_back_to_configured_voice_ids(monkeypatch, settings):
+    from learning.views import configuration as configuration_views
+
+    User = get_user_model()
+    admin = User.objects.create_superuser(username="admin", email="admin@example.com", password="1234")
+    token = UserAuthToken.objects.create(user=admin)
+    monkeypatch.setattr(configuration_views, "fetch_elevenlabs_voices", lambda: [])
+    monkeypatch.setattr(configuration_views, "configured_elevenlabs_voice_ids", lambda target_language: ["voice-a", "voice-b"])
+    client = APIClient()
+
+    response = client.get("/api/config/elevenlabs-voices?target_language=german", HTTP_AUTHORIZATION=f"Bearer {token.key}")
+
+    assert response.status_code == 200
+    assert response.json()["voices"] == [
+        {
+            "voice_id": "voice-a",
+            "name": "voice-a",
+            "category": "configured",
+            "description": "",
+            "preview_url": "",
+            "labels": {},
+            "disabled": False,
+        },
+        {
+            "voice_id": "voice-b",
+            "name": "voice-b",
+            "category": "configured",
+            "description": "",
+            "preview_url": "",
+            "labels": {},
+            "disabled": False,
+        },
+    ]
+
+
+@pytest.mark.django_db
+def test_elevenlabs_voice_preview_endpoint_returns_audio_url(monkeypatch):
+    from learning.views import configuration as configuration_views
+
+    User = get_user_model()
+    admin = User.objects.create_superuser(username="admin", email="admin@example.com", password="1234")
+    token = UserAuthToken.objects.create(user=admin)
+    monkeypatch.setattr(configuration_views, "create_elevenlabs_audio_file", lambda **kwargs: "http://localhost:8000/media/audio/preview.mp3")
+    client = APIClient()
+
+    response = client.post(
+        "/api/config/elevenlabs-voices/preview",
+        data={"voice_id": "voice-a", "text": "Hallo.", "target_language": "german"},
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {token.key}",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["audio_url"] == "http://localhost:8000/media/audio/preview.mp3"
 
 
 def test_basic_word_metadata_prompt_requires_noun_articles_in_both_languages(monkeypatch):
@@ -2141,6 +2305,47 @@ def test_quick_add_word_from_unselected_dialog_turn_creates_phrase_audio_context
     assert detail.status_code == 200
     related_turns = detail.json()["related_dialogs"][0]["turns"]
     assert related_turns[1]["phrase_audio_url"] == turn.audio_url
+
+
+@pytest.mark.django_db
+def test_related_dialog_turns_prefer_dialog_turn_audio_over_saved_phrase_audio():
+    from learning.views.content.dialog_item_context import related_dialogs_by_item_ids
+
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Hola.",
+        german_text="Hallo.",
+        source_language="spanish",
+        target_language="german",
+        audio_url="http://localhost:8000/media/audio/openai-phrase.mp3",
+    )
+    dialog = SavedDialog.objects.create(
+        topic="greetings",
+        context="",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Hola.", "target_text": "Hallo.", "speaker": "a"}],
+        audio_url="",
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Hola.",
+        target_text="Hallo.",
+        audio_url="http://localhost:8000/media/audio/elevenlabs-turn.mp3",
+    )
+    ItemDialogOccurrence.objects.create(
+        item=phrase,
+        dialog=dialog,
+        turn=turn,
+        turn_index=0,
+        side=ItemDialogOccurrence.Side.TARGET,
+        match_score=1.0,
+    )
+
+    related_dialogs = related_dialogs_by_item_ids([phrase.id], user=None)
+
+    assert related_dialogs[phrase.id][0]["turns"][0]["phrase_audio_url"] == "http://localhost:8000/media/audio/elevenlabs-turn.mp3"
 
 
 @pytest.mark.django_db

@@ -533,6 +533,7 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "notes": entry.item.notes,
                 "word_type": entry.item.word_type,
                 "audio_url": entry.item.audio_url,
+                "prompt_audio_url": _prompt_audio_url_for_entry(entry, user=user),
                 "exercise_phrases": entry.item.exercise_phrases or {},
                 "mode": entry.mode,
                 "direction": entry.direction,
@@ -552,6 +553,28 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
         )
 
     return payload
+
+
+def _prompt_audio_url_for_entry(entry: SessionEntry, *, user) -> str:
+    item_audio_url = str(entry.item.audio_url or "").strip()
+    if not (
+        entry.item.item_type == Item.ItemType.PHRASE
+        and entry.direction == Item.ReviewDirection.GERMAN_TO_SPANISH
+    ):
+        return item_audio_url
+
+    occurrence = (
+        apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
+        .filter(item=entry.item)
+        .select_related("turn")
+        .order_by("-created_at", "-match_score", "-id")
+        .first()
+    )
+    if occurrence:
+        turn_audio_url = str(occurrence.turn.audio_url or "").strip()
+        if turn_audio_url:
+            return turn_audio_url
+    return item_audio_url
 
 
 def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int, str | None], list[dict]]:
@@ -808,9 +831,9 @@ def _dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
             "source_text": turn["source_text"],
             "target_text": turn["target_text"],
             "speaker": turn["speaker"],
-            "phrase_audio_url": phrase_audio_by_key.get(
-                (turn["source_text"].lower(), turn["target_text"].lower()),
-                turn_audio_by_index.get(turn["turn_index"], ""),
+            "phrase_audio_url": turn_audio_by_index.get(
+                turn["turn_index"],
+                phrase_audio_by_key.get((turn["source_text"].lower(), turn["target_text"].lower()), ""),
             ),
         }
         for turn in normalized_turns

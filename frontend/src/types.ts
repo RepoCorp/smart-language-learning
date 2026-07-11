@@ -33,6 +33,7 @@ export interface CompareWordRecord {
   german_text: string;
   word_type?: string;
   audio_url?: string;
+  prompt_audio_url?: string;
   exercise_phrases?: ItemExercisePhrases;
   created_at?: string;
 }
@@ -257,6 +258,29 @@ export interface ContentItemConversationResponse {
 
 export interface ContentTopicContextsResponse {
   contexts: string[];
+}
+
+export interface ElevenLabsVoiceRecord {
+  voice_id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  preview_url?: string;
+  labels?: Record<string, string>;
+  disabled: boolean;
+}
+
+export interface ElevenLabsVoicesResponse {
+  voices: ElevenLabsVoiceRecord[];
+  target_language: StudyLanguageCode;
+  target_language_label: string;
+  preview_text: string;
+}
+
+export interface ElevenLabsVoicePreviewResponse {
+  audio_url: string;
+  voice_id: string;
+  text: string;
 }
 
 export interface TopicConversationStartResponse {

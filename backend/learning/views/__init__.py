@@ -35,6 +35,7 @@ from .session import SessionView
 from .session_state import RestoreSessionItemStateView
 from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
 from .difficult_items import CompleteDifficultItemView
+from .configuration import ElevenLabsVoiceDisableView, ElevenLabsVoicePreviewView, ElevenLabsVoicesView
 
 __all__ = [
     "ContentConfirmView",
@@ -76,4 +77,7 @@ __all__ = [
     "AuthMeView",
     "AuthRegisterView",
     "AuthBootstrapStatusView",
+    "ElevenLabsVoicesView",
+    "ElevenLabsVoiceDisableView",
+    "ElevenLabsVoicePreviewView",
 ]

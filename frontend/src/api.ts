@@ -10,6 +10,8 @@ import type {
   ContentPreviewResponse,
   CompareWordRecord,
   ContentTopicContextsResponse,
+  ElevenLabsVoicePreviewResponse,
+  ElevenLabsVoicesResponse,
   TopicConversationStartResponse,
   TopicConversationHelpResponse,
   ContentTopicsResponse,
@@ -178,6 +180,73 @@ export async function createUserWithPin(username: string, email: string, pin: st
   }
   const payload = (await response.json()) as { user: AuthUser };
   return payload.user;
+}
+
+export async function fetchElevenLabsVoices(targetLanguage: StudyLanguageCode): Promise<ElevenLabsVoicesResponse> {
+  const params = new URLSearchParams({ target_language: targetLanguage });
+  const response = await apiFetch(`${API_BASE}/config/elevenlabs-voices?${params.toString()}`);
+  if (!response.ok) {
+    let detail = "Failed to load ElevenLabs voices";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ElevenLabsVoicesResponse;
+}
+
+export async function updateElevenLabsVoiceDisabledState(
+  voiceId: string,
+  voiceName: string,
+  disabled: boolean,
+): Promise<void> {
+  const response = await apiFetch(`${API_BASE}/config/elevenlabs-voices/disable`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ voice_id: voiceId, voice_name: voiceName, disabled }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to update ElevenLabs voice";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+}
+
+export async function previewElevenLabsVoice(
+  voiceId: string,
+  text: string,
+  targetLanguage: StudyLanguageCode,
+): Promise<ElevenLabsVoicePreviewResponse> {
+  const response = await apiFetch(`${API_BASE}/config/elevenlabs-voices/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ voice_id: voiceId, text, target_language: targetLanguage }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to preview ElevenLabs voice";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ElevenLabsVoicePreviewResponse;
 }
 
 export async function logoutFromPinSession(): Promise<void> {

@@ -228,3 +228,16 @@ class UserAuthToken(models.Model):
 
     def __str__(self) -> str:
         return f"Token for user {self.user_id}"
+
+
+class DisabledElevenLabsVoice(models.Model):
+    voice_id = models.CharField(max_length=120, unique=True)
+    voice_name = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("voice_name", "voice_id")
+
+    def __str__(self) -> str:
+        return self.voice_name or self.voice_id
