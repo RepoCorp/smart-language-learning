@@ -1727,33 +1727,54 @@ export default function NewItem({
   };
 
   return (
-    <div>
+    <div className="item-view-shell">
       {readOnly && onClose && (
         <button type="button" className="modal-corner-close" aria-label={t("words.close")} onClick={onClose}>
           ×
         </button>
       )}
-      <p className="prompt">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
-      <p>
-        <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {sourceText}
-      </p>
-      <p>
-        <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {targetText}
-      </p>
-      {item.item_type === "word" && (
-        <p>
-          <strong>{t("newItem.wordTypeLabel")}</strong> {wordType || t("newItem.wordAddTypeUnknown")}
-        </p>
-      )}
-      <p>
-        <strong>{t("newItem.notes")}</strong> {item.notes || "-"}
-      </p>
+      <section className="item-view-header-card">
+        <p className="item-view-kicker">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
+        <div className="item-view-title-row">
+          <div className="item-view-title-block">
+            <h2 className="item-view-title">{targetText || sourceText}</h2>
+            <p className="item-view-subtitle">{sourceText}</p>
+          </div>
+          {item.item_type === "word" && (
+            <div className="item-view-hero-pill">
+              <span className="item-view-hero-target">{targetText}</span>
+              <span className="item-view-hero-separator" aria-hidden="true" />
+              <span className="item-view-hero-source">{sourceText}</span>
+            </div>
+          )}
+        </div>
+        <div className="item-view-meta-grid">
+          <div className="item-view-meta-card">
+            <span className="item-view-meta-label">{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</span>
+            <strong className="item-view-meta-value">{sourceText}</strong>
+          </div>
+          <div className="item-view-meta-card">
+            <span className="item-view-meta-label">{t("newItem.targetLabel", { language: targetLanguageLabel })}</span>
+            <strong className="item-view-meta-value">{targetText}</strong>
+          </div>
+          {item.item_type === "word" && (
+            <div className="item-view-meta-card">
+              <span className="item-view-meta-label">{t("newItem.wordTypeLabel")}</span>
+              <strong className="item-view-meta-value">{wordType || t("newItem.wordAddTypeUnknown")}</strong>
+            </div>
+          )}
+          <div className="item-view-meta-card">
+            <span className="item-view-meta-label">{t("newItem.notes")}</span>
+            <strong className="item-view-meta-value item-view-meta-value-notes">{item.notes || "-"}</strong>
+          </div>
+        </div>
+      </section>
       {audioUrl && (
-        <>
+        <div className="item-view-audio-wrap">
           <audio controls src={audioUrl}>
             {t("newItem.noAudioSupport")}
           </audio>
-        </>
+        </div>
       )}
       {(item.item_type === "word" || item.item_type === "phrase") && (
         <div className={showMobileActionLabels ? "mobile-action-labels-expanded" : undefined}>

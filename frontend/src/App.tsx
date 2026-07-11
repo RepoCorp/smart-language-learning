@@ -102,9 +102,12 @@ export default function App(): JSX.Element {
     { path: "/content/manage", label: "Manage content" },
     { path: "/dialogs", label: "Dialogs" },
     { path: "/conversation", label: "Conversation" },
-    { path: "/configurations", label: "Configurations" },
   ];
+  const configPath = "/configurations";
   const selectedPagePath = pageOptions.some((option) => option.path === location.pathname) ? location.pathname : "/session";
+  const userBadgeLabel = authUser?.username?.trim().charAt(0).toUpperCase()
+    || authUser?.email?.trim().charAt(0).toUpperCase()
+    || "U";
 
   return (
     <>
@@ -180,38 +183,56 @@ export default function App(): JSX.Element {
             showFutureReviews={false}
             showWordCount={false}
             topBarControl={(
-              <div className="top-nav">
-                <button
-                  type="button"
-                  className="top-nav-menu-button"
-                  onClick={() => setShowPageMenu((value) => !value)}
-                  aria-expanded={showPageMenu}
-                  aria-haspopup="menu"
-                  aria-label="Open page menu"
-                >
-                  <span className="top-nav-menu-label">Menu</span>
-                  <span className="top-nav-menu-icon" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
+              <div className="app-top-bar">
+                <div className="app-top-bar-brand" aria-label="Smart Learn">
+                  <span className="app-top-bar-brand-mark" aria-hidden="true">
+                    <span className="app-top-bar-brand-mark-dot" />
                   </span>
-                </button>
-                {showPageMenu ? (
-                  <div className="top-nav-menu" role="menu" aria-label="Pages">
-                    {pageOptions.map((option) => (
-                      <button
-                        key={option.path}
-                        type="button"
-                        className={`top-nav-menu-item ${selectedPagePath === option.path ? "active" : ""}`}
-                        onClick={() => navigate(option.path)}
-                        role="menuitem"
-                        aria-current={selectedPagePath === option.path ? "page" : undefined}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                  <span className="app-top-bar-brand-text">Smart Learn</span>
+                </div>
+                <div className="app-top-bar-actions">
+                  <div className="top-nav">
+                    <button
+                      type="button"
+                      className="top-nav-menu-button"
+                      onClick={() => setShowPageMenu((value) => !value)}
+                      aria-expanded={showPageMenu}
+                      aria-haspopup="menu"
+                      aria-label="Open page menu"
+                    >
+                      <span className="top-nav-menu-icon" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </button>
+                    {showPageMenu ? (
+                      <div className="top-nav-menu" role="menu" aria-label="Pages">
+                        {pageOptions.map((option) => (
+                          <button
+                            key={option.path}
+                            type="button"
+                            className={`top-nav-menu-item ${selectedPagePath === option.path ? "active" : ""}`}
+                            onClick={() => navigate(option.path)}
+                            role="menuitem"
+                            aria-current={selectedPagePath === option.path ? "page" : undefined}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                  <button
+                    type="button"
+                    className={`app-top-bar-user-badge ${location.pathname === configPath ? "active" : ""}`}
+                    aria-label={authUser?.username || authUser?.email || "User"}
+                    aria-current={location.pathname === configPath ? "page" : undefined}
+                    onClick={() => navigate(configPath)}
+                  >
+                    {userBadgeLabel}
+                  </button>
+                </div>
               </div>
             )}
           />

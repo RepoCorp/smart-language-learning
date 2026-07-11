@@ -50,15 +50,24 @@ export default function OverviewStatsBar({
     };
   }, [sourceLanguage, targetLanguage]);
 
+  const metricCards = [
+    { key: "ready", label: t("stats.readyLabel"), value: stats?.ready_to_review ?? "-" },
+    ...(showFutureReviews ? [{ key: "future", label: t("stats.futureLabel"), value: stats?.future_reviews ?? "-" }] : []),
+    { key: "not-started", label: t("stats.notStartedLabel"), value: stats?.not_started ?? "-" },
+    ...(showWordCount ? [{ key: "words", label: t("stats.wordsLabel"), value: stats?.word_items ?? "-" }] : []),
+  ];
+
   return (
     <header className="overview-stats">
       <div className="overview-stats-content">
+        {topBarControl ? <div className="overview-stats-header">{topBarControl}</div> : null}
         <div className="overview-stats-metrics">
-          <span>{t("stats.ready", { count: stats?.ready_to_review ?? "-" })}</span>
-          {showFutureReviews ? <span>{t("stats.future", { count: stats?.future_reviews ?? "-" })}</span> : null}
-          <span>{t("stats.notStarted", { count: stats?.not_started ?? "-" })}</span>
-          {showWordCount ? <span className="overview-stats-word-count">{t("stats.words", { count: stats?.word_items ?? "-" })}</span> : null}
-          {topBarControl ? <div className="overview-stats-top-control">{topBarControl}</div> : null}
+          {metricCards.map((metric) => (
+            <div key={metric.key} className="overview-stats-metric-card">
+              <span className="overview-stats-metric-label">{metric.label}</span>
+              <strong className="overview-stats-metric-value">{metric.value}</strong>
+            </div>
+          ))}
         </div>
       </div>
     </header>

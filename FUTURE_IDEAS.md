@@ -1,12 +1,11 @@
 # Todos
 
 
-PROBLEMAS/ERRORES EXISTENTES
+PROBLEMAS/ERRORES EXISTENTESLK
 Play all dialogs is not playing all dialogs
 En pregunta enter envia y mejorar las respuestas, incluyendo quitar el que dice si esta relacionado
 Para liberar espacio, el menu esta quedando por debajo de las stats, reducir longitud de texto depronto
 En los ejercicios de confusing palabras cuando es verbo usar el formato apropiado
-El area post respuesta esta mal en el otro sentido, liked phrase en español
 Generación de imagen está muy lenta
 Audio no siempre está autoplay al inicio de test
 Parece que hay una voz de mujer que no queda bien, se come letras
