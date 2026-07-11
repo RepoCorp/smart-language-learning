@@ -1,14 +1,18 @@
 # Todos
 
+Urgentes
+- Arreglar conversacion 
+- Conversation goals are not fully working fine
+Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
+Evaluar cuando se consigio el objetivo
+Mejorar velocidad de respuesta de la conversacion 
 
 PROBLEMAS/ERRORES EXISTENTESLK
 Play all dialogs is not playing all dialogs
 En pregunta enter envia y mejorar las respuestas, incluyendo quitar el que dice si esta relacionado
-Para liberar espacio, el menu esta quedando por debajo de las stats, reducir longitud de texto depronto
 En los ejercicios de confusing palabras cuando es verbo usar el formato apropiado
-Generación de imagen está muy lenta
+Mejorar velocidad creacion imagenes The clearest speed-focused option I found is fal FLUX.1 [schnell] Black Forest Labs (BFL)
 Audio no siempre está autoplay al inicio de test
-Parece que hay una voz de mujer que no queda bien, se come letras
 Que no seleccione el texto del boton en los bloques
 Retome focus after clicking letter option
 Problema con palabras que toma como.expresion como.bitte y gleichfalls
@@ -26,9 +30,6 @@ Que la pregunta común llene el input pero permita escribir
 Guiones espacios y demás en hints
 Que errores de mayusculas y umlauts y eso los trate como errores
 Recrear audio de un turno en particular que pudo haber quedado regu
-Poder identificar la voz de cada audio para ajustar lo que se usa de 11labs
-Test audio usa voces naturales, post answer usa voz estandar
-When testing with natural audio and audio only give button to play standard tambien
 Correr todos los diálogos y regenerar los que se necesite
 Ejercicios de expresiones no pueden ser como las frases
 En la sección de calentar palabra que muestre los espacios para cada letra
@@ -38,16 +39,13 @@ Que los ejercicios de un helper sean otros usos del helpee
 Cómo hacer para que en el ejercicio de bloques sea más entrecomillas fácil equivocarse
 El segundo ejercicio de palabra, el teclado completo, se va pendiendo la tecla qué es y se mueve al puesto como bloque. De pronto que prenda tres opciones pero de un color no verde, y cuando uno toca la que si es se pone verde y después uno la arrastra
 Que mutear en el ejercicio no lo lo silencie  si no que pare donde estaba para continuar en la misma parte si se desmutea
-De español a ingles no use articulo
 In the create content window, make dialog lenght and language of required words a simple radio
 en las ventanas, como generar contenido, limpiar y que las opciones empiecen colapsadas y solo abra el area si se hace click en ella
 Que al escoger sesión procure no incluir frases y sus palabras juntas
 Que la palabra en la imagen sea completa por ejemplo herauskommen y que se muestre
-Conversation goals are not fully working fine 
 Cuales son las diferencias entre los dialog windows para ver si se puede unificar mas (botones, scrolling...) (from item, from dialogs, from create content, and even conversation)
 Que indefinido sea en sujeto
 Add con diese diesels...
-Mejorar velocidad creacion imagenes The clearest speed-focused option I found is fal FLUX.1 [schnell] Black Forest Labs (BFL)
 
 NUEVAS FUNCIONALIDADES
 Ejercicio de escribir la palabra muchas veces, como lo de los treinta minutos. Pero algo que sea rapido: dibujandola sobre preescrita, con letras de teclado que se iluminan, con mover letras…?
@@ -82,13 +80,10 @@ Que cuando uno complete los items de la sesion le haga fiesta
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la traduce como devolveria cuando realmente es volverse / llegar a ser y solo es devolveria junto con la plabra zuruckgeben
 Pilas con palabras que pueden ser masculino o femenino, cuando busca la palabra base que si diferencie las dos (el doctor, la doctora)
-No reconoce cuando cumplio el objetivo en la conversacion 
 Sigue sacando cosas raras como sein de stimmt
 Mejorar lo de los helpers
 Revisar future and present tense ejercicios
 Para las palabras seleccionadas añadir funcionalidad a guardar cuando son agregadas desde una conversacion
-Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
-Evaluar cuando se consigio el objetivo
 Mejorar ejemplos de helpers y que la imagen lo represente mejor, como por ejemplo que es en el futuro o es como würde 
 Que el helper no lo traduzca como palabra si no como una explicacion o algo asi 
 Mas creatividad para la imagen 
@@ -110,7 +105,6 @@ Do not allow deleting phrases, only mark them as inactive or archived.
 Ensayar otros modelos
 Seguridad de S3
 Arreglar allowed hosts de Django
-Mejorar velocidad de respuesta de la conversacion 
 En lugar de validar longitud de entradas como el rol limitar desde el input
 Remove some text in some places that I don't really need, like These notes are only used for this conversation and are not saved. 
 Usar un model mejor para las preguntas (ENVs para distintos objetivos)
@@ -118,7 +112,6 @@ en los ejercicios no cortar el audio cuando terminan los 30 segundos, simplement
 Ser mas especifico en el goal de la conversacion 
 Usar servicio de autenticacion de Azure
 Add settings to deploy files, like updated roles permissions, env...
-Audio mas rapido y mas "ofuscado"
 escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
 Actualizar `aws-deploy/ecs-task-backend.json` y `aws-deploy/ecs-task-frontend.json`; ahora el script usa ARNs de task definitions porque esos archivos estan obsoletos.
 Que primero genere una frase y después a esa misma frase le haga las conjugaciones
