@@ -7,6 +7,7 @@ import {
   fetchOverviewStats,
   getOverviewStatsUpdatedEventName,
   previewElevenLabsVoice,
+  resetUserPin,
   updateElevenLabsVoiceDisabledState,
   type AuthUser,
 } from "../api";
@@ -48,6 +49,11 @@ export default function ConfigurationsPage({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
+  const [resetIdentifier, setResetIdentifier] = useState("");
+  const [resetPin, setResetPin] = useState("");
+  const [resettingPin, setResettingPin] = useState(false);
+  const [resetPinError, setResetPinError] = useState("");
+  const [resetPinSuccess, setResetPinSuccess] = useState("");
   const [browserVoiceOptions, setBrowserVoiceOptions] = useState<SpeechSynthesisVoice[]>([]);
   const [previewingVoiceURI, setPreviewingVoiceURI] = useState<string>("");
   const activePreviewRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -282,6 +288,24 @@ export default function ConfigurationsPage({
       setElevenLabsError(error instanceof Error ? error.message : t("config.elevenLabsUpdateError"));
     } finally {
       setUpdatingElevenLabsVoiceId("");
+    }
+  };
+
+  const handleResetPin = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    setResetPinError("");
+    setResetPinSuccess("");
+    setResettingPin(true);
+    try {
+      const user = await resetUserPin(resetIdentifier, resetPin);
+      setResetPinSuccess(t("config.resetPinSuccess", { username: user.username }));
+      setResetIdentifier("");
+      setResetPin("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("config.resetPinFailed");
+      setResetPinError(message);
+    } finally {
+      setResettingPin(false);
     }
   };
 
@@ -531,49 +555,84 @@ export default function ConfigurationsPage({
         </section>
       ) : null}
       {canCreateUsers ? (
-        <section className="card settings-card">
-          <h2 className="settings-title">{t("config.createUserTitle")}</h2>
-          <p className="settings-subtitle">{t("config.createUserSubtitle")}</p>
-          <form className="settings-create-user-form" onSubmit={handleCreateUser}>
-            <label className="settings-field">
-              {t("config.username")}
-              <input
-                type="text"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                autoComplete="username"
-                required
-              />
-            </label>
-            <label className="settings-field">
-              {t("config.email")}
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                required
-              />
-            </label>
-            <label className="settings-field">
-              {t("config.pin")}
-              <input
-                type="password"
-                value={pin}
-                onChange={(event) => setPin(event.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </label>
-            <div className="actions">
-              <button type="submit" disabled={creating}>
-                {creating ? t("config.creatingUser") : t("config.createUser")}
-              </button>
-            </div>
-            {createError ? <p className="error">{createError}</p> : null}
-            {createSuccess ? <p className="hint">{createSuccess}</p> : null}
-          </form>
-        </section>
+        <>
+          <section className="card settings-card">
+            <h2 className="settings-title">{t("config.createUserTitle")}</h2>
+            <p className="settings-subtitle">{t("config.createUserSubtitle")}</p>
+            <form className="settings-create-user-form" onSubmit={handleCreateUser}>
+              <label className="settings-field">
+                {t("config.username")}
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  autoComplete="username"
+                  required
+                />
+              </label>
+              <label className="settings-field">
+                {t("config.email")}
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label className="settings-field">
+                {t("config.pin")}
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={(event) => setPin(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              <div className="actions">
+                <button type="submit" disabled={creating}>
+                  {creating ? t("config.creatingUser") : t("config.createUser")}
+                </button>
+              </div>
+              {createError ? <p className="error">{createError}</p> : null}
+              {createSuccess ? <p className="hint">{createSuccess}</p> : null}
+            </form>
+          </section>
+          <section className="card settings-card">
+            <h2 className="settings-title">{t("config.resetPinTitle")}</h2>
+            <p className="settings-subtitle">{t("config.resetPinSubtitle")}</p>
+            <form className="settings-create-user-form" onSubmit={handleResetPin}>
+              <label className="settings-field">
+                {t("config.userIdentifier")}
+                <input
+                  type="text"
+                  value={resetIdentifier}
+                  onChange={(event) => setResetIdentifier(event.target.value)}
+                  autoComplete="username"
+                  required
+                />
+              </label>
+              <label className="settings-field">
+                {t("config.newPin")}
+                <input
+                  type="password"
+                  value={resetPin}
+                  onChange={(event) => setResetPin(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              <div className="actions">
+                <button type="submit" disabled={resettingPin}>
+                  {resettingPin ? t("config.resettingPin") : t("config.resetPin")}
+                </button>
+              </div>
+              {resetPinError ? <p className="error">{resetPinError}</p> : null}
+              {resetPinSuccess ? <p className="hint">{resetPinSuccess}</p> : null}
+            </form>
+          </section>
+        </>
       ) : null}
     </main>
   );

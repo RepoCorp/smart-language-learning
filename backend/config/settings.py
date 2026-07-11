@@ -8,6 +8,10 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
+
+def _env_flag(name: str, default: str = "1") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -109,6 +113,10 @@ AWS_S3_IMAGE_PREFIX = os.getenv("AWS_S3_IMAGE_PREFIX", "exercise-images").strip(
 AWS_S3_IMAGE_REGION = os.getenv("AWS_S3_IMAGE_REGION", AWS_S3_AUDIO_REGION).strip()
 AWS_S3_IMAGE_BASE_URL = os.getenv("AWS_S3_IMAGE_BASE_URL", "").strip().rstrip("/")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
+DEV_CONVERSATION_ENABLE_ANALYSIS = _env_flag("DEV_CONVERSATION_ENABLE_ANALYSIS", "0")
+DEV_CONVERSATION_ENABLE_GOAL_EVALUATION = _env_flag("DEV_CONVERSATION_ENABLE_GOAL_EVALUATION", "0")
+DEV_CONVERSATION_ENABLE_AUDIO = _env_flag("DEV_CONVERSATION_ENABLE_AUDIO", "1")
+DEV_CONVERSATION_RETURN_INLINE_AUDIO = _env_flag("DEV_CONVERSATION_RETURN_INLINE_AUDIO", "1")
 
 LOGGING = {
     "version": 1,

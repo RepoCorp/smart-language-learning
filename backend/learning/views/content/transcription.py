@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
+
 
 def openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> str:
+    started_at = time.perf_counter()
     api_key = settings.OPENAI_API_KEY
     if not api_key:
+        logger.warning("content.transcription.skipped reason=missing_api_key target_language=%s", target_language)
         return ""
 
     try:
@@ -18,8 +24,10 @@ def openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> st
         if hasattr(uploaded_file, "seek"):
             uploaded_file.seek(0)
     except Exception:
+        logger.warning("content.transcription.failed stage=read_upload target_language=%s", target_language)
         return ""
     if not file_bytes:
+        logger.warning("content.transcription.failed stage=empty_upload target_language=%s", target_language)
         return ""
 
     model_name = str(getattr(settings, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")).strip() or "gpt-4o-mini-transcribe"
@@ -90,9 +98,31 @@ def openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> st
         method="POST",
     )
     timeout_seconds = int(getattr(settings, "OPENAI_REQUEST_TIMEOUT_SECONDS", 30))
+    logger.info(
+        "content.transcription.started model=%s target_language=%s content_type=%s bytes=%s filename=%s",
+        model_name,
+        target_language,
+        content_type,
+        len(file_bytes),
+        filename,
+    )
     try:
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        logger.warning(
+            "content.transcription.failed stage=request model=%s target_language=%s elapsed_ms=%s",
+            model_name,
+            target_language,
+            int((time.perf_counter() - started_at) * 1000),
+        )
         return ""
-    return str(payload.get("text", "")).strip()[:1000]
+    text = str(payload.get("text", "")).strip()[:1000]
+    logger.info(
+        "content.transcription.finished model=%s target_language=%s elapsed_ms=%s transcript_length=%s",
+        model_name,
+        target_language,
+        int((time.perf_counter() - started_at) * 1000),
+        len(text),
+    )
+    return text

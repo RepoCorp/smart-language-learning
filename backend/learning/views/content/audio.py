@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
@@ -249,6 +251,7 @@ def _store_audio_bytes(filename: str, payload: bytes, content_type: str) -> str:
 
 
 def create_audio_file(text: str, prefix: str, target_language: str = "german", voice_id: str = "") -> str:
+    started_at = time.perf_counter()
     if not text.strip():
         logger.warning("content.audio.skipped prefix=%s reason=empty_text", prefix)
         return ""
@@ -260,6 +263,7 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german", v
 
     default_speed = OPENAI_TTS_PHRASE_DEFAULT_SPEED if prefix == "phrase" else OPENAI_TTS_ITEM_DEFAULT_SPEED
     if voice_id and _configured_tts_provider() == "elevenlabs":
+        tts_started_at = time.perf_counter()
         audio_bytes = _elevenlabs_tts_audio(
             text=text,
             voice_id=voice_id,
@@ -267,6 +271,14 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german", v
             output_format=str(getattr(settings, "ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")),
         )
         voice = f"elevenlabs:{voice_id}"
+        logger.info(
+            "content.audio.tts_finished prefix=%s provider=elevenlabs target_language=%s voice=%s elapsed_ms=%s bytes=%s",
+            prefix,
+            target_language,
+            voice,
+            int((time.perf_counter() - tts_started_at) * 1000),
+            len(audio_bytes),
+        )
         if not audio_bytes:
             logger.warning(
                 "content.audio.elevenlabs.voice_fallback prefix=%s target_language=%s voice_id=%s",
@@ -274,34 +286,142 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german", v
                 target_language,
                 voice_id,
             )
+            fallback_tts_started_at = time.perf_counter()
             audio_bytes, voice = _item_tts_audio_bytes(
                 text=text,
                 prefix=prefix,
                 target_language=target_language,
                 default_speed=default_speed,
             )
+            logger.info(
+                "content.audio.tts_finished prefix=%s provider=fallback target_language=%s voice=%s elapsed_ms=%s bytes=%s",
+                prefix,
+                target_language,
+                voice,
+                int((time.perf_counter() - fallback_tts_started_at) * 1000),
+                len(audio_bytes),
+            )
     else:
+        tts_started_at = time.perf_counter()
         audio_bytes, voice = _item_tts_audio_bytes(
             text=text,
             prefix=prefix,
             target_language=target_language,
             default_speed=default_speed,
         )
+        logger.info(
+            "content.audio.tts_finished prefix=%s provider=%s target_language=%s voice=%s elapsed_ms=%s bytes=%s",
+            prefix,
+            "auto",
+            target_language,
+            voice,
+            int((time.perf_counter() - tts_started_at) * 1000),
+            len(audio_bytes),
+        )
     if not audio_bytes:
         logger.warning("content.audio.failed prefix=%s filename=%s target_language=%s", prefix, filename, target_language)
         return ""
+    store_started_at = time.perf_counter()
     audio_url = _store_audio_bytes(filename, audio_bytes, content_type="audio/mpeg")
+    logger.info(
+        "content.audio.store_finished prefix=%s filename=%s target_language=%s elapsed_ms=%s has_audio=%s",
+        prefix,
+        filename,
+        target_language,
+        int((time.perf_counter() - store_started_at) * 1000),
+        bool(audio_url),
+    )
     if not audio_url:
         logger.warning("content.audio.failed_store prefix=%s filename=%s", prefix, filename)
         return ""
     logger.info(
-        "content.audio.created prefix=%s filename=%s target_language=%s voice=%s",
+        "content.audio.created prefix=%s filename=%s target_language=%s voice=%s total_elapsed_ms=%s",
         prefix,
         filename,
         target_language,
         voice,
+        int((time.perf_counter() - started_at) * 1000),
     )
     return audio_url
+
+
+def create_audio_data_url(text: str, prefix: str, target_language: str = "german", voice_id: str = "") -> str:
+    started_at = time.perf_counter()
+    if not text.strip():
+        logger.warning("content.audio.inline_skipped prefix=%s reason=empty_text", prefix)
+        return ""
+
+    default_speed = OPENAI_TTS_PHRASE_DEFAULT_SPEED if prefix == "phrase" else OPENAI_TTS_ITEM_DEFAULT_SPEED
+    if voice_id and _configured_tts_provider() == "elevenlabs":
+        tts_started_at = time.perf_counter()
+        audio_bytes = _elevenlabs_tts_audio(
+            text=text,
+            voice_id=voice_id,
+            target_language=target_language,
+            output_format=str(getattr(settings, "ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")),
+        )
+        voice = f"elevenlabs:{voice_id}"
+        logger.info(
+            "content.audio.inline_tts_finished prefix=%s provider=elevenlabs target_language=%s voice=%s elapsed_ms=%s bytes=%s",
+            prefix,
+            target_language,
+            voice,
+            int((time.perf_counter() - tts_started_at) * 1000),
+            len(audio_bytes),
+        )
+        if not audio_bytes:
+            logger.warning(
+                "content.audio.inline_elevenlabs.voice_fallback prefix=%s target_language=%s voice_id=%s",
+                prefix,
+                target_language,
+                voice_id,
+            )
+            fallback_tts_started_at = time.perf_counter()
+            audio_bytes, voice = _item_tts_audio_bytes(
+                text=text,
+                prefix=prefix,
+                target_language=target_language,
+                default_speed=default_speed,
+            )
+            logger.info(
+                "content.audio.inline_tts_finished prefix=%s provider=fallback target_language=%s voice=%s elapsed_ms=%s bytes=%s",
+                prefix,
+                target_language,
+                voice,
+                int((time.perf_counter() - fallback_tts_started_at) * 1000),
+                len(audio_bytes),
+            )
+    else:
+        tts_started_at = time.perf_counter()
+        audio_bytes, voice = _item_tts_audio_bytes(
+            text=text,
+            prefix=prefix,
+            target_language=target_language,
+            default_speed=default_speed,
+        )
+        logger.info(
+            "content.audio.inline_tts_finished prefix=%s provider=%s target_language=%s voice=%s elapsed_ms=%s bytes=%s",
+            prefix,
+            "auto",
+            target_language,
+            voice,
+            int((time.perf_counter() - tts_started_at) * 1000),
+            len(audio_bytes),
+        )
+    if not audio_bytes:
+        logger.warning("content.audio.inline_failed prefix=%s target_language=%s", prefix, target_language)
+        return ""
+
+    data_url = f"data:audio/mpeg;base64,{base64.b64encode(audio_bytes).decode('ascii')}"
+    logger.info(
+        "content.audio.inline_created prefix=%s target_language=%s voice=%s total_elapsed_ms=%s bytes=%s",
+        prefix,
+        target_language,
+        voice,
+        int((time.perf_counter() - started_at) * 1000),
+        len(audio_bytes),
+    )
+    return data_url
 
 
 def create_openai_audio_file(text: str, prefix: str, target_language: str = "german") -> str:

@@ -55,9 +55,6 @@ class AuthRegisterView(APIView):
 
         User = get_user_model()
         is_first_user = User.objects.count() == 0
-        request_user = get_request_user(request)
-        if (not is_first_user) and (request_user is None or not request_user.is_superuser):
-            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
 
         if User.objects.filter(username__iexact=username).exists():
             return Response({"detail": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
@@ -66,23 +63,12 @@ class AuthRegisterView(APIView):
 
         if is_first_user:
             user = User.objects.create_superuser(username=username, email=email, password=pin)
-            token = UserAuthToken.objects.create(user=user)
-            return Response(
-                {
-                    "token": token.key,
-                    "user": {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email,
-                        "is_superuser": bool(user.is_superuser),
-                    },
-                },
-                status=status.HTTP_201_CREATED,
-            )
         else:
             user = User.objects.create_user(username=username, email=email, password=pin)
+        token = UserAuthToken.objects.create(user=user)
         return Response(
             {
+                "token": token.key,
                 "user": {
                     "id": user.id,
                     "username": user.username,
@@ -91,6 +77,41 @@ class AuthRegisterView(APIView):
                 },
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class AuthResetPinView(APIView):
+    def post(self, request: Request) -> Response:
+        request_user = get_request_user(request)
+        if request_user is None or not request_user.is_superuser:
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+
+        identifier = str(request.data.get("identifier", "")).strip()
+        pin = str(request.data.get("pin", "")).strip()
+        if not identifier or not pin:
+            return Response({"detail": "identifier and pin are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(pin) < 4:
+            return Response({"detail": "pin must have at least 4 characters"}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        user = (
+            User.objects.filter(username__iexact=identifier).first()
+            or User.objects.filter(email__iexact=identifier).first()
+        )
+        if user is None:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        user.set_password(pin)
+        user.save(update_fields=["password"])
+        return Response(
+            {
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "is_superuser": bool(user.is_superuser),
+                },
+            }
         )
 
 
@@ -126,5 +147,4 @@ class AuthMeView(APIView):
 
 class AuthBootstrapStatusView(APIView):
     def get(self, request: Request) -> Response:
-        User = get_user_model()
-        return Response({"can_public_register": User.objects.count() == 0})
+        return Response({"can_public_register": True})

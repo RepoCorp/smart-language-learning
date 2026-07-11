@@ -6,6 +6,7 @@ Urgentes
 Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
 Evaluar cuando se consigio el objetivo
 Mejorar velocidad de respuesta de la conversacion 
+No reproduce audio automaticamente de la respuesta
 
 PROBLEMAS/ERRORES EXISTENTESLK
 Play all dialogs is not playing all dialogs

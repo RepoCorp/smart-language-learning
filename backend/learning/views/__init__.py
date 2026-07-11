@@ -33,7 +33,7 @@ from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
 from .session_state import RestoreSessionItemStateView
-from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
+from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView, AuthResetPinView
 from .difficult_items import CompleteDifficultItemView
 from .configuration import ElevenLabsVoiceDisableView, ElevenLabsVoicePreviewView, ElevenLabsVoicesView
 
@@ -76,6 +76,7 @@ __all__ = [
     "AuthLogoutView",
     "AuthMeView",
     "AuthRegisterView",
+    "AuthResetPinView",
     "AuthBootstrapStatusView",
     "ElevenLabsVoicesView",
     "ElevenLabsVoiceDisableView",

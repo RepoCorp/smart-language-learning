@@ -182,6 +182,28 @@ export async function createUserWithPin(username: string, email: string, pin: st
   return payload.user;
 }
 
+export async function resetUserPin(identifier: string, pin: string): Promise<AuthUser> {
+  const response = await apiFetch(`${API_BASE}/auth/reset-pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier, pin }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to reset user PIN";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  const payload = (await response.json()) as { user: AuthUser };
+  return payload.user;
+}
+
 export async function fetchElevenLabsVoices(targetLanguage: StudyLanguageCode): Promise<ElevenLabsVoicesResponse> {
   const params = new URLSearchParams({ target_language: targetLanguage });
   const response = await apiFetch(`${API_BASE}/config/elevenlabs-voices?${params.toString()}`);
