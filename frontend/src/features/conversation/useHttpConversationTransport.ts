@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { sendTopicConversationAudio } from "../../api";
-import { CONVERSATION_MAX_RECORDING_MS } from "./conversationConstants";
+import {
+  CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS,
+  CONVERSATION_MAX_RECORDING_MS,
+} from "./conversationConstants";
 import type { BaseConversationTransportArgs } from "./conversationTransportTypes";
 
 const MIC_UNSUPPORTED = "Microphone recording is not supported on this device.";
@@ -24,6 +27,7 @@ export function useHttpConversationTransport({
 }: BaseConversationTransportArgs) {
   const [conversationRecording, setConversationRecording] = useState<boolean>(false);
   const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
+  const [conversationPaused, setConversationPaused] = useState<boolean>(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -31,6 +35,8 @@ export function useHttpConversationTransport({
   const timerRef = useRef<number | null>(null);
   const maxRecordingTimeoutRef = useRef<number | null>(null);
   const autoRestartAfterAssistantRef = useRef<boolean>(true);
+  const timedOutSubmissionRef = useRef<boolean>(false);
+  const consecutiveTimeoutCountRef = useRef<number>(0);
 
   useEffect(() => {
     return () => {
@@ -99,6 +105,9 @@ export function useHttpConversationTransport({
   };
 
   const stopRecording = (submit: boolean): void => {
+    if (submit && !timedOutSubmissionRef.current) {
+      consecutiveTimeoutCountRef.current = 0;
+    }
     shouldSubmitRef.current = submit;
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
@@ -119,6 +128,8 @@ export function useHttpConversationTransport({
     if (conversationRecording || conversationLoading) {
       return;
     }
+    setConversationPaused(false);
+    autoRestartAfterAssistantRef.current = true;
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       onError(MIC_UNSUPPORTED);
       return;
@@ -159,6 +170,13 @@ export function useHttpConversationTransport({
         recorderRef.current = null;
         const recordedBlob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         chunksRef.current = [];
+        if (timedOutSubmissionRef.current) {
+          timedOutSubmissionRef.current = false;
+          consecutiveTimeoutCountRef.current += 1;
+          if (consecutiveTimeoutCountRef.current >= CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS) {
+            setPaused(true);
+          }
+        }
         if (shouldSubmit && recordedBlob.size > 0) {
           void submitRecordedAudio(recordedBlob);
         }
@@ -171,6 +189,7 @@ export function useHttpConversationTransport({
         setConversationRecordingSeconds((value) => value + 1);
       }, 1000);
       maxRecordingTimeoutRef.current = window.setTimeout(() => {
+        timedOutSubmissionRef.current = true;
         stopRecording(true);
       }, CONVERSATION_MAX_RECORDING_MS);
     } catch {
@@ -183,9 +202,22 @@ export function useHttpConversationTransport({
     }
   };
 
+  const setPaused = (paused: boolean): void => {
+    if (!paused) {
+      consecutiveTimeoutCountRef.current = 0;
+    }
+    setConversationPaused(paused);
+    autoRestartAfterAssistantRef.current = !paused;
+    if (paused && conversationRecording) {
+      stopRecording(false);
+    }
+  };
+
   return {
+    conversationPaused,
     conversationRecording,
     conversationRecordingSeconds,
+    setPaused,
     startRecording,
     stopRecording,
   };

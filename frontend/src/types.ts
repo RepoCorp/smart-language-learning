@@ -303,6 +303,7 @@ export interface TopicConversationRealtimeSessionResponse {
   model?: string;
   voice?: string;
   transcription_model?: string;
+  instructions?: string;
 }
 
 export interface TopicConversationHelpResponse {

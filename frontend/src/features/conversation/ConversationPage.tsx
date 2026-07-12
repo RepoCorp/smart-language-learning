@@ -16,9 +16,16 @@ import { type StudyLanguageCode, useStudyLanguages } from "../../studyLanguages"
 import type { ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
+import { CONVERSATION_SEND_ENABLE_DELAY_SECONDS } from "./conversationConstants";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
 import ConversationTurns from "./ConversationTurns";
-import { type GoalDifficulty, useConversationTransport } from "./useConversationTransport";
+import {
+  type ConversationResponseLevel,
+  type ConversationSpeechSpeed,
+  type ConversationTransport,
+  type GoalDifficulty,
+  useConversationTransport,
+} from "./useConversationTransport";
 
 const CREATE_NEW_OPTION = "__create_new__";
 
@@ -49,6 +56,9 @@ export default function ConversationPage(): JSX.Element {
   const [notes, setNotes] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [goalDifficulty, setGoalDifficulty] = useState<GoalDifficulty>("medium");
+  const [selectedConversationMode, setSelectedConversationMode] = useState<ConversationTransport>("realtime");
+  const [speechSpeed, setSpeechSpeed] = useState<ConversationSpeechSpeed>("normal");
+  const [responseLevel, setResponseLevel] = useState<ConversationResponseLevel>("A2");
   const [loadingTopics, setLoadingTopics] = useState<boolean>(false);
 
   const [started, setStarted] = useState<boolean>(false);
@@ -258,6 +268,7 @@ export default function ConversationPage(): JSX.Element {
   };
 
   const {
+    conversationPaused,
     conversationRecording,
     conversationRecordingSeconds,
     conversationTransport,
@@ -265,6 +276,7 @@ export default function ConversationPage(): JSX.Element {
     conversationRealtimeReady,
     conversationRealtimeVoice,
     closeRealtimeSession,
+    setPaused,
     setupRealtimeConversation,
     startRecording,
     stopRecording,
@@ -285,6 +297,8 @@ export default function ConversationPage(): JSX.Element {
     activeNotes,
     activeRole,
     conversationGoal,
+    speechSpeed,
+    responseLevel,
   });
 
   useEffect(() => {
@@ -383,6 +397,36 @@ export default function ConversationPage(): JSX.Element {
     setHelpOpen(false);
   };
 
+  const applyConversationStartState = (
+    payload: Awaited<ReturnType<typeof startTopicConversation>>,
+    fallbackTopic: string,
+    fallbackNotes: string,
+    fallbackRole: string,
+    fallbackGoalDifficulty: GoalDifficulty,
+  ): void => {
+    setStarted(true);
+    setActiveTopic(payload.topic || fallbackTopic);
+    setActiveNotes(payload.notes || fallbackNotes);
+    setActiveRole(payload.role_text || fallbackRole);
+    setActiveGoalDifficulty(payload.goal_difficulty || fallbackGoalDifficulty);
+    setConversationGoal(payload.goal_text || "");
+    setOpeningText(payload.opening_text || "");
+    setOpeningAudioUrl(payload.opening_audio_url || "");
+    setOpeningTranslation(payload.opening_translation_text || "");
+    setShowOpeningTranslation(false);
+    setConversationTurns([]);
+    setConversationTranslationVisible({});
+    setConversationCorrectionVisible({});
+    setConversationUserTranslationVisible({});
+    setConversationUserTranslationLoading({});
+    setConversationUserCorrectionLoading({});
+    setSentenceActionStatus({});
+    setWordActionStatus({});
+    setPendingWordAdd(null);
+    setPendingSentenceAdd(null);
+    setConversationPendingAssistantText("");
+  };
+
   const startConversation = async (): Promise<void> => {
     setConversationError("");
     if (!resolvedTopic) {
@@ -401,47 +445,45 @@ export default function ConversationPage(): JSX.Element {
         sourceLanguage,
         targetLanguage,
       );
-      setStarted(true);
-      setActiveTopic(payload.topic || resolvedTopic);
-      setActiveNotes(payload.notes || trimmedNotes);
-      setActiveRole(payload.role_text || trimmedRole);
-      setActiveGoalDifficulty(payload.goal_difficulty || goalDifficulty);
-      setConversationGoal(payload.goal_text || "");
-      setOpeningText(payload.opening_text || "");
-      setOpeningAudioUrl(payload.opening_audio_url || "");
-      setOpeningTranslation(payload.opening_translation_text || "");
-      setShowOpeningTranslation(false);
-      setConversationTurns([]);
-      setConversationTranslationVisible({});
-      setConversationCorrectionVisible({});
-      setConversationUserTranslationVisible({});
-      setConversationUserTranslationLoading({});
-      setConversationUserCorrectionLoading({});
-      setSentenceActionStatus({});
-      setWordActionStatus({});
-      setPendingWordAdd(null);
-      setPendingSentenceAdd(null);
-      setConversationTransport("http");
-      setConversationPendingAssistantText("");
-      logRealtime("start-conversation-http-ready", {
-        topic: payload.topic || resolvedTopic,
-      });
-      const realtimeEnabled = await setupRealtimeConversation({
-        topic: payload.topic || resolvedTopic,
-        notes: payload.notes || trimmedNotes,
-        roleText: payload.role_text || trimmedRole,
-        goalDifficulty: payload.goal_difficulty || goalDifficulty,
-      }).catch((error) => {
-        warnRealtime("fallback-to-http", {
-          reason: error instanceof Error ? error.message : String(error),
+      if (selectedConversationMode === "realtime") {
+        logRealtime("start-conversation-http-ready", {
+          topic: payload.topic || resolvedTopic,
         });
-        return false;
-      });
-      if (!realtimeEnabled) {
-        closeRealtimeSession();
-        setConversationTransport("http");
-        warnRealtime("http-transport-active");
+        const realtimeEnabled = await setupRealtimeConversation({
+          topic: payload.topic || resolvedTopic,
+          notes: payload.notes || trimmedNotes,
+          roleText: payload.role_text || trimmedRole,
+          goalDifficulty: payload.goal_difficulty || goalDifficulty,
+        }).catch((error) => {
+          warnRealtime("live-setup-failed", {
+            reason: error instanceof Error ? error.message : String(error),
+          });
+          return false;
+        });
+        if (!realtimeEnabled) {
+          closeRealtimeSession();
+          setConversationTransport("http");
+          setConversationError(t("conversation.liveUnavailable"));
+          return;
+        }
+        applyConversationStartState(
+          payload,
+          resolvedTopic,
+          trimmedNotes,
+          trimmedRole,
+          goalDifficulty,
+        );
+        return;
       }
+
+      setConversationTransport("http");
+      applyConversationStartState(
+        payload,
+        resolvedTopic,
+        trimmedNotes,
+        trimmedRole,
+        goalDifficulty,
+      );
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
       setConversationError(detail || t("newItem.questionsError"));
@@ -813,6 +855,31 @@ export default function ConversationPage(): JSX.Element {
               </label>
             </div>
           </div>
+          <div className="conversation-notes-wrap">
+            <label className="prompt conversation-goal-difficulty-label">{t("conversation.modeLabel")}</label>
+            <div className="exercise-audio-mode">
+              <label className={`exercise-radio-option ${selectedConversationMode === "realtime" ? "exercise-radio-option-selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="conversation-mode"
+                  checked={selectedConversationMode === "realtime"}
+                  onChange={() => setSelectedConversationMode("realtime")}
+                  disabled={conversationLoading || started}
+                />
+                <span>{t("conversation.modeLive")}</span>
+              </label>
+              <label className={`exercise-radio-option ${selectedConversationMode === "http" ? "exercise-radio-option-selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="conversation-mode"
+                  checked={selectedConversationMode === "http"}
+                  onChange={() => setSelectedConversationMode("http")}
+                  disabled={conversationLoading || started}
+                />
+                <span>{t("conversation.modeNaturalVoices")}</span>
+              </label>
+            </div>
+          </div>
           {!started && (
             <div className="actions">
               <button
@@ -836,10 +903,16 @@ export default function ConversationPage(): JSX.Element {
                 goal: conversationGoal,
               }}
               status={{
+                canSendResponse: conversationRecordingSeconds >= CONVERSATION_SEND_ENABLE_DELAY_SECONDS,
+                conversationPaused,
                 conversationRecording,
                 conversationRecordingSeconds,
                 conversationLoading,
                 conversationRealtimeConnecting,
+                responseLevel,
+                showResponseLevelControl: conversationTransport === "realtime",
+                showSpeechSpeedControl: conversationTransport === "realtime",
+                speechSpeed,
                 transportHint: conversationTransport === "realtime" && conversationRealtimeReady
                   ? `Realtime voice active${conversationRealtimeVoice ? ` (${conversationRealtimeVoice})` : ""}`
                   : "Standard voice flow active",
@@ -848,6 +921,9 @@ export default function ConversationPage(): JSX.Element {
                 helpLoading,
                 onEndConversation: endConversation,
                 onOpenHelp: openHelpModal,
+                onResponseLevelChange: setResponseLevel,
+                onSpeechSpeedChange: setSpeechSpeed,
+                onTogglePaused: () => setPaused(!conversationPaused),
                 onStartRecording: () => void startRecording(conversationLoading),
                 onStopRecording: () => stopRecording(true),
               }}

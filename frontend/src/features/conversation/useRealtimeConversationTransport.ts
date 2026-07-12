@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 
 import { createTopicConversationRealtimeSession } from "../../api";
-import { CONVERSATION_MAX_RECORDING_MS } from "./conversationConstants";
+import {
+  CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS,
+  CONVERSATION_MAX_RECORDING_MS,
+} from "./conversationConstants";
 import type {
   BaseConversationTransportArgs,
+  ConversationResponseLevel,
+  ConversationSpeechSpeed,
   StartConversationTransportArgs,
 } from "./conversationTransportTypes";
 import { extractRealtimeText, logRealtime, type RealtimeServerEvent, warnRealtime } from "./conversationRealtimeSupport";
@@ -14,9 +19,12 @@ export function useRealtimeConversationTransport({
   onLoadingChange,
   onConversationTurn,
   onPendingAssistantTextChange,
+  speechSpeed,
+  responseLevel,
 }: BaseConversationTransportArgs) {
   const [conversationRecording, setConversationRecording] = useState<boolean>(false);
   const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
+  const [conversationPaused, setConversationPaused] = useState<boolean>(false);
   const [conversationRealtimeConnecting, setConversationRealtimeConnecting] = useState<boolean>(false);
   const [conversationRealtimeReady, setConversationRealtimeReady] = useState<boolean>(false);
   const [conversationRealtimeVoice, setConversationRealtimeVoice] = useState<string>("");
@@ -31,6 +39,56 @@ export function useRealtimeConversationTransport({
   const maxRecordingTimeoutRef = useRef<number | null>(null);
   const autoRestartAfterAssistantRef = useRef<boolean>(true);
   const activeSessionTokenRef = useRef<number>(0);
+  const baseInstructionsRef = useRef<string>("");
+  const timedOutSubmissionRef = useRef<boolean>(false);
+  const consecutiveTimeoutCountRef = useRef<number>(0);
+
+  const buildSpeedInstruction = (speed: ConversationSpeechSpeed): string => {
+    if (speed === "super_slow") {
+      return "Speak very slowly, with clear pauses between short phrases.";
+    }
+    if (speed === "slow") {
+      return "Speak slowly and clearly.";
+    }
+    return "Speak at a normal pace for an A2 learner.";
+  };
+
+  const buildLevelInstruction = (level: ConversationResponseLevel): string => {
+    if (level === "A1") {
+      return "Use an A1 level. Use very simple words, very short sentences, and very basic grammar.";
+    }
+    if (level === "B1") {
+      return "Use a B1 level. You can use somewhat more natural and varied vocabulary, but keep it learner-friendly.";
+    }
+    return "Use an A2 level. Use simple vocabulary and simple grammar.";
+  };
+
+  const buildRealtimeInstructions = (speed: ConversationSpeechSpeed, level: ConversationResponseLevel): string => {
+    const baseInstructions = baseInstructionsRef.current.trim();
+    const speedInstruction = buildSpeedInstruction(speed);
+    const levelInstruction = buildLevelInstruction(level);
+    return [baseInstructions, levelInstruction, speedInstruction].filter(Boolean).join("\n");
+  };
+
+  const sendRealtimeSessionUpdate = (
+    speed: ConversationSpeechSpeed,
+    level: ConversationResponseLevel,
+    transcriptionModel: string,
+  ): void => {
+    const dataChannel = dataChannelRef.current;
+    if (!dataChannel || dataChannel.readyState !== "open") {
+      return;
+    }
+    dataChannel.send(JSON.stringify({
+      type: "session.update",
+      session: {
+        type: "realtime",
+        instructions: buildRealtimeInstructions(speed, level),
+        output_modalities: ["audio"],
+        audio: { input: { transcription: { model: transcriptionModel }, turn_detection: null } },
+      },
+    }));
+  };
   const clearTimer = (): void => {
     if (timerRef.current !== null) {
       window.clearInterval(timerRef.current);
@@ -68,10 +126,19 @@ export function useRealtimeConversationTransport({
     clearTimer();
   }, []);
 
+  useEffect(() => {
+    if (!conversationRealtimeReady) {
+      return;
+    }
+    sendRealtimeSessionUpdate(speechSpeed, responseLevel, "gpt-4o-mini-transcribe");
+  }, [conversationRealtimeReady, responseLevel, speechSpeed]);
+
   const startRecording = async (conversationLoading: boolean): Promise<void> => {
     if (conversationRecording || conversationLoading) {
       return;
     }
+    setConversationPaused(false);
+    autoRestartAfterAssistantRef.current = true;
     const audioTrack = realtimeStreamRef.current?.getAudioTracks()[0] || null;
     const dataChannel = dataChannelRef.current;
     if (!audioTrack || !dataChannel || dataChannel.readyState !== "open") {
@@ -99,8 +166,20 @@ export function useRealtimeConversationTransport({
       setConversationRecordingSeconds((value) => value + 1);
     }, 1000);
     maxRecordingTimeoutRef.current = window.setTimeout(() => {
+      timedOutSubmissionRef.current = true;
       stopRecording(true);
     }, CONVERSATION_MAX_RECORDING_MS);
+  };
+
+  const setPaused = (paused: boolean): void => {
+    if (!paused) {
+      consecutiveTimeoutCountRef.current = 0;
+    }
+    setConversationPaused(paused);
+    autoRestartAfterAssistantRef.current = !paused;
+    if (paused && conversationRecording) {
+      stopRecording(false);
+    }
   };
 
   const stopRecording = (submit: boolean): void => {
@@ -119,7 +198,21 @@ export function useRealtimeConversationTransport({
     if (dataChannel && dataChannel.readyState === "open") {
       logRealtime("push-to-talk-submitted");
       dataChannel.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
-      dataChannel.send(JSON.stringify({ type: "response.create" }));
+      dataChannel.send(JSON.stringify({
+        type: "response.create",
+        response: {
+          instructions: buildRealtimeInstructions(speechSpeed, responseLevel),
+        },
+      }));
+      if (timedOutSubmissionRef.current) {
+        timedOutSubmissionRef.current = false;
+        consecutiveTimeoutCountRef.current += 1;
+        if (consecutiveTimeoutCountRef.current >= CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS) {
+          setPaused(true);
+        }
+      } else {
+        consecutiveTimeoutCountRef.current = 0;
+      }
       return;
     }
     warnRealtime("submit-blocked", { dataChannelState: dataChannel?.readyState || "missing" });
@@ -142,6 +235,7 @@ export function useRealtimeConversationTransport({
     try {
       logRealtime("setup-started", { topic, sourceLanguage, targetLanguage, goalDifficulty });
       const session = await createTopicConversationRealtimeSession(topic, notes, roleText, goalDifficulty, sourceLanguage, targetLanguage);
+      baseInstructionsRef.current = (session.instructions || "").trim();
       logRealtime("session-response", {
         realtimeEnabled: session.realtime_enabled,
         hasClientSecret: Boolean(session.client_secret?.value),
@@ -176,14 +270,11 @@ export function useRealtimeConversationTransport({
       dataChannel.addEventListener("open", () => {
         if (activeSessionTokenRef.current !== sessionToken) return;
         logRealtime("data-channel-open");
-        dataChannel.send(JSON.stringify({
-          type: "session.update",
-          session: {
-            type: "realtime",
-            output_modalities: ["audio"],
-            audio: { input: { transcription: { model: session.transcription_model || "gpt-4o-mini-transcribe" }, turn_detection: null } },
-          },
-        }));
+        sendRealtimeSessionUpdate(
+          speechSpeed,
+          responseLevel,
+          session.transcription_model || "gpt-4o-mini-transcribe",
+        );
         setConversationRealtimeReady(true);
         setConversationRealtimeVoice(session.voice || "");
       });
@@ -285,12 +376,14 @@ export function useRealtimeConversationTransport({
     }
   };
   return {
+    conversationPaused,
     conversationRecording,
     conversationRecordingSeconds,
     conversationRealtimeConnecting,
     conversationRealtimeReady,
     conversationRealtimeVoice,
     closeRealtimeSession,
+    setPaused,
     setupRealtimeConversation,
     startRecording,
     stopRecording,

@@ -294,16 +294,18 @@ class ContentTopicConversationRealtimeSessionView(APIView):
             logger.info("content.topic_conversation.realtime_session_disabled topic=%s", topic)
             return Response({"realtime_enabled": False})
 
+        realtime_instructions = _build_realtime_conversation_instructions(
+            topic=topic,
+            notes=notes,
+            role_text=role_text,
+            source_language=source_language,
+            target_language=target_language,
+        )
+
         try:
             client_secret_payload = _create_realtime_client_secret(
                 request=request,
-                instructions=_build_realtime_conversation_instructions(
-                    topic=topic,
-                    notes=notes,
-                    role_text=role_text,
-                    source_language=source_language,
-                    target_language=target_language,
-                ),
+                instructions=realtime_instructions,
             )
         except RuntimeError as exc:
             logger.warning(
@@ -345,6 +347,7 @@ class ContentTopicConversationRealtimeSessionView(APIView):
                     str(getattr(settings, "OPENAI_REALTIME_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")).strip()
                     or "gpt-4o-mini-transcribe"
                 ),
+                "instructions": realtime_instructions,
             }
         )
 

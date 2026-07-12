@@ -2358,6 +2358,15 @@ textarea {
   margin-bottom: 10px;
 }
 
+.conversation-speed-controls {
+  margin-top: 10px;
+}
+
+.conversation-speed-label {
+  display: block;
+  margin-bottom: 8px;
+}
+
 .topic-options {
   display: flex;
   flex-wrap: wrap;

@@ -4,7 +4,12 @@ import type { BaseConversationTransportArgs, StartConversationTransportArgs } fr
 import { useHttpConversationTransport } from "./useHttpConversationTransport";
 import { useRealtimeConversationTransport } from "./useRealtimeConversationTransport";
 
-export type { ConversationTransport, GoalDifficulty } from "./conversationTransportTypes";
+export type {
+  ConversationResponseLevel,
+  ConversationSpeechSpeed,
+  ConversationTransport,
+  GoalDifficulty,
+} from "./conversationTransportTypes";
 
 export function useConversationTransport(args: BaseConversationTransportArgs) {
   const [conversationTransport, setConversationTransport] = useState<"http" | "realtime">("http");
@@ -40,6 +45,9 @@ export function useConversationTransport(args: BaseConversationTransportArgs) {
   };
 
   return {
+    conversationPaused: conversationTransport === "realtime"
+      ? realtimeTransport.conversationPaused
+      : httpTransport.conversationPaused,
     conversationRecording: conversationTransport === "realtime"
       ? realtimeTransport.conversationRecording
       : httpTransport.conversationRecording,
@@ -51,6 +59,9 @@ export function useConversationTransport(args: BaseConversationTransportArgs) {
     conversationRealtimeReady: realtimeTransport.conversationRealtimeReady,
     conversationRealtimeVoice: realtimeTransport.conversationRealtimeVoice,
     closeRealtimeSession,
+    setPaused: conversationTransport === "realtime"
+      ? realtimeTransport.setPaused
+      : httpTransport.setPaused,
     setupRealtimeConversation,
     startRecording,
     stopRecording,
