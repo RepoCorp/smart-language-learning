@@ -28,6 +28,7 @@ import {
 } from "./useConversationTransport";
 
 const CREATE_NEW_OPTION = "__create_new__";
+const CONVERSATION_ASSISTANT_HINT_LIMIT = 3;
 
 interface ConversationTurn extends ContentItemConversationResponse {}
 type ConversationHelpEntry = {
@@ -77,6 +78,10 @@ export default function ConversationPage(): JSX.Element {
   const [conversationLoading, setConversationLoading] = useState<boolean>(false);
   const [conversationError, setConversationError] = useState<string>("");
   const [conversationPendingAssistantText, setConversationPendingAssistantText] = useState<string>("");
+  const [conversationPendingUserTurn, setConversationPendingUserTurn] = useState<boolean>(false);
+  const [assistantSpeaking, setAssistantSpeaking] = useState<boolean>(false);
+  const [assistantHintsUsed, setAssistantHintsUsed] = useState<number>(0);
+  const [assistantRevealUsedByTurn, setAssistantRevealUsedByTurn] = useState<Record<number, boolean>>({});
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
   const [helpLoading, setHelpLoading] = useState<boolean>(false);
   const [helpError, setHelpError] = useState<string>("");
@@ -246,11 +251,59 @@ export default function ConversationPage(): JSX.Element {
   };
 
   const toggleAssistantTurnTranslation = (index: number): void => {
-    const nextVisible = !Boolean(conversationTranslationVisible[index]);
-    setConversationTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
-    if (nextVisible) {
-      window.setTimeout(scrollConversationToBottom, 0);
+    const nextVisible = true;
+    const showTranslation = async (): Promise<void> => {
+      if (nextVisible && !conversationTurns[index]?.assistant_translation_text && conversationTurns[index]?.assistant_text) {
+        try {
+          const payload = await fetchTopicConversationUserLiteralTranslation(
+            conversationTurns[index].assistant_text,
+            sourceLanguage,
+            targetLanguage,
+          );
+          setConversationTurns((current) => current.map((turn, turnIndex) => (
+            turnIndex === index
+              ? { ...turn, assistant_translation_text: payload.user_translation_text || "" }
+              : turn
+          )));
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : "";
+          setConversationError(detail || t("newItem.questionsError"));
+          return;
+        }
+      }
+      setConversationTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
+      if (nextVisible) {
+        window.setTimeout(scrollConversationToBottom, 0);
+      }
+    };
+
+    void showTranslation();
+  };
+
+  const hideAssistantTurnHelper = (): void => {
+    setConversationTranslationVisible({});
+  };
+
+  const showAssistantTurnHint = (index: number): void => {
+    const alreadyUsedForTurn = Boolean(assistantRevealUsedByTurn[index]);
+    if (
+      assistantSpeaking
+      || (!alreadyUsedForTurn && assistantHintsUsed >= CONVERSATION_ASSISTANT_HINT_LIMIT)
+      || conversationTranslationVisible[index]
+    ) {
+      return;
     }
+    if (!alreadyUsedForTurn) {
+      setAssistantHintsUsed((current) => current + 1);
+      setAssistantRevealUsedByTurn((current) => ({ ...current, [index]: true }));
+    }
+    setPaused(true);
+    toggleAssistantTurnTranslation(index);
+  };
+
+  const startConversationRecording = (): void => {
+    hideAssistantTurnHelper();
+    void startRecording(conversationLoading);
   };
 
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
@@ -286,6 +339,8 @@ export default function ConversationPage(): JSX.Element {
     targetLanguage,
     onError: setConversationError,
     onLoadingChange: setConversationLoading,
+    onAssistantSpeakingChange: setAssistantSpeaking,
+    onPendingUserTurnChange: setConversationPendingUserTurn,
     onConversationTurn: (response) => {
       setConversationTurns((current) => [...current, response]);
     },
@@ -425,6 +480,10 @@ export default function ConversationPage(): JSX.Element {
     setPendingWordAdd(null);
     setPendingSentenceAdd(null);
     setConversationPendingAssistantText("");
+    setConversationPendingUserTurn(false);
+    setAssistantSpeaking(false);
+    setAssistantHintsUsed(0);
+    setAssistantRevealUsedByTurn({});
   };
 
   const startConversation = async (): Promise<void> => {
@@ -516,6 +575,10 @@ export default function ConversationPage(): JSX.Element {
     setOpeningTranslation("");
     setShowOpeningTranslation(false);
     setConversationTransport("http");
+    setConversationPendingUserTurn(false);
+    setAssistantSpeaking(false);
+    setAssistantHintsUsed(0);
+    setAssistantRevealUsedByTurn({});
 
     if (activeTopic) {
       if (previousTopics.includes(activeTopic)) {
@@ -921,10 +984,10 @@ export default function ConversationPage(): JSX.Element {
                 helpLoading,
                 onEndConversation: endConversation,
                 onOpenHelp: openHelpModal,
+                onPause: () => setPaused(true),
                 onResponseLevelChange: setResponseLevel,
                 onSpeechSpeedChange: setSpeechSpeed,
-                onTogglePaused: () => setPaused(!conversationPaused),
-                onStartRecording: () => void startRecording(conversationLoading),
+                onStartRecording: startConversationRecording,
                 onStopRecording: () => stopRecording(true),
               }}
             >
@@ -939,9 +1002,13 @@ export default function ConversationPage(): JSX.Element {
                 display={{
                   hideSourceText,
                   sourceLanguageLabel,
+                  pendingUserTurn: conversationPendingUserTurn,
                   pendingAssistantText: conversationPendingAssistantText,
                 }}
                 visibility={{
+                  assistantHintsRemaining: Math.max(0, CONVERSATION_ASSISTANT_HINT_LIMIT - assistantHintsUsed),
+                  assistantRevealUsed: assistantRevealUsedByTurn,
+                  assistantSpeaking,
                   translationVisible: conversationTranslationVisible,
                   correctionVisible: conversationCorrectionVisible,
                   userTranslationVisible: conversationUserTranslationVisible,
@@ -956,7 +1023,7 @@ export default function ConversationPage(): JSX.Element {
                   playAudioUrl,
                   toggleUserTurnTranslation,
                   toggleUserTurnCorrection,
-                  toggleAssistantTurnTranslation,
+                  showAssistantTurnHint,
                   requestAddSentenceFromConversation,
                 }}
                 conversationTurns={conversationTurns}

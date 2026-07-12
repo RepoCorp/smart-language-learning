@@ -28,9 +28,9 @@ type ControlProps = {
   helpLoading: boolean;
   onEndConversation: () => void;
   onOpenHelp: () => void;
+  onPause: () => void;
   onResponseLevelChange: (level: ConversationResponseLevel) => void;
   onSpeechSpeedChange: (speed: ConversationSpeechSpeed) => void;
-  onTogglePaused: () => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
 };
@@ -155,10 +155,20 @@ export default function ConversationActiveControls({
       {children}
 
       {status.conversationRecording && (
-        <p className="item-conversation-listening">
-          <span className="item-conversation-listening-dot" />
-          {t("newItem.conversationListening", { seconds: status.conversationRecordingSeconds })}
-        </p>
+        <div className="conversation-listening-row">
+          <p className="item-conversation-listening">
+            <span className="item-conversation-listening-dot" />
+            {t("newItem.conversationListening", { seconds: status.conversationRecordingSeconds })}
+          </p>
+          <button
+            type="button"
+            className="dangerous-action-button"
+            onClick={controls.onStopRecording}
+            disabled={!status.canSendResponse || status.conversationLoading || status.conversationRealtimeConnecting}
+          >
+            {t("newItem.conversationStopRecording")}
+          </button>
+        </div>
       )}
       {status.conversationPaused && !status.conversationRecording && <p className="hint">{t("conversation.paused")}</p>}
       {status.conversationLoading && <p className="hint">{t("newItem.conversationProcessing")}</p>}
@@ -174,27 +184,17 @@ export default function ConversationActiveControls({
             {t("newItem.conversationStartRecording")}
           </button>
         )}
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={controls.onTogglePaused}
-          disabled={status.conversationLoading || status.conversationRealtimeConnecting}
-        >
-          {status.conversationPaused ? t("conversation.resume") : t("conversation.pause")}
-        </button>
-      </div>
-      {status.conversationRecording && (
-        <div className="actions">
+        {!status.conversationPaused && (
           <button
             type="button"
-            className="dangerous-action-button"
-            onClick={controls.onStopRecording}
-            disabled={!status.canSendResponse || status.conversationLoading || status.conversationRealtimeConnecting}
+            className="secondary-button"
+            onClick={controls.onPause}
+            disabled={status.conversationLoading || status.conversationRealtimeConnecting}
           >
-            {t("newItem.conversationStopRecording")}
+            {t("conversation.pause")}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 }

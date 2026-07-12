@@ -17,6 +17,8 @@ export function useRealtimeConversationTransport({
   targetLanguage,
   onError,
   onLoadingChange,
+  onAssistantSpeakingChange,
+  onPendingUserTurnChange,
   onConversationTurn,
   onPendingAssistantTextChange,
   speechSpeed,
@@ -35,6 +37,8 @@ export function useRealtimeConversationTransport({
   const realtimeResponseActiveRef = useRef<boolean>(false);
   const realtimePendingUserTextRef = useRef<string>("");
   const realtimePendingAssistantTextRef = useRef<string>("");
+  const realtimeCompletedTurnRef = useRef<BaseConversationTransportArgs["onConversationTurn"] extends (response: infer T) => void ? T | null : null>(null);
+  const realtimeAudioStoppedRef = useRef<boolean>(false);
   const timerRef = useRef<number | null>(null);
   const maxRecordingTimeoutRef = useRef<number | null>(null);
   const autoRestartAfterAssistantRef = useRef<boolean>(true);
@@ -45,10 +49,10 @@ export function useRealtimeConversationTransport({
 
   const buildSpeedInstruction = (speed: ConversationSpeechSpeed): string => {
     if (speed === "super_slow") {
-      return "Speak very slowly, with clear pauses between short phrases.";
+      return "Speak extremely slowly, like you are talking to a beginner who is just starting to learn the language. Keep that very slow pace for the entire response from beginning to end. Do not speed up at the end of the sentence. Use very short phrases, pause often, separate ideas clearly, and articulate each word carefully.";
     }
     if (speed === "slow") {
-      return "Speak slowly and clearly.";
+      return "Speak slowly and clearly for the entire response. Keep the same slow pace from beginning to end and do not speed up at the end.";
     }
     return "Speak at a normal pace for an A2 learner.";
   };
@@ -100,6 +104,21 @@ export function useRealtimeConversationTransport({
     }
   };
 
+  const flushCompletedTurn = (): void => {
+    const completedTurn = realtimeCompletedTurnRef.current;
+    if (!completedTurn) {
+      return;
+    }
+    onConversationTurn(completedTurn);
+    realtimeCompletedTurnRef.current = null;
+    realtimePendingUserTextRef.current = "";
+    realtimePendingAssistantTextRef.current = "";
+    realtimeAudioStoppedRef.current = false;
+    onPendingAssistantTextChange("");
+    onPendingUserTurnChange(false);
+    onLoadingChange(false);
+  };
+
   const closeRealtimeSession = (): void => {
     activeSessionTokenRef.current += 1;
     dataChannelRef.current?.close();
@@ -115,8 +134,12 @@ export function useRealtimeConversationTransport({
     realtimeAudioRef.current = null;
     realtimePendingUserTextRef.current = "";
     realtimePendingAssistantTextRef.current = "";
+    realtimeCompletedTurnRef.current = null;
+    realtimeAudioStoppedRef.current = false;
     realtimeResponseActiveRef.current = false;
     onPendingAssistantTextChange("");
+    onAssistantSpeakingChange(false);
+    onPendingUserTurnChange(false);
     setConversationRealtimeConnecting(false);
     setConversationRealtimeReady(false);
     setConversationRealtimeVoice("");
@@ -152,7 +175,10 @@ export function useRealtimeConversationTransport({
     onError("");
     realtimePendingUserTextRef.current = "";
     realtimePendingAssistantTextRef.current = "";
+    realtimeCompletedTurnRef.current = null;
+    realtimeAudioStoppedRef.current = false;
     onPendingAssistantTextChange("");
+    onPendingUserTurnChange(false);
     dataChannel.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
     if (realtimeResponseActiveRef.current) {
       dataChannel.send(JSON.stringify({ type: "response.cancel" }));
@@ -194,6 +220,7 @@ export function useRealtimeConversationTransport({
       return;
     }
     onLoadingChange(true);
+    onPendingUserTurnChange(true);
     const dataChannel = dataChannelRef.current;
     if (dataChannel && dataChannel.readyState === "open") {
       logRealtime("push-to-talk-submitted");
@@ -216,6 +243,7 @@ export function useRealtimeConversationTransport({
       return;
     }
     warnRealtime("submit-blocked", { dataChannelState: dataChannel?.readyState || "missing" });
+    onPendingUserTurnChange(false);
     onLoadingChange(false);
     onError("Realtime connection is not ready");
   };
@@ -294,9 +322,16 @@ export function useRealtimeConversationTransport({
         }
         if (eventType === "response.created" || eventType === "output_audio_buffer.started") {
           realtimeResponseActiveRef.current = true;
+          onAssistantSpeakingChange(true);
         }
-        if (eventType === "response.done" || eventType === "output_audio_buffer.stopped" || eventType === "response.output_audio.done") {
+        if (eventType === "response.done" || eventType === "response.output_audio.done") {
           realtimeResponseActiveRef.current = false;
+        }
+        if (eventType === "output_audio_buffer.stopped") {
+          realtimeResponseActiveRef.current = false;
+          realtimeAudioStoppedRef.current = true;
+          onAssistantSpeakingChange(false);
+          flushCompletedTurn();
         }
         if (eventType === "conversation.item.input_audio_transcription.completed" || eventType === "conversation.item.input_audio_transcription.done") {
           const transcript = (typeof event.transcript === "string" ? event.transcript : typeof event.item?.content?.[0]?.transcript === "string" ? event.item.content[0].transcript : "").trim();
@@ -318,7 +353,7 @@ export function useRealtimeConversationTransport({
         }
         if (eventType === "response.done") {
           const assistantText = extractRealtimeText(event) || realtimePendingAssistantTextRef.current.trim();
-          onConversationTurn({
+          realtimeCompletedTurnRef.current = {
             user_text: realtimePendingUserTextRef.current.trim(),
             user_translation_text: "",
             user_corrected_text: "",
@@ -333,11 +368,10 @@ export function useRealtimeConversationTransport({
             goal_achieved: false,
             goal_achievement_message: "",
             next_goal_suggestion: "",
-          });
-          realtimePendingUserTextRef.current = "";
-          realtimePendingAssistantTextRef.current = "";
-          onPendingAssistantTextChange("");
-          onLoadingChange(false);
+          };
+          if (realtimeAudioStoppedRef.current) {
+            flushCompletedTurn();
+          }
           return;
         }
         if (eventType === "output_audio_buffer.stopped" && autoRestartAfterAssistantRef.current) {
@@ -345,6 +379,8 @@ export function useRealtimeConversationTransport({
           return;
         }
         if (eventType === "error" || eventType === "invalid_request_error") {
+          onAssistantSpeakingChange(false);
+          onPendingUserTurnChange(false);
           onLoadingChange(false);
           onError(event.error?.message || event.message || "Realtime conversation error");
         }

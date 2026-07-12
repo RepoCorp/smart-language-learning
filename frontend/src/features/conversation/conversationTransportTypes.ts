@@ -16,6 +16,8 @@ export type BaseConversationTransportArgs = {
   targetLanguage: StudyLanguageCode;
   onError: (message: string) => void;
   onLoadingChange: (loading: boolean) => void;
+  onAssistantSpeakingChange: (speaking: boolean) => void;
+  onPendingUserTurnChange: (pending: boolean) => void;
   onConversationTurn: (response: ContentItemConversationResponse) => void;
   onPendingAssistantTextChange: (text: string) => void;
   onConversationGoalChange: (goal: string) => void;

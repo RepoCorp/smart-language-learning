@@ -139,6 +139,14 @@ Create a script, using AWS deployment service, to create all the initial setup
 Alguna forma de preguntar conjugaciones en tests
 Upgrade to React router v7
 
+
+
+
+OTROS IDIOMAS
+Apostrofes en frances
+
+
+
 # Future Ideas
 
 ## Deployment and operations

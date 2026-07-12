@@ -16,6 +16,8 @@ export function useHttpConversationTransport({
   targetLanguage,
   onError,
   onLoadingChange,
+  onAssistantSpeakingChange,
+  onPendingUserTurnChange,
   onConversationTurn,
   onConversationGoalChange,
   playAudioUrl,
@@ -69,6 +71,7 @@ export function useHttpConversationTransport({
 
   const submitRecordedAudio = async (audioBlob: Blob): Promise<void> => {
     onLoadingChange(true);
+    onPendingUserTurnChange(true);
     onError("");
     try {
       const response = await sendTopicConversationAudio(
@@ -82,21 +85,26 @@ export function useHttpConversationTransport({
         targetLanguage,
       );
       onConversationTurn(response);
+      onPendingUserTurnChange(false);
       if (response.goal_achieved && response.next_goal_suggestion) {
         onConversationGoalChange(response.next_goal_suggestion);
       }
       if (response.assistant_audio_url) {
+        onAssistantSpeakingChange(true);
         const audio = new Audio(response.assistant_audio_url);
         audio.addEventListener("ended", () => {
+          onAssistantSpeakingChange(false);
           if (autoRestartAfterAssistantRef.current) {
             void startRecording(false);
           }
         }, { once: true });
         void audio.play().catch(() => {
+          onAssistantSpeakingChange(false);
           playAudioUrl(response.assistant_audio_url);
         });
       }
     } catch (error) {
+      onPendingUserTurnChange(false);
       const detail = error instanceof Error ? error.message : "";
       onError(detail || AUDIO_FAILED);
     } finally {
