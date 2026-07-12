@@ -2354,6 +2354,10 @@ textarea {
   margin-bottom: 8px;
 }
 
+.conversation-goal-difficulty-label + .exercise-audio-mode {
+  margin-bottom: 10px;
+}
+
 .topic-options {
   display: flex;
   flex-wrap: wrap;

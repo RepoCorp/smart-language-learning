@@ -5,7 +5,7 @@ import { fetchAuthBootstrapStatus, getStoredAuthUser, loginWithPin, logoutFromPi
 import ConfigurationsPage from "./components/ConfigurationsPage";
 import ContentCreatePage from "./components/ContentCreatePage";
 import ContentManagePage from "./components/ContentManagePage";
-import ConversationPage from "./components/ConversationPage";
+import ConversationPage from "./features/conversation/ConversationPage";
 import DialogsPage from "./components/DialogsPage";
 import OverviewStatsBar from "./components/OverviewStatsBar";
 import SessionPage from "./components/SessionPage";

@@ -1,7 +1,7 @@
 import type { RefObject } from "react";
 
-import { useI18n } from "../i18n";
-import type { ContentItemConversationResponse } from "../types";
+import { useI18n } from "../../i18n";
+import type { ContentItemConversationResponse } from "../../types";
 
 type ConversationTurn = ContentItemConversationResponse;
 

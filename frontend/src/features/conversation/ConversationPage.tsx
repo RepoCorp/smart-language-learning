@@ -1,71 +1,34 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  createTopicConversationRealtimeSession,
   fetchContentItemDetail,
   fetchTopicConversationUserCorrection,
   fetchTopicConversationUserLiteralTranslation,
   fetchContentTopics,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
-  sendTopicConversationAudio,
   sendTopicConversationHelpRequest,
   startTopicConversation,
-} from "../api";
-import { useI18n } from "../i18n";
-import { usePromptPreferences } from "../promptPreferences";
-import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
-import type { ContentItemConversationResponse, SessionItem } from "../types";
-import NewItem from "./NewItem";
+} from "../../api";
+import { useI18n } from "../../i18n";
+import { usePromptPreferences } from "../../promptPreferences";
+import { type StudyLanguageCode, useStudyLanguages } from "../../studyLanguages";
+import type { ContentItemConversationResponse, SessionItem } from "../../types";
+import NewItem from "../../components/NewItem";
+import ConversationActiveControls from "./ConversationActiveControls";
+import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
 import ConversationTurns from "./ConversationTurns";
+import { type GoalDifficulty, useConversationTransport } from "./useConversationTransport";
 
 const CREATE_NEW_OPTION = "__create_new__";
 
 interface ConversationTurn extends ContentItemConversationResponse {}
-type GoalDifficulty = "easy" | "medium" | "hard";
-type ConversationTransport = "http" | "realtime";
 type ConversationHelpEntry = {
   request_kind?: "coach" | "say";
   request_text: string;
   help_text: string;
   target_text?: string;
 };
-
-type RealtimeResponseOutputPart = {
-  type?: string;
-  text?: string;
-  transcript?: string;
-};
-
-type RealtimeResponseOutputItem = {
-  type?: string;
-  content?: RealtimeResponseOutputPart[];
-};
-
-type RealtimeServerEvent = {
-  type?: string;
-  delta?: string;
-  text?: string;
-  transcript?: string;
-  response?: {
-    output?: RealtimeResponseOutputItem[];
-  };
-  item?: {
-    content?: RealtimeResponseOutputPart[];
-  };
-  error?: {
-    message?: string;
-  };
-  message?: string;
-};
-
-function logRealtime(step: string, details?: Record<string, unknown>): void {
-  console.info("[conversation-realtime]", step, details || {});
-}
-
-function warnRealtime(step: string, details?: Record<string, unknown>): void {
-  console.warn("[conversation-realtime]", step, details || {});
-}
 
 export default function ConversationPage(): JSX.Element {
   const { t } = useI18n();
@@ -103,12 +66,6 @@ export default function ConversationPage(): JSX.Element {
   const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([]);
   const [conversationLoading, setConversationLoading] = useState<boolean>(false);
   const [conversationError, setConversationError] = useState<string>("");
-  const [conversationRecording, setConversationRecording] = useState<boolean>(false);
-  const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
-  const [conversationTransport, setConversationTransport] = useState<ConversationTransport>("http");
-  const [conversationRealtimeConnecting, setConversationRealtimeConnecting] = useState<boolean>(false);
-  const [conversationRealtimeReady, setConversationRealtimeReady] = useState<boolean>(false);
-  const [conversationRealtimeVoice, setConversationRealtimeVoice] = useState<string>("");
   const [conversationPendingAssistantText, setConversationPendingAssistantText] = useState<string>("");
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
   const [helpLoading, setHelpLoading] = useState<boolean>(false);
@@ -141,19 +98,6 @@ export default function ConversationPage(): JSX.Element {
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
-
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const realtimeStreamRef = useRef<MediaStream | null>(null);
-  const realtimeAudioRef = useRef<HTMLAudioElement | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const realtimeResponseActiveRef = useRef<boolean>(false);
-  const realtimePendingUserTextRef = useRef<string>("");
-  const realtimePendingAssistantTextRef = useRef<string>("");
-  const chunksRef = useRef<Blob[]>([]);
-  const shouldSubmitRef = useRef<boolean>(false);
-  const timerRef = useRef<number | null>(null);
   const historyRef = useRef<HTMLDivElement | null>(null);
   const helpModalRef = useRef<HTMLDivElement | null>(null);
 
@@ -185,14 +129,6 @@ export default function ConversationPage(): JSX.Element {
   }, [sourceLanguage, targetLanguage]);
 
   useEffect(() => {
-    const historyElement = historyRef.current;
-    if (!historyElement) {
-      return;
-    }
-    historyElement.scrollTo({ top: historyElement.scrollHeight, behavior: "smooth" });
-  }, [conversationTurns, conversationLoading, conversationRecording]);
-
-  useEffect(() => {
     if (!helpOpen) {
       return;
     }
@@ -203,40 +139,6 @@ export default function ConversationPage(): JSX.Element {
     helpElement.scrollTo({ top: helpElement.scrollHeight, behavior: "smooth" });
   }, [helpOpen, helpHistory, helpLoading]);
 
-  useEffect(() => {
-    return () => {
-      if (dataChannelRef.current) {
-        dataChannelRef.current.close();
-        dataChannelRef.current = null;
-      }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-      if (realtimeStreamRef.current) {
-        realtimeStreamRef.current.getTracks().forEach((track) => track.stop());
-        realtimeStreamRef.current = null;
-      }
-      if (realtimeAudioRef.current) {
-        realtimeAudioRef.current.pause();
-        realtimeAudioRef.current.srcObject = null;
-        realtimeAudioRef.current = null;
-      }
-      if (recorderRef.current && recorderRef.current.state !== "inactive") {
-        shouldSubmitRef.current = false;
-        recorderRef.current.stop();
-      }
-      if (timerRef.current !== null) {
-        window.clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-    };
-  }, []);
-
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
   const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
   const goalDifficultyLabelByCode: Record<GoalDifficulty, Parameters<typeof t>[0]> = {
@@ -244,7 +146,6 @@ export default function ConversationPage(): JSX.Element {
     medium: "conversation.goalDifficultyMedium",
     hard: "conversation.goalDifficultyHard",
   };
-  const hideTargetText = targetPromptMode === "audio" && !showTargetText;
   const hideSourceText = targetPromptMode === "audio" && !showTargetText;
 
   const scrollConversationToBottom = (): void => {
@@ -356,63 +257,47 @@ export default function ConversationPage(): JSX.Element {
     void audio.play().catch(() => {});
   };
 
+  const {
+    conversationRecording,
+    conversationRecordingSeconds,
+    conversationTransport,
+    conversationRealtimeConnecting,
+    conversationRealtimeReady,
+    conversationRealtimeVoice,
+    closeRealtimeSession,
+    setupRealtimeConversation,
+    startRecording,
+    stopRecording,
+    setConversationTransport,
+  } = useConversationTransport({
+    sourceLanguage,
+    targetLanguage,
+    onError: setConversationError,
+    onLoadingChange: setConversationLoading,
+    onConversationTurn: (response) => {
+      setConversationTurns((current) => [...current, response]);
+    },
+    onPendingAssistantTextChange: setConversationPendingAssistantText,
+    onConversationGoalChange: setConversationGoal,
+    playAudioUrl,
+    conversationHistory: conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
+    activeTopic,
+    activeNotes,
+    activeRole,
+    conversationGoal,
+  });
+
+  useEffect(() => {
+    const historyElement = historyRef.current;
+    if (!historyElement) {
+      return;
+    }
+    historyElement.scrollTo({ top: historyElement.scrollHeight, behavior: "smooth" });
+  }, [conversationTurns, conversationLoading, conversationRecording]);
+
   useEffect(() => {
     setShowTargetText(targetPromptMode === "text");
   }, [targetPromptMode]);
-
-  const closeRealtimeSession = (): void => {
-    if (dataChannelRef.current) {
-      dataChannelRef.current.close();
-      dataChannelRef.current = null;
-    }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-    if (realtimeStreamRef.current) {
-      realtimeStreamRef.current.getTracks().forEach((track) => track.stop());
-      realtimeStreamRef.current = null;
-    }
-    if (realtimeAudioRef.current) {
-      realtimeAudioRef.current.pause();
-      realtimeAudioRef.current.srcObject = null;
-      realtimeAudioRef.current = null;
-    }
-    realtimePendingUserTextRef.current = "";
-    realtimePendingAssistantTextRef.current = "";
-    realtimeResponseActiveRef.current = false;
-    setConversationPendingAssistantText("");
-    setConversationRealtimeConnecting(false);
-    setConversationRealtimeReady(false);
-    setConversationRealtimeVoice("");
-  };
-
-  const extractRealtimeText = (event: RealtimeServerEvent): string => {
-    const eventText = typeof event.text === "string" ? event.text.trim() : "";
-    if (eventText) {
-      return eventText;
-    }
-    const output = event.response?.output;
-    if (!Array.isArray(output)) {
-      return "";
-    }
-    for (const item of output) {
-      if (!Array.isArray(item.content)) {
-        continue;
-      }
-      for (const part of item.content) {
-        const contentText = typeof part.text === "string" ? part.text.trim() : "";
-        if (contentText) {
-          return contentText;
-        }
-        const transcriptText = typeof part.transcript === "string" ? part.transcript.trim() : "";
-        if (transcriptText) {
-          return transcriptText;
-        }
-      }
-    }
-    return "";
-  };
 
   const submitHelpRequest = async (): Promise<void> => {
     const requestText = helpInput.trim();
@@ -498,282 +383,6 @@ export default function ConversationPage(): JSX.Element {
     setHelpOpen(false);
   };
 
-  const setupRealtimeConversation = async (
-    topic: string,
-    trimmedNotes: string,
-    trimmedRole: string,
-    selectedGoalDifficulty: GoalDifficulty,
-  ): Promise<boolean> => {
-    if (
-      typeof window === "undefined"
-      || typeof RTCPeerConnection === "undefined"
-      || typeof navigator === "undefined"
-      || !navigator.mediaDevices?.getUserMedia
-    ) {
-      warnRealtime("unsupported", {
-        hasWindow: typeof window !== "undefined",
-        hasRTCPeerConnection: typeof RTCPeerConnection !== "undefined",
-        hasNavigator: typeof navigator !== "undefined",
-        hasGetUserMedia: Boolean(navigator?.mediaDevices?.getUserMedia),
-      });
-      return false;
-    }
-
-    setConversationRealtimeConnecting(true);
-    try {
-      logRealtime("setup-started", {
-        topic,
-        sourceLanguage,
-        targetLanguage,
-        selectedGoalDifficulty,
-      });
-      const realtimeSession = await createTopicConversationRealtimeSession(
-        topic,
-        trimmedNotes,
-        trimmedRole,
-        selectedGoalDifficulty,
-        sourceLanguage,
-        targetLanguage,
-      );
-      logRealtime("session-response", {
-        realtimeEnabled: realtimeSession.realtime_enabled,
-        hasClientSecret: Boolean(realtimeSession.client_secret?.value),
-        voice: realtimeSession.voice || "",
-        model: realtimeSession.model || "",
-      });
-      if (!realtimeSession.realtime_enabled) {
-        warnRealtime("session-disabled");
-        return false;
-      }
-      const ephemeralKey = realtimeSession.client_secret?.value?.trim() || "";
-      if (!ephemeralKey) {
-        warnRealtime("missing-client-secret");
-        return false;
-      }
-
-      closeRealtimeSession();
-      logRealtime("session-reset-complete");
-
-      const peerConnection = new RTCPeerConnection();
-      const dataChannel = peerConnection.createDataChannel("oai-events");
-      const remoteAudio = document.createElement("audio");
-      remoteAudio.autoplay = true;
-      remoteAudio.playsInline = true;
-      realtimeAudioRef.current = remoteAudio;
-      peerConnectionRef.current = peerConnection;
-      dataChannelRef.current = dataChannel;
-      logRealtime("peer-connection-created");
-
-      peerConnection.ontrack = (event) => {
-        realtimeAudioRef.current = remoteAudio;
-        remoteAudio.srcObject = event.streams[0];
-        logRealtime("remote-audio-track", {
-          streamCount: event.streams.length,
-        });
-        void remoteAudio.play().catch(() => {});
-      };
-
-      peerConnection.addEventListener("connectionstatechange", () => {
-        logRealtime("peer-connection-state", { state: peerConnection.connectionState });
-      });
-
-      peerConnection.addEventListener("iceconnectionstatechange", () => {
-        logRealtime("ice-connection-state", { state: peerConnection.iceConnectionState });
-      });
-
-      dataChannel.addEventListener("open", () => {
-        logRealtime("data-channel-open");
-        dataChannel.send(JSON.stringify({
-          type: "session.update",
-          session: {
-            type: "realtime",
-            output_modalities: ["audio"],
-            audio: {
-              input: {
-                transcription: {
-                  model: realtimeSession.transcription_model || "gpt-4o-mini-transcribe",
-                },
-                turn_detection: null,
-              },
-            },
-          },
-        }));
-        setConversationTransport("realtime");
-        setConversationRealtimeReady(true);
-        setConversationRealtimeVoice(realtimeSession.voice || "");
-      });
-
-      dataChannel.addEventListener("close", () => {
-        warnRealtime("data-channel-close");
-      });
-
-      dataChannel.addEventListener("error", (event) => {
-        warnRealtime("data-channel-error", {
-          eventType: event.type,
-        });
-      });
-
-      dataChannel.addEventListener("message", (messageEvent) => {
-        let event: RealtimeServerEvent;
-        try {
-          event = JSON.parse(messageEvent.data) as RealtimeServerEvent;
-        } catch {
-          warnRealtime("message-parse-failed");
-          return;
-        }
-        const eventType = String(event.type || "");
-        if (eventType) {
-          logRealtime("server-event", { type: eventType });
-        }
-        if (eventType === "response.created" || eventType === "output_audio_buffer.started") {
-          realtimeResponseActiveRef.current = true;
-        }
-        if (
-          eventType === "response.done"
-          || eventType === "output_audio_buffer.stopped"
-          || eventType === "response.output_audio.done"
-        ) {
-          realtimeResponseActiveRef.current = false;
-        }
-        if (
-          eventType === "conversation.item.input_audio_transcription.completed"
-          || eventType === "conversation.item.input_audio_transcription.done"
-        ) {
-          const transcript = (
-            typeof event.transcript === "string" ? event.transcript
-              : typeof event.item?.content?.[0]?.transcript === "string" ? event.item.content[0].transcript
-                : ""
-          ).trim();
-          realtimePendingUserTextRef.current = transcript;
-          logRealtime("transcription-complete", { transcript });
-          return;
-        }
-        if (eventType === "response.output_text.delta" && typeof event.delta === "string") {
-          realtimePendingAssistantTextRef.current = `${realtimePendingAssistantTextRef.current}${event.delta}`;
-          setConversationPendingAssistantText(realtimePendingAssistantTextRef.current);
-          return;
-        }
-        if (eventType === "response.output_audio_transcript.delta" && typeof event.delta === "string") {
-          realtimePendingAssistantTextRef.current = `${realtimePendingAssistantTextRef.current}${event.delta}`;
-          setConversationPendingAssistantText(realtimePendingAssistantTextRef.current);
-          return;
-        }
-        if (eventType === "response.output_text.done") {
-          const assistantText = (typeof event.text === "string" ? event.text : "").trim();
-          if (assistantText) {
-            realtimePendingAssistantTextRef.current = assistantText;
-            setConversationPendingAssistantText(assistantText);
-          }
-          return;
-        }
-        if (eventType === "response.output_audio_transcript.done") {
-          const assistantText = (typeof event.transcript === "string" ? event.transcript : "").trim();
-          if (assistantText) {
-            realtimePendingAssistantTextRef.current = assistantText;
-            setConversationPendingAssistantText(assistantText);
-          }
-          return;
-        }
-        if (eventType === "response.done") {
-          const assistantText = extractRealtimeText(event) || realtimePendingAssistantTextRef.current.trim();
-          const userText = realtimePendingUserTextRef.current.trim();
-          logRealtime("response-done", {
-            userText,
-            assistantText,
-          });
-          if (assistantText) {
-            setConversationTurns((current) => [...current, {
-              user_text: userText,
-              user_translation_text: "",
-              user_corrected_text: "",
-              user_corrected_translation_text: "",
-              user_correction_explanation: "",
-              user_is_grammatically_correct: true,
-              user_makes_sense_in_context: true,
-              user_needs_correction: false,
-              assistant_text: assistantText,
-              assistant_translation_text: "",
-              assistant_audio_url: "",
-              goal_achieved: false,
-              goal_achievement_message: "",
-              next_goal_suggestion: "",
-            }]);
-          }
-          realtimePendingUserTextRef.current = "";
-          realtimePendingAssistantTextRef.current = "";
-          setConversationPendingAssistantText("");
-          setConversationLoading(false);
-          return;
-        }
-        if (eventType === "error" || eventType === "invalid_request_error") {
-          warnRealtime("server-error", {
-            eventType,
-            message: event.error?.message || event.message || "",
-          });
-          setConversationLoading(false);
-          setConversationError(event.error?.message || event.message || "Realtime conversation error");
-        }
-      });
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      logRealtime("microphone-ready", {
-        audioTrackCount: mediaStream.getAudioTracks().length,
-      });
-      realtimeStreamRef.current = mediaStream;
-      const audioTrack = mediaStream.getAudioTracks()[0];
-      if (!audioTrack) {
-        warnRealtime("missing-audio-track");
-        closeRealtimeSession();
-        return false;
-      }
-      audioTrack.enabled = false;
-      peerConnection.addTrack(audioTrack, mediaStream);
-      logRealtime("local-audio-track-added");
-
-      const offer = await peerConnection.createOffer();
-      logRealtime("offer-created", {
-        sdpLength: (offer.sdp || "").length,
-      });
-      await peerConnection.setLocalDescription(offer);
-      logRealtime("local-description-set");
-
-      const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${ephemeralKey}`,
-          "Content-Type": "application/sdp",
-        },
-      });
-      if (!sdpResponse.ok) {
-        const errorText = await sdpResponse.text();
-        warnRealtime("sdp-connect-failed", {
-          status: sdpResponse.status,
-          statusText: sdpResponse.statusText,
-          body: errorText,
-        });
-        throw new Error("Failed to connect Realtime audio session");
-      }
-      const remoteSdp = await sdpResponse.text();
-      logRealtime("sdp-connect-succeeded", {
-        answerLength: remoteSdp.length,
-      });
-      await peerConnection.setRemoteDescription({
-        type: "answer",
-        sdp: remoteSdp,
-      });
-      logRealtime("remote-description-set");
-      return true;
-    } catch (error) {
-      warnRealtime("setup-failed", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    } finally {
-      setConversationRealtimeConnecting(false);
-    }
-  };
-
   const startConversation = async (): Promise<void> => {
     setConversationError("");
     if (!resolvedTopic) {
@@ -817,12 +426,12 @@ export default function ConversationPage(): JSX.Element {
       logRealtime("start-conversation-http-ready", {
         topic: payload.topic || resolvedTopic,
       });
-      const realtimeEnabled = await setupRealtimeConversation(
-        payload.topic || resolvedTopic,
-        payload.notes || trimmedNotes,
-        payload.role_text || trimmedRole,
-        payload.goal_difficulty || goalDifficulty,
-      ).catch((error) => {
+      const realtimeEnabled = await setupRealtimeConversation({
+        topic: payload.topic || resolvedTopic,
+        notes: payload.notes || trimmedNotes,
+        roleText: payload.role_text || trimmedRole,
+        goalDifficulty: payload.goal_difficulty || goalDifficulty,
+      }).catch((error) => {
         warnRealtime("fallback-to-http", {
           reason: error instanceof Error ? error.message : String(error),
         });
@@ -838,185 +447,6 @@ export default function ConversationPage(): JSX.Element {
       setConversationError(detail || t("newItem.questionsError"));
     } finally {
       setConversationLoading(false);
-    }
-  };
-
-  const stopRecording = (submit: boolean): void => {
-    if (conversationTransport === "realtime") {
-      const audioTrack = realtimeStreamRef.current?.getAudioTracks()[0] || null;
-      if (audioTrack) {
-        audioTrack.enabled = false;
-      }
-      if (timerRef.current !== null) {
-        window.clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      setConversationRecording(false);
-      setConversationRecordingSeconds(0);
-      if (submit) {
-        setConversationLoading(true);
-        const dataChannel = dataChannelRef.current;
-        if (dataChannel && dataChannel.readyState === "open") {
-          logRealtime("push-to-talk-submitted");
-          dataChannel.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
-          dataChannel.send(JSON.stringify({ type: "response.create" }));
-        } else {
-          warnRealtime("submit-blocked", {
-            dataChannelState: dataChannel?.readyState || "missing",
-          });
-          setConversationLoading(false);
-          setConversationError("Realtime connection is not ready");
-        }
-      }
-      return;
-    }
-    shouldSubmitRef.current = submit;
-    const recorder = recorderRef.current;
-    if (recorder && recorder.state !== "inactive") {
-      recorder.stop();
-    }
-    if (timerRef.current !== null) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (!submit && streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (!submit) {
-      setConversationRecording(false);
-      setConversationRecordingSeconds(0);
-    }
-  };
-
-  const submitRecordedAudio = async (audioBlob: Blob): Promise<void> => {
-    setConversationLoading(true);
-    setConversationError("");
-    try {
-      const response = await sendTopicConversationAudio(
-        activeTopic,
-        activeNotes,
-        activeRole,
-        conversationGoal,
-        audioBlob,
-        conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
-        sourceLanguage,
-        targetLanguage,
-      );
-      setConversationTurns((current) => [...current, response]);
-      if (response.goal_achieved && response.next_goal_suggestion) {
-        setConversationGoal(response.next_goal_suggestion);
-      }
-      if (response.assistant_audio_url) {
-        playAudioUrl(response.assistant_audio_url);
-      }
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "";
-      setConversationError(detail || t("newItem.questionsError"));
-    } finally {
-      setConversationLoading(false);
-    }
-  };
-
-  const startRecording = async (): Promise<void> => {
-    if (conversationRecording || conversationLoading) {
-      return;
-    }
-    if (conversationTransport === "realtime") {
-      const audioTrack = realtimeStreamRef.current?.getAudioTracks()[0] || null;
-      const dataChannel = dataChannelRef.current;
-      if (!audioTrack || !dataChannel || dataChannel.readyState !== "open") {
-        warnRealtime("recording-start-blocked", {
-          hasAudioTrack: Boolean(audioTrack),
-          dataChannelState: dataChannel?.readyState || "missing",
-        });
-        setConversationError("Realtime connection is not ready");
-        return;
-      }
-      setConversationError("");
-      realtimePendingUserTextRef.current = "";
-      realtimePendingAssistantTextRef.current = "";
-      setConversationPendingAssistantText("");
-      dataChannel.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
-      if (realtimeResponseActiveRef.current) {
-        dataChannel.send(JSON.stringify({ type: "response.cancel" }));
-        dataChannel.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
-      }
-      logRealtime("push-to-talk-started");
-      audioTrack.enabled = true;
-      setConversationRecording(true);
-      setConversationRecordingSeconds(0);
-      timerRef.current = window.setInterval(() => {
-        setConversationRecordingSeconds((value) => value + 1);
-      }, 1000);
-      return;
-    }
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setConversationError(t("newItem.conversationMicUnsupported"));
-      return;
-    }
-
-    setConversationError("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const recorderOptions: MediaRecorderOptions = {};
-      const preferredMimeTypes = [
-        "audio/webm;codecs=opus",
-        "audio/mp4",
-        "audio/webm",
-      ];
-      for (const mimeType of preferredMimeTypes) {
-        if (typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(mimeType)) {
-          recorderOptions.mimeType = mimeType;
-          break;
-        }
-      }
-      const recorder = new MediaRecorder(stream, recorderOptions);
-      recorderRef.current = recorder;
-      chunksRef.current = [];
-      shouldSubmitRef.current = true;
-
-      recorder.addEventListener("dataavailable", (event) => {
-        if (event.data && event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      });
-
-      recorder.addEventListener("stop", () => {
-        const shouldSubmit = shouldSubmitRef.current;
-        if (timerRef.current !== null) {
-          window.clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        const liveStream = streamRef.current;
-        if (liveStream) {
-          liveStream.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
-        }
-        setConversationRecording(false);
-        setConversationRecordingSeconds(0);
-        recorderRef.current = null;
-        const recordedBlob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        chunksRef.current = [];
-        if (shouldSubmit && recordedBlob.size > 0) {
-          void submitRecordedAudio(recordedBlob);
-        }
-      });
-
-      recorder.start();
-      setConversationRecording(true);
-      setConversationRecordingSeconds(0);
-      timerRef.current = window.setInterval(() => {
-        setConversationRecordingSeconds((value) => value + 1);
-      }, 1000);
-    } catch {
-      setConversationError(t("newItem.conversationMicDenied"));
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-      recorderRef.current = null;
     }
   };
 
@@ -1057,6 +487,13 @@ export default function ConversationPage(): JSX.Element {
     setNotes(activeNotes);
     setRole(activeRole);
     setGoalDifficulty(activeGoalDifficulty);
+  };
+
+  const endConversation = (): void => {
+    if (typeof window !== "undefined" && !window.confirm(t("conversation.endConfirm"))) {
+      return;
+    }
+    restartConversation();
   };
 
   const requestAddWordFromTurnToken = async (
@@ -1391,100 +828,65 @@ export default function ConversationPage(): JSX.Element {
 
         {started && (
           <>
-            <div className="content-form-section conversation-goal-card">
-              <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {activeTopic}</p>
-              {activeRole && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {activeRole}</p>}
-              <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {t(goalDifficultyLabelByCode[activeGoalDifficulty])}</p>
-              <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {conversationGoal}</p>
-              <div className="actions">
-                {targetPromptMode === "audio" && (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => setShowTargetText((value) => !value)}
-                  >
-                    {showTargetText ? t("prompt.hideText") : t("prompt.showText")}
-                  </button>
-                )}
-                <button type="button" className="secondary-button" onClick={restartConversation} disabled={conversationLoading}>
-                  {t("conversation.restart")}
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={openHelpModal}
-                  disabled={conversationLoading || conversationRealtimeConnecting || helpLoading}
-                >
-                  {t("conversation.helpOpen")}
-                </button>
-              </div>
-              <p className="hint">
-                {conversationTransport === "realtime" && conversationRealtimeReady
+            <ConversationActiveControls
+              summary={{
+                topic: activeTopic,
+                role: activeRole,
+                goalDifficultyLabel: t(goalDifficultyLabelByCode[activeGoalDifficulty]),
+                goal: conversationGoal,
+              }}
+              status={{
+                conversationRecording,
+                conversationRecordingSeconds,
+                conversationLoading,
+                conversationRealtimeConnecting,
+                transportHint: conversationTransport === "realtime" && conversationRealtimeReady
                   ? `Realtime voice active${conversationRealtimeVoice ? ` (${conversationRealtimeVoice})` : ""}`
-                  : "Standard voice flow active"}
-              </p>
-            </div>
-
-            <ConversationTurns
-              historyRef={historyRef}
-              opening={{
-                text: openingText,
-                translation: openingTranslation,
-                audioUrl: openingAudioUrl,
-                showTranslation: showOpeningTranslation,
+                  : "Standard voice flow active",
               }}
-              display={{
-                hideSourceText,
-                sourceLanguageLabel,
-                pendingAssistantText: conversationPendingAssistantText,
+              controls={{
+                helpLoading,
+                onEndConversation: endConversation,
+                onOpenHelp: openHelpModal,
+                onStartRecording: () => void startRecording(conversationLoading),
+                onStopRecording: () => stopRecording(true),
               }}
-              visibility={{
-                translationVisible: conversationTranslationVisible,
-                correctionVisible: conversationCorrectionVisible,
-                userTranslationVisible: conversationUserTranslationVisible,
-                userTranslationLoading: conversationUserTranslationLoading,
-                userCorrectionLoading: conversationUserCorrectionLoading,
-                sentenceActionStatus,
-              }}
-              actions={{
-                renderTargetLineWithWordLinks,
-                hasTurnCorrection,
-                toggleOpeningTranslation,
-                playAudioUrl,
-                toggleUserTurnTranslation,
-                toggleUserTurnCorrection,
-                toggleAssistantTurnTranslation,
-                requestAddSentenceFromConversation,
-              }}
-              conversationTurns={conversationTurns}
-            />
-
-            {conversationError && <p className="error">{conversationError}</p>}
-            {conversationRecording && (
-              <p className="item-conversation-listening">
-                <span className="item-conversation-listening-dot" />
-                {t("newItem.conversationListening", { seconds: conversationRecordingSeconds })}
-              </p>
-            )}
-            {conversationLoading && <p className="hint">{t("newItem.conversationProcessing")}</p>}
-            {conversationRealtimeConnecting && <p className="hint">Connecting Realtime voice...</p>}
-
-            <div className="actions">
-              {!conversationRecording && (
-                <button
-                  type="button"
-                  onClick={() => void startRecording()}
-                  disabled={conversationLoading || conversationRealtimeConnecting || helpLoading}
-                >
-                  {t("newItem.conversationStartRecording")}
-                </button>
-              )}
-              {conversationRecording && (
-                <button type="button" onClick={() => stopRecording(true)} disabled={conversationLoading || conversationRealtimeConnecting}>
-                  {t("newItem.conversationStopRecording")}
-                </button>
-              )}
-            </div>
+            >
+              <ConversationTurns
+                historyRef={historyRef}
+                opening={{
+                  text: openingText,
+                  translation: openingTranslation,
+                  audioUrl: openingAudioUrl,
+                  showTranslation: showOpeningTranslation,
+                }}
+                display={{
+                  hideSourceText,
+                  sourceLanguageLabel,
+                  pendingAssistantText: conversationPendingAssistantText,
+                }}
+                visibility={{
+                  translationVisible: conversationTranslationVisible,
+                  correctionVisible: conversationCorrectionVisible,
+                  userTranslationVisible: conversationUserTranslationVisible,
+                  userTranslationLoading: conversationUserTranslationLoading,
+                  userCorrectionLoading: conversationUserCorrectionLoading,
+                  sentenceActionStatus,
+                }}
+                actions={{
+                  renderTargetLineWithWordLinks,
+                  hasTurnCorrection,
+                  toggleOpeningTranslation,
+                  playAudioUrl,
+                  toggleUserTurnTranslation,
+                  toggleUserTurnCorrection,
+                  toggleAssistantTurnTranslation,
+                  requestAddSentenceFromConversation,
+                }}
+                conversationTurns={conversationTurns}
+              />
+              {conversationError && <p className="error">{conversationError}</p>}
+            </ConversationActiveControls>
           </>
         )}
       </section>

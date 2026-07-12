@@ -16,6 +16,7 @@ services:
       retries: 5
 
   backend:
+    image: smart-language-learning-backend-dev
     build:
       context: ./backend
     env_file:
@@ -51,6 +52,7 @@ services:
       retries: 5
 
   frontend:
+    image: smart-language-learning-frontend-dev
     build:
       context: ./frontend
     environment:
