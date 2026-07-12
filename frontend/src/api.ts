@@ -13,6 +13,7 @@ import type {
   ElevenLabsVoicePreviewResponse,
   ElevenLabsVoicesResponse,
   TopicConversationStartResponse,
+  TopicConversationRealtimeSessionResponse,
   TopicConversationHelpResponse,
   ContentTopicsResponse,
   ItemExercisePhrases,
@@ -924,6 +925,38 @@ export async function sendTopicConversationAudio(
     throw new Error(detail);
   }
   return (await response.json()) as ContentItemConversationResponse;
+}
+
+export async function createTopicConversationRealtimeSession(
+  topic: string,
+  notes: string,
+  roleText: string,
+  goalDifficulty: "easy" | "medium" | "hard",
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<TopicConversationRealtimeSessionResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/conversation/realtime-session?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, notes, role_text: roleText, goal_difficulty: goalDifficulty }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to create Realtime conversation session";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as TopicConversationRealtimeSessionResponse;
 }
 
 export async function sendTopicConversationHelpRequest(

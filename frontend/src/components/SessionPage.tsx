@@ -657,11 +657,6 @@ export default function SessionPage(): JSX.Element {
               </p>
               <p data-testid="session-countdown">{t("session.timeRemaining", { time: formattedRemaining })}</p>
             </div>
-            {showPostReviewItem && currentReviewCorrect !== null && (
-              <p className={currentReviewCorrect ? "hint" : "error"}>
-                {currentReviewCorrect ? t("review.passed") : t("review.failed")}
-              </p>
-            )}
             {resetCurrentResultError && <p className="error">{t("session.error", { message: resetCurrentResultError })}</p>}
             <div className="actions session-header-actions">
               <button

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { fetchAuthBootstrapStatus, getStoredAuthUser, loginWithPin, logoutFromPinSession, registerWithPin, type AuthUser } from "./api";
@@ -29,6 +29,7 @@ export default function App(): JSX.Element {
   const [registerBusy, setRegisterBusy] = useState(false);
   const [canPublicRegister, setCanPublicRegister] = useState(false);
   const [showPageMenu, setShowPageMenu] = useState(false);
+  const pageMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -47,6 +48,30 @@ export default function App(): JSX.Element {
   useEffect(() => {
     setShowPageMenu(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!showPageMenu) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent): void => {
+      const menuElement = pageMenuRef.current;
+      const targetNode = event.target;
+      if (!menuElement || !(targetNode instanceof Node)) {
+        return;
+      }
+      if (!menuElement.contains(targetNode)) {
+        setShowPageMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [showPageMenu]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -223,7 +248,7 @@ export default function App(): JSX.Element {
                   <span className="app-top-bar-brand-text">Smart Learn</span>
                 </div>
                 <div className="app-top-bar-actions">
-                  <div className="top-nav">
+                  <div className="top-nav" ref={pageMenuRef}>
                     <button
                       type="button"
                       className="top-nav-menu-button"

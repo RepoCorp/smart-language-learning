@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  createTopicConversationRealtimeSession,
   fetchContentItemDetail,
   fetchTopicConversationUserCorrection,
   fetchTopicConversationUserLiteralTranslation,
@@ -16,18 +17,55 @@ import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { ContentItemConversationResponse, SessionItem } from "../types";
 import NewItem from "./NewItem";
-import TargetPhraseText from "./TargetPhraseText";
+import ConversationTurns from "./ConversationTurns";
 
 const CREATE_NEW_OPTION = "__create_new__";
 
 interface ConversationTurn extends ContentItemConversationResponse {}
 type GoalDifficulty = "easy" | "medium" | "hard";
+type ConversationTransport = "http" | "realtime";
 type ConversationHelpEntry = {
   request_kind?: "coach" | "say";
   request_text: string;
   help_text: string;
   target_text?: string;
 };
+
+type RealtimeResponseOutputPart = {
+  type?: string;
+  text?: string;
+  transcript?: string;
+};
+
+type RealtimeResponseOutputItem = {
+  type?: string;
+  content?: RealtimeResponseOutputPart[];
+};
+
+type RealtimeServerEvent = {
+  type?: string;
+  delta?: string;
+  text?: string;
+  transcript?: string;
+  response?: {
+    output?: RealtimeResponseOutputItem[];
+  };
+  item?: {
+    content?: RealtimeResponseOutputPart[];
+  };
+  error?: {
+    message?: string;
+  };
+  message?: string;
+};
+
+function logRealtime(step: string, details?: Record<string, unknown>): void {
+  console.info("[conversation-realtime]", step, details || {});
+}
+
+function warnRealtime(step: string, details?: Record<string, unknown>): void {
+  console.warn("[conversation-realtime]", step, details || {});
+}
 
 export default function ConversationPage(): JSX.Element {
   const { t } = useI18n();
@@ -67,6 +105,11 @@ export default function ConversationPage(): JSX.Element {
   const [conversationError, setConversationError] = useState<string>("");
   const [conversationRecording, setConversationRecording] = useState<boolean>(false);
   const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
+  const [conversationTransport, setConversationTransport] = useState<ConversationTransport>("http");
+  const [conversationRealtimeConnecting, setConversationRealtimeConnecting] = useState<boolean>(false);
+  const [conversationRealtimeReady, setConversationRealtimeReady] = useState<boolean>(false);
+  const [conversationRealtimeVoice, setConversationRealtimeVoice] = useState<string>("");
+  const [conversationPendingAssistantText, setConversationPendingAssistantText] = useState<string>("");
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
   const [helpLoading, setHelpLoading] = useState<boolean>(false);
   const [helpError, setHelpError] = useState<string>("");
@@ -101,6 +144,13 @@ export default function ConversationPage(): JSX.Element {
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const realtimeStreamRef = useRef<MediaStream | null>(null);
+  const realtimeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  const realtimeResponseActiveRef = useRef<boolean>(false);
+  const realtimePendingUserTextRef = useRef<string>("");
+  const realtimePendingAssistantTextRef = useRef<string>("");
   const chunksRef = useRef<Blob[]>([]);
   const shouldSubmitRef = useRef<boolean>(false);
   const timerRef = useRef<number | null>(null);
@@ -155,6 +205,23 @@ export default function ConversationPage(): JSX.Element {
 
   useEffect(() => {
     return () => {
+      if (dataChannelRef.current) {
+        dataChannelRef.current.close();
+        dataChannelRef.current = null;
+      }
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      if (realtimeStreamRef.current) {
+        realtimeStreamRef.current.getTracks().forEach((track) => track.stop());
+        realtimeStreamRef.current = null;
+      }
+      if (realtimeAudioRef.current) {
+        realtimeAudioRef.current.pause();
+        realtimeAudioRef.current.srcObject = null;
+        realtimeAudioRef.current = null;
+      }
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
         shouldSubmitRef.current = false;
         recorderRef.current.stop();
@@ -293,6 +360,60 @@ export default function ConversationPage(): JSX.Element {
     setShowTargetText(targetPromptMode === "text");
   }, [targetPromptMode]);
 
+  const closeRealtimeSession = (): void => {
+    if (dataChannelRef.current) {
+      dataChannelRef.current.close();
+      dataChannelRef.current = null;
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    if (realtimeStreamRef.current) {
+      realtimeStreamRef.current.getTracks().forEach((track) => track.stop());
+      realtimeStreamRef.current = null;
+    }
+    if (realtimeAudioRef.current) {
+      realtimeAudioRef.current.pause();
+      realtimeAudioRef.current.srcObject = null;
+      realtimeAudioRef.current = null;
+    }
+    realtimePendingUserTextRef.current = "";
+    realtimePendingAssistantTextRef.current = "";
+    realtimeResponseActiveRef.current = false;
+    setConversationPendingAssistantText("");
+    setConversationRealtimeConnecting(false);
+    setConversationRealtimeReady(false);
+    setConversationRealtimeVoice("");
+  };
+
+  const extractRealtimeText = (event: RealtimeServerEvent): string => {
+    const eventText = typeof event.text === "string" ? event.text.trim() : "";
+    if (eventText) {
+      return eventText;
+    }
+    const output = event.response?.output;
+    if (!Array.isArray(output)) {
+      return "";
+    }
+    for (const item of output) {
+      if (!Array.isArray(item.content)) {
+        continue;
+      }
+      for (const part of item.content) {
+        const contentText = typeof part.text === "string" ? part.text.trim() : "";
+        if (contentText) {
+          return contentText;
+        }
+        const transcriptText = typeof part.transcript === "string" ? part.transcript.trim() : "";
+        if (transcriptText) {
+          return transcriptText;
+        }
+      }
+    }
+    return "";
+  };
+
   const submitHelpRequest = async (): Promise<void> => {
     const requestText = helpInput.trim();
     if (!requestText) {
@@ -377,6 +498,282 @@ export default function ConversationPage(): JSX.Element {
     setHelpOpen(false);
   };
 
+  const setupRealtimeConversation = async (
+    topic: string,
+    trimmedNotes: string,
+    trimmedRole: string,
+    selectedGoalDifficulty: GoalDifficulty,
+  ): Promise<boolean> => {
+    if (
+      typeof window === "undefined"
+      || typeof RTCPeerConnection === "undefined"
+      || typeof navigator === "undefined"
+      || !navigator.mediaDevices?.getUserMedia
+    ) {
+      warnRealtime("unsupported", {
+        hasWindow: typeof window !== "undefined",
+        hasRTCPeerConnection: typeof RTCPeerConnection !== "undefined",
+        hasNavigator: typeof navigator !== "undefined",
+        hasGetUserMedia: Boolean(navigator?.mediaDevices?.getUserMedia),
+      });
+      return false;
+    }
+
+    setConversationRealtimeConnecting(true);
+    try {
+      logRealtime("setup-started", {
+        topic,
+        sourceLanguage,
+        targetLanguage,
+        selectedGoalDifficulty,
+      });
+      const realtimeSession = await createTopicConversationRealtimeSession(
+        topic,
+        trimmedNotes,
+        trimmedRole,
+        selectedGoalDifficulty,
+        sourceLanguage,
+        targetLanguage,
+      );
+      logRealtime("session-response", {
+        realtimeEnabled: realtimeSession.realtime_enabled,
+        hasClientSecret: Boolean(realtimeSession.client_secret?.value),
+        voice: realtimeSession.voice || "",
+        model: realtimeSession.model || "",
+      });
+      if (!realtimeSession.realtime_enabled) {
+        warnRealtime("session-disabled");
+        return false;
+      }
+      const ephemeralKey = realtimeSession.client_secret?.value?.trim() || "";
+      if (!ephemeralKey) {
+        warnRealtime("missing-client-secret");
+        return false;
+      }
+
+      closeRealtimeSession();
+      logRealtime("session-reset-complete");
+
+      const peerConnection = new RTCPeerConnection();
+      const dataChannel = peerConnection.createDataChannel("oai-events");
+      const remoteAudio = document.createElement("audio");
+      remoteAudio.autoplay = true;
+      remoteAudio.playsInline = true;
+      realtimeAudioRef.current = remoteAudio;
+      peerConnectionRef.current = peerConnection;
+      dataChannelRef.current = dataChannel;
+      logRealtime("peer-connection-created");
+
+      peerConnection.ontrack = (event) => {
+        realtimeAudioRef.current = remoteAudio;
+        remoteAudio.srcObject = event.streams[0];
+        logRealtime("remote-audio-track", {
+          streamCount: event.streams.length,
+        });
+        void remoteAudio.play().catch(() => {});
+      };
+
+      peerConnection.addEventListener("connectionstatechange", () => {
+        logRealtime("peer-connection-state", { state: peerConnection.connectionState });
+      });
+
+      peerConnection.addEventListener("iceconnectionstatechange", () => {
+        logRealtime("ice-connection-state", { state: peerConnection.iceConnectionState });
+      });
+
+      dataChannel.addEventListener("open", () => {
+        logRealtime("data-channel-open");
+        dataChannel.send(JSON.stringify({
+          type: "session.update",
+          session: {
+            type: "realtime",
+            output_modalities: ["audio"],
+            audio: {
+              input: {
+                transcription: {
+                  model: realtimeSession.transcription_model || "gpt-4o-mini-transcribe",
+                },
+                turn_detection: null,
+              },
+            },
+          },
+        }));
+        setConversationTransport("realtime");
+        setConversationRealtimeReady(true);
+        setConversationRealtimeVoice(realtimeSession.voice || "");
+      });
+
+      dataChannel.addEventListener("close", () => {
+        warnRealtime("data-channel-close");
+      });
+
+      dataChannel.addEventListener("error", (event) => {
+        warnRealtime("data-channel-error", {
+          eventType: event.type,
+        });
+      });
+
+      dataChannel.addEventListener("message", (messageEvent) => {
+        let event: RealtimeServerEvent;
+        try {
+          event = JSON.parse(messageEvent.data) as RealtimeServerEvent;
+        } catch {
+          warnRealtime("message-parse-failed");
+          return;
+        }
+        const eventType = String(event.type || "");
+        if (eventType) {
+          logRealtime("server-event", { type: eventType });
+        }
+        if (eventType === "response.created" || eventType === "output_audio_buffer.started") {
+          realtimeResponseActiveRef.current = true;
+        }
+        if (
+          eventType === "response.done"
+          || eventType === "output_audio_buffer.stopped"
+          || eventType === "response.output_audio.done"
+        ) {
+          realtimeResponseActiveRef.current = false;
+        }
+        if (
+          eventType === "conversation.item.input_audio_transcription.completed"
+          || eventType === "conversation.item.input_audio_transcription.done"
+        ) {
+          const transcript = (
+            typeof event.transcript === "string" ? event.transcript
+              : typeof event.item?.content?.[0]?.transcript === "string" ? event.item.content[0].transcript
+                : ""
+          ).trim();
+          realtimePendingUserTextRef.current = transcript;
+          logRealtime("transcription-complete", { transcript });
+          return;
+        }
+        if (eventType === "response.output_text.delta" && typeof event.delta === "string") {
+          realtimePendingAssistantTextRef.current = `${realtimePendingAssistantTextRef.current}${event.delta}`;
+          setConversationPendingAssistantText(realtimePendingAssistantTextRef.current);
+          return;
+        }
+        if (eventType === "response.output_audio_transcript.delta" && typeof event.delta === "string") {
+          realtimePendingAssistantTextRef.current = `${realtimePendingAssistantTextRef.current}${event.delta}`;
+          setConversationPendingAssistantText(realtimePendingAssistantTextRef.current);
+          return;
+        }
+        if (eventType === "response.output_text.done") {
+          const assistantText = (typeof event.text === "string" ? event.text : "").trim();
+          if (assistantText) {
+            realtimePendingAssistantTextRef.current = assistantText;
+            setConversationPendingAssistantText(assistantText);
+          }
+          return;
+        }
+        if (eventType === "response.output_audio_transcript.done") {
+          const assistantText = (typeof event.transcript === "string" ? event.transcript : "").trim();
+          if (assistantText) {
+            realtimePendingAssistantTextRef.current = assistantText;
+            setConversationPendingAssistantText(assistantText);
+          }
+          return;
+        }
+        if (eventType === "response.done") {
+          const assistantText = extractRealtimeText(event) || realtimePendingAssistantTextRef.current.trim();
+          const userText = realtimePendingUserTextRef.current.trim();
+          logRealtime("response-done", {
+            userText,
+            assistantText,
+          });
+          if (assistantText) {
+            setConversationTurns((current) => [...current, {
+              user_text: userText,
+              user_translation_text: "",
+              user_corrected_text: "",
+              user_corrected_translation_text: "",
+              user_correction_explanation: "",
+              user_is_grammatically_correct: true,
+              user_makes_sense_in_context: true,
+              user_needs_correction: false,
+              assistant_text: assistantText,
+              assistant_translation_text: "",
+              assistant_audio_url: "",
+              goal_achieved: false,
+              goal_achievement_message: "",
+              next_goal_suggestion: "",
+            }]);
+          }
+          realtimePendingUserTextRef.current = "";
+          realtimePendingAssistantTextRef.current = "";
+          setConversationPendingAssistantText("");
+          setConversationLoading(false);
+          return;
+        }
+        if (eventType === "error" || eventType === "invalid_request_error") {
+          warnRealtime("server-error", {
+            eventType,
+            message: event.error?.message || event.message || "",
+          });
+          setConversationLoading(false);
+          setConversationError(event.error?.message || event.message || "Realtime conversation error");
+        }
+      });
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      logRealtime("microphone-ready", {
+        audioTrackCount: mediaStream.getAudioTracks().length,
+      });
+      realtimeStreamRef.current = mediaStream;
+      const audioTrack = mediaStream.getAudioTracks()[0];
+      if (!audioTrack) {
+        warnRealtime("missing-audio-track");
+        closeRealtimeSession();
+        return false;
+      }
+      audioTrack.enabled = false;
+      peerConnection.addTrack(audioTrack, mediaStream);
+      logRealtime("local-audio-track-added");
+
+      const offer = await peerConnection.createOffer();
+      logRealtime("offer-created", {
+        sdpLength: (offer.sdp || "").length,
+      });
+      await peerConnection.setLocalDescription(offer);
+      logRealtime("local-description-set");
+
+      const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
+        method: "POST",
+        body: offer.sdp,
+        headers: {
+          Authorization: `Bearer ${ephemeralKey}`,
+          "Content-Type": "application/sdp",
+        },
+      });
+      if (!sdpResponse.ok) {
+        const errorText = await sdpResponse.text();
+        warnRealtime("sdp-connect-failed", {
+          status: sdpResponse.status,
+          statusText: sdpResponse.statusText,
+          body: errorText,
+        });
+        throw new Error("Failed to connect Realtime audio session");
+      }
+      const remoteSdp = await sdpResponse.text();
+      logRealtime("sdp-connect-succeeded", {
+        answerLength: remoteSdp.length,
+      });
+      await peerConnection.setRemoteDescription({
+        type: "answer",
+        sdp: remoteSdp,
+      });
+      logRealtime("remote-description-set");
+      return true;
+    } catch (error) {
+      warnRealtime("setup-failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    } finally {
+      setConversationRealtimeConnecting(false);
+    }
+  };
+
   const startConversation = async (): Promise<void> => {
     setConversationError("");
     if (!resolvedTopic) {
@@ -385,18 +782,20 @@ export default function ConversationPage(): JSX.Element {
     }
     setConversationLoading(true);
     try {
+      const trimmedNotes = notes.trim();
+      const trimmedRole = role.trim();
       const payload = await startTopicConversation(
         resolvedTopic,
-        notes.trim(),
-        role.trim(),
+        trimmedNotes,
+        trimmedRole,
         goalDifficulty,
         sourceLanguage,
         targetLanguage,
       );
       setStarted(true);
       setActiveTopic(payload.topic || resolvedTopic);
-      setActiveNotes(payload.notes || notes.trim());
-      setActiveRole(payload.role_text || role.trim());
+      setActiveNotes(payload.notes || trimmedNotes);
+      setActiveRole(payload.role_text || trimmedRole);
       setActiveGoalDifficulty(payload.goal_difficulty || goalDifficulty);
       setConversationGoal(payload.goal_text || "");
       setOpeningText(payload.opening_text || "");
@@ -413,6 +812,27 @@ export default function ConversationPage(): JSX.Element {
       setWordActionStatus({});
       setPendingWordAdd(null);
       setPendingSentenceAdd(null);
+      setConversationTransport("http");
+      setConversationPendingAssistantText("");
+      logRealtime("start-conversation-http-ready", {
+        topic: payload.topic || resolvedTopic,
+      });
+      const realtimeEnabled = await setupRealtimeConversation(
+        payload.topic || resolvedTopic,
+        payload.notes || trimmedNotes,
+        payload.role_text || trimmedRole,
+        payload.goal_difficulty || goalDifficulty,
+      ).catch((error) => {
+        warnRealtime("fallback-to-http", {
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        return false;
+      });
+      if (!realtimeEnabled) {
+        closeRealtimeSession();
+        setConversationTransport("http");
+        warnRealtime("http-transport-active");
+      }
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
       setConversationError(detail || t("newItem.questionsError"));
@@ -422,6 +842,34 @@ export default function ConversationPage(): JSX.Element {
   };
 
   const stopRecording = (submit: boolean): void => {
+    if (conversationTransport === "realtime") {
+      const audioTrack = realtimeStreamRef.current?.getAudioTracks()[0] || null;
+      if (audioTrack) {
+        audioTrack.enabled = false;
+      }
+      if (timerRef.current !== null) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setConversationRecording(false);
+      setConversationRecordingSeconds(0);
+      if (submit) {
+        setConversationLoading(true);
+        const dataChannel = dataChannelRef.current;
+        if (dataChannel && dataChannel.readyState === "open") {
+          logRealtime("push-to-talk-submitted");
+          dataChannel.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+          dataChannel.send(JSON.stringify({ type: "response.create" }));
+        } else {
+          warnRealtime("submit-blocked", {
+            dataChannelState: dataChannel?.readyState || "missing",
+          });
+          setConversationLoading(false);
+          setConversationError("Realtime connection is not ready");
+        }
+      }
+      return;
+    }
     shouldSubmitRef.current = submit;
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
@@ -472,6 +920,35 @@ export default function ConversationPage(): JSX.Element {
 
   const startRecording = async (): Promise<void> => {
     if (conversationRecording || conversationLoading) {
+      return;
+    }
+    if (conversationTransport === "realtime") {
+      const audioTrack = realtimeStreamRef.current?.getAudioTracks()[0] || null;
+      const dataChannel = dataChannelRef.current;
+      if (!audioTrack || !dataChannel || dataChannel.readyState !== "open") {
+        warnRealtime("recording-start-blocked", {
+          hasAudioTrack: Boolean(audioTrack),
+          dataChannelState: dataChannel?.readyState || "missing",
+        });
+        setConversationError("Realtime connection is not ready");
+        return;
+      }
+      setConversationError("");
+      realtimePendingUserTextRef.current = "";
+      realtimePendingAssistantTextRef.current = "";
+      setConversationPendingAssistantText("");
+      dataChannel.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+      if (realtimeResponseActiveRef.current) {
+        dataChannel.send(JSON.stringify({ type: "response.cancel" }));
+        dataChannel.send(JSON.stringify({ type: "output_audio_buffer.clear" }));
+      }
+      logRealtime("push-to-talk-started");
+      audioTrack.enabled = true;
+      setConversationRecording(true);
+      setConversationRecordingSeconds(0);
+      timerRef.current = window.setInterval(() => {
+        setConversationRecordingSeconds((value) => value + 1);
+      }, 1000);
       return;
     }
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
@@ -545,6 +1022,7 @@ export default function ConversationPage(): JSX.Element {
 
   const restartConversation = (): void => {
     stopRecording(false);
+    closeRealtimeSession();
     setConversationError("");
     setHelpError("");
     setHelpInput("");
@@ -565,6 +1043,7 @@ export default function ConversationPage(): JSX.Element {
     setOpeningAudioUrl("");
     setOpeningTranslation("");
     setShowOpeningTranslation(false);
+    setConversationTransport("http");
 
     if (activeTopic) {
       if (previousTopics.includes(activeTopic)) {
@@ -812,6 +1291,7 @@ export default function ConversationPage(): JSX.Element {
       <section className="card">
         <div className="content-form-section">
           <label htmlFor="conversation-topic-select" className="prompt">{t("content.topic.label")}</label>
+          {!resolvedTopic && <p className="content-required-hint">{t("content.topic.requiredHint")}</p>}
           <select
             id="conversation-topic-select"
             value={selectedTopic}
@@ -898,7 +1378,11 @@ export default function ConversationPage(): JSX.Element {
           </div>
           {!started && (
             <div className="actions">
-              <button type="button" onClick={() => void startConversation()} disabled={conversationLoading || loadingTopics}>
+              <button
+                type="button"
+                onClick={() => void startConversation()}
+                disabled={conversationLoading || loadingTopics || !resolvedTopic}
+              >
                 {conversationLoading ? t("conversation.starting") : t("conversation.start")}
               </button>
             </div>
@@ -929,195 +1413,51 @@ export default function ConversationPage(): JSX.Element {
                   type="button"
                   className="secondary-button"
                   onClick={openHelpModal}
-                  disabled={conversationLoading || helpLoading}
+                  disabled={conversationLoading || conversationRealtimeConnecting || helpLoading}
                 >
                   {t("conversation.helpOpen")}
                 </button>
               </div>
+              <p className="hint">
+                {conversationTransport === "realtime" && conversationRealtimeReady
+                  ? `Realtime voice active${conversationRealtimeVoice ? ` (${conversationRealtimeVoice})` : ""}`
+                  : "Standard voice flow active"}
+              </p>
             </div>
 
-            <div ref={historyRef} className="item-questions-history item-chat-thread item-conversation-history">
-              {openingText && (
-                <div className="item-chat-entry item-chat-message item-chat-assistant">
-                  <TargetPhraseText as="p" className="item-chat-bubble" hideText={hideTargetText} variant="chat">
-                    {renderTargetLineWithWordLinks({
-                      baseKey: "opening",
-                      sourceText: openingTranslation,
-                      targetText: openingText,
-                    })}
-                  </TargetPhraseText>
-                  {openingTranslation && showOpeningTranslation && !hideSourceText && (
-                    <p className="item-conversation-translation"><strong>{sourceLanguageLabel}:</strong> {openingTranslation}</p>
-                  )}
-                  <div className="turn-action-row turn-action-row-assistant">
-                    {openingAudioUrl && (
-                      <button
-                        type="button"
-                        className="turn-audio-button"
-                        onClick={() => playAudioUrl(openingAudioUrl)}
-                      >
-                        {t("newItem.playTurnAudio")}
-                      </button>
-                    )}
-                    {openingTranslation && !hideSourceText && (
-                      <button
-                        type="button"
-                        className="item-conversation-translation-toggle"
-                        onClick={toggleOpeningTranslation}
-                      >
-                        {showOpeningTranslation ? t("newItem.conversationHideTranslation") : t("newItem.conversationShowTranslation")}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {!conversationTurns.length && !openingText && (
-                <p className="hint item-conversation-empty">{t("newItem.conversationEmpty")}</p>
-              )}
-
-              {conversationTurns.map((turn, index) => (
-                <div key={`conversation-turn-${index}`} className="item-chat-entry">
-                  <div className="item-chat-message item-chat-user">
-                    <p className="item-chat-meta">{t("newItem.conversationLabelYou")}</p>
-                    <p className="item-chat-bubble">{turn.user_text}</p>
-                    {conversationUserTranslationVisible[index] && !hideSourceText && (
-                      <p className="item-conversation-correction item-conversation-correction-translation">
-                        <strong>{sourceLanguageLabel}:</strong> {turn.user_translation_text || t("newItem.conversationNoTranslation")}
-                      </p>
-                    )}
-                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_text && !hideTargetText && (
-                      <p className="item-conversation-correction">
-                        <strong>{t("newItem.conversationCorrectionLabel")}</strong> {turn.user_corrected_text}
-                      </p>
-                    )}
-                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_corrected_translation_text && !hideSourceText && (
-                      <p className="item-conversation-correction item-conversation-correction-translation">
-                        <strong>{sourceLanguageLabel}:</strong> {turn.user_corrected_translation_text}
-                      </p>
-                    )}
-                    {hasTurnCorrection(turn) && conversationCorrectionVisible[index] && !!turn.user_correction_explanation && (
-                      <p className="item-conversation-correction item-conversation-correction-explanation">
-                        <strong>{t("newItem.conversationCorrectionExplanationLabel")}</strong> {turn.user_correction_explanation}
-                      </p>
-                    )}
-                    <div className="turn-action-row turn-action-row-user">
-                      {!hideSourceText && (
-                        <button
-                          type="button"
-                          className="item-conversation-correction-toggle"
-                          onClick={() => void toggleUserTurnTranslation(index)}
-                          disabled={conversationUserTranslationLoading[index]}
-                        >
-                          {conversationUserTranslationVisible[index]
-                            ? t("newItem.conversationHideUserTranslation")
-                            : t("newItem.conversationShowUserTranslation")}
-                        </button>
-                      )}
-                      {hasTurnCorrection(turn) && (
-                        <>
-                          <button
-                            type="button"
-                            className="item-conversation-correction-toggle"
-                            onClick={() => void toggleUserTurnCorrection(index)}
-                            disabled={conversationUserCorrectionLoading[index]}
-                          >
-                            {conversationCorrectionVisible[index]
-                              ? t("newItem.conversationHideCorrection")
-                              : t("newItem.conversationShowCorrection")}
-                          </button>
-                          {conversationCorrectionVisible[index] && !!turn.user_corrected_text && (
-                            <button
-                              type="button"
-                              className="item-conversation-correction-toggle"
-                              onClick={() => void requestAddSentenceFromConversation(
-                                `conversation-corrected-${index}`,
-                                turn.user_corrected_translation_text || turn.user_translation_text || "",
-                                turn.user_corrected_text,
-                              )}
-                            >
-                              {t("newItem.sentenceAddButton")}
-                            </button>
-                          )}
-                          {(sentenceActionStatus[`conversation-corrected-${index}`] || "idle") !== "idle" && (
-                            <span className="turn-token-status">
-                              {sentenceActionStatus[`conversation-corrected-${index}`] === "saving" && `(${t("newItem.sentenceAddSaving")})`}
-                              {sentenceActionStatus[`conversation-corrected-${index}`] === "added" && `(${t("newItem.sentenceAddAdded")})`}
-                              {sentenceActionStatus[`conversation-corrected-${index}`] === "exists" && `(${t("newItem.sentenceAddExists")})`}
-                              {sentenceActionStatus[`conversation-corrected-${index}`] === "error" && `(${t("newItem.sentenceAddError")})`}
-                              {sentenceActionStatus[`conversation-corrected-${index}`] === "missing_source" && `(${t("newItem.sentenceAddMissingSource")})`}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="item-chat-message item-chat-assistant">
-                    <p className="item-chat-meta">{t("newItem.conversationLabelTutor")}</p>
-                    <TargetPhraseText as="p" className="item-chat-bubble" hideText={hideTargetText} variant="chat">
-                      {renderTargetLineWithWordLinks({
-                        baseKey: `assistant-${index}`,
-                        sourceText: turn.assistant_translation_text || "",
-                        targetText: turn.assistant_text,
-                      })}
-                    </TargetPhraseText>
-                    {conversationTranslationVisible[index] && !hideSourceText && (
-                      <p className="item-conversation-translation">
-                        <strong>{sourceLanguageLabel}:</strong> {turn.assistant_translation_text || t("newItem.conversationNoTranslation")}
-                      </p>
-                    )}
-                    {turn.goal_achieved && (
-                      <p className="item-conversation-goal-achieved">
-                        {turn.goal_achievement_message || t("conversation.goalAchievedDefault")}
-                      </p>
-                    )}
-                    <div className="turn-action-row turn-action-row-assistant">
-                      {turn.assistant_audio_url && (
-                        <button
-                          type="button"
-                          className="turn-audio-button"
-                          onClick={() => playAudioUrl(turn.assistant_audio_url)}
-                        >
-                          {t("newItem.playTurnAudio")}
-                        </button>
-                      )}
-                      {!hideSourceText && (
-                        <button
-                          type="button"
-                          className="item-conversation-translation-toggle"
-                          onClick={() => toggleAssistantTurnTranslation(index)}
-                        >
-                          {conversationTranslationVisible[index]
-                            ? t("newItem.conversationHideTranslation")
-                            : t("newItem.conversationShowTranslation")}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="item-conversation-translation-toggle"
-                        onClick={() => void requestAddSentenceFromConversation(
-                          `conversation-assistant-${index}`,
-                          turn.assistant_translation_text || "",
-                          turn.assistant_text,
-                        )}
-                      >
-                        {t("newItem.sentenceAddButton")}
-                      </button>
-                      {(sentenceActionStatus[`conversation-assistant-${index}`] || "idle") !== "idle" && (
-                        <span className="turn-token-status">
-                          {sentenceActionStatus[`conversation-assistant-${index}`] === "saving" && `(${t("newItem.sentenceAddSaving")})`}
-                          {sentenceActionStatus[`conversation-assistant-${index}`] === "added" && `(${t("newItem.sentenceAddAdded")})`}
-                          {sentenceActionStatus[`conversation-assistant-${index}`] === "exists" && `(${t("newItem.sentenceAddExists")})`}
-                          {sentenceActionStatus[`conversation-assistant-${index}`] === "error" && `(${t("newItem.sentenceAddError")})`}
-                          {sentenceActionStatus[`conversation-assistant-${index}`] === "missing_source" && `(${t("newItem.sentenceAddMissingSource")})`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ConversationTurns
+              historyRef={historyRef}
+              opening={{
+                text: openingText,
+                translation: openingTranslation,
+                audioUrl: openingAudioUrl,
+                showTranslation: showOpeningTranslation,
+              }}
+              display={{
+                hideSourceText,
+                sourceLanguageLabel,
+                pendingAssistantText: conversationPendingAssistantText,
+              }}
+              visibility={{
+                translationVisible: conversationTranslationVisible,
+                correctionVisible: conversationCorrectionVisible,
+                userTranslationVisible: conversationUserTranslationVisible,
+                userTranslationLoading: conversationUserTranslationLoading,
+                userCorrectionLoading: conversationUserCorrectionLoading,
+                sentenceActionStatus,
+              }}
+              actions={{
+                renderTargetLineWithWordLinks,
+                hasTurnCorrection,
+                toggleOpeningTranslation,
+                playAudioUrl,
+                toggleUserTurnTranslation,
+                toggleUserTurnCorrection,
+                toggleAssistantTurnTranslation,
+                requestAddSentenceFromConversation,
+              }}
+              conversationTurns={conversationTurns}
+            />
 
             {conversationError && <p className="error">{conversationError}</p>}
             {conversationRecording && (
@@ -1127,15 +1467,20 @@ export default function ConversationPage(): JSX.Element {
               </p>
             )}
             {conversationLoading && <p className="hint">{t("newItem.conversationProcessing")}</p>}
+            {conversationRealtimeConnecting && <p className="hint">Connecting Realtime voice...</p>}
 
             <div className="actions">
               {!conversationRecording && (
-                <button type="button" onClick={() => void startRecording()} disabled={conversationLoading || helpLoading}>
+                <button
+                  type="button"
+                  onClick={() => void startRecording()}
+                  disabled={conversationLoading || conversationRealtimeConnecting || helpLoading}
+                >
                   {t("newItem.conversationStartRecording")}
                 </button>
               )}
               {conversationRecording && (
-                <button type="button" onClick={() => stopRecording(true)} disabled={conversationLoading}>
+                <button type="button" onClick={() => stopRecording(true)} disabled={conversationLoading || conversationRealtimeConnecting}>
                   {t("newItem.conversationStopRecording")}
                 </button>
               )}

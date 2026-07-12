@@ -26,6 +26,7 @@ from .views import (
     ContentPreviewView,
     ContentTopicConversationStartView,
     ContentTopicConversationHelpView,
+    ContentTopicConversationRealtimeSessionView,
     ContentTopicConversationTurnView,
     ContentTopicConversationUserCorrectionView,
     ContentTopicConversationUserTranslationView,
@@ -87,6 +88,7 @@ urlpatterns = [
     path("content/items/<int:item_id>/refresh-word", ContentItemRefreshWordView.as_view(), name="content-item-refresh-word"),
     path("content/items/<int:item_id>/question", ContentItemQuestionView.as_view(), name="content-item-question"),
     path("content/conversation/start", ContentTopicConversationStartView.as_view(), name="content-topic-conversation-start"),
+    path("content/conversation/realtime-session", ContentTopicConversationRealtimeSessionView.as_view(), name="content-topic-conversation-realtime-session"),
     path("content/conversation/help", ContentTopicConversationHelpView.as_view(), name="content-topic-conversation-help"),
     path("content/conversation/turn", ContentTopicConversationTurnView.as_view(), name="content-topic-conversation-turn"),
     path(

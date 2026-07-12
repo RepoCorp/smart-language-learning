@@ -294,6 +294,17 @@ export interface TopicConversationStartResponse {
   opening_audio_url?: string;
 }
 
+export interface TopicConversationRealtimeSessionResponse {
+  realtime_enabled: boolean;
+  client_secret?: {
+    value?: string;
+    expires_at?: number;
+  };
+  model?: string;
+  voice?: string;
+  transcription_model?: string;
+}
+
 export interface TopicConversationHelpResponse {
   request_kind?: "coach" | "say";
   request_text: string;

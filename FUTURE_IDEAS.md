@@ -1,6 +1,7 @@
 # Todos
 
 Urgentes
+Algun security by obscurity, que igual deje el pin sencillo. 
 - Arreglar conversacion 
 - Conversation goals are not fully working fine
 Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
@@ -8,7 +9,25 @@ Evaluar cuando se consigio el objetivo
 Mejorar velocidad de respuesta de la conversacion 
 No reproduce audio automaticamente de la respuesta
 
-PROBLEMAS/ERRORES EXISTENTESLK
+Can we have the user recorded audios available during the conversation session to replay them at some point?
+
+
+
+
+COSAS QUE NO DEBERIAN ESPERAR PERO QUE VAN A TENER QUE ESPERAR:
+- Refactor 
+- Mejorar prompts
+
+
+COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
+- Introducir gramatica, gradualmente. Empecemos con sustantivos.
+  - Añadir la informacion del genero y mostrarlo de alguna manera en la UI
+  - Revisar los ejercicios, que si se cubran las principales formas gramaticales y que permita abrir una ventana para cada una de ellas que de una pequeña explicacion y que muestre las equivalentes de otras palabras del mismo genero
+  - 
+
+
+
+PROBLEMAS/ERRORES EXISTENTES
 Play all dialogs is not playing all dialogs
 En pregunta enter envia y mejorar las respuestas, incluyendo quitar el que dice si esta relacionado
 En los ejercicios de confusing palabras cuando es verbo usar el formato apropiado

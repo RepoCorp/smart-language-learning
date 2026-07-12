@@ -243,6 +243,7 @@ from .management_items import (
 from .management_topic_admin import ContentTopicDeleteView
 from .management_topic_conversation import (
     ContentTopicConversationHelpView,
+    ContentTopicConversationRealtimeSessionView,
     ContentTopicConversationStartView,
     ContentTopicConversationTurnView,
     ContentTopicConversationUserCorrectionView,
