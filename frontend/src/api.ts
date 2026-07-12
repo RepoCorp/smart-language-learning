@@ -959,6 +959,45 @@ export async function createTopicConversationRealtimeSession(
   return (await response.json()) as TopicConversationRealtimeSessionResponse;
 }
 
+export async function generateTopicConversationReview(
+  topic: string,
+  notes: string,
+  roleText: string,
+  goalText: string,
+  turns: ContentItemConversationResponse[],
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentDialogRecord> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/conversation/review?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      topic,
+      notes,
+      role_text: roleText,
+      goal_text: goalText,
+      turns,
+    }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate conversation review";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentDialogRecord;
+}
+
 export async function sendTopicConversationHelpRequest(
   topic: string,
   notes: string,

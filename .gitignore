@@ -4,3 +4,4 @@ aws-deploy/deploy.env
 # Generated media artifacts
 backend/media/audio/*
 backend/media/exercise-images/*
+frontend/node_modules/*

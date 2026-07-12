@@ -2356,6 +2356,51 @@ textarea {
   border-color: #8ddfcf;
 }
 
+.conversation-review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conversation-review-heading {
+  margin: 4px 0 0 0;
+  font-weight: 700;
+}
+
+.conversation-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.conversation-review-entry {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+}
+
+.conversation-review-entry-user {
+  background: var(--color-accent-surface);
+  border-color: #8ddfcf;
+}
+
+.conversation-review-speaker {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  color: var(--color-text-soft);
+}
+
+.conversation-review-target {
+  color: var(--color-text);
+}
+
+.conversation-review-original {
+  margin: 4px 0 0 0;
+  color: var(--color-text-soft);
+  font-size: 12px;
+}
+
 .conversation-notes-wrap {
   margin-top: 10px;
 }

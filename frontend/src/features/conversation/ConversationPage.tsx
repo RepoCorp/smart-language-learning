@@ -5,6 +5,7 @@ import {
   fetchTopicConversationUserCorrection,
   fetchTopicConversationUserLiteralTranslation,
   fetchContentTopics,
+  generateTopicConversationReview,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
   sendTopicConversationHelpRequest,
@@ -13,9 +14,10 @@ import {
 import { useI18n } from "../../i18n";
 import { usePromptPreferences } from "../../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../../studyLanguages";
-import type { ContentItemConversationResponse, SessionItem } from "../../types";
+import type { ContentDialogRecord, ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
+import ConversationReviewTurns from "./ConversationReviewTurns";
 import { CONVERSATION_SEND_ENABLE_DELAY_SECONDS } from "./conversationConstants";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
 import ConversationTurns from "./ConversationTurns";
@@ -79,6 +81,9 @@ export default function ConversationPage(): JSX.Element {
   const [conversationError, setConversationError] = useState<string>("");
   const [conversationPendingAssistantText, setConversationPendingAssistantText] = useState<string>("");
   const [conversationPendingUserTurn, setConversationPendingUserTurn] = useState<boolean>(false);
+  const [conversationFinished, setConversationFinished] = useState<boolean>(false);
+  const [conversationEnded, setConversationEnded] = useState<boolean>(false);
+  const [conversationReviewDialog, setConversationReviewDialog] = useState<ContentDialogRecord | null>(null);
   const [assistantSpeaking, setAssistantSpeaking] = useState<boolean>(false);
   const [assistantHintsUsed, setAssistantHintsUsed] = useState<number>(0);
   const [assistantRevealUsedByTurn, setAssistantRevealUsedByTurn] = useState<Record<number, boolean>>({});
@@ -98,6 +103,8 @@ export default function ConversationPage(): JSX.Element {
     key: string;
     source: string;
     target: string;
+    dialogId?: number;
+    turnIndex?: number;
   } | null>(null);
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
   const [pendingWordAdd, setPendingWordAdd] = useState<{
@@ -105,6 +112,8 @@ export default function ConversationPage(): JSX.Element {
     source: string;
     target: string;
     wordType: string;
+    dialogId?: number;
+    turnIndex?: number;
     sourceLine: string;
     targetLine: string;
     clickedTargetToken: string;
@@ -306,6 +315,29 @@ export default function ConversationPage(): JSX.Element {
     void startRecording(conversationLoading);
   };
 
+  const generateConversationReview = async (): Promise<void> => {
+    setConversationError("");
+    setConversationLoading(true);
+    try {
+      const dialog = await generateTopicConversationReview(
+        activeTopic,
+        activeNotes,
+        activeRole,
+        conversationGoal,
+        conversationTurns,
+        sourceLanguage,
+        targetLanguage,
+      );
+      setConversationReviewDialog(dialog);
+      setConversationEnded(true);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      setConversationError(detail || t("newItem.questionsError"));
+    } finally {
+      setConversationLoading(false);
+    }
+  };
+
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
 
   const resolvedTopic = (shouldCreateNewTopic ? customTopic : selectedTopic).trim();
@@ -481,6 +513,9 @@ export default function ConversationPage(): JSX.Element {
     setPendingSentenceAdd(null);
     setConversationPendingAssistantText("");
     setConversationPendingUserTurn(false);
+    setConversationFinished(false);
+    setConversationEnded(false);
+    setConversationReviewDialog(null);
     setAssistantSpeaking(false);
     setAssistantHintsUsed(0);
     setAssistantRevealUsedByTurn({});
@@ -576,6 +611,9 @@ export default function ConversationPage(): JSX.Element {
     setShowOpeningTranslation(false);
     setConversationTransport("http");
     setConversationPendingUserTurn(false);
+    setConversationFinished(false);
+    setConversationEnded(false);
+    setConversationReviewDialog(null);
     setAssistantSpeaking(false);
     setAssistantHintsUsed(0);
     setAssistantRevealUsedByTurn({});
@@ -598,7 +636,15 @@ export default function ConversationPage(): JSX.Element {
     if (typeof window !== "undefined" && !window.confirm(t("conversation.endConfirm"))) {
       return;
     }
-    restartConversation();
+    stopRecording(false);
+    closeRealtimeSession();
+    setConversationPendingAssistantText("");
+    setConversationPendingUserTurn(false);
+    setAssistantSpeaking(false);
+    hideAssistantTurnHelper();
+    setConversationFinished(true);
+    setConversationEnded(false);
+    setConversationReviewDialog(null);
   };
 
   const requestAddWordFromTurnToken = async (
@@ -606,6 +652,8 @@ export default function ConversationPage(): JSX.Element {
     sourceText: string,
     targetText: string,
     targetTokenRaw: string,
+    dialogId?: number,
+    turnIndex?: number,
   ): Promise<void> => {
     const targetToken = cleanToken(targetTokenRaw);
     if (!targetToken || !sourceText.trim() || !targetText.trim()) {
@@ -619,8 +667,8 @@ export default function ConversationPage(): JSX.Element {
         targetToken,
         sourceLanguage,
         targetLanguage,
-        undefined,
-        undefined,
+        dialogId,
+        turnIndex,
         true,
         sourceText,
         targetText,
@@ -674,6 +722,8 @@ export default function ConversationPage(): JSX.Element {
         source: check.source_text || targetToken,
         target: check.target_text || targetToken,
         wordType: resolvedWordType,
+        dialogId,
+        turnIndex,
         sourceLine: sourceText,
         targetLine: targetText,
         clickedTargetToken: targetToken,
@@ -689,7 +739,7 @@ export default function ConversationPage(): JSX.Element {
       return;
     }
 
-    const { key, source, target, sourceLine, targetLine, clickedTargetToken } = pendingWordAdd;
+    const { key, source, target, dialogId, turnIndex, sourceLine, targetLine, clickedTargetToken } = pendingWordAdd;
     setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
     setAddingWord(true);
     try {
@@ -698,8 +748,8 @@ export default function ConversationPage(): JSX.Element {
         target,
         sourceLanguage,
         targetLanguage,
-        undefined,
-        undefined,
+        dialogId,
+        turnIndex,
         false,
         sourceLine,
         targetLine,
@@ -718,10 +768,14 @@ export default function ConversationPage(): JSX.Element {
     baseKey,
     sourceText,
     targetText,
+    dialogId,
+    turnIndex,
   }: {
     baseKey: string;
     sourceText: string;
     targetText: string;
+    dialogId?: number;
+    turnIndex?: number;
   }): JSX.Element => {
     if (!sourceText.trim()) {
       return <>{targetText}</>;
@@ -750,7 +804,7 @@ export default function ConversationPage(): JSX.Element {
               <button
                 type="button"
                 className="turn-token-button"
-                onClick={() => void requestAddWordFromTurnToken(statusKey, sourceText, targetText, token)}
+                onClick={() => void requestAddWordFromTurnToken(statusKey, sourceText, targetText, token, dialogId, turnIndex)}
                 disabled={status === "saving"}
               >
                 {token}
@@ -771,6 +825,8 @@ export default function ConversationPage(): JSX.Element {
     key: string,
     sourceTextRaw: string,
     targetTextRaw: string,
+    dialogId?: number,
+    turnIndex?: number,
   ): Promise<void> => {
     const sourceText = sourceTextRaw.trim();
     const targetText = targetTextRaw.trim();
@@ -784,7 +840,7 @@ export default function ConversationPage(): JSX.Element {
 
     setSentenceActionStatus((current) => ({ ...current, [key]: "saving" }));
     try {
-      const check = await quickAddPhraseFromConversation(sourceText, targetText, sourceLanguage, targetLanguage, true);
+      const check = await quickAddPhraseFromConversation(sourceText, targetText, sourceLanguage, targetLanguage, true, dialogId, turnIndex, sourceText, targetText);
       if (check.exists) {
         setSentenceActionStatus((current) => ({ ...current, [key]: "exists" }));
         return;
@@ -794,6 +850,8 @@ export default function ConversationPage(): JSX.Element {
         key,
         source: check.source_text || sourceText,
         target: check.target_text || targetText,
+        dialogId,
+        turnIndex,
       });
     } catch {
       setSentenceActionStatus((current) => ({ ...current, [key]: "error" }));
@@ -804,10 +862,10 @@ export default function ConversationPage(): JSX.Element {
     if (!pendingSentenceAdd) {
       return;
     }
-    const { key, source, target } = pendingSentenceAdd;
+    const { key, source, target, dialogId, turnIndex } = pendingSentenceAdd;
     setSentenceActionStatus((current) => ({ ...current, [key]: "saving" }));
     try {
-      const result = await quickAddPhraseFromConversation(source, target, sourceLanguage, targetLanguage);
+      const result = await quickAddPhraseFromConversation(source, target, sourceLanguage, targetLanguage, false, dialogId, turnIndex, source, target);
       setSentenceActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
     } catch {
       setSentenceActionStatus((current) => ({ ...current, [key]: "error" }));
@@ -956,7 +1014,7 @@ export default function ConversationPage(): JSX.Element {
           )}
         </div>
 
-        {started && (
+        {started && !conversationFinished && (
           <>
             <ConversationActiveControls
               summary={{
@@ -1031,6 +1089,48 @@ export default function ConversationPage(): JSX.Element {
               {conversationError && <p className="error">{conversationError}</p>}
             </ConversationActiveControls>
           </>
+        )}
+        {started && conversationFinished && !conversationEnded && (
+          <div className="content-form-section conversation-review-card">
+            <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {activeTopic}</p>
+            {activeRole && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {activeRole}</p>}
+            <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {t(goalDifficultyLabelByCode[activeGoalDifficulty])}</p>
+            <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {conversationGoal}</p>
+            <p className="conversation-review-heading">{t("conversation.reviewTitle")}</p>
+            <p className="hint">{t("conversation.reviewDescription")}</p>
+            {conversationLoading && <p className="hint">{t("conversation.reviewGenerating")}</p>}
+            <div className="actions">
+              <button type="button" onClick={() => void generateConversationReview()} disabled={conversationLoading}>
+                {t("conversation.generateReview")}
+              </button>
+              <button type="button" className="secondary-button" onClick={restartConversation} disabled={conversationLoading}>
+                {t("conversation.closeAfterEnd")}
+              </button>
+            </div>
+            {conversationError && <p className="error">{conversationError}</p>}
+          </div>
+        )}
+        {started && conversationEnded && conversationReviewDialog && (
+          <div className="content-form-section conversation-review-card">
+            <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {activeTopic}</p>
+            {activeRole && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {activeRole}</p>}
+            <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {t(goalDifficultyLabelByCode[activeGoalDifficulty])}</p>
+            <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {conversationGoal}</p>
+            <p className="conversation-review-heading">{t("conversation.reviewTitle")}</p>
+            <p className="hint">{t("conversation.reviewDescription")}</p>
+            <ConversationReviewTurns
+              dialog={conversationReviewDialog}
+              renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
+              requestAddSentenceFromConversation={requestAddSentenceFromConversation}
+              sentenceActionStatus={sentenceActionStatus}
+            />
+            <div className="actions">
+              <button type="button" onClick={restartConversation}>
+                {t("conversation.restart")}
+              </button>
+            </div>
+            {conversationError && <p className="error">{conversationError}</p>}
+          </div>
         )}
       </section>
       {pendingWordAdd && (
