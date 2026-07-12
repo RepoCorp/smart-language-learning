@@ -17,10 +17,12 @@ import { type StudyLanguageCode, useStudyLanguages } from "../../studyLanguages"
 import type { ContentDialogRecord, ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
-import ConversationReviewTurns from "./ConversationReviewTurns";
+import ConversationReviewSection from "./ConversationReviewSection";
 import { CONVERSATION_SEND_ENABLE_DELAY_SECONDS } from "./conversationConstants";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
+import { buildFinishedConversationTranscript, buildGeneratedReviewOriginalUserTexts } from "./conversationReviewTranscript";
 import ConversationTurns from "./ConversationTurns";
+import { useConversationReviewPreparation } from "./useConversationReviewPreparation";
 import {
   type ConversationResponseLevel,
   type ConversationSpeechSpeed,
@@ -82,7 +84,6 @@ export default function ConversationPage(): JSX.Element {
   const [conversationPendingAssistantText, setConversationPendingAssistantText] = useState<string>("");
   const [conversationPendingUserTurn, setConversationPendingUserTurn] = useState<boolean>(false);
   const [conversationFinished, setConversationFinished] = useState<boolean>(false);
-  const [conversationFinishedEnriching, setConversationFinishedEnriching] = useState<boolean>(false);
   const [conversationEnded, setConversationEnded] = useState<boolean>(false);
   const [conversationReviewDialog, setConversationReviewDialog] = useState<ContentDialogRecord | null>(null);
   const [assistantSpeaking, setAssistantSpeaking] = useState<boolean>(false);
@@ -172,6 +173,20 @@ export default function ConversationPage(): JSX.Element {
     hard: "conversation.goalDifficultyHard",
   };
   const hideSourceText = targetPromptMode === "audio" && !showTargetText;
+  const {
+    remainingCount: conversationReviewPreparationRemainingCount,
+    ready: conversationReviewPreparationReady,
+  } = useConversationReviewPreparation({
+    enabled: started,
+    topic: activeTopic,
+    notes: activeNotes,
+    roleText: activeRole,
+    goalText: conversationGoal,
+    turns: conversationTurns,
+    setTurns: setConversationTurns,
+    sourceLanguage,
+    targetLanguage,
+  });
 
   const scrollConversationToBottom = (): void => {
     const historyElement = historyRef.current;
@@ -339,142 +354,8 @@ export default function ConversationPage(): JSX.Element {
     }
   };
 
-  useEffect(() => {
-    if (!conversationFinished || conversationEnded || conversationFinishedEnriching || !conversationTurns.length) {
-      return;
-    }
-    const needsEnrichment = conversationTurns.some((turn) => (
-      (turn.user_text || "").trim() && !((turn.user_corrected_text || "").trim())
-    ));
-    if (!needsEnrichment) {
-      return;
-    }
-
-    let active = true;
-    const enrichFinishedTranscript = async (): Promise<void> => {
-      setConversationFinishedEnriching(true);
-      try {
-        const currentTurns = [...conversationTurns];
-        const updatedTurns = [...currentTurns];
-        for (let index = 0; index < currentTurns.length; index += 1) {
-          const turn = currentTurns[index];
-          const userText = (turn.user_text || "").trim();
-          if (!userText || (turn.user_corrected_text || "").trim()) {
-            continue;
-          }
-          try {
-            const payload = await fetchTopicConversationUserCorrection(
-              activeTopic,
-              activeNotes,
-              activeRole,
-              conversationGoal,
-              userText,
-              currentTurns.slice(0, index).map((entry) => ({
-                user_text: entry.user_text,
-                assistant_text: entry.assistant_text,
-              })),
-              sourceLanguage,
-              targetLanguage,
-            );
-            updatedTurns[index] = {
-              ...updatedTurns[index],
-              user_corrected_text: payload.user_corrected_text || updatedTurns[index].user_corrected_text || userText,
-              user_corrected_translation_text: payload.user_corrected_translation_text || updatedTurns[index].user_corrected_translation_text || "",
-              user_correction_explanation: payload.user_correction_explanation || updatedTurns[index].user_correction_explanation || "",
-            };
-          } catch {
-            // Keep the finished transcript available even if one correction fails.
-          }
-        }
-        if (active) {
-          setConversationTurns(updatedTurns);
-        }
-      } finally {
-        if (active) {
-          setConversationFinishedEnriching(false);
-        }
-      }
-    };
-
-    void enrichFinishedTranscript();
-    return () => {
-      active = false;
-    };
-  }, [
-    activeNotes,
-    activeRole,
-    conversationEnded,
-    conversationFinished,
-    conversationFinishedEnriching,
-    conversationGoal,
-    conversationTurns,
-    sourceLanguage,
-    targetLanguage,
-  ]);
-
-  const finishedTranscript = (() => {
-    const turns: ContentDialogRecord["turns"] = [];
-    const originalUserTexts: Record<number, string> = {};
-    const correctedUserTexts: Record<number, string> = {};
-    let reviewTurnIndex = 0;
-    for (const turn of conversationTurns) {
-      const userText = (turn.user_text || "").trim();
-      const userTranslation = (turn.user_translation_text || "").trim();
-      const correctedUserText = (turn.user_corrected_text || "").trim();
-      const assistantText = (turn.assistant_text || "").trim();
-      const assistantTranslation = (turn.assistant_translation_text || "").trim();
-      if (userText) {
-        turns.push({
-          source_text: userTranslation,
-          target_text: userText,
-          speaker: "a",
-        });
-        originalUserTexts[reviewTurnIndex] = userText;
-        if (correctedUserText && correctedUserText !== userText) {
-          correctedUserTexts[reviewTurnIndex] = correctedUserText;
-        }
-        reviewTurnIndex += 1;
-      }
-      if (assistantText) {
-        turns.push({
-          source_text: assistantTranslation,
-          target_text: assistantText,
-          speaker: "b",
-        });
-        reviewTurnIndex += 1;
-      }
-    }
-    return {
-      dialog: {
-        dialog_id: 0,
-        topic: activeTopic,
-        context: "",
-        audio_url: "",
-        created_at: "",
-        turn_count: turns.length,
-        turns,
-      } as ContentDialogRecord,
-      originalUserTexts,
-      correctedUserTexts,
-    };
-  })();
-
-  const generatedReviewOriginalUserTexts = (() => {
-    const originalUserTexts: Record<number, string> = {};
-    let reviewTurnIndex = 0;
-    for (const turn of conversationTurns) {
-      const userText = (turn.user_text || "").trim();
-      const assistantText = (turn.assistant_text || "").trim();
-      if (userText) {
-        originalUserTexts[reviewTurnIndex] = userText;
-        reviewTurnIndex += 1;
-      }
-      if (assistantText) {
-        reviewTurnIndex += 1;
-      }
-    }
-    return originalUserTexts;
-  })();
+  const finishedTranscript = buildFinishedConversationTranscript(activeTopic, conversationTurns);
+  const generatedReviewOriginalUserTexts = buildGeneratedReviewOriginalUserTexts(conversationTurns);
 
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
 
@@ -776,6 +657,7 @@ export default function ConversationPage(): JSX.Element {
     }
     stopRecording(false);
     closeRealtimeSession();
+    setConversationError("");
     setConversationPendingAssistantText("");
     setConversationPendingUserTurn(false);
     setAssistantSpeaking(false);
@@ -1176,8 +1058,8 @@ export default function ConversationPage(): JSX.Element {
                 conversationLoading,
                 conversationRealtimeConnecting,
                 responseLevel,
-                showResponseLevelControl: conversationTransport === "realtime",
-                showSpeechSpeedControl: conversationTransport === "realtime",
+                showResponseLevelControl: true,
+                showSpeechSpeedControl: true,
                 speechSpeed,
                 transportHint: conversationTransport === "realtime" && conversationRealtimeReady
                   ? `Realtime voice active${conversationRealtimeVoice ? ` (${conversationRealtimeVoice})` : ""}`
@@ -1236,57 +1118,67 @@ export default function ConversationPage(): JSX.Element {
           </>
         )}
         {started && conversationFinished && !conversationEnded && (
-          <div className="content-form-section conversation-review-card">
-            <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {activeTopic}</p>
-            {activeRole && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {activeRole}</p>}
-            <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {t(goalDifficultyLabelByCode[activeGoalDifficulty])}</p>
-            <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {conversationGoal}</p>
-            <p className="conversation-review-heading">{t("conversation.finishedTitle")}</p>
-            <p className="hint">{t("conversation.finishedDescription")}</p>
-            <ConversationReviewTurns
-              dialog={finishedTranscript.dialog}
-              renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
-              requestAddSentenceFromConversation={requestAddSentenceFromConversation}
-              sentenceActionStatus={sentenceActionStatus}
-              readOnly
-              originalUserTexts={finishedTranscript.originalUserTexts}
-              correctedUserTexts={finishedTranscript.correctedUserTexts}
-            />
-            {conversationFinishedEnriching && <p className="hint">{t("conversation.finishedPreparing")}</p>}
-            {conversationLoading && <p className="hint">{t("conversation.reviewGenerating")}</p>}
-            <div className="actions">
-              <button type="button" onClick={() => void generateConversationReview()} disabled={conversationLoading}>
-                {t("conversation.generateReview")}
-              </button>
-              <button type="button" className="secondary-button" onClick={restartConversation} disabled={conversationLoading}>
-                {t("conversation.closeAfterEnd")}
-              </button>
-            </div>
-            {conversationError && <p className="error">{conversationError}</p>}
-          </div>
+          <ConversationReviewSection
+            topic={activeTopic}
+            role={activeRole}
+            goal={conversationGoal}
+            goalDifficultyLabel={t(goalDifficultyLabelByCode[activeGoalDifficulty])}
+            heading={t("conversation.finishedTitle")}
+            description={t("conversation.finishedDescription")}
+            dialog={conversationReviewPreparationReady ? finishedTranscript.dialog : {
+              dialog_id: 0,
+              topic: activeTopic,
+              context: "",
+              audio_url: "",
+              created_at: "",
+              turn_count: 0,
+              turns: [],
+            }}
+            renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
+            requestAddSentenceFromConversation={requestAddSentenceFromConversation}
+            sentenceActionStatus={sentenceActionStatus}
+            readOnly
+            originalUserTexts={conversationReviewPreparationReady ? finishedTranscript.originalUserTexts : {}}
+            correctedUserTexts={conversationReviewPreparationReady ? finishedTranscript.correctedUserTexts : {}}
+            loading={conversationLoading || !conversationReviewPreparationReady}
+            loadingMessage={!conversationReviewPreparationReady
+              ? `${t("conversation.finishedPreparing")} (${conversationReviewPreparationRemainingCount})`
+              : t("conversation.reviewGenerating")}
+            primaryAction={{
+              label: t("conversation.generateReview"),
+              onClick: () => {
+                void generateConversationReview();
+              },
+              disabled: conversationLoading || !conversationReviewPreparationReady,
+            }}
+            secondaryAction={{
+              label: t("conversation.closeAfterEnd"),
+              onClick: restartConversation,
+              disabled: conversationLoading,
+              secondary: true,
+            }}
+            error={conversationError}
+          />
         )}
         {started && conversationEnded && conversationReviewDialog && (
-          <div className="content-form-section conversation-review-card">
-            <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {activeTopic}</p>
-            {activeRole && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {activeRole}</p>}
-            <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {t(goalDifficultyLabelByCode[activeGoalDifficulty])}</p>
-            <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {conversationGoal}</p>
-            <p className="conversation-review-heading">{t("conversation.reviewTitle")}</p>
-            <p className="hint">{t("conversation.reviewDescription")}</p>
-            <ConversationReviewTurns
-              dialog={conversationReviewDialog}
-              renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
-              requestAddSentenceFromConversation={requestAddSentenceFromConversation}
-              sentenceActionStatus={sentenceActionStatus}
-              originalUserTexts={generatedReviewOriginalUserTexts}
-            />
-            <div className="actions">
-              <button type="button" onClick={restartConversation}>
-                {t("conversation.restart")}
-              </button>
-            </div>
-            {conversationError && <p className="error">{conversationError}</p>}
-          </div>
+          <ConversationReviewSection
+            topic={activeTopic}
+            role={activeRole}
+            goal={conversationGoal}
+            goalDifficultyLabel={t(goalDifficultyLabelByCode[activeGoalDifficulty])}
+            heading={t("conversation.reviewTitle")}
+            description={t("conversation.reviewDescription")}
+            dialog={conversationReviewDialog}
+            renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
+            requestAddSentenceFromConversation={requestAddSentenceFromConversation}
+            sentenceActionStatus={sentenceActionStatus}
+            originalUserTexts={generatedReviewOriginalUserTexts}
+            primaryAction={{
+              label: t("conversation.restart"),
+              onClick: restartConversation,
+            }}
+            error={conversationError}
+          />
         )}
       </section>
       {pendingWordAdd && (

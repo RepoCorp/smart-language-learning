@@ -26,6 +26,8 @@ export function useHttpConversationTransport({
   activeNotes,
   activeRole,
   conversationGoal,
+  speechSpeed,
+  responseLevel,
 }: BaseConversationTransportArgs) {
   const [conversationRecording, setConversationRecording] = useState<boolean>(false);
   const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
@@ -81,6 +83,8 @@ export function useHttpConversationTransport({
         conversationGoal,
         audioBlob,
         conversationHistory,
+        speechSpeed,
+        responseLevel,
         sourceLanguage,
         targetLanguage,
       );

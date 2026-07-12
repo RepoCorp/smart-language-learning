@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-from .audio import create_audio_data_url
+from .audio import create_audio_data_url, select_dialog_speaker_voice_ids
 from .core import create_audio_file
 from .management import (
     APIView,
@@ -30,6 +30,44 @@ from .topic_conversation_models import (
 logger = logging.getLogger(__name__)
 
 
+def _conversation_assistant_voice_id(*, topic: str, notes: str, role_text: str, target_language: str) -> str:
+    speaker_voice_ids = select_dialog_speaker_voice_ids(
+        target_language,
+        seed=f"conversation:{target_language}:{topic}:{notes}:{role_text}",
+    )
+    if not speaker_voice_ids:
+        return ""
+    return speaker_voice_ids[1]
+
+
+def _response_level_instruction(level: str) -> str:
+    normalized_level = str(level).strip().upper() or "A2"
+    if normalized_level == "A1":
+        return "Use an A1 level. Use very simple words, very short sentences, and very basic grammar."
+    if normalized_level == "B1":
+        return "Use a B1 level. You can use somewhat more natural and varied vocabulary, but keep it learner-friendly."
+    return "Use an A2 level. Use simple vocabulary and simple grammar."
+
+
+def _speech_speed_instruction(speed: str) -> str:
+    normalized_speed = str(speed).strip().lower() or "normal"
+    if normalized_speed == "super_slow":
+        return "Speak extremely slowly, with very short sentences and very clear wording that stays slow from beginning to end."
+    if normalized_speed == "slow":
+        return "Speak slowly and clearly, using short sentences and easy wording."
+    return ""
+
+
+def _effective_notes(*, notes: str, response_level: str, speech_speed: str) -> str:
+    return "\n".join(
+        part for part in [
+            notes.strip(),
+            _response_level_instruction(response_level),
+            _speech_speed_instruction(speech_speed),
+        ] if part
+    )
+
+
 class ContentTopicConversationTurnView(APIView):
     def post(self, request: Request) -> Response:
         request_started_at = time.perf_counter()
@@ -43,6 +81,13 @@ class ContentTopicConversationTurnView(APIView):
         notes = str(request.data.get("notes", "")).strip()
         role_text = str(request.data.get("role_text", "")).strip()
         goal_text = str(request.data.get("goal_text", "")).strip()
+        response_level = str(request.data.get("response_level", "A2")).strip().upper() or "A2"
+        speech_speed = str(request.data.get("speech_speed", "normal")).strip().lower() or "normal"
+        effective_notes = _effective_notes(
+            notes=notes,
+            response_level=response_level,
+            speech_speed=speech_speed,
+        )
         if not topic:
             return Response({"detail": "topic is required"}, status=status.HTTP_400_BAD_REQUEST)
         if len(topic) > 120:
@@ -110,7 +155,7 @@ class ContentTopicConversationTurnView(APIView):
                     history=history,
                     source_language=source_language,
                     target_language=target_language,
-                    context_label=conversation_context_label(topic=topic, notes=notes, role_text=role_text),
+                    context_label=conversation_context_label(topic=topic, notes=effective_notes, role_text=role_text),
                 )
                 analysis_elapsed_ms = int((time.perf_counter() - analysis_started_at) * 1000)
                 logger.info(
@@ -135,7 +180,7 @@ class ContentTopicConversationTurnView(APIView):
             reply_started_at = time.perf_counter()
             assistant_payload = generate_topic_conversation_reply_with_question_model(
                 topic=topic,
-                notes=notes,
+                notes=effective_notes,
                 role_text=role_text,
                 user_text=user_text,
                 history=history,
@@ -168,7 +213,7 @@ class ContentTopicConversationTurnView(APIView):
                 goal_started_at = time.perf_counter()
                 goal_achieved, goal_achievement_message, next_goal_suggestion = evaluate_goal_achievement_with_question_model(
                     topic=topic,
-                    notes=notes,
+                    notes=effective_notes,
                     role_text=role_text,
                     goal_text=goal_text,
                     history=history,
@@ -199,15 +244,32 @@ class ContentTopicConversationTurnView(APIView):
         assistant_audio_url = ""
         if assistant_text and audio_is_enabled:
             audio_started_at = time.perf_counter()
+            assistant_voice_id = _conversation_assistant_voice_id(
+                topic=topic,
+                notes=notes,
+                role_text=role_text,
+                target_language=target_language,
+            )
             if inline_audio_is_enabled:
-                assistant_audio_url = create_audio_data_url(assistant_text, "conversation", target_language=target_language)
+                assistant_audio_url = create_audio_data_url(
+                    assistant_text,
+                    "conversation",
+                    target_language=target_language,
+                    voice_id=assistant_voice_id,
+                )
             else:
-                assistant_audio_url = create_audio_file(assistant_text, "conversation", target_language=target_language)
+                assistant_audio_url = create_audio_file(
+                    assistant_text,
+                    "conversation",
+                    target_language=target_language,
+                    voice_id=assistant_voice_id,
+                )
             assistant_audio_elapsed_ms = int((time.perf_counter() - audio_started_at) * 1000)
             logger.info(
-                "content.topic_conversation.turn_stage stage=assistant_audio elapsed_ms=%s has_audio=%s",
+                "content.topic_conversation.turn_stage stage=assistant_audio elapsed_ms=%s has_audio=%s assistant_voice_id=%s",
                 assistant_audio_elapsed_ms,
                 bool(assistant_audio_url),
+                assistant_voice_id,
             )
         elif assistant_text:
             logger.info("content.topic_conversation.turn_stage stage=assistant_audio skipped=true")

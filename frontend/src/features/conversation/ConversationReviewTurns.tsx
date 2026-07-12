@@ -1,7 +1,7 @@
 import { useI18n } from "../../i18n";
 import type { ContentDialogRecord } from "../../types";
 
-type SentenceActionStatus = "idle" | "saving" | "added" | "exists" | "error" | "missing_source";
+export type SentenceActionStatus = "idle" | "saving" | "added" | "exists" | "error" | "missing_source";
 
 type Props = {
   dialog: ContentDialogRecord;

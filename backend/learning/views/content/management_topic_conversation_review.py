@@ -6,7 +6,6 @@ from .dialog_item_context import dialog_turns_with_phrase_audio
 from .management import APIView, Request, Response, status
 from .management_topic_conversation_shared import (
     conversation_context_label,
-    conversation_review_context,
     validate_conversation_start_fields,
     validate_conversation_start_payload,
 )
@@ -16,6 +15,8 @@ from .topic_conversation_models import (
     literal_translate_user_text as literal_translate_user_text_with_question_model,
 )
 from .topics import save_topic
+
+CONVERSATION_DIALOG_CONTEXT = "From conversation"
 
 
 class ContentTopicConversationReviewView(APIView):
@@ -38,7 +39,7 @@ class ContentTopicConversationReviewView(APIView):
         save_topic(
             user=user,
             topic=topic,
-            context=conversation_review_context(notes=notes, role_text=role_text),
+            context=CONVERSATION_DIALOG_CONTEXT,
             source_language=source_language,
             target_language=target_language,
         )
@@ -117,11 +118,10 @@ class ContentTopicConversationReviewView(APIView):
         if not review_turns:
             return Response({"detail": "No review turns available"}, status=status.HTTP_400_BAD_REQUEST)
 
-        context = conversation_review_context(notes=notes, role_text=role_text)
         saved_dialog = save_dialog(
             user=user,
             topic=topic,
-            context=context,
+            context=CONVERSATION_DIALOG_CONTEXT,
             source_language=source_language,
             target_language=target_language,
             turns=review_turns,

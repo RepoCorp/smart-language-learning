@@ -882,6 +882,8 @@ export async function sendTopicConversationAudio(
   goalText: string,
   audioBlob: Blob,
   history: Array<{ user_text: string; assistant_text: string }>,
+  speechSpeed: "normal" | "slow" | "super_slow" = "normal",
+  responseLevel: "A1" | "A2" | "B1" = "A2",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentItemConversationResponse> {
@@ -907,6 +909,8 @@ export async function sendTopicConversationAudio(
   formData.append("notes", notes);
   formData.append("role_text", roleText);
   formData.append("goal_text", goalText);
+  formData.append("speech_speed", speechSpeed);
+  formData.append("response_level", responseLevel);
 
   const response = await apiFetch(`${API_BASE}/content/conversation/turn?${params.toString()}`, {
     method: "POST",
