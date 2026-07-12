@@ -38,6 +38,7 @@ type TurnActions = {
     baseKey: string;
     sourceText: string;
     targetText: string;
+    disableWordClicks?: boolean;
   }) => JSX.Element;
   hasTurnCorrection: (turn: ConversationTurn) => boolean;
   toggleOpeningTranslation: () => void;
@@ -125,6 +126,7 @@ export default function ConversationTurns({
                     baseKey: `conversation-assistant-${index}`,
                     sourceText: turn.assistant_translation_text || "",
                     targetText: turn.assistant_text || "",
+                    disableWordClicks: true,
                   })}
                 </div>
                 {Boolean(turn.assistant_translation_text) && (

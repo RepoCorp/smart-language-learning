@@ -11,9 +11,13 @@ type Props = {
     targetText: string;
     dialogId?: number;
     turnIndex?: number;
+    disableWordClicks?: boolean;
   }) => JSX.Element;
   requestAddSentenceFromConversation: (key: string, sourceTextRaw: string, targetTextRaw: string, dialogId?: number, turnIndex?: number) => Promise<void>;
   sentenceActionStatus: Record<string, SentenceActionStatus>;
+  readOnly?: boolean;
+  originalUserTexts?: Record<number, string>;
+  correctedUserTexts?: Record<number, string>;
 };
 
 export default function ConversationReviewTurns({
@@ -21,6 +25,9 @@ export default function ConversationReviewTurns({
   renderTargetLineWithWordLinks,
   requestAddSentenceFromConversation,
   sentenceActionStatus,
+  readOnly = false,
+  originalUserTexts = {},
+  correctedUserTexts = {},
 }: Props): JSX.Element {
   const { t } = useI18n();
 
@@ -45,26 +52,39 @@ export default function ConversationReviewTurns({
                 targetText: turn.target_text,
                 dialogId: dialog.dialog_id,
                 turnIndex: index,
+                disableWordClicks: readOnly,
               })}
             </div>
             {Boolean(turn.source_text) && (
               <p className="conversation-line conversation-line-translation">{turn.source_text}</p>
             )}
-            <div className="actions turn-action-row">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => void requestAddSentenceFromConversation(phraseKey, turn.source_text, turn.target_text, dialog.dialog_id, index)}
-                disabled={phraseStatus === "saving"}
-              >
-                {t("newItem.sentenceAddButton")}
-              </button>
-              {phraseStatus === "saving" && <span className="turn-token-status">{t("newItem.sentenceAddSaving")}</span>}
-              {phraseStatus === "added" && <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>}
-              {phraseStatus === "exists" && <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>}
-              {phraseStatus === "missing_source" && <span className="turn-token-status">{t("newItem.sentenceAddMissingSource")}</span>}
-              {phraseStatus === "error" && <span className="turn-token-status">{t("newItem.sentenceAddError")}</span>}
-            </div>
+            {speaker === "user" && originalUserTexts[index] && originalUserTexts[index].trim() !== turn.target_text.trim() && (
+              <p className="conversation-review-original">
+                <strong>{t("conversation.helpYouSaid")}</strong> {originalUserTexts[index]}
+              </p>
+            )}
+            {speaker === "user" && correctedUserTexts[index] && correctedUserTexts[index].trim() !== turn.target_text.trim() && (
+              <p className="conversation-review-corrected">
+                <strong>{t("conversation.correctedLabel")}</strong> {correctedUserTexts[index]}
+              </p>
+            )}
+            {!readOnly && (
+              <div className="actions turn-action-row">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void requestAddSentenceFromConversation(phraseKey, turn.source_text, turn.target_text, dialog.dialog_id, index)}
+                  disabled={phraseStatus === "saving"}
+                >
+                  {t("newItem.sentenceAddButton")}
+                </button>
+                {phraseStatus === "saving" && <span className="turn-token-status">{t("newItem.sentenceAddSaving")}</span>}
+                {phraseStatus === "added" && <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>}
+                {phraseStatus === "exists" && <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>}
+                {phraseStatus === "missing_source" && <span className="turn-token-status">{t("newItem.sentenceAddMissingSource")}</span>}
+                {phraseStatus === "error" && <span className="turn-token-status">{t("newItem.sentenceAddError")}</span>}
+              </div>
+            )}
           </div>
         );
       })}

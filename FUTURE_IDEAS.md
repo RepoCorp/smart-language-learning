@@ -1,12 +1,8 @@
 # Todos
 
 ## URGENTES
-- Conversation goals are not fully working fine
-Por que los goals son siempre tan similares? Siempre me pregunta por manzanas
-Evaluar cuando se consigio el objetivo
-Mejorar velocidad de respuesta de la conversacion 
-Ser mas especifico en el goal de la conversacion 
 Natural voices
+Conversation goals are not working
 
 
 ## COSAS QUE NO DEBERIAN ESPERAR PERO QUE VAN A TENER QUE ESPERAR:
@@ -23,6 +19,7 @@ Natural voices
 ## PROBLEMAS/ERRORES EXISTENTES
 
 ### Tier 1
+Mejorar velocidad de respuesta de la conversacion con natural voices
 Algun security by obscurity, que igual deje el pin sencillo.
 Play all dialogs is not playing all dialogs
 Refreshing palabra que solo busque nuevos dialogos (revisar que es lo otro que hace e implementarlo separadamente tambien ) 
