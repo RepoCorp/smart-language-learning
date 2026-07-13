@@ -313,6 +313,12 @@ export interface TopicConversationHelpResponse {
   target_text?: string;
 }
 
+export interface TopicConversationGoalEvaluationResponse {
+  goal_achieved: boolean;
+  goal_achievement_message?: string;
+  next_goal_suggestion?: string;
+}
+
 export interface OverviewStatsResponse {
   ready_to_review: number;
   future_reviews: number;

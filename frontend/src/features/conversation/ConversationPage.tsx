@@ -22,6 +22,7 @@ import { CONVERSATION_SEND_ENABLE_DELAY_SECONDS } from "./conversationConstants"
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
 import { buildFinishedConversationTranscript, buildGeneratedReviewOriginalUserTexts } from "./conversationReviewTranscript";
 import ConversationTurns from "./ConversationTurns";
+import { useConversationGoalEvaluation } from "./useConversationGoalEvaluation";
 import { useConversationReviewPreparation } from "./useConversationReviewPreparation";
 import {
   type ConversationResponseLevel,
@@ -186,6 +187,20 @@ export default function ConversationPage(): JSX.Element {
     setTurns: setConversationTurns,
     sourceLanguage,
     targetLanguage,
+  });
+  const {
+    goalAchievementMessage,
+    clearGoalAchievementMessage,
+  } = useConversationGoalEvaluation({
+    enabled: started && !conversationFinished,
+    topic: activeTopic,
+    notes: activeNotes,
+    roleText: activeRole,
+    goalText: conversationGoal,
+    turns: conversationTurns,
+    sourceLanguage,
+    targetLanguage,
+    onGoalChange: setConversationGoal,
   });
 
   const scrollConversationToBottom = (): void => {
@@ -538,6 +553,7 @@ export default function ConversationPage(): JSX.Element {
     setAssistantSpeaking(false);
     setAssistantHintsUsed(0);
     setAssistantRevealUsedByTurn({});
+    clearGoalAchievementMessage();
   };
 
   const startConversation = async (): Promise<void> => {
@@ -636,6 +652,7 @@ export default function ConversationPage(): JSX.Element {
     setAssistantSpeaking(false);
     setAssistantHintsUsed(0);
     setAssistantRevealUsedByTurn({});
+    clearGoalAchievementMessage();
 
     if (activeTopic) {
       if (previousTopics.includes(activeTopic)) {
@@ -665,6 +682,7 @@ export default function ConversationPage(): JSX.Element {
     setConversationFinished(true);
     setConversationEnded(false);
     setConversationReviewDialog(null);
+    clearGoalAchievementMessage();
   };
 
   const requestAddWordFromTurnToken = async (
@@ -1112,6 +1130,8 @@ export default function ConversationPage(): JSX.Element {
                   requestAddSentenceFromConversation,
                 }}
                 conversationTurns={conversationTurns}
+                goalAchievementMessage={goalAchievementMessage}
+                currentGoal={conversationGoal}
               />
               {conversationError && <p className="error">{conversationError}</p>}
             </ConversationActiveControls>

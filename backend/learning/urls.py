@@ -25,6 +25,7 @@ from .views import (
     ContentPhraseQuickAddView,
     ContentPreviewView,
     ContentTopicConversationStartView,
+    ContentTopicConversationGoalEvaluationView,
     ContentTopicConversationHelpView,
     ContentTopicConversationRealtimeSessionView,
     ContentTopicConversationReviewView,
@@ -92,6 +93,7 @@ urlpatterns = [
     path("content/conversation/realtime-session", ContentTopicConversationRealtimeSessionView.as_view(), name="content-topic-conversation-realtime-session"),
     path("content/conversation/review", ContentTopicConversationReviewView.as_view(), name="content-topic-conversation-review"),
     path("content/conversation/help", ContentTopicConversationHelpView.as_view(), name="content-topic-conversation-help"),
+    path("content/conversation/goal-evaluate", ContentTopicConversationGoalEvaluationView.as_view(), name="content-topic-conversation-goal-evaluate"),
     path("content/conversation/turn", ContentTopicConversationTurnView.as_view(), name="content-topic-conversation-turn"),
     path(
         "content/conversation/user-translation",

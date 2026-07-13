@@ -1,6 +1,7 @@
 from .api import ContentConfirmView, ContentPreviewView
 from .core import *  # noqa: F401,F403
 from .management import (
+    ContentTopicConversationGoalEvaluationView,
     ContentTopicConversationStartView,
     ContentTopicConversationHelpView,
     ContentTopicConversationRealtimeSessionView,
@@ -51,6 +52,7 @@ __all__ = [
     "ContentItemsView",
     "ContentPhraseQuickAddView",
     "ContentTopicConversationStartView",
+    "ContentTopicConversationGoalEvaluationView",
     "ContentTopicConversationHelpView",
     "ContentTopicConversationRealtimeSessionView",
     "ContentTopicConversationReviewView",

@@ -53,6 +53,9 @@ def build_realtime_conversation_instructions(
         f"Do not switch to {source_name} unless the learner explicitly asks for it.\n"
         "Do not explain grammar unless asked.\n"
         "Ask at most one short follow-up question when it helps keep the conversation moving.\n"
+        f"If the learner is clearly saying goodbye or ending the conversation, reply with a short natural goodbye in {target_name}.\n"
+        "In that goodbye case, do not force another question and do not try to continue the conversation.\n"
+        "Do not end or close the session on your own.\n"
         "If the audio is unclear or empty, briefly ask the learner to repeat it.\n"
     )
 

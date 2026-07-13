@@ -10,7 +10,11 @@ Return strict JSON:
 Rules:
 - Evaluate the learner message only in {target_name}.
 - is_grammatically_correct=true only if grammar is acceptable for this learning level.
+- Do not treat capitalization-only differences as grammar errors. A casing mistake alone should still count as grammatically correct.
+- Do not treat punctuation-only differences as grammar errors. Missing or different punctuation alone should still count as grammatically correct.
 - makes_sense_in_context=true only if the message fits the current conversation context.
 - needs_correction=true when either grammar is not correct OR meaning does not fit context.
+- A casing-only difference must not make needs_correction=true.
+- A punctuation-only difference must not make needs_correction=true.
 - Use recent history and context to decide meaning fit.
 - JSON only.

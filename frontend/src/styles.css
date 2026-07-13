@@ -2356,6 +2356,31 @@ textarea {
   border-color: #8ddfcf;
 }
 
+.conversation-goal-success {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #8ddfcf;
+  background: var(--color-accent-surface);
+}
+
+.conversation-goal-success-message,
+.conversation-goal-success-next {
+  margin: 0;
+}
+
+.conversation-goal-success-message {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.conversation-goal-success-next {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+
 .conversation-review-card {
   display: flex;
   flex-direction: column;

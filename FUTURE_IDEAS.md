@@ -1,12 +1,9 @@
 # Todos
 
 ## PRIORITARIO
-Natural voices
 Conversation goals are not working
 Ask questions : botón para descomponer y si hay conversación para ese ítem indicarlo en el boton
 Que los tests the frases usen la voz de eleven labs
-En repeticion en los grupos de verbos cuando se click en el header hacer toggle
-Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
@@ -47,6 +44,7 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
 Delay entre frases de ejercicio repeticion
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
 en bloques no repetir audio desde el principio si no desde el ppio de la frase, es decir ppio o despues de un punto

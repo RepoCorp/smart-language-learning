@@ -12,6 +12,14 @@ Rules:
 - corrected_user_text must be the corrected version in {target_name}.
 - corrected_user_source_translation must be a natural translation in {source_name}.
 - corrected_user_explanation must be in {source_name} only.
+- Only change the learner message when there is a real error:
+  1) grammar is wrong,
+  2) the meaning is unclear or wrong,
+  3) the wording is clearly unnatural for a native speaker.
+- Do not treat capitalization-only differences as real errors, because spoken language does not carry uppercase/lowercase information.
+- Do not treat punctuation-only differences as real errors, because spoken language does not carry punctuation information.
+- Do not rewrite just because another version sounds a bit better.
+- If the learner message is acceptable, keep corrected_user_text identical to the original message.
 - Keep corrected_user_explanation very short and practical:
   1) one brief reason,
   2) one final tip.

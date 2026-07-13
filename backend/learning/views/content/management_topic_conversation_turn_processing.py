@@ -81,6 +81,7 @@ class ContentTopicConversationTurnView(APIView):
         notes = str(request.data.get("notes", "")).strip()
         role_text = str(request.data.get("role_text", "")).strip()
         goal_text = str(request.data.get("goal_text", "")).strip()
+        skip_goal_evaluation = str(request.data.get("skip_goal_evaluation", "")).strip().lower() in {"1", "true", "yes", "on"}
         response_level = str(request.data.get("response_level", "A2")).strip().upper() or "A2"
         speech_speed = str(request.data.get("speech_speed", "normal")).strip().lower() or "normal"
         effective_notes = _effective_notes(
@@ -208,7 +209,7 @@ class ContentTopicConversationTurnView(APIView):
         goal_achieved = False
         goal_achievement_message = ""
         next_goal_suggestion = ""
-        if goal_text and goal_evaluation_is_enabled:
+        if goal_text and goal_evaluation_is_enabled and not skip_goal_evaluation:
             try:
                 goal_started_at = time.perf_counter()
                 goal_achieved, goal_achievement_message, next_goal_suggestion = evaluate_goal_achievement_with_question_model(

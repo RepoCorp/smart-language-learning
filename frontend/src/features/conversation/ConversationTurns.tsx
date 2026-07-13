@@ -56,6 +56,8 @@ type Props = {
   visibility: VisibilityState;
   actions: TurnActions;
   conversationTurns: ConversationTurn[];
+  goalAchievementMessage: string;
+  currentGoal: string;
 };
 
 export default function ConversationTurns({
@@ -65,6 +67,8 @@ export default function ConversationTurns({
   visibility,
   actions,
   conversationTurns,
+  goalAchievementMessage,
+  currentGoal,
 }: Props): JSX.Element {
   const { t } = useI18n();
 
@@ -134,6 +138,16 @@ export default function ConversationTurns({
                     {turn.assistant_translation_text}
                   </div>
                 )}
+              </div>
+            )}
+            {index === conversationTurns.length - 1 && currentGoal && (
+              <div className="conversation-goal-success">
+                {goalAchievementMessage && (
+                  <p className="conversation-goal-success-message">{goalAchievementMessage}</p>
+                )}
+                <p className="conversation-goal-success-next">
+                  <strong>{t("conversation.goalLabel")}</strong> {currentGoal}
+                </p>
               </div>
             )}
           </div>
