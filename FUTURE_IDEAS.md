@@ -1,9 +1,9 @@
 # Todos
 
-## URGENTES
+## PRIORITARIO
 Natural voices
 Conversation goals are not working
-
+Ask questions : botón para descomponer y si hay conversación para ese ítem indicarlo en el boton
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
@@ -14,6 +14,9 @@ Conversation goals are not working
 ## COSAS QUE NO DEBERIAN ESPERAR PERO QUE VAN A TENER QUE ESPERAR:
 - Refactor (Lo vamos a ir haciendo gradualmente)
 - Mejorar prompts
+
+## New functionalities 
+De las conversaciones saca errores. Darle al modelo la lista de errores que tenemos incluidas y el dice si/cuales de esos están y sugiere repasarlo. Que sea bien empatico 😂
 
 
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
@@ -40,6 +43,7 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Delay entre frases de ejercicio repeticion
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
 en bloques no repetir audio desde el principio si no desde el ppio de la frase, es decir ppio o despues de un punto
 En ejercicios u otra parte tambien poner ejemplos en otros contextos, no solo de donde vino la palabra

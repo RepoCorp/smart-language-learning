@@ -43,6 +43,23 @@ const DIALOGS_PAGE_SIZE = 20;
 const ALL_TOPICS_OPTION = "";
 const ALL_CONTEXTS_OPTION = "";
 
+function mergeDialogRecord(existing: ContentDialogRecord | null, incoming: ContentDialogRecord): ContentDialogRecord {
+  if (!existing) {
+    return incoming;
+  }
+  return {
+    ...existing,
+    ...incoming,
+    turns: incoming.turns?.length ? incoming.turns : existing.turns,
+    turn_count: incoming.turn_count ?? existing.turn_count,
+  };
+}
+
+function mergeDialogList(current: ContentDialogRecord[], incoming: ContentDialogRecord[]): ContentDialogRecord[] {
+  const existingById = new Map(current.map((dialog) => [dialog.dialog_id, dialog]));
+  return incoming.map((dialog) => mergeDialogRecord(existingById.get(dialog.dialog_id) || null, dialog));
+}
+
 export default function DialogsPage(): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode, showMobileActionLabels } = usePromptPreferences();
@@ -142,7 +159,7 @@ export default function DialogsPage(): JSX.Element {
       contextFilter,
     );
     const nextDialogs = payload.dialogs || [];
-    setDialogs(nextDialogs);
+    setDialogs((current) => mergeDialogList(current, nextDialogs));
     setSelectedDialogId((current) => {
       if (current !== null && nextDialogs.some((dialog) => dialog.dialog_id === current)) {
         return current;
@@ -176,7 +193,9 @@ export default function DialogsPage(): JSX.Element {
     setDialogs((current) => {
       const existingIndex = current.findIndex((entry) => entry.dialog_id === dialog.dialog_id);
       if (existingIndex >= 0) {
-        return current.map((entry, index) => (index === existingIndex ? { ...entry, ...dialog } : entry));
+        return current.map((entry, index) => (
+          index === existingIndex ? mergeDialogRecord(entry, dialog) : entry
+        ));
       }
       return [dialog, ...current];
     });

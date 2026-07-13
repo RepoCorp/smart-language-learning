@@ -1081,6 +1081,8 @@ export default function WordReview({
                   key={letter}
                   type="button"
                   className="secondary-button letter-suggestion-button word-cloze-letter-button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onPointerDown={(event) => event.preventDefault()}
                   onClick={() => void chooseClozeLetter(letter)}
                   disabled={isSubmitting}
                 >
@@ -1213,6 +1215,8 @@ export default function WordReview({
               key={letter}
               type="button"
               className="secondary-button letter-suggestion-button"
+              onMouseDown={(event) => event.preventDefault()}
+              onPointerDown={(event) => event.preventDefault()}
               onClick={() => handleAnswerChange(answer + letter)}
               disabled={isSubmitting}
             >

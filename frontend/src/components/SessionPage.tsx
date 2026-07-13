@@ -667,9 +667,9 @@ export default function SessionPage(): JSX.Element {
               >
                 {t("words.openItem")}
               </button>
-              <button className="secondary-button" onClick={resetToSessionStart}>
+              <DangerousButton className="secondary-button dangerous-action-button" onConfirm={resetToSessionStart}>
                 {t("session.restart")}
-              </button>
+              </DangerousButton>
               {showPostReviewItem && (
                 <button
                   type="button"

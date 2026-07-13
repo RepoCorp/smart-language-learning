@@ -24,7 +24,11 @@ export function beginPromptAutoplaySuppression(windowMs = 1800): () => void {
 
 export function suppressPromptAutoplayForAudio(audio: HTMLAudioElement, fallbackWindowMs = 4000): void {
   const release = beginPromptAutoplaySuppression(fallbackWindowMs);
+  const timeoutId = window.setTimeout(() => {
+    finish();
+  }, fallbackWindowMs);
   const finish = (): void => {
+    window.clearTimeout(timeoutId);
     audio.removeEventListener("ended", finish);
     audio.removeEventListener("error", finish);
     audio.removeEventListener("abort", finish);
