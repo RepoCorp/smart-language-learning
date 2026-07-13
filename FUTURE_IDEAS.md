@@ -4,6 +4,9 @@
 Natural voices
 Conversation goals are not working
 Ask questions : botón para descomponer y si hay conversación para ese ítem indicarlo en el boton
+Que los tests the frases usen la voz de eleven labs
+En repeticion en los grupos de verbos cuando se click en el header hacer toggle
+Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
@@ -17,7 +20,7 @@ Ask questions : botón para descomponer y si hay conversación para ese ítem in
 
 ## New functionalities 
 De las conversaciones saca errores. Darle al modelo la lista de errores que tenemos incluidas y el dice si/cuales de esos están y sugiere repasarlo. Que sea bien empatico 😂
-
+Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Depronto incluso que la celebración ayude, como que las letras hagan la ola
 
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
@@ -31,6 +34,7 @@ Que errores de mayusculas y umlauts y eso los trate como errores
 In the create content window, make dialog lenght and language of required words a simple radio
 Que palabras confusas pueda preguntarse al modelo que hable sobre sus diferencias (En palabras confundidoras que añada la direfencia/relación, como con pregunta y que después del potencial varias preguntas anote la conclusión
 )
+En diálogos en item view y creo que diálogos también, que no scrolls back
 
 #### PROMPTS/MODEL WORK
 En pregunta mejorar las respuestas, incluyendo quitar el que dice si esta relacionado
