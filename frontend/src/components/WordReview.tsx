@@ -8,63 +8,15 @@ import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
-
-function normalize(value: string): string {
-  return value.trim();
-}
-
-function isLetter(value: string): boolean {
-  return /^[A-Za-zÀ-ÖØ-öø-ÿ]$/.test(value);
-}
-
-function stripDiacritics(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function isSingleBaseLetterForNextDiacritic(value: string, acceptedAnswer: string, expectedAnswer: string): boolean {
-  if (value.length !== acceptedAnswer.length + 1) {
-    return false;
-  }
-  if (!value.startsWith(acceptedAnswer)) {
-    return false;
-  }
-  const typedLetter = value.charAt(acceptedAnswer.length);
-  const expectedLetter = expectedAnswer.charAt(acceptedAnswer.length);
-  if (!isLetter(typedLetter) || !isLetter(expectedLetter)) {
-    return false;
-  }
-  if (typedLetter === expectedLetter) {
-    return false;
-  }
-  return stripDiacritics(expectedLetter).toLowerCase() === typedLetter.toLowerCase();
-}
-
-function matchLetterCase(letter: string, reference: string): string {
-  return reference === reference.toUpperCase() ? letter.toUpperCase() : letter.toLowerCase();
-}
-
-function nextLetterSuggestions(correctLetter: string, offset: number): string[] {
-  if (!isLetter(correctLetter)) {
-    return [];
-  }
-  const alphabet = "abcdefghijklmnopqrstuvwxyz";
-  const correctLower = correctLetter.toLowerCase();
-  const wrongLetters = alphabet
-    .split("")
-    .filter((letter) => letter !== correctLower)
-    .slice(offset % 20, (offset % 20) + 2);
-  const suggestions = [
-    matchLetterCase(correctLower, correctLetter),
-    ...wrongLetters.map((letter) => matchLetterCase(letter, correctLetter)),
-  ];
-  const correctIndex = offset % suggestions.length;
-  const correct = suggestions.shift();
-  if (!correct) {
-    return [];
-  }
-  suggestions.splice(correctIndex, 0, correct);
-  return suggestions;
-}
+import {
+  hintOptionLabel,
+  isLetter,
+  nextLetterSuggestions,
+  normalizeWordAnswer as normalize,
+  type PendingCaseMismatch,
+  resolveWordInputChange,
+  stripDiacritics,
+} from "./wordChallengeInputLogic";
 
 function blankTargetInPhrase(phrase: string, targetText: string): string {
   const normalizedPhrase = phrase.trim();
@@ -401,6 +353,7 @@ export default function WordReview({
   const answerBeforeCompositionRef = useRef<string>("");
   const pendingCompositionValidationRef = useRef<boolean>(false);
   const provisionalBaseAnswerRef = useRef<string | null>(null);
+  const pendingCaseMismatchRef = useRef<PendingCaseMismatch | null>(null);
   const pendingRewriteFocusRef = useRef<boolean>(false);
 
   const isSpanishToGerman = item.direction !== "de_to_es";
@@ -612,11 +565,58 @@ export default function WordReview({
     if (isSubmitting) {
       return;
     }
+    const pendingCaseMismatch = pendingCaseMismatchRef.current;
+    if (pendingCaseMismatch && pendingCaseMismatch.acceptedAnswer === acceptedAnswer) {
+      if (value === acceptedAnswer) {
+        pendingCaseMismatchRef.current = null;
+      } else if (value === acceptedAnswer + pendingCaseMismatch.expectedLetter) {
+        pendingCaseMismatchRef.current = null;
+      } else if (value === acceptedAnswer + pendingCaseMismatch.typedLetter) {
+        setAnswer(acceptedAnswer);
+        setFeedback("");
+        setFeedbackTone("neutral");
+        setHintLetter("");
+        setLetterSuggestions([]);
+        return;
+      } else {
+        pendingCaseMismatchRef.current = null;
+        const wrongText = value.slice(acceptedAnswer.length) || pendingCaseMismatch.typedLetter;
+        if (reviewComplete) {
+          setRewriteAttemptHadMistake(true);
+          setRewriteAttemptMistakeIndexes((current) => (
+            current.includes(pendingCaseMismatch.mismatchIndex) ? current : [...current, pendingCaseMismatch.mismatchIndex]
+          ));
+          setAnswer(acceptedAnswer);
+          setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
+          setFeedbackTone("error");
+          setSubmittedResultTone("error");
+          setRewriteStatusTone("error");
+          setLetterSuggestions([]);
+          setHintLetter("");
+          return;
+        }
+        setAnswer(acceptedAnswer);
+        setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
+        setFeedbackTone("error");
+        setLetterSuggestions([]);
+        setHintLetter("");
+        setWrittenWordAssistanceIndexes((current) => (
+          current.includes(pendingCaseMismatch.mismatchIndex) ? current : [...current, pendingCaseMismatch.mismatchIndex]
+        ));
+        return;
+      }
+    }
     if (reviewComplete) {
-      if (!expectedAnswer.startsWith(value)) {
-        if (isSingleBaseLetterForNextDiacritic(value, acceptedAnswer, expectedAnswer)) {
-          provisionalBaseAnswerRef.current = acceptedAnswer;
-          setAnswer(value);
+      const decision = resolveWordInputChange({
+        value,
+        acceptedAnswer,
+        expectedAnswer,
+        provisionalBaseAnswer: provisionalBaseAnswerRef.current,
+      });
+      if (decision.kind !== "accept") {
+        if (decision.kind === "hide_pending_case_mismatch") {
+          pendingCaseMismatchRef.current = decision.pendingCaseMismatch;
+          setAnswer(acceptedAnswer);
           setFeedback("");
           setFeedbackTone("neutral");
           setRewriteStatusTone("neutral");
@@ -624,22 +624,22 @@ export default function WordReview({
           setHintLetter("");
           return;
         }
-        const fallbackAnswer = provisionalBaseAnswerRef.current && acceptedAnswer.startsWith(provisionalBaseAnswerRef.current)
-          ? provisionalBaseAnswerRef.current
-          : acceptedAnswer;
-        const maxCompareLength = Math.min(value.length, expectedAnswer.length);
-        let mismatchIndex = 0;
-        while (mismatchIndex < maxCompareLength && value.charAt(mismatchIndex) === expectedAnswer.charAt(mismatchIndex)) {
-          mismatchIndex += 1;
+        if (decision.kind === "accept_provisional") {
+          provisionalBaseAnswerRef.current = decision.provisionalBaseAnswer;
+          setAnswer(decision.nextAnswer);
+          setFeedback("");
+          setFeedbackTone("neutral");
+          setRewriteStatusTone("neutral");
+          setLetterSuggestions([]);
+          setHintLetter("");
+          return;
         }
-        if (mismatchIndex >= maxCompareLength) {
-          mismatchIndex = fallbackAnswer.length;
-        }
-        const wrongText = value.slice(acceptedAnswer.length) || value.slice(fallbackAnswer.length) || value.slice(-1);
         setRewriteAttemptHadMistake(true);
-        setRewriteAttemptMistakeIndexes((current) => (current.includes(mismatchIndex) ? current : [...current, mismatchIndex]));
-        setAnswer(fallbackAnswer);
-        setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
+        setRewriteAttemptMistakeIndexes((current) => (
+          current.includes(decision.mismatchIndex) ? current : [...current, decision.mismatchIndex]
+        ));
+        setAnswer(decision.fallbackAnswer);
+        setFeedback(t("word.feedback.wrongLetter", { letter: decision.wrongText }));
         setFeedbackTone("error");
         setSubmittedResultTone("error");
         setRewriteStatusTone("error");
@@ -648,10 +648,10 @@ export default function WordReview({
         return;
       }
       provisionalBaseAnswerRef.current = null;
-      setAnswer(value);
+      setAnswer(decision.nextAnswer);
       setHintLetter("");
       setLetterSuggestions([]);
-      if (normalize(value) === normalize(expectedAnswer)) {
+      if (normalize(decision.nextAnswer) === normalize(expectedAnswer)) {
         if (rewriteAttemptHadMistake) {
           setRewriteAttemptHadMistake(false);
           clearAnswerAndRefocus();
@@ -675,45 +675,50 @@ export default function WordReview({
       return;
     }
 
-    if (!expectedAnswer.startsWith(value)) {
-      if (isSingleBaseLetterForNextDiacritic(value, acceptedAnswer, expectedAnswer)) {
-        provisionalBaseAnswerRef.current = acceptedAnswer;
-        setAnswer(value);
+    const decision = resolveWordInputChange({
+      value,
+      acceptedAnswer,
+      expectedAnswer,
+      provisionalBaseAnswer: provisionalBaseAnswerRef.current,
+    });
+    if (decision.kind !== "accept") {
+      if (decision.kind === "hide_pending_case_mismatch") {
+        pendingCaseMismatchRef.current = decision.pendingCaseMismatch;
+        setAnswer(acceptedAnswer);
         setFeedback("");
         setFeedbackTone("neutral");
         setLetterSuggestions([]);
         setHintLetter("");
         return;
       }
-      const fallbackAnswer = provisionalBaseAnswerRef.current && acceptedAnswer.startsWith(provisionalBaseAnswerRef.current)
-        ? provisionalBaseAnswerRef.current
-        : acceptedAnswer;
-      const maxCompareLength = Math.min(value.length, expectedAnswer.length);
-      let mismatchIndex = 0;
-      while (mismatchIndex < maxCompareLength && value.charAt(mismatchIndex) === expectedAnswer.charAt(mismatchIndex)) {
-        mismatchIndex += 1;
+      if (decision.kind === "accept_provisional") {
+        provisionalBaseAnswerRef.current = decision.provisionalBaseAnswer;
+        setAnswer(decision.nextAnswer);
+        setFeedback("");
+        setFeedbackTone("neutral");
+        setLetterSuggestions([]);
+        setHintLetter("");
+        return;
       }
-      if (mismatchIndex >= maxCompareLength) {
-        mismatchIndex = fallbackAnswer.length;
-      }
-      const wrongText = value.slice(acceptedAnswer.length) || value.slice(fallbackAnswer.length) || value.slice(-1);
-      setAnswer(fallbackAnswer);
-      setFeedback(t("word.feedback.wrongLetter", { letter: wrongText }));
+      setAnswer(decision.fallbackAnswer);
+      setFeedback(t("word.feedback.wrongLetter", { letter: decision.wrongText }));
       setFeedbackTone("error");
       setLetterSuggestions([]);
       setHintLetter("");
-      setWrittenWordAssistanceIndexes((current) => (current.includes(mismatchIndex) ? current : [...current, mismatchIndex]));
+      setWrittenWordAssistanceIndexes((current) => (
+        current.includes(decision.mismatchIndex) ? current : [...current, decision.mismatchIndex]
+      ));
       return;
     }
 
     provisionalBaseAnswerRef.current = null;
-    setAnswer(value);
+    setAnswer(decision.nextAnswer);
     setFeedback("");
     setFeedbackTone("neutral");
     setLetterSuggestions([]);
     setHintLetter("");
 
-    if (normalize(value) !== normalize(expectedAnswer)) {
+    if (normalize(decision.nextAnswer) !== normalize(expectedAnswer)) {
       return;
     }
 
@@ -866,6 +871,7 @@ export default function WordReview({
     setRewriteAttemptMistakeIndexes([]);
     setRewriteStatusTone("neutral");
     setPendingRewriteTakeover(false);
+    pendingCaseMismatchRef.current = null;
     composingAnswerRef.current = false;
     pendingCompositionValidationRef.current = false;
     answerBeforeCompositionRef.current = "";
@@ -1071,16 +1077,16 @@ export default function WordReview({
             {clozeLetterSuggestions.length > 0 && (
               <div className="letter-suggestions word-cloze-letter-options" role="group" aria-label={t("word.letterSuggestions")}>
                 {clozeLetterSuggestions.map((letter) => (
-                  <button
-                    key={letter}
-                    type="button"
-                    className="secondary-button letter-suggestion-button word-cloze-letter-button"
-                    onClick={() => void chooseClozeLetter(letter)}
-                    disabled={isSubmitting}
-                  >
-                    {letter}
-                  </button>
-                ))}
+                <button
+                  key={letter}
+                  type="button"
+                  className="secondary-button letter-suggestion-button word-cloze-letter-button"
+                  onClick={() => void chooseClozeLetter(letter)}
+                  disabled={isSubmitting}
+                >
+                  {hintOptionLabel(letter)}
+                </button>
+              ))}
               </div>
             )}
           </>
@@ -1210,7 +1216,7 @@ export default function WordReview({
               onClick={() => handleAnswerChange(answer + letter)}
               disabled={isSubmitting}
             >
-              {letter}
+              {hintOptionLabel(letter)}
             </button>
           ))}
         </div>

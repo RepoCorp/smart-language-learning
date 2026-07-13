@@ -5,21 +5,20 @@ Natural voices
 Conversation goals are not working
 
 
+## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
+- Introducir gramatica, gradualmente. Empecemos con sustantivos.
+  - Añadir la informacion del genero y mostrarlo de alguna manera en la UI
+  - Revisar los ejercicios, que si se cubran las principales formas gramaticales y que permita abrir una ventana para cada una de ellas que de una pequeña explicacion y que muestre las equivalentes de otras palabras del mismo genero
+
+
 ## COSAS QUE NO DEBERIAN ESPERAR PERO QUE VAN A TENER QUE ESPERAR:
 - Refactor (Lo vamos a ir haciendo gradualmente)
 - Mejorar prompts
 
 
-## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
-- Introducir gramatica, gradualmente. Empecemos con sustantivos.
-  - Añadir la informacion del genero y mostrarlo de alguna manera en la UI
-  - Revisar los ejercicios, que si se cubran las principales formas gramaticales y que permita abrir una ventana para cada una de ellas que de una pequeña explicacion y que muestre las equivalentes de otras palabras del mismo genero
-  -
-
-## PROBLEMAS/ERRORES EXISTENTES
+## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
-Mejorar velocidad de respuesta de la conversacion con natural voices
 Algun security by obscurity, que igual deje el pin sencillo.
 Play all dialogs is not playing all dialogs
 Refreshing palabra que solo busque nuevos dialogos (revisar que es lo otro que hace e implementarlo separadamente tambien ) 
