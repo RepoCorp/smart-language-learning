@@ -1270,6 +1270,14 @@ export default function NewItem({
     return deterministicTake(keys, count, `${itemDeterministicKey}:exercise-keys:${count}`, (key) => key);
   };
 
+  const initialExerciseEntryKeys = (): string[] => {
+    if (wordOnlyExerciseEntry) {
+      return [exerciseEntryKey(wordOnlyExerciseEntry)];
+    }
+    const firstEntry = allWordExerciseEntries[0];
+    return firstEntry ? [exerciseEntryKey(firstEntry)] : [];
+  };
+
   const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] => verbExerciseGridEntries
     .filter(({ parsed }) => parsed.person === person)
     .map(({ entry }) => exerciseEntryKey(entry));
@@ -1307,7 +1315,7 @@ export default function NewItem({
     if (isVerbExerciseGrid) {
       selectDeterministicVerbExerciseGroup();
     } else {
-      setSelectedExerciseKeys(deterministicExerciseEntryKeys(2));
+      setSelectedExerciseKeys(initialExerciseEntryKeys());
     }
   }, [showExerciseModal, item.id, item.item_type, isVerbExerciseGrid, itemDeterministicKey, compareWords]);
 
