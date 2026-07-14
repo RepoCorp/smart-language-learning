@@ -40,6 +40,7 @@ class Item(models.Model):
     audio_url = models.URLField(blank=True)
     exercise_phrases = models.JSONField(default=dict, blank=True)
     confusing_with = models.ManyToManyField("self", blank=True, symmetrical=True)
+    compare_words_insights = models.TextField(blank=True)
     is_learned = models.BooleanField(default=False)
     is_difficult = models.BooleanField(default=False)
     difficult_marked_at = models.DateTimeField(null=True, blank=True)
@@ -228,6 +229,19 @@ class UserAuthToken(models.Model):
 
     def __str__(self) -> str:
         return f"Token for user {self.user_id}"
+
+
+class RegistrationRequest(models.Model):
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"Registration request: {self.username}"
 
 
 class DisabledElevenLabsVoice(models.Model):

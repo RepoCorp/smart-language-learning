@@ -1,18 +1,22 @@
 import { useI18n } from "../../i18n";
-import type { ContentDialogRecord } from "../../types";
+import type { ContentDialogRecord, StudyLanguageCode } from "../../types";
+import DialogTurnText from "../../components/DialogTurnText";
 
 export type SentenceActionStatus = "idle" | "saving" | "added" | "exists" | "error" | "missing_source";
 
 type Props = {
   dialog: ContentDialogRecord;
-  renderTargetLineWithWordLinks: (args: {
-    baseKey: string;
-    sourceText: string;
-    targetText: string;
-    dialogId?: number;
-    turnIndex?: number;
-    disableWordClicks?: boolean;
-  }) => JSX.Element;
+  sourceLanguage: StudyLanguageCode;
+  targetLanguage: StudyLanguageCode;
+  wordActionStatus: Record<string, "idle" | "saving" | "added" | "exists" | "error">;
+  requestAddWordFromConversation: (
+    key: string,
+    sourceText: string,
+    targetText: string,
+    targetToken: string,
+    dialogId?: number,
+    turnIndex?: number,
+  ) => Promise<void>;
   requestAddSentenceFromConversation: (key: string, sourceTextRaw: string, targetTextRaw: string, dialogId?: number, turnIndex?: number) => Promise<void>;
   sentenceActionStatus: Record<string, SentenceActionStatus>;
   readOnly?: boolean;
@@ -22,7 +26,10 @@ type Props = {
 
 export default function ConversationReviewTurns({
   dialog,
-  renderTargetLineWithWordLinks,
+  sourceLanguage,
+  targetLanguage,
+  wordActionStatus,
+  requestAddWordFromConversation,
   requestAddSentenceFromConversation,
   sentenceActionStatus,
   readOnly = false,
@@ -46,18 +53,41 @@ export default function ConversationReviewTurns({
               {speaker === "assistant" ? t("newItem.conversationLabelTutor") : t("newItem.conversationLabelYou")}
             </p>
             <div className="conversation-review-target">
-              {renderTargetLineWithWordLinks({
-                baseKey: `conversation-review-${dialog.dialog_id}-${index}`,
-                sourceText: turn.source_text,
-                targetText: turn.target_text,
-                dialogId: dialog.dialog_id,
-                turnIndex: index,
-                disableWordClicks: readOnly,
-              })}
+              <DialogTurnText
+                dialogId={dialog.dialog_id}
+                turnIndex={index}
+                sourceText={turn.source_text}
+                targetText={turn.target_text}
+                sourceLanguage={sourceLanguage}
+                targetLanguage={targetLanguage}
+                tokenStatus={wordActionStatus}
+                statusKeyPrefix={`conversation-review-${dialog.dialog_id}-${index}-target`}
+                onTokenClick={(statusKey, token) => {
+                  if (readOnly) {
+                    return;
+                  }
+                  void requestAddWordFromConversation(
+                    statusKey,
+                    turn.source_text,
+                    turn.target_text,
+                    token,
+                    dialog.dialog_id,
+                    index,
+                  );
+                }}
+                showPhraseSelection={!readOnly}
+                extraActions={!readOnly ? (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => void requestAddSentenceFromConversation(phraseKey, turn.source_text, turn.target_text, dialog.dialog_id, index)}
+                    disabled={phraseStatus === "saving"}
+                  >
+                    {t("newItem.sentenceAddButton")}
+                  </button>
+                ) : undefined}
+              />
             </div>
-            {Boolean(turn.source_text) && (
-              <p className="conversation-line conversation-line-translation">{turn.source_text}</p>
-            )}
             {speaker === "user" && originalUserTexts[index] && originalUserTexts[index].trim() !== turn.target_text.trim() && (
               <p className="conversation-review-original">
                 <strong>{t("conversation.helpYouSaid")}</strong> {originalUserTexts[index]}

@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..auth import get_request_user
-from ..models import UserAuthToken
+from ..models import RegistrationRequest, UserAuthToken
 
 
 class AuthLoginView(APIView):
@@ -47,6 +47,41 @@ class AuthRegisterView(APIView):
     def post(self, request: Request) -> Response:
         username = str(request.data.get("username", "")).strip()
         email = str(request.data.get("email", "")).strip().lower()
+        if not username or not email:
+            return Response({"detail": "username and email are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+
+        if User.objects.filter(username__iexact=username).exists():
+            return Response({"detail": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({"detail": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        if RegistrationRequest.objects.filter(username__iexact=username).exists():
+            return Response({"detail": "A request with this username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        if RegistrationRequest.objects.filter(email__iexact=email).exists():
+            return Response({"detail": "A request with this email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
+        RegistrationRequest.objects.create(
+            username=username,
+            email=email,
+        )
+        return Response(
+            {
+                "ok": True,
+                "message": "Registration request submitted",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AuthAdminCreateUserView(APIView):
+    def post(self, request: Request) -> Response:
+        request_user = get_request_user(request)
+        if request_user is None or not request_user.is_superuser:
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+
+        username = str(request.data.get("username", "")).strip()
+        email = str(request.data.get("email", "")).strip().lower()
         pin = str(request.data.get("pin", "")).strip()
         if not username or not email or not pin:
             return Response({"detail": "username, email and pin are required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -54,21 +89,16 @@ class AuthRegisterView(APIView):
             return Response({"detail": "pin must have at least 4 characters"}, status=status.HTTP_400_BAD_REQUEST)
 
         User = get_user_model()
-        is_first_user = User.objects.count() == 0
-
         if User.objects.filter(username__iexact=username).exists():
             return Response({"detail": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
         if User.objects.filter(email__iexact=email).exists():
             return Response({"detail": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if is_first_user:
-            user = User.objects.create_superuser(username=username, email=email, password=pin)
-        else:
-            user = User.objects.create_user(username=username, email=email, password=pin)
-        token = UserAuthToken.objects.create(user=user)
+        user = User.objects.create_user(username=username, email=email, password=pin)
+        RegistrationRequest.objects.filter(username__iexact=username).delete()
+        RegistrationRequest.objects.filter(email__iexact=email).delete()
         return Response(
             {
-                "token": token.key,
                 "user": {
                     "id": user.id,
                     "username": user.username,
@@ -148,3 +178,14 @@ class AuthMeView(APIView):
 class AuthBootstrapStatusView(APIView):
     def get(self, request: Request) -> Response:
         return Response({"can_public_register": True})
+
+
+class AuthUsersView(APIView):
+    def get(self, request: Request) -> Response:
+        request_user = get_request_user(request)
+        if request_user is None or not request_user.is_superuser:
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+
+        User = get_user_model()
+        users = User.objects.order_by("username", "id").values("id", "username", "email", "is_superuser")
+        return Response({"users": list(users)})

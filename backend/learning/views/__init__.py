@@ -1,6 +1,7 @@
 from .content import (
     ContentConfirmView,
     ContentItemCompareWordDetailView,
+    ContentItemCompareWordsInsightsView,
     ContentItemCompareWordsSearchView,
     ContentItemCompareWordsView,
     ContentDialogAudioRegenerateView,
@@ -36,13 +37,23 @@ from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
 from .session_state import RestoreSessionItemStateView
-from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView, AuthResetPinView
+from .auth import (
+    AuthAdminCreateUserView,
+    AuthBootstrapStatusView,
+    AuthLoginView,
+    AuthLogoutView,
+    AuthMeView,
+    AuthRegisterView,
+    AuthResetPinView,
+    AuthUsersView,
+)
 from .difficult_items import CompleteDifficultItemView
 from .configuration import ElevenLabsVoiceDisableView, ElevenLabsVoicePreviewView, ElevenLabsVoicesView
 
 __all__ = [
     "ContentConfirmView",
     "ContentItemCompareWordDetailView",
+    "ContentItemCompareWordsInsightsView",
     "ContentItemCompareWordsSearchView",
     "ContentItemCompareWordsView",
     "ContentDialogAudioRegenerateView",
@@ -81,9 +92,11 @@ __all__ = [
     "AuthLoginView",
     "AuthLogoutView",
     "AuthMeView",
+    "AuthAdminCreateUserView",
     "AuthRegisterView",
     "AuthResetPinView",
     "AuthBootstrapStatusView",
+    "AuthUsersView",
     "ElevenLabsVoicesView",
     "ElevenLabsVoiceDisableView",
     "ElevenLabsVoicePreviewView",

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { fetchOverviewStats, getOverviewStatsUpdatedEventName } from "../api";
+import { fetchOverviewStats } from "../api";
+import { getOverviewStatsUpdatedEventName } from "../apiCore";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { OverviewStatsResponse } from "../types";

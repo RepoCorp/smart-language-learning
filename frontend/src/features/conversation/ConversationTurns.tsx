@@ -140,16 +140,6 @@ export default function ConversationTurns({
                 )}
               </div>
             )}
-            {index === conversationTurns.length - 1 && currentGoal && (
-              <div className="conversation-goal-success">
-                {goalAchievementMessage && (
-                  <p className="conversation-goal-success-message">{goalAchievementMessage}</p>
-                )}
-                <p className="conversation-goal-success-next">
-                  <strong>{t("conversation.goalLabel")}</strong> {currentGoal}
-                </p>
-              </div>
-            )}
           </div>
         </div>
       ))}
@@ -165,6 +155,16 @@ export default function ConversationTurns({
           <div className="item-chat-message item-chat-assistant">
             <p className="item-chat-bubble" />
           </div>
+        </div>
+      )}
+      {currentGoal && (
+        <div className="conversation-goal-success conversation-goal-current">
+          {goalAchievementMessage && (
+            <p className="conversation-goal-success-message">{goalAchievementMessage}</p>
+          )}
+          <p className="conversation-goal-success-next">
+            <strong>{t("conversation.goalLabel")}</strong> {currentGoal}
+          </p>
         </div>
       )}
     </div>

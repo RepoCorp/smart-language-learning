@@ -1,21 +1,17 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getSpeechSynthesisVoiceSelectionOptions } from "../browserSpeech";
-import {
-  createUserWithPin,
-  fetchElevenLabsVoices,
-  fetchOverviewStats,
-  getOverviewStatsUpdatedEventName,
-  previewElevenLabsVoice,
-  resetUserPin,
-  updateElevenLabsVoiceDisabledState,
-  type AuthUser,
-} from "../api";
+import { fetchOverviewStats } from "../api";
+import { getOverviewStatsUpdatedEventName } from "../apiCore";
+import type { AuthUser } from "../authApi";
 import { useDebugTools } from "../debugTools";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
-import type { ElevenLabsVoiceRecord, OverviewStatsResponse } from "../types";
+import type { OverviewStatsResponse } from "../types";
+import ConfigurationAccountSection from "./ConfigurationAccountSection";
+import ConfigurationAdminUsersSection from "./ConfigurationAdminUsersSection";
+import ConfigurationElevenLabsSection from "./ConfigurationElevenLabsSection";
 
 interface ConfigurationsPageProps {
   canCreateUsers?: boolean;
@@ -43,29 +39,12 @@ export default function ConfigurationsPage({
   } = usePromptPreferences();
   const { sourceLanguage, targetLanguage, setSourceLanguage, setTargetLanguage, supportedLanguages } = useStudyLanguages();
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [pin, setPin] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
-  const [createSuccess, setCreateSuccess] = useState("");
-  const [resetIdentifier, setResetIdentifier] = useState("");
-  const [resetPin, setResetPin] = useState("");
-  const [resettingPin, setResettingPin] = useState(false);
-  const [resetPinError, setResetPinError] = useState("");
-  const [resetPinSuccess, setResetPinSuccess] = useState("");
   const [browserVoiceOptions, setBrowserVoiceOptions] = useState<SpeechSynthesisVoice[]>([]);
-  const [previewingVoiceURI, setPreviewingVoiceURI] = useState<string>("");
+  const [previewingVoiceURI, setPreviewingVoiceURI] = useState("");
   const activePreviewRef = useRef<SpeechSynthesisUtterance | null>(null);
   const loadedBrowserVoiceOptionsByLanguageRef = useRef<Partial<Record<StudyLanguageCode, SpeechSynthesisVoice[]>>>({});
-  const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoiceRecord[]>([]);
-  const [elevenLabsPreviewText, setElevenLabsPreviewText] = useState("");
-  const [loadingElevenLabsVoices, setLoadingElevenLabsVoices] = useState(false);
-  const [elevenLabsError, setElevenLabsError] = useState("");
-  const [previewingElevenLabsVoiceId, setPreviewingElevenLabsVoiceId] = useState("");
-  const [updatingElevenLabsVoiceId, setUpdatingElevenLabsVoiceId] = useState("");
-  const elevenLabsPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
-  const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
+
+  const languageKeyByCode: Record<StudyLanguageCode, string> = {
     spanish: "study.language.spanish",
     english: "study.language.english",
     german: "study.language.german",
@@ -125,7 +104,6 @@ export default function ConfigurationsPage({
     }
     const speechSynthesis = window.speechSynthesis;
     const lang = speechLangByCode[targetLanguage] || "de-DE";
-
     const storedOptions = loadedBrowserVoiceOptionsByLanguageRef.current[targetLanguage];
     if (storedOptions && storedOptions.length > 0) {
       setBrowserVoiceOptions(storedOptions);
@@ -156,46 +134,6 @@ export default function ConfigurationsPage({
       window.speechSynthesis.cancel();
     }
   }, []);
-
-  useEffect(() => () => {
-    if (elevenLabsPreviewAudioRef.current) {
-      elevenLabsPreviewAudioRef.current.pause();
-      elevenLabsPreviewAudioRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!authUser?.is_superuser) {
-      setElevenLabsVoices([]);
-      setElevenLabsError("");
-      return;
-    }
-    let mounted = true;
-    setLoadingElevenLabsVoices(true);
-    setElevenLabsError("");
-    void fetchElevenLabsVoices(targetLanguage)
-      .then((payload) => {
-        if (!mounted) {
-          return;
-        }
-        setElevenLabsVoices(payload.voices);
-        setElevenLabsPreviewText((current) => current.trim() || payload.preview_text || "");
-      })
-      .catch((error) => {
-        if (!mounted) {
-          return;
-        }
-        setElevenLabsError(error instanceof Error ? error.message : "Failed to load ElevenLabs voices");
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoadingElevenLabsVoices(false);
-        }
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [authUser?.is_superuser, targetLanguage]);
 
   const resetDefaults = (): void => {
     setLanguage("en");
@@ -229,115 +167,12 @@ export default function ConfigurationsPage({
     window.speechSynthesis.speak(utterance);
   };
 
-  const handleCreateUser = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    setCreateError("");
-    setCreateSuccess("");
-    setCreating(true);
-    try {
-      const user = await createUserWithPin(username, email, pin);
-      setCreateSuccess(t("config.userCreated", { username: user.username }));
-      setUsername("");
-      setEmail("");
-      setPin("");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("config.createUserFailed");
-      setCreateError(message);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handlePreviewElevenLabsVoice = async (voice: ElevenLabsVoiceRecord): Promise<void> => {
-    setElevenLabsError("");
-    setPreviewingElevenLabsVoiceId(voice.voice_id);
-    try {
-      const payload = await previewElevenLabsVoice(
-        voice.voice_id,
-        elevenLabsPreviewText.trim() || browserVoicePreviewTextByCode[targetLanguage] || browserVoicePreviewTextByCode.german,
-        targetLanguage,
-      );
-      if (elevenLabsPreviewAudioRef.current) {
-        elevenLabsPreviewAudioRef.current.pause();
-      }
-      const audio = new Audio(payload.audio_url);
-      elevenLabsPreviewAudioRef.current = audio;
-      audio.onended = () => {
-        setPreviewingElevenLabsVoiceId((current) => (current === voice.voice_id ? "" : current));
-      };
-      audio.onerror = () => {
-        setPreviewingElevenLabsVoiceId((current) => (current === voice.voice_id ? "" : current));
-        setElevenLabsError(t("config.elevenLabsPreviewError"));
-      };
-      await audio.play();
-    } catch (error) {
-      setElevenLabsError(error instanceof Error ? error.message : t("config.elevenLabsPreviewError"));
-      setPreviewingElevenLabsVoiceId("");
-    }
-  };
-
-  const handleToggleElevenLabsVoice = async (voice: ElevenLabsVoiceRecord): Promise<void> => {
-    setElevenLabsError("");
-    setUpdatingElevenLabsVoiceId(voice.voice_id);
-    try {
-      await updateElevenLabsVoiceDisabledState(voice.voice_id, voice.name, !voice.disabled);
-      setElevenLabsVoices((current) => current.map((entry) => (
-        entry.voice_id === voice.voice_id ? { ...entry, disabled: !entry.disabled } : entry
-      )));
-    } catch (error) {
-      setElevenLabsError(error instanceof Error ? error.message : t("config.elevenLabsUpdateError"));
-    } finally {
-      setUpdatingElevenLabsVoiceId("");
-    }
-  };
-
-  const handleResetPin = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    setResetPinError("");
-    setResetPinSuccess("");
-    setResettingPin(true);
-    try {
-      const user = await resetUserPin(resetIdentifier, resetPin);
-      setResetPinSuccess(t("config.resetPinSuccess", { username: user.username }));
-      setResetIdentifier("");
-      setResetPin("");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("config.resetPinFailed");
-      setResetPinError(message);
-    } finally {
-      setResettingPin(false);
-    }
-  };
-
   return (
     <main className="container">
-      <section className="card settings-card">
-        <h2 className="settings-title">{t("config.accountTitle")}</h2>
-        <div className="settings-grid">
-          <div className="settings-field">
-            {t("config.currentUser")}
-            <strong>{authUser?.email || authUser?.username || t("config.noCurrentUser")}</strong>
-          </div>
-          <div className="settings-field">
-            {t("config.accountTitle")}
-            <div className="settings-stats-list">
-              <span>{t("stats.future", { count: stats?.future_reviews ?? "-" })}</span>
-              <span>{t("stats.words", { count: stats?.word_items ?? "-" })}</span>
-            </div>
-          </div>
-        </div>
-        {onLogout ? (
-          <div className="actions">
-            <button type="button" className="secondary-button" onClick={() => void onLogout()} disabled={authBusy}>
-              {authBusy ? t("config.loggingOut") : t("config.logOut")}
-            </button>
-          </div>
-        ) : null}
-      </section>
+      <ConfigurationAccountSection authBusy={authBusy} authUser={authUser} onLogout={onLogout} stats={stats} />
       <section className="card settings-card">
         <h2 className="settings-title">{t("config.title")}</h2>
         <p className="settings-subtitle">{t("config.subtitle")}</p>
-
         <div className="settings-grid">
           <label className="settings-field">
             {t("config.appLanguage")}
@@ -494,146 +329,13 @@ export default function ConfigurationsPage({
           </button>
         </div>
       </section>
-      {authUser?.is_superuser ? (
-        <section className="card settings-card">
-          <h2 className="settings-title">{t("config.elevenLabsTitle")}</h2>
-          <p className="settings-subtitle">{t("config.elevenLabsSubtitle", { language: t(languageKeyByCode[targetLanguage]) })}</p>
-          <label className="settings-field">
-            {t("config.elevenLabsPreviewText")}
-            <input
-              type="text"
-              value={elevenLabsPreviewText}
-              onChange={(event) => setElevenLabsPreviewText(event.target.value)}
-              placeholder={browserVoicePreviewTextByCode[targetLanguage] || browserVoicePreviewTextByCode.german}
-            />
-          </label>
-          {loadingElevenLabsVoices ? <p className="hint">{t("config.elevenLabsLoading")}</p> : null}
-          {elevenLabsError ? <p className="error">{elevenLabsError}</p> : null}
-          {!loadingElevenLabsVoices && elevenLabsVoices.length > 0 ? (
-            <div className="elevenlabs-voice-list">
-              {elevenLabsVoices.map((voice) => (
-                <div
-                  key={voice.voice_id}
-                  className={`elevenlabs-voice-row ${voice.disabled ? "elevenlabs-voice-row-disabled" : ""}`}
-                >
-                  <div className="elevenlabs-voice-main">
-                    <strong>{voice.name}</strong>
-                    {voice.category ? <span className="hint">{voice.category}</span> : null}
-                    <code className="elevenlabs-voice-id">{voice.voice_id}</code>
-                  </div>
-                  <div className="elevenlabs-voice-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => void handlePreviewElevenLabsVoice(voice)}
-                      disabled={previewingElevenLabsVoiceId === voice.voice_id}
-                    >
-                      {previewingElevenLabsVoiceId === voice.voice_id
-                        ? t("config.elevenLabsPreviewing")
-                        : t("config.elevenLabsPreview")}
-                    </button>
-                    <button
-                      type="button"
-                      className={voice.disabled ? "secondary-button" : ""}
-                      onClick={() => void handleToggleElevenLabsVoice(voice)}
-                      disabled={updatingElevenLabsVoiceId === voice.voice_id}
-                    >
-                      {updatingElevenLabsVoiceId === voice.voice_id
-                        ? t("config.elevenLabsSaving")
-                        : voice.disabled
-                          ? t("config.elevenLabsEnable")
-                          : t("config.elevenLabsDisable")}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          {!loadingElevenLabsVoices && !elevenLabsError && elevenLabsVoices.length === 0 ? (
-            <p className="hint">{t("config.elevenLabsEmpty")}</p>
-          ) : null}
-        </section>
-      ) : null}
-      {canCreateUsers ? (
-        <>
-          <section className="card settings-card">
-            <h2 className="settings-title">{t("config.createUserTitle")}</h2>
-            <p className="settings-subtitle">{t("config.createUserSubtitle")}</p>
-            <form className="settings-create-user-form" onSubmit={handleCreateUser}>
-              <label className="settings-field">
-                {t("config.username")}
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  autoComplete="username"
-                  required
-                />
-              </label>
-              <label className="settings-field">
-                {t("config.email")}
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </label>
-              <label className="settings-field">
-                {t("config.pin")}
-                <input
-                  type="password"
-                  value={pin}
-                  onChange={(event) => setPin(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              <div className="actions">
-                <button type="submit" disabled={creating}>
-                  {creating ? t("config.creatingUser") : t("config.createUser")}
-                </button>
-              </div>
-              {createError ? <p className="error">{createError}</p> : null}
-              {createSuccess ? <p className="hint">{createSuccess}</p> : null}
-            </form>
-          </section>
-          <section className="card settings-card">
-            <h2 className="settings-title">{t("config.resetPinTitle")}</h2>
-            <p className="settings-subtitle">{t("config.resetPinSubtitle")}</p>
-            <form className="settings-create-user-form" onSubmit={handleResetPin}>
-              <label className="settings-field">
-                {t("config.userIdentifier")}
-                <input
-                  type="text"
-                  value={resetIdentifier}
-                  onChange={(event) => setResetIdentifier(event.target.value)}
-                  autoComplete="username"
-                  required
-                />
-              </label>
-              <label className="settings-field">
-                {t("config.newPin")}
-                <input
-                  type="password"
-                  value={resetPin}
-                  onChange={(event) => setResetPin(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              <div className="actions">
-                <button type="submit" disabled={resettingPin}>
-                  {resettingPin ? t("config.resettingPin") : t("config.resetPin")}
-                </button>
-              </div>
-              {resetPinError ? <p className="error">{resetPinError}</p> : null}
-              {resetPinSuccess ? <p className="hint">{resetPinSuccess}</p> : null}
-            </form>
-          </section>
-        </>
-      ) : null}
+      <ConfigurationElevenLabsSection
+        authUser={authUser}
+        languageKeyByCode={languageKeyByCode}
+        previewTextByCode={browserVoicePreviewTextByCode}
+        targetLanguage={targetLanguage}
+      />
+      <ConfigurationAdminUsersSection canCreateUsers={canCreateUsers} />
     </main>
   );
 }

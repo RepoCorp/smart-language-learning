@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type FocusEvent, type PointerEvent } from "react";
 
 import {
-  addContentItemCompareWords,
   askContentItemQuestion,
   fetchContentItemDetail,
   generateContentDialogTurnAudio,
@@ -11,9 +10,7 @@ import {
   quickAddWordFromDialog,
   regenerateContentDialogAudio,
   regenerateContentItemAudio,
-  removeContentItemCompareWord,
   refreshContentItemWord,
-  searchContentItemCompareWords,
   submitReview,
 } from "../api";
 import { selectBestSpeechSynthesisVoice } from "../browserSpeech";
@@ -23,8 +20,11 @@ import { usePromptPreferences } from "../promptPreferences";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
+import CompareWordsModal from "./CompareWordsModal";
 import DialogActionIcon from "./DialogActionIcon";
 import DialogTurnsList from "./DialogTurnsList";
+import ItemActionToolbar from "./ItemActionToolbar";
+import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
 import WordReview from "./WordReview";
 
@@ -56,110 +56,15 @@ const VERB_PERSONS = [
 ] as const;
 type VerbTenseKey = typeof VERB_TENSES[number]["key"];
 type VerbPersonKey = typeof VERB_PERSONS[number]["key"];
-type ItemActionIconName =
-  | "test"
-  | "exercise"
-  | "warmup"
-  | "letters"
-  | "builder"
-  | "dialogMatch"
-  | "dialogs"
-  | "questions"
-  | "audio"
-  | "selectAll"
-  | "clearAll"
-  | "random"
-  | "image"
-  | "openImage"
-  | "refresh";
-
-function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
+function ItemActionIcon({ name }: {
+  name: "selectAll" | "clearAll" | "random" | "image" | "openImage" | "refresh";
+}): JSX.Element {
   const commonProps = {
     className: "item-action-icon",
     viewBox: "0 0 24 24",
     "aria-hidden": true,
   };
 
-  if (name === "exercise") {
-    return (
-      <svg {...commonProps}>
-        <path d="M8 5v14l11-7-11-7Z" />
-        <path d="M4 6h1M4 12h1M4 18h1" />
-      </svg>
-    );
-  }
-  if (name === "test") {
-    return (
-      <svg {...commonProps}>
-        <path d="M5 12h6" />
-        <path d="m9 8 4 4-4 4" />
-        <path d="M14 7h5v10h-5" />
-      </svg>
-    );
-  }
-  if (name === "warmup") {
-    return (
-      <svg {...commonProps}>
-        <path d="M12 3l1.4 4.2L18 9l-4.6 1.8L12 15l-1.4-4.2L6 9l4.6-1.8L12 3Z" />
-        <path d="M6 15l.7 2.1L9 18l-2.3.9L6 21l-.7-2.1L3 18l2.3-.9L6 15Z" />
-      </svg>
-    );
-  }
-  if (name === "letters") {
-    return (
-      <svg {...commonProps}>
-        <path d="M4 18 9 6l5 12" />
-        <path d="M6 14h6" />
-        <path d="M16 8h4M18 6v4" />
-      </svg>
-    );
-  }
-  if (name === "builder") {
-    return (
-      <svg {...commonProps}>
-        <rect x="3" y="5" width="7" height="5" rx="1" />
-        <rect x="14" y="5" width="7" height="5" rx="1" />
-        <rect x="8" y="14" width="8" height="5" rx="1" />
-      </svg>
-    );
-  }
-  if (name === "dialogMatch") {
-    return (
-      <svg {...commonProps}>
-        <path d="M4 7h10l3 3H4V7Z" />
-        <path d="M20 17H10l-3-3h13v3Z" />
-      </svg>
-    );
-  }
-  if (name === "dialogs") {
-    return (
-      <svg {...commonProps}>
-        <path d="M4 5h11v8H8l-4 4V5Z" />
-        <path d="M13 11h7v7l-3-3h-4" />
-      </svg>
-    );
-  }
-  if (name === "questions") {
-    return (
-      <svg {...commonProps}>
-        <path d="M9 9a3 3 0 1 1 4.4 2.6c-.9.5-1.4 1.1-1.4 2.4" />
-        <path d="M12 18h.01" />
-        <circle cx="12" cy="12" r="9" />
-      </svg>
-    );
-  }
-  if (name === "audio") {
-    return (
-      <svg {...commonProps}>
-        <path d="M4 10v4h4l4 3V7l-4 3H4Z" />
-        <path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" />
-        <path d="M19 5v4h-4" />
-        <path d="M15 19v-4h4" />
-        <path d="M19 9a7 7 0 0 0-11-3.6" />
-        <path d="M15 15a7 7 0 0 1-11 3.6" />
-      </svg>
-    );
-  }
   if (name === "selectAll") {
     return (
       <svg {...commonProps}>
@@ -329,20 +234,12 @@ export default function NewItem({
   const [dialogPhraseOddIndex, setDialogPhraseOddIndex] = useState<number | null>(item.dialog_phrase_odd_index ?? null);
   const [relatedDialogs, setRelatedDialogs] = useState<NonNullable<SessionItem["related_dialogs"]>>(item.related_dialogs || []);
   const [compareWords, setCompareWords] = useState<NonNullable<SessionItem["compare_words"]>>(item.compare_words || []);
+  const [compareWordsInsights, setCompareWordsInsights] = useState<string>(item.compare_words_insights || "");
   const [showCompareWordsModal, setShowCompareWordsModal] = useState<boolean>(false);
-  const [compareWordsQuery, setCompareWordsQuery] = useState<string>("");
-  const [compareWordsResults, setCompareWordsResults] = useState<NonNullable<SessionItem["compare_words"]>>([]);
-  const [selectedCompareWordIds, setSelectedCompareWordIds] = useState<number[]>([]);
-  const [compareWordsPage, setCompareWordsPage] = useState<number>(1);
-  const [compareWordsHasMore, setCompareWordsHasMore] = useState<boolean>(false);
-  const [loadingCompareWords, setLoadingCompareWords] = useState<boolean>(false);
-  const [savingCompareWords, setSavingCompareWords] = useState<boolean>(false);
-  const [compareWordsError, setCompareWordsError] = useState<string>("");
   const [playingRelatedDialogId, setPlayingRelatedDialogId] = useState<number | null>(null);
   const [playingRelatedDialogTurn, setPlayingRelatedDialogTurn] = useState<{ dialogId: number; turnIndex: number } | null>(null);
   const [loadingRelatedDialogAudioKey, setLoadingRelatedDialogAudioKey] = useState<string>("");
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
-  const [itemQuestionInput, setItemQuestionInput] = useState<string>("");
   const [askingQuestion, setAskingQuestion] = useState<boolean>(false);
   const [showDialogTargetTextById, setShowDialogTargetTextById] = useState<Record<number, boolean>>({});
   const exerciseTimerRef = useRef<number | null>(null);
@@ -354,8 +251,6 @@ export default function NewItem({
   const relatedDialogAudioRef = useRef<HTMLAudioElement | null>(null);
   const relatedDialogsScrollRef = useRef<HTMLDivElement | null>(null);
   const relatedDialogCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const questionsHistoryRef = useRef<HTMLDivElement | null>(null);
-  const questionInputRef = useRef<HTMLInputElement | null>(null);
   const autoplayedAudioKeyRef = useRef<string>("");
 
   useEffect(() => {
@@ -374,7 +269,8 @@ export default function NewItem({
     setDialogPhraseOddIndex(item.dialog_phrase_odd_index ?? null);
     setRelatedDialogs(item.related_dialogs || []);
     setCompareWords(item.compare_words || []);
-  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.dialog_phrase_turns, item.dialog_phrase_odd_index, item.related_dialogs, item.compare_words]);
+    setCompareWordsInsights(item.compare_words_insights || "");
+  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.dialog_phrase_turns, item.dialog_phrase_odd_index, item.related_dialogs, item.compare_words, item.compare_words_insights]);
 
   useEffect(() => {
     if (!autoplayAudioOnMount || !audioUrl) {
@@ -485,19 +381,12 @@ export default function NewItem({
   useEffect(() => {
     setItemQuestions(item.item_questions || []);
     setItemQuestionError("");
-    setItemQuestionInput("");
     setAskingQuestion(false);
     setShowQuestionsModal(false);
     setShowWordIntroPracticeModal(false);
     setShowWordLetterPracticeModal(false);
     setShowPhraseBuilderModal(false);
     setShowCompareWordsModal(false);
-    setCompareWordsError("");
-    setCompareWordsQuery("");
-    setCompareWordsResults([]);
-    setSelectedCompareWordIds([]);
-    setCompareWordsPage(1);
-    setCompareWordsHasMore(false);
   }, [item.id, item.item_questions]);
 
   useEffect(() => {
@@ -529,45 +418,6 @@ export default function NewItem({
   useEffect(() => {
     setShowDialogTargetTextById({});
   }, [item.id]);
-
-  useEffect(() => {
-    if (!showQuestionsModal) {
-      return;
-    }
-    questionInputRef.current?.focus();
-  }, [showQuestionsModal]);
-
-  useEffect(() => {
-    if (!showQuestionsModal) {
-      return;
-    }
-    const historyElement = questionsHistoryRef.current;
-    if (!historyElement) {
-      return;
-    }
-    historyElement.scrollTo({
-      top: historyElement.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [showQuestionsModal, itemQuestions, askingQuestion]);
-
-  useEffect(() => {
-    if (!showCompareWordsModal || item.item_type !== "word") {
-      return;
-    }
-    let cancelled = false;
-    const timeoutId = window.setTimeout(() => {
-      void loadCompareWordsSearch(1, compareWordsQuery).catch(() => {
-        if (!cancelled) {
-          setCompareWordsError(t("newItem.compareWordsLoadError"));
-        }
-      });
-    }, 180);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [showCompareWordsModal, compareWordsQuery, item.item_type, t]);
 
   const wordCandidates = (word: string): string[] => {
     const normalized = word.trim();
@@ -793,6 +643,7 @@ export default function NewItem({
             dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             compare_words: detail.compare_words || [],
+            compare_words_insights: detail.compare_words_insights || "",
             item_questions: detail.item_questions || [],
           });
         } finally {
@@ -848,6 +699,7 @@ export default function NewItem({
         dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
         related_dialogs: detail.related_dialogs || [],
         compare_words: detail.compare_words || [],
+        compare_words_insights: detail.compare_words_insights || "",
         item_questions: detail.item_questions || [],
       });
     } finally {
@@ -921,76 +773,11 @@ export default function NewItem({
     }
   };
 
-  const loadCompareWordsSearch = async (page = 1, query = compareWordsQuery): Promise<void> => {
-    if (item.item_type !== "word") {
-      return;
-    }
-    setLoadingCompareWords(true);
-    setCompareWordsError("");
-    try {
-      const payload = await searchContentItemCompareWords(item.id, query, page, 10, sourceLanguage, targetLanguage);
-      setCompareWordsResults(payload.items || []);
-      setCompareWordsPage(payload.page || page);
-      setCompareWordsHasMore(Boolean(payload.has_more));
-    } catch {
-      setCompareWordsError(t("newItem.compareWordsLoadError"));
-    } finally {
-      setLoadingCompareWords(false);
-    }
-  };
-
   const openCompareWordsModal = (): void => {
     setShowCompareWordsModal(true);
-    setSelectedCompareWordIds([]);
   };
 
-  const toggleCompareWordSelection = (wordId: number): void => {
-    setSelectedCompareWordIds((current) => (
-      current.includes(wordId)
-        ? current.filter((id) => id !== wordId)
-        : [...current, wordId]
-    ));
-  };
-
-  const saveCompareWords = async (): Promise<void> => {
-    if (!selectedCompareWordIds.length || savingCompareWords) {
-      return;
-    }
-    setSavingCompareWords(true);
-    setCompareWordsError("");
-    try {
-      const payload = await addContentItemCompareWords(item.id, selectedCompareWordIds, sourceLanguage, targetLanguage);
-      setCompareWords(payload.compare_words || []);
-      setSelectedCompareWordIds([]);
-      setShowCompareWordsModal(false);
-    } catch {
-      setCompareWordsError(t("newItem.compareWordsSaveError"));
-    } finally {
-      setSavingCompareWords(false);
-    }
-  };
-
-  const removeCompareWord = async (linkedItemId: number): Promise<void> => {
-    if (savingCompareWords) {
-      return;
-    }
-    setSavingCompareWords(true);
-    setCompareWordsError("");
-    try {
-      const payload = await removeContentItemCompareWord(item.id, linkedItemId, sourceLanguage, targetLanguage);
-      setCompareWords(payload.compare_words || []);
-      if (showCompareWordsModal) {
-        void loadCompareWordsSearch(compareWordsPage, compareWordsQuery);
-      }
-    } catch {
-      setCompareWordsError(t("newItem.compareWordsRemoveError"));
-    } finally {
-      setSavingCompareWords(false);
-    }
-  };
-
-  const askItemQuestion = async (): Promise<void> => {
-    const questionText = itemQuestionInput.trim();
+  const askItemQuestion = async (questionText: string): Promise<void> => {
     if (askingQuestion || !questionText) {
       return;
     }
@@ -999,7 +786,6 @@ export default function NewItem({
     try {
       const response = await askContentItemQuestion(item.id, questionText, itemQuestions, sourceLanguage, targetLanguage);
       setItemQuestions(response.conversation || []);
-      setItemQuestionInput("");
     } catch (error) {
       if (error instanceof Error && error.message) {
         setItemQuestionError(error.message);
@@ -1010,35 +796,6 @@ export default function NewItem({
       setAskingQuestion(false);
     }
   };
-
-  const askPresetItemQuestion = async (questionText: string): Promise<void> => {
-    const trimmed = questionText.trim();
-    if (askingQuestion || !trimmed) {
-      return;
-    }
-    setAskingQuestion(true);
-    setItemQuestionError("");
-    try {
-      const response = await askContentItemQuestion(item.id, trimmed, itemQuestions, sourceLanguage, targetLanguage);
-      setItemQuestions(response.conversation || []);
-      setItemQuestionInput("");
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        setItemQuestionError(error.message);
-      } else {
-        setItemQuestionError(t("newItem.questionsError"));
-      }
-    } finally {
-      setAskingQuestion(false);
-    }
-  };
-
-  const quickItemQuestions = [
-    t("newItem.questionsQuickMeaning"),
-    t("newItem.questionsQuickUse"),
-    t("newItem.questionsQuickExamples"),
-    t("newItem.questionsQuickMistakes"),
-  ];
 
   const confirmAddWordFromDialog = async (): Promise<void> => {
     if (!pendingWordAdd || addingWord) {
@@ -1087,6 +844,7 @@ export default function NewItem({
             dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             compare_words: detail.compare_words || [],
+            compare_words_insights: detail.compare_words_insights || "",
             item_questions: detail.item_questions || [],
           });
         } finally {
@@ -1204,7 +962,6 @@ export default function NewItem({
     ? [{ source: sourceText, target: targetText }]
     : allWordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
-  const orderedItemQuestions = [...itemQuestions].sort((left, right) => left.id - right.id);
   const wordPracticeItemBase: SessionItem = {
     ...item,
     spanish_text: sourceText,
@@ -1368,6 +1125,7 @@ export default function NewItem({
           const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
           nextCompareWords = detail.compare_words || [];
           setCompareWords(nextCompareWords);
+          setCompareWordsInsights(detail.compare_words_insights || "");
         }
         const shouldGenerateCurrentWordExercises = item.id > 0
           && (
@@ -1421,10 +1179,6 @@ export default function NewItem({
     setWordRefreshMessage("");
     try {
       const payload = await refreshContentItemWord(item.id, sourceLanguage, targetLanguage);
-      setExercisePhrases(payload.exercise_phrases || {});
-      setSourceText(payload.spanish_text || sourceText);
-      setTargetText(payload.german_text || targetText);
-      setWordType(payload.word_type || "");
       setRelatedDialogs(payload.related_dialogs || []);
       setWordRefreshMessage(t("newItem.wordRefreshComplete", { count: payload.dialog_occurrences_created || 0 }));
     } catch (error) {
@@ -1771,152 +1525,29 @@ export default function NewItem({
         </div>
       )}
       {(item.item_type === "word" || item.item_type === "phrase") && (
-        <div className={showMobileActionLabels ? "mobile-action-labels-expanded" : undefined}>
-          <div className="actions item-actions-toolbar">
-          <div className="item-action-group item-action-group-primary" aria-label={t("newItem.actionGroupPractice")}>
-            <button
-              type="button"
-              className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-              onClick={() => void openExerciseModal()}
-              disabled={loadingExercises}
-              aria-label={t("newItem.openExercises")}
-              title={t("newItem.openExercises")}
-              data-mobile-label={t("newItem.openExercises")}
-              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
-              onPointerLeave={hideItemActionTooltip}
-              onFocus={(event) => showItemActionTooltip(event, t("newItem.openExercises"))}
-              onBlur={hideItemActionTooltip}
-            >
-              <ItemActionIcon name="exercise" />
-            </button>
-            <button
-              type="button"
-              className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-              onClick={openPrimaryTestModal}
-              disabled={loadingExercises}
-              aria-label={t("newItem.openItemTest")}
-              title={t("newItem.openItemTest")}
-              data-mobile-label={t("newItem.openItemTest")}
-              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openItemTest"))}
-              onPointerLeave={hideItemActionTooltip}
-              onFocus={(event) => showItemActionTooltip(event, t("newItem.openItemTest"))}
-              onBlur={hideItemActionTooltip}
-            >
-              <ItemActionIcon name="test" />
-            </button>
-            {item.item_type === "word" && (
-              <button
-                type="button"
-                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-                onClick={() => setShowWordIntroPracticeModal(true)}
-                aria-label={t("newItem.openWordIntroPractice")}
-                title={t("newItem.openWordIntroPractice")}
-                data-mobile-label={t("newItem.openWordIntroPractice")}
-                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
-                onPointerLeave={hideItemActionTooltip}
-                onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordIntroPractice"))}
-                onBlur={hideItemActionTooltip}
-              >
-                <ItemActionIcon name="warmup" />
-              </button>
-            )}
-            {item.item_type === "word" && (
-              <button
-                type="button"
-                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-                onClick={() => setShowWordLetterPracticeModal(true)}
-                aria-label={t("newItem.openWordLetterPractice")}
-                title={t("newItem.openWordLetterPractice")}
-                data-mobile-label={t("newItem.openWordLetterPractice")}
-                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
-                onPointerLeave={hideItemActionTooltip}
-                onFocus={(event) => showItemActionTooltip(event, t("newItem.openWordLetterPractice"))}
-                onBlur={hideItemActionTooltip}
-              >
-                <ItemActionIcon name="letters" />
-              </button>
-            )}
-            {item.item_type === "phrase" && (
-              <button
-                type="button"
-                className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-                onClick={() => setShowPhraseBuilderModal(true)}
-                aria-label={t("newItem.openPhraseBuilder")}
-                title={t("newItem.openPhraseBuilder")}
-                data-mobile-label={t("newItem.openPhraseBuilder")}
-                onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
-                onPointerLeave={hideItemActionTooltip}
-                onFocus={(event) => showItemActionTooltip(event, t("newItem.openPhraseBuilder"))}
-                onBlur={hideItemActionTooltip}
-              >
-                <ItemActionIcon name="builder" />
-              </button>
-            )}
-          </div>
-          <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
-            <button
-              type="button"
-              className="secondary-button item-action-button item-action-button-icon"
-              onClick={() => setShowDialogsModal(true)}
-              aria-label={t("newItem.openRelatedDialogs")}
-              title={t("newItem.openRelatedDialogs")}
-              data-mobile-label={t("newItem.openRelatedDialogs")}
-              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
-              onPointerLeave={hideItemActionTooltip}
-              onFocus={(event) => showItemActionTooltip(event, t("newItem.openRelatedDialogs"))}
-              onBlur={hideItemActionTooltip}
-            >
-              <ItemActionIcon name="dialogs" />
-            </button>
-            <button
-              type="button"
-              className="secondary-button item-action-button item-action-button-icon"
-              onClick={() => setShowQuestionsModal(true)}
-              aria-label={t("newItem.openQuestions")}
-              title={t("newItem.openQuestions")}
-              data-mobile-label={t("newItem.openQuestions")}
-              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
-              onPointerLeave={hideItemActionTooltip}
-              onFocus={(event) => showItemActionTooltip(event, t("newItem.openQuestions"))}
-              onBlur={hideItemActionTooltip}
-            >
-              <ItemActionIcon name="questions" />
-            </button>
-          </div>
-          <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
-            <DangerousButton
-              className="secondary-button item-action-button item-action-button-icon dangerous-action-button"
-              onConfirm={regenerateAudio}
-              disabled={regeneratingAudio || refreshingWord}
-              aria-label={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
-              title={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
-              data-mobile-label={regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio")}
-              onPointerEnter={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
-              onPointerLeave={hideItemActionTooltip}
-              onFocus={(event) => showItemActionTooltip(event, regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"))}
-              onBlur={hideItemActionTooltip}
-            >
-              <ItemActionIcon name="audio" />
-            </DangerousButton>
-            {item.item_type === "word" && (
-              <DangerousButton
-                className="secondary-button item-action-button item-action-button-icon dangerous-action-button"
-                onConfirm={refreshWordData}
-                disabled={refreshingWord || regeneratingAudio}
-                aria-label={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
-                title={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
-                data-mobile-label={refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh")}
-                onPointerEnter={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
-                onPointerLeave={hideItemActionTooltip}
-                onFocus={(event) => showItemActionTooltip(event, refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"))}
-                onBlur={hideItemActionTooltip}
-              >
-                <ItemActionIcon name="refresh" />
-              </DangerousButton>
-            )}
-          </div>
-        </div>
-        </div>
+        <ItemActionToolbar
+          itemType={item.item_type}
+          loadingExercises={loadingExercises}
+          regeneratingAudio={regeneratingAudio}
+          refreshingWord={refreshingWord}
+          showMobileActionLabels={showMobileActionLabels}
+          hasQuestions={itemQuestions.length > 0}
+          hasCompareWordsContent={compareWords.length > 0 || Boolean(compareWordsInsights.trim())}
+          onOpenExercises={() => {
+            void openExerciseModal();
+          }}
+          onOpenTest={openPrimaryTestModal}
+          onOpenWordIntroPractice={() => setShowWordIntroPracticeModal(true)}
+          onOpenWordLetterPractice={() => setShowWordLetterPracticeModal(true)}
+          onOpenPhraseBuilder={() => setShowPhraseBuilderModal(true)}
+          onOpenRelatedDialogs={() => setShowDialogsModal(true)}
+          onOpenQuestions={() => setShowQuestionsModal(true)}
+          onOpenCompareWords={openCompareWordsModal}
+          onRegenerateAudio={regenerateAudio}
+          onRefreshWordData={refreshWordData}
+          onShowTooltip={showItemActionTooltip}
+          onHideTooltip={hideItemActionTooltip}
+        />
       )}
       {itemActionTooltip && (
         <div
@@ -2148,77 +1779,18 @@ export default function NewItem({
         </div>
       )}
       {showCompareWordsModal && item.item_type === "word" && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal related-dialogs-modal compare-words-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={() => setShowCompareWordsModal(false)}>
-              ×
-            </button>
-            <p>
-              <strong>{t("newItem.compareWordsModalTitle")}</strong>
-            </p>
-            <div className="compare-words-search-row">
-              <input
-                value={compareWordsQuery}
-                onChange={(event) => setCompareWordsQuery(event.target.value)}
-                placeholder={t("newItem.compareWordsSearchPlaceholder")}
-                disabled={savingCompareWords}
-              />
-            </div>
-            {compareWordsError && <p className="error">{compareWordsError}</p>}
-            {loadingCompareWords && <p className="hint">{t("session.loading")}</p>}
-            {!loadingCompareWords && !compareWordsResults.length && (
-              <p className="hint">{t("newItem.compareWordsSearchEmpty")}</p>
-            )}
-            {!!compareWordsResults.length && (
-              <div className="compare-words-modal-list">
-                {compareWordsResults.map((candidate) => {
-                  const checked = selectedCompareWordIds.includes(candidate.id);
-                  return (
-                    <label key={candidate.id} className={`compare-word-select-row ${checked ? "compare-word-select-row-selected" : ""}`}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCompareWordSelection(candidate.id)}
-                        disabled={savingCompareWords}
-                      />
-                      <span>
-                        <strong>{candidate.german_text}</strong>
-                        <small>{candidate.spanish_text}</small>
-                        <em>{candidate.word_type || t("newItem.wordAddTypeUnknown")}</em>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-            <div className="actions compare-words-modal-actions">
-              <button
-                type="button"
-                onClick={() => void saveCompareWords()}
-                disabled={!selectedCompareWordIds.length || savingCompareWords}
-              >
-                {savingCompareWords ? t("newItem.wordAddSaving") : t("newItem.compareWordsConfirm")}
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => void loadCompareWordsSearch(Math.max(1, compareWordsPage - 1), compareWordsQuery)}
-                disabled={compareWordsPage <= 1 || loadingCompareWords || savingCompareWords}
-              >
-                {t("manage.previousPage")}
-              </button>
-              <span>{t("manage.pageLabel", { page: compareWordsPage })}</span>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => void loadCompareWordsSearch(compareWordsPage + 1, compareWordsQuery)}
-                disabled={!compareWordsHasMore || loadingCompareWords || savingCompareWords}
-              >
-                {t("manage.nextPage")}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CompareWordsModal
+          open={showCompareWordsModal}
+          itemId={item.id}
+          compareWords={compareWords}
+          initialInsights={compareWordsInsights}
+          sourceLanguage={sourceLanguage}
+          targetLanguage={targetLanguage}
+          onClose={() => setShowCompareWordsModal(false)}
+          onCompareWordsChange={setCompareWords}
+          onInsightsChange={setCompareWordsInsights}
+          onOpenItem={openLinkedDialogItem}
+        />
       )}
       {showDirectTestModal && (item.item_type === "word" || item.item_type === "phrase") && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
@@ -2591,119 +2163,19 @@ export default function NewItem({
           </div>
         </div>
       )}
-      {showQuestionsModal && (item.item_type === "word" || item.item_type === "phrase") && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal related-dialogs-modal questions-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={() => setShowQuestionsModal(false)}>
-              ×
-            </button>
-            <p>
-              <strong>{t("newItem.questionsTitle")}</strong>
-            </p>
-            <div className="questions-modal-item-texts">
-              <p className="questions-modal-item-text">
-                <strong>{t("newItem.sourceLabel", { language: sourceLanguageLabel })}</strong> {sourceText}
-              </p>
-              <p className="questions-modal-item-text">
-                <strong>{t("newItem.targetLabel", { language: targetLanguageLabel })}</strong> {targetText}
-              </p>
-            </div>
-            {!!itemQuestions.length && (
-              <div ref={questionsHistoryRef} className="item-questions-history item-chat-thread">
-                {orderedItemQuestions.map((entry, index) => (
-                  <article
-                    key={entry.id}
-                    className="item-question-entry item-chat-entry"
-                    tabIndex={index === orderedItemQuestions.length - 1 ? -1 : undefined}
-                  >
-                    <div className="item-chat-message item-chat-user">
-                      <p className="item-chat-meta">{t("newItem.questionsLabelQuestion")}</p>
-                      <p className="item-chat-bubble">{entry.question_text}</p>
-                    </div>
-                    <div className="item-chat-message item-chat-assistant">
-                      <p className="item-chat-meta">{t("newItem.questionsLabelAnswer")}</p>
-                      <p className="item-chat-bubble">{entry.answer_text}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-            <form
-              className="item-questions-actions"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void askItemQuestion();
-              }}
-            >
-              <input
-                ref={questionInputRef}
-                value={itemQuestionInput}
-                onChange={(event) => setItemQuestionInput(event.target.value)}
-                placeholder={t("newItem.questionsPlaceholder")}
-                disabled={askingQuestion}
-              />
-              <button type="submit" disabled={askingQuestion || !itemQuestionInput.trim()}>
-                {askingQuestion ? t("newItem.questionsLoading") : t("newItem.questionsAskButton")}
-              </button>
-            </form>
-            <div className="item-question-presets">
-              {quickItemQuestions.map((question) => (
-                <button
-                  key={question}
-                  type="button"
-                  className="secondary-button item-question-preset"
-                  disabled={askingQuestion}
-                  onClick={() => void askPresetItemQuestion(question)}
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
-            {itemQuestionError && <p className="error">{itemQuestionError}</p>}
-          </div>
-        </div>
-      )}
-      {item.item_type === "word" && (
-        <section className="compare-words-section">
-          <div className="compare-words-header">
-            <p className="compare-words-title">
-              <strong>{t("newItem.compareWordsTitle")}</strong>
-            </p>
-            <button type="button" className="secondary-button" onClick={openCompareWordsModal}>
-              {t("newItem.compareWordsAdd")}
-            </button>
-          </div>
-          {!compareWords.length && (
-            <p className="hint compare-words-empty">{t("newItem.compareWordsEmpty")}</p>
-          )}
-          {!!compareWords.length && (
-            <div className="compare-words-list">
-              {compareWords.map((linkedWord) => (
-                <div key={linkedWord.id} className="compare-word-row">
-                  <div className="compare-word-text">
-                    <strong>{linkedWord.german_text}</strong>
-                    <span>{linkedWord.spanish_text}</span>
-                    <small>{linkedWord.word_type || t("newItem.wordAddTypeUnknown")}</small>
-                  </div>
-                  <div className="compare-word-actions">
-                    <button type="button" className="secondary-button" onClick={() => void openLinkedDialogItem(linkedWord.id)}>
-                      {t("words.openItem")}
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => void removeCompareWord(linkedWord.id)}
-                      disabled={savingCompareWords}
-                    >
-                      {t("newItem.compareWordsRemove")}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {compareWordsError && !showCompareWordsModal && <p className="error">{compareWordsError}</p>}
-        </section>
+      {(item.item_type === "word" || item.item_type === "phrase") && (
+        <ItemQuestionsModal
+          open={showQuestionsModal}
+          askingQuestion={askingQuestion}
+          errorMessage={itemQuestionError}
+          itemQuestions={itemQuestions}
+          sourceLanguageLabel={sourceLanguageLabel}
+          sourceText={sourceText}
+          targetLanguageLabel={targetLanguageLabel}
+          targetText={targetText}
+          onClose={() => setShowQuestionsModal(false)}
+          onAskQuestion={askItemQuestion}
+        />
       )}
       {pendingWordAdd && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">

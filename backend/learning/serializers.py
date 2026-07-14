@@ -51,6 +51,8 @@ class SessionItemSerializer(serializers.Serializer):
     dialog_phrase_turns = serializers.ListField(child=serializers.DictField(), required=False)
     dialog_phrase_odd_index = serializers.IntegerField(required=False, allow_null=True)
     related_dialogs = serializers.ListField(child=serializers.DictField(), required=False)
+    compare_words = serializers.ListField(child=serializers.DictField(), required=False)
+    compare_words_insights = serializers.CharField(allow_blank=True, required=False)
     session_restore_state = SessionRestoreStateSerializer(required=False)
 
 

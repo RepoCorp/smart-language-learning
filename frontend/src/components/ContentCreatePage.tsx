@@ -317,6 +317,7 @@ export default function ContentCreatePage(): JSX.Element {
             dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             compare_words: detail.compare_words || [],
+            compare_words_insights: detail.compare_words_insights || "",
             item_questions: detail.item_questions || [],
           });
           setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
@@ -404,6 +405,7 @@ export default function ContentCreatePage(): JSX.Element {
         dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
         related_dialogs: detail.related_dialogs || [],
         compare_words: detail.compare_words || [],
+        compare_words_insights: detail.compare_words_insights || "",
         item_questions: detail.item_questions || [],
       });
     } finally {

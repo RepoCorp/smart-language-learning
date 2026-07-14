@@ -4,6 +4,15 @@ from django.conf import settings
 
 from .management import Request, Response, _normalized_pair, status
 
+DEFAULT_CONVERSATION_GOAL_BY_LANGUAGE = {
+    "spanish": "Saluda.",
+    "english": "Say hello.",
+    "german": "Begruesse die andere Person.",
+    "french": "Dis bonjour.",
+    "italian": "Saluta.",
+    "portuguese": "Cumprimente.",
+}
+
 
 def analysis_enabled() -> bool:
     return bool(getattr(settings, "DEV_CONVERSATION_ENABLE_ANALYSIS", True))
@@ -68,4 +77,11 @@ def conversation_context_label(*, topic: str, notes: str, role_text: str) -> str
         f"Conversation topic: {topic}\n"
         f"Temporary notes: {notes}\n"
         f"Learner role: {role_text}\n"
+    )
+
+
+def default_conversation_goal(source_language: str) -> str:
+    return DEFAULT_CONVERSATION_GOAL_BY_LANGUAGE.get(
+        source_language,
+        "Say hello.",
     )

@@ -8,6 +8,7 @@ import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
+import { useWordChallengeInputFocus } from "./useWordChallengeInputFocus";
 import {
   hintOptionLabel,
   isLetter,
@@ -347,14 +348,18 @@ export default function WordReview({
   const [rewriteAttemptMistakeIndexes, setRewriteAttemptMistakeIndexes] = useState<number[]>([]);
   const [rewriteStatusTone, setRewriteStatusTone] = useState<RewriteStatusTone>("neutral");
   const [pendingRewriteTakeover, setPendingRewriteTakeover] = useState<boolean>(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const completionAudioRef = useRef<HTMLAudioElement | null>(null);
   const composingAnswerRef = useRef<boolean>(false);
   const answerBeforeCompositionRef = useRef<string>("");
   const pendingCompositionValidationRef = useRef<boolean>(false);
   const provisionalBaseAnswerRef = useRef<string | null>(null);
   const pendingCaseMismatchRef = useRef<PendingCaseMismatch | null>(null);
-  const pendingRewriteFocusRef = useRef<boolean>(false);
+  const {
+    inputRef,
+    focusInput,
+    scheduleRefocus,
+    blurInputOnMobileCompletion,
+  } = useWordChallengeInputFocus({ isSubmitting });
 
   const isSpanishToGerman = item.direction !== "de_to_es";
   const useSelfGradedAnswer = !isSpanishToGerman;
@@ -549,13 +554,13 @@ export default function WordReview({
   const handleHintButtonPress = (): void => {
     showInputAwareHint();
     window.setTimeout(() => {
-      inputRef.current?.focus({ preventScroll: true });
+      focusInput();
     }, 0);
   };
 
   const clearAnswerAndRefocus = (): void => {
     setAnswer("");
-    pendingRewriteFocusRef.current = true;
+    scheduleRefocus();
   };
 
   const handleAnswerChange = (value: string, acceptedAnswer = answer): void => {
@@ -665,6 +670,7 @@ export default function WordReview({
           setSubmittedResultTone("success");
           setRewriteStatusTone("success");
           setRewriteAttemptMistakeIndexes([]);
+          blurInputOnMobileCompletion();
         }
       } else {
         setFeedback(t("word.feedback.rewritePrompt"));
@@ -723,6 +729,7 @@ export default function WordReview({
     }
 
     if (needsWrittenWordRewrite()) {
+      blurInputOnMobileCompletion();
       setRewriteAttemptHadMistake(false);
       setRewriteAttemptMistakeIndexes([]);
       setSubmittedResultTone(shouldFailWrittenWordFromAssistance() ? "error" : "success");
@@ -730,6 +737,7 @@ export default function WordReview({
       void submitWithFeedback(!shouldFailWrittenWordFromAssistance(), "", { preserveExistingFeedback: true });
       return;
     }
+    blurInputOnMobileCompletion();
     void submitWithFeedback(true, t("word.feedback.correct"));
   };
 
@@ -785,6 +793,7 @@ export default function WordReview({
       : warmupRevealCount <= 2
         ? t("word.warmupAlmostPerfect")
         : t("word.feedback.correct");
+    blurInputOnMobileCompletion();
     void submitWithFeedback(true, warmupSuccessMessage);
   };
 
@@ -811,19 +820,9 @@ export default function WordReview({
 
   useEffect(() => {
     if (!useSelfGradedAnswer) {
-      inputRef.current?.focus();
+      focusInput();
     }
-  }, [useSelfGradedAnswer]);
-
-  useEffect(() => {
-    if (!pendingRewriteFocusRef.current || isSubmitting) {
-      return;
-    }
-    pendingRewriteFocusRef.current = false;
-    window.setTimeout(() => {
-      inputRef.current?.focus({ preventScroll: true });
-    }, 0);
-  }, [isSubmitting]);
+  }, [focusInput, useSelfGradedAnswer]);
 
   useEffect(() => {
     if (!reviewComplete || !pendingRewriteTakeover) {

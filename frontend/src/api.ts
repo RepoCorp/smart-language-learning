@@ -9,6 +9,7 @@ import type {
   ContentItemQuestionResponse,
   ContentPreviewResponse,
   CompareWordRecord,
+  CompareWordInsightsResponse,
   ContentTopicContextsResponse,
   ElevenLabsVoicePreviewResponse,
   ElevenLabsVoicesResponse,
@@ -24,187 +25,7 @@ import type {
   SessionRestoreState,
   StudyLanguageCode,
 } from "./types";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
-const AUTH_TOKEN_KEY = "smart-language-learning-auth-token";
-const AUTH_USER_KEY = "smart-language-learning-auth-user";
-const OVERVIEW_STATS_UPDATED_EVENT = "overview-stats-updated";
-
-export type AuthUser = {
-  id: number;
-  username: string;
-  email: string;
-  is_superuser: boolean;
-};
-
-function notifyOverviewStatsUpdated(): void {
-  window.dispatchEvent(new CustomEvent(OVERVIEW_STATS_UPDATED_EVENT));
-}
-
-function apiRequestSummary(input: string, init?: RequestInit): { method: string; url: string } {
-  return {
-    method: init?.method || "GET",
-    url: typeof input === "string" ? input : input.toString(),
-  };
-}
-
-function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const token = getAuthToken();
-  const headers = new Headers(init?.headers || {});
-  headers.set("Accept", "application/json");
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  const request = apiRequestSummary(input, init);
-  return fetch(input, { ...init, headers })
-    .then((response) => {
-      if (!response.ok) {
-        console.error("Backend request failed", {
-          ...request,
-          status: response.status,
-          statusText: response.statusText,
-        });
-      }
-      const contentType = response.headers.get("Content-Type") || "";
-      if (response.ok && contentType.includes("text/html")) {
-        console.error("Backend request returned HTML instead of JSON. Check VITE_API_URL/BACKEND_API_URL and ALB routing.", {
-          ...request,
-          status: response.status,
-          contentType,
-        });
-      }
-      return response;
-    })
-    .catch((error) => {
-      console.error("Backend request error", {
-        ...request,
-        error,
-      });
-      throw error;
-    });
-}
-
-export function getAuthToken(): string {
-  return window.localStorage.getItem(AUTH_TOKEN_KEY) || "";
-}
-
-export function getStoredAuthUser(): AuthUser | null {
-  try {
-    const raw = window.localStorage.getItem(AUTH_USER_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as AuthUser;
-    if (!parsed || typeof parsed.id !== "number") {
-      return null;
-    }
-    if (typeof parsed.is_superuser !== "boolean") {
-      return { ...parsed, is_superuser: false };
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function storeAuthSession(token: string, user: AuthUser): void {
-  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
-  window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-}
-
-function clearStoredAuthSession(): void {
-  window.localStorage.removeItem(AUTH_TOKEN_KEY);
-  window.localStorage.removeItem(AUTH_USER_KEY);
-}
-
-export function getOverviewStatsUpdatedEventName(): string {
-  return OVERVIEW_STATS_UPDATED_EVENT;
-}
-
-export async function loginWithPin(identifier: string, pin: string): Promise<AuthUser> {
-  const response = await apiFetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ identifier, pin }),
-  });
-  if (!response.ok) {
-    throw new Error("Invalid credentials");
-  }
-  const payload = (await response.json()) as { token: string; user: AuthUser };
-  storeAuthSession(payload.token, payload.user);
-  notifyOverviewStatsUpdated();
-  return payload.user;
-}
-
-export async function registerWithPin(username: string, email: string, pin: string): Promise<AuthUser> {
-  const response = await apiFetch(`${API_BASE}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, email, pin }),
-  });
-  if (!response.ok) {
-    let detail = "Failed to create user";
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
-        detail = payload.detail;
-      }
-    } catch {
-      // Keep default message.
-    }
-    throw new Error(detail);
-  }
-  const payload = (await response.json()) as { token?: string; user: AuthUser };
-  if (payload.token) {
-    storeAuthSession(payload.token, payload.user);
-    notifyOverviewStatsUpdated();
-  }
-  return payload.user;
-}
-
-export async function createUserWithPin(username: string, email: string, pin: string): Promise<AuthUser> {
-  const response = await apiFetch(`${API_BASE}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, email, pin }),
-  });
-  if (!response.ok) {
-    let detail = "Failed to create user";
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
-        detail = payload.detail;
-      }
-    } catch {
-      // Keep default message.
-    }
-    throw new Error(detail);
-  }
-  const payload = (await response.json()) as { user: AuthUser };
-  return payload.user;
-}
-
-export async function resetUserPin(identifier: string, pin: string): Promise<AuthUser> {
-  const response = await apiFetch(`${API_BASE}/auth/reset-pin`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ identifier, pin }),
-  });
-  if (!response.ok) {
-    let detail = "Failed to reset user PIN";
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
-        detail = payload.detail;
-      }
-    } catch {
-      // Keep default message.
-    }
-    throw new Error(detail);
-  }
-  const payload = (await response.json()) as { user: AuthUser };
-  return payload.user;
-}
+import { API_BASE, apiFetch, getOverviewStatsUpdatedEventName, notifyOverviewStatsUpdated } from "./apiCore";
 
 export async function fetchElevenLabsVoices(targetLanguage: StudyLanguageCode): Promise<ElevenLabsVoicesResponse> {
   const params = new URLSearchParams({ target_language: targetLanguage });
@@ -271,21 +92,6 @@ export async function previewElevenLabsVoice(
     throw new Error(detail);
   }
   return (await response.json()) as ElevenLabsVoicePreviewResponse;
-}
-
-export async function logoutFromPinSession(): Promise<void> {
-  await apiFetch(`${API_BASE}/auth/logout`, { method: "POST" });
-  clearStoredAuthSession();
-  notifyOverviewStatsUpdated();
-}
-
-export async function fetchAuthBootstrapStatus(): Promise<boolean> {
-  const response = await apiFetch(`${API_BASE}/auth/bootstrap-status`);
-  if (!response.ok) {
-    return false;
-  }
-  const payload = (await response.json()) as { can_public_register?: boolean };
-  return Boolean(payload.can_public_register);
 }
 
 export async function fetchSession(
@@ -648,7 +454,7 @@ export async function addContentItemCompareWords(
   wordIds: number[],
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
-): Promise<{ compare_words?: CompareWordRecord[] }> {
+): Promise<{ compare_words?: CompareWordRecord[]; compare_words_insights?: string }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
@@ -661,7 +467,7 @@ export async function addContentItemCompareWords(
   if (!response.ok) {
     throw new Error("Failed to add compare words");
   }
-  return (await response.json()) as { compare_words?: CompareWordRecord[] };
+  return (await response.json()) as { compare_words?: CompareWordRecord[]; compare_words_insights?: string };
 }
 
 export async function removeContentItemCompareWord(
@@ -669,7 +475,7 @@ export async function removeContentItemCompareWord(
   linkedItemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
-): Promise<{ compare_words?: CompareWordRecord[] }> {
+): Promise<{ compare_words?: CompareWordRecord[]; compare_words_insights?: string }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
@@ -680,7 +486,37 @@ export async function removeContentItemCompareWord(
   if (!response.ok) {
     throw new Error("Failed to remove compare word");
   }
-  return (await response.json()) as { compare_words?: CompareWordRecord[] };
+  return (await response.json()) as { compare_words?: CompareWordRecord[]; compare_words_insights?: string };
+}
+
+export async function fetchContentItemCompareWordInsights(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+  forceRefresh = false,
+): Promise<CompareWordInsightsResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/compare-words/insights?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ force_refresh: forceRefresh }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to load compare word insights";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as CompareWordInsightsResponse;
 }
 
 export async function generateContentItemExercises(

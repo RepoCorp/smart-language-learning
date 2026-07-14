@@ -18,10 +18,10 @@ from .management_topic_conversation_shared import (
     conversation_audio_enabled,
     conversation_inline_audio_enabled,
     conversation_realtime_enabled,
+    default_conversation_goal,
     validate_conversation_start_fields,
     validate_conversation_start_payload,
 )
-from .topic_conversation_models import generate_topic_conversation_start as generate_topic_conversation_start_with_question_model
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,8 @@ def build_realtime_conversation_instructions(
         "Use 1 or 2 short sentences maximum.\n"
         f"Do not switch to {source_name} unless the learner explicitly asks for it.\n"
         "Do not explain grammar unless asked.\n"
+        "Do not correct the learner's mistakes unless the learner explicitly asks for correction or help with the sentence.\n"
+        "If the learner makes mistakes, keep the conversation moving naturally instead of correcting them.\n"
         "Ask at most one short follow-up question when it helps keep the conversation moving.\n"
         f"If the learner is clearly saying goodbye or ending the conversation, reply with a short natural goodbye in {target_name}.\n"
         "In that goodbye case, do not force another question and do not try to continue the conversation.\n"
@@ -153,6 +155,7 @@ def create_realtime_client_secret(*, request: Request, instructions: str) -> dic
 
 class ContentTopicConversationStartView(APIView):
     def post(self, request: Request) -> Response:
+        request_started_at = time.perf_counter()
         source_language, target_language, topic, notes, role_text, goal_difficulty = validate_conversation_start_fields(request)
         validation_error = validate_conversation_start_payload(
             topic=topic,
@@ -163,30 +166,56 @@ class ContentTopicConversationStartView(APIView):
         if validation_error is not None:
             return validation_error
 
-        try:
-            start_payload = generate_topic_conversation_start_with_question_model(
-                topic=topic,
-                notes=notes,
-                role_text=role_text,
-                goal_difficulty=goal_difficulty,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        opening_text = start_payload["opening_text"]
-        opening_translation_text = start_payload["opening_translation_text"]
-        goal_text = start_payload["goal_text"]
-        selected_goal_difficulty = start_payload["goal_difficulty"]
+        goal_elapsed_ms = 0
+        goal_text = default_conversation_goal(source_language)
+        selected_goal_difficulty = goal_difficulty
+        opening_text = ""
+        opening_translation_text = ""
+        logger.info(
+            "content.topic_conversation.start_stage stage=default_goal elapsed_ms=%s topic=%s goal_difficulty=%s",
+            goal_elapsed_ms,
+            topic,
+            goal_difficulty,
+        )
         opening_audio_url = ""
+        opening_audio_elapsed_ms = 0
         if opening_text and conversation_audio_enabled():
+            opening_audio_started_at = time.perf_counter()
             if conversation_inline_audio_enabled():
                 opening_audio_url = create_audio_data_url(opening_text, "conversation", target_language=target_language)
             else:
                 opening_audio_url = create_audio_file(opening_text, "conversation", target_language=target_language)
+            opening_audio_elapsed_ms = int((time.perf_counter() - opening_audio_started_at) * 1000)
+            logger.info(
+                "content.topic_conversation.start_stage stage=opening_audio elapsed_ms=%s has_audio=%s",
+                opening_audio_elapsed_ms,
+                bool(opening_audio_url),
+            )
         elif opening_text:
             logger.info("content.topic_conversation.start_stage stage=opening_audio skipped=true")
+
+        total_elapsed_ms = int((time.perf_counter() - request_started_at) * 1000)
+        logger.info(
+            "content.topic_conversation.start_finished total_elapsed_ms=%s goal_generation_ms=%s opening_audio_ms=%s topic=%s goal_length=%s has_opening_text=%s has_opening_audio=%s",
+            total_elapsed_ms,
+            goal_elapsed_ms,
+            opening_audio_elapsed_ms,
+            topic,
+            len(goal_text),
+            bool(opening_text),
+            bool(opening_audio_url),
+        )
+        logger.info(
+            "content.topic_conversation.start_timing_summary total_elapsed_ms=%s goal_generation_ms=%s opening_audio_ms=%s topic=%s goal_difficulty=%s goal_length=%s has_opening_text=%s has_opening_audio=%s",
+            total_elapsed_ms,
+            goal_elapsed_ms,
+            opening_audio_elapsed_ms,
+            topic,
+            selected_goal_difficulty,
+            len(goal_text),
+            bool(opening_text),
+            bool(opening_audio_url),
+        )
 
         return Response(
             {
@@ -204,6 +233,7 @@ class ContentTopicConversationStartView(APIView):
 
 class ContentTopicConversationRealtimeSessionView(APIView):
     def post(self, request: Request) -> Response:
+        request_started_at = time.perf_counter()
         source_language, target_language, topic, notes, role_text, goal_difficulty = validate_conversation_start_fields(request)
         logger.info(
             "content.topic_conversation.realtime_session_requested topic=%s source_language=%s target_language=%s goal_difficulty=%s notes_length=%s role_length=%s realtime_enabled=%s",
@@ -241,9 +271,16 @@ class ContentTopicConversationRealtimeSessionView(APIView):
         )
 
         try:
+            client_secret_started_at = time.perf_counter()
             client_secret_payload = create_realtime_client_secret(
                 request=request,
                 instructions=realtime_instructions,
+            )
+            client_secret_elapsed_ms = int((time.perf_counter() - client_secret_started_at) * 1000)
+            logger.info(
+                "content.topic_conversation.realtime_session_stage stage=client_secret elapsed_ms=%s topic=%s",
+                client_secret_elapsed_ms,
+                topic,
             )
         except RuntimeError as exc:
             logger.warning(
@@ -273,6 +310,22 @@ class ContentTopicConversationRealtimeSessionView(APIView):
             topic,
             str(getattr(settings, "OPENAI_REALTIME_MODEL", "gpt-realtime-1.5")).strip() or "gpt-realtime-1.5",
             str(getattr(settings, "OPENAI_REALTIME_VOICE", "marin")).strip() or "marin",
+            bool(normalized_client_secret["value"]),
+        )
+        logger.info(
+            "content.topic_conversation.realtime_session_finished total_elapsed_ms=%s client_secret_ms=%s topic=%s instructions_length=%s",
+            int((time.perf_counter() - request_started_at) * 1000),
+            client_secret_elapsed_ms,
+            topic,
+            len(realtime_instructions),
+        )
+        logger.info(
+            "content.topic_conversation.realtime_session_timing_summary total_elapsed_ms=%s client_secret_ms=%s topic=%s goal_difficulty=%s instructions_length=%s has_client_secret=%s",
+            int((time.perf_counter() - request_started_at) * 1000),
+            client_secret_elapsed_ms,
+            topic,
+            goal_difficulty,
+            len(realtime_instructions),
             bool(normalized_client_secret["value"]),
         )
         return Response(

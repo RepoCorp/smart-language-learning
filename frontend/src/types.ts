@@ -38,6 +38,10 @@ export interface CompareWordRecord {
   created_at?: string;
 }
 
+export interface CompareWordInsightsResponse {
+  insights: string;
+}
+
 export interface SessionRestoreState {
   repetition_count_es_to_de: number;
   interval_days_es_to_de: number;
@@ -99,6 +103,7 @@ export interface SessionItem {
     }>;
   }>;
   compare_words?: CompareWordRecord[];
+  compare_words_insights?: string;
   item_questions?: ItemQuestionExchange[];
   session_restore_state?: SessionRestoreState;
 }
@@ -219,6 +224,7 @@ export interface ContentItemDetailResponse {
   dialog_phrase_odd_index?: number | null;
   related_dialogs?: SessionItem["related_dialogs"];
   compare_words?: CompareWordRecord[];
+  compare_words_insights?: string;
   item_questions?: ItemQuestionExchange[];
 }
 
@@ -229,12 +235,6 @@ export interface ContentItemQuestionResponse {
 
 export interface ContentItemRefreshWordResponse {
   ok: boolean;
-  spanish_text?: string;
-  german_text?: string;
-  word_type?: string;
-  word_type_added?: boolean;
-  word_text_updated?: boolean;
-  exercise_phrases?: ItemExercisePhrases;
   dialog_occurrences_created?: number;
   related_dialogs?: SessionItem["related_dialogs"];
 }

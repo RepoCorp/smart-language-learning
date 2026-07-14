@@ -13,6 +13,7 @@ from .management import (
 )
 from .management_items import (
     ContentItemCompareWordDetailView,
+    ContentItemCompareWordsInsightsView,
     ContentItemCompareWordsSearchView,
     ContentItemCompareWordsView,
     ContentItemDetailView,
@@ -37,6 +38,7 @@ from .topics import ContentTopicContextsView, ContentTopicsView, save_topic
 __all__ = [
     "ContentConfirmView",
     "ContentItemCompareWordDetailView",
+    "ContentItemCompareWordsInsightsView",
     "ContentItemCompareWordsSearchView",
     "ContentItemCompareWordsView",
     "ContentItemDetailView",

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   fetchContentItemDetail,
@@ -24,6 +24,7 @@ import { buildFinishedConversationTranscript, buildGeneratedReviewOriginalUserTe
 import ConversationTurns from "./ConversationTurns";
 import { useConversationGoalEvaluation } from "./useConversationGoalEvaluation";
 import { useConversationReviewPreparation } from "./useConversationReviewPreparation";
+import { useConversationScroll } from "./useConversationScroll";
 import {
   type ConversationResponseLevel,
   type ConversationSpeechSpeed,
@@ -125,47 +126,6 @@ export default function ConversationPage(): JSX.Element {
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
-  const historyRef = useRef<HTMLDivElement | null>(null);
-  const helpModalRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const loadTopics = async (): Promise<void> => {
-      setLoadingTopics(true);
-      try {
-        const response = await fetchContentTopics(sourceLanguage, targetLanguage);
-        if (!active) {
-          return;
-        }
-        setPreviousTopics(response.topics || []);
-      } catch {
-        if (active) {
-          setPreviousTopics([]);
-        }
-      } finally {
-        if (active) {
-          setLoadingTopics(false);
-        }
-      }
-    };
-
-    void loadTopics();
-    return () => {
-      active = false;
-    };
-  }, [sourceLanguage, targetLanguage]);
-
-  useEffect(() => {
-    if (!helpOpen) {
-      return;
-    }
-    const helpElement = helpModalRef.current;
-    if (!helpElement) {
-      return;
-    }
-    helpElement.scrollTo({ top: helpElement.scrollHeight, behavior: "smooth" });
-  }, [helpOpen, helpHistory, helpLoading]);
-
   const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
   const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
   const goalDifficultyLabelByCode: Record<GoalDifficulty, Parameters<typeof t>[0]> = {
@@ -203,15 +163,32 @@ export default function ConversationPage(): JSX.Element {
     onGoalChange: setConversationGoal,
   });
 
-  const scrollConversationToBottom = (): void => {
-    const historyElement = historyRef.current;
-    if (!historyElement) {
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      historyElement.scrollTo({ top: historyElement.scrollHeight, behavior: "smooth" });
-    });
-  };
+  useEffect(() => {
+    let active = true;
+    const loadTopics = async (): Promise<void> => {
+      setLoadingTopics(true);
+      try {
+        const response = await fetchContentTopics(sourceLanguage, targetLanguage);
+        if (!active) {
+          return;
+        }
+        setPreviousTopics(response.topics || []);
+      } catch {
+        if (active) {
+          setPreviousTopics([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingTopics(false);
+        }
+      }
+    };
+
+    void loadTopics();
+    return () => {
+      active = false;
+    };
+  }, [sourceLanguage, targetLanguage]);
 
   const toggleOpeningTranslation = (): void => {
     const nextVisible = !showOpeningTranslation;
@@ -392,8 +369,6 @@ export default function ConversationPage(): JSX.Element {
     conversationRecordingSeconds,
     conversationTransport,
     conversationRealtimeConnecting,
-    conversationRealtimeReady,
-    conversationRealtimeVoice,
     closeRealtimeSession,
     setPaused,
     setupRealtimeConversation,
@@ -421,14 +396,19 @@ export default function ConversationPage(): JSX.Element {
     speechSpeed,
     responseLevel,
   });
-
-  useEffect(() => {
-    const historyElement = historyRef.current;
-    if (!historyElement) {
-      return;
-    }
-    historyElement.scrollTo({ top: historyElement.scrollHeight, behavior: "smooth" });
-  }, [conversationTurns, conversationLoading, conversationRecording]);
+  const {
+    helpModalRef,
+    historyRef,
+    scrollConversationToBottom,
+  } = useConversationScroll({
+    started,
+    helpHistoryCount: helpHistory.length,
+    helpLoading,
+    helpOpen,
+    conversationTurnsCount: conversationTurns.length,
+    conversationLoading,
+    conversationRecording,
+  });
 
   useEffect(() => {
     setShowTargetText(targetPromptMode === "text");
@@ -510,6 +490,7 @@ export default function ConversationPage(): JSX.Element {
 
   const openHelpModal = (): void => {
     setHelpError("");
+    setPaused(true);
     setHelpOpen(true);
   };
 
@@ -557,6 +538,7 @@ export default function ConversationPage(): JSX.Element {
   };
 
   const startConversation = async (): Promise<void> => {
+    const startStartedAt = performance.now();
     setConversationError("");
     if (!resolvedTopic) {
       setConversationError(previousTopics.length ? t("content.error.selectOrEnterTopic") : t("content.error.enterTopic"));
@@ -566,6 +548,14 @@ export default function ConversationPage(): JSX.Element {
     try {
       const trimmedNotes = notes.trim();
       const trimmedRole = role.trim();
+      logRealtime("start-request-started", {
+        topic: resolvedTopic,
+        sourceLanguage,
+        targetLanguage,
+        goalDifficulty,
+        mode: selectedConversationMode,
+      });
+      const startRequestStartedAt = performance.now();
       const payload = await startTopicConversation(
         resolvedTopic,
         trimmedNotes,
@@ -574,10 +564,18 @@ export default function ConversationPage(): JSX.Element {
         sourceLanguage,
         targetLanguage,
       );
+      logRealtime("start-request-finished", {
+        elapsedMs: Math.round(performance.now() - startRequestStartedAt),
+        goalLength: (payload.goal_text || "").length,
+        hasOpeningText: Boolean(payload.opening_text),
+        hasOpeningAudio: Boolean(payload.opening_audio_url),
+      });
+      const startRequestMs = Math.round(performance.now() - startRequestStartedAt);
       if (selectedConversationMode === "realtime") {
         logRealtime("start-conversation-http-ready", {
           topic: payload.topic || resolvedTopic,
         });
+        const realtimeSetupStartedAt = performance.now();
         const realtimeEnabled = await setupRealtimeConversation({
           topic: payload.topic || resolvedTopic,
           notes: payload.notes || trimmedNotes,
@@ -588,6 +586,20 @@ export default function ConversationPage(): JSX.Element {
             reason: error instanceof Error ? error.message : String(error),
           });
           return false;
+        });
+        logRealtime("start-realtime-setup-finished", {
+          elapsedMs: Math.round(performance.now() - realtimeSetupStartedAt),
+          realtimeEnabled,
+        });
+        logRealtime("start-timing-summary", {
+          totalElapsedMs: Math.round(performance.now() - startStartedAt),
+          startRequestMs,
+          realtimeSetupMs: Math.round(performance.now() - realtimeSetupStartedAt),
+          mode: "realtime",
+          realtimeEnabled,
+          goalLength: (payload.goal_text || "").length,
+          hasOpeningText: Boolean(payload.opening_text),
+          hasOpeningAudio: Boolean(payload.opening_audio_url),
         });
         if (!realtimeEnabled) {
           closeRealtimeSession();
@@ -602,6 +614,10 @@ export default function ConversationPage(): JSX.Element {
           trimmedRole,
           goalDifficulty,
         );
+        logRealtime("start-finished", {
+          elapsedMs: Math.round(performance.now() - startStartedAt),
+          mode: "realtime",
+        });
         return;
       }
 
@@ -613,9 +629,27 @@ export default function ConversationPage(): JSX.Element {
         trimmedRole,
         goalDifficulty,
       );
+      logRealtime("start-timing-summary", {
+        totalElapsedMs: Math.round(performance.now() - startStartedAt),
+        startRequestMs,
+        realtimeSetupMs: 0,
+        mode: "http",
+        realtimeEnabled: false,
+        goalLength: (payload.goal_text || "").length,
+        hasOpeningText: Boolean(payload.opening_text),
+        hasOpeningAudio: Boolean(payload.opening_audio_url),
+      });
+      logRealtime("start-finished", {
+        elapsedMs: Math.round(performance.now() - startStartedAt),
+        mode: "http",
+      });
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
       setConversationError(detail || t("newItem.questionsError"));
+      warnRealtime("start-failed", {
+        elapsedMs: Math.round(performance.now() - startStartedAt),
+        reason: detail || t("newItem.questionsError"),
+      });
     } finally {
       setConversationLoading(false);
     }
@@ -741,6 +775,7 @@ export default function ConversationPage(): JSX.Element {
             dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
             related_dialogs: detail.related_dialogs || [],
             compare_words: detail.compare_words || [],
+            compare_words_insights: detail.compare_words_insights || "",
             item_questions: detail.item_questions || [],
           });
           setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
@@ -1063,10 +1098,7 @@ export default function ConversationPage(): JSX.Element {
           <>
             <ConversationActiveControls
               summary={{
-                topic: activeTopic,
                 role: activeRole,
-                goalDifficultyLabel: t(goalDifficultyLabelByCode[activeGoalDifficulty]),
-                goal: conversationGoal,
               }}
               status={{
                 canSendResponse: conversationRecordingSeconds >= CONVERSATION_SEND_ENABLE_DELAY_SECONDS,
@@ -1079,9 +1111,6 @@ export default function ConversationPage(): JSX.Element {
                 showResponseLevelControl: true,
                 showSpeechSpeedControl: true,
                 speechSpeed,
-                transportHint: conversationTransport === "realtime" && conversationRealtimeReady
-                  ? `Realtime voice active${conversationRealtimeVoice ? ` (${conversationRealtimeVoice})` : ""}`
-                  : "Standard voice flow active",
               }}
               controls={{
                 helpLoading,
@@ -1154,7 +1183,10 @@ export default function ConversationPage(): JSX.Element {
               turn_count: 0,
               turns: [],
             }}
-            renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
+            sourceLanguage={sourceLanguage}
+            targetLanguage={targetLanguage}
+            wordActionStatus={wordActionStatus}
+            requestAddWordFromConversation={requestAddWordFromTurnToken}
             requestAddSentenceFromConversation={requestAddSentenceFromConversation}
             sentenceActionStatus={sentenceActionStatus}
             readOnly
@@ -1189,7 +1221,10 @@ export default function ConversationPage(): JSX.Element {
             heading={t("conversation.reviewTitle")}
             description={t("conversation.reviewDescription")}
             dialog={conversationReviewDialog}
-            renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
+            sourceLanguage={sourceLanguage}
+            targetLanguage={targetLanguage}
+            wordActionStatus={wordActionStatus}
+            requestAddWordFromConversation={requestAddWordFromTurnToken}
             requestAddSentenceFromConversation={requestAddSentenceFromConversation}
             sentenceActionStatus={sentenceActionStatus}
             originalUserTexts={generatedReviewOriginalUserTexts}

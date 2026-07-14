@@ -26,17 +26,14 @@ from .management import (
 )
 from .dialog_item_context import related_dialogs_by_item_ids
 from .item_questions import item_question_history
-from .types import ContentCandidate
-from .word_metadata import basic_word_metadata as _basic_word_metadata
-from ...models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
+from ...models import DialogTurn, Item, ItemDialogOccurrence
 from ..dialog_phrase_match import build_dialog_phrase_match_payload
 from .core import (
     create_audio_file,
     generate_funny_image_exercise_phrase_with_chatgpt,
     generate_word_exercise_phrases_with_chatgpt,
-    normalize_word_type,
-    save_word_dialog_occurrences,
 )
+from .management_items_word_refresh import scan_all_dialogs_for_word
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +71,6 @@ def _deterministic_choice(values: list, *, seed: str, key_fn):
         return None
     return _deterministic_sort(values, seed=seed, key_fn=key_fn)[0]
 MAX_EXERCISE_PHRASES = 30
-ARTICLES_BY_LANGUAGE = {
-    "spanish": {"el", "la", "los", "las", "un", "una", "unos", "unas"},
-    "german": {"der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines"},
-}
-
-
 def _compare_words_payload(item: Item) -> list[dict]:
     if item.item_type != Item.ItemType.WORD:
         return []
@@ -98,23 +89,6 @@ def _compare_words_payload(item: Item) -> list[dict]:
         )
     )
     return linked_words
-
-
-def _word_refresh_model() -> str:
-    configured = str(getattr(settings, "OPENAI_WORD_REFRESH_MODEL", "")).strip()
-    if configured:
-        return configured
-    question_model = str(getattr(settings, "OPENAI_QUESTION_MODEL", "")).strip()
-    if question_model:
-        return question_model
-    return str(getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")).strip() or "gpt-4o-mini"
-
-
-def _word_refresh_reasoning_effort() -> str:
-    configured = str(getattr(settings, "OPENAI_WORD_REFRESH_REASONING_EFFORT", "")).strip()
-    if configured:
-        return configured
-    return str(getattr(settings, "OPENAI_REASONING_EFFORT", "")).strip()
 
 
 class ContentItemsView(APIView):
@@ -234,6 +208,7 @@ class ContentItemDetailView(APIView):
                 "dialog_phrase_odd_index": dialog_phrase_payload["odd_index"],
                 "related_dialogs": related_dialogs_map.get(item.id, []),
                 "compare_words": _compare_words_payload(item),
+                "compare_words_insights": item.compare_words_insights or "",
                 "item_questions": item_question_history(item),
             }
         )
@@ -362,9 +337,14 @@ class ContentItemCompareWordsView(APIView):
                 )
             )
             item.confusing_with.add(*linked_items)
+            item.compare_words_insights = ""
+            item.save(update_fields=["compare_words_insights", "updated_at"])
 
         item.refresh_from_db()
-        return Response({"compare_words": _compare_words_payload(item)})
+        return Response({
+            "compare_words": _compare_words_payload(item),
+            "compare_words_insights": item.compare_words_insights or "",
+        })
 
 
 class ContentItemCompareWordDetailView(APIView):
@@ -390,8 +370,13 @@ class ContentItemCompareWordDetailView(APIView):
             return Response({"detail": "Linked item not found"}, status=status.HTTP_404_NOT_FOUND)
 
         item.confusing_with.remove(linked_item)
+        item.compare_words_insights = ""
+        item.save(update_fields=["compare_words_insights", "updated_at"])
         item.refresh_from_db()
-        return Response({"compare_words": _compare_words_payload(item)})
+        return Response({
+            "compare_words": _compare_words_payload(item),
+            "compare_words_insights": item.compare_words_insights or "",
+        })
 
 
 def _phrase_audio_url_for_turn(turn: DialogTurn, *, user, fallback_item: Item | None = None) -> str:
@@ -429,157 +414,8 @@ class ContentItemMarkLearnedView(APIView):
         return Response({"ok": True, "is_learned": is_learned})
 
 
-class ContentItemRefreshWordView(APIView):
-    def post(self, request: Request, item_id: int) -> Response:
-        user = get_request_user(request)
-        source_language, target_language = _normalized_pair(request)
-        item = apply_user_scope(Item.objects, user).filter(
-            id=item_id,
-            source_language=source_language,
-            target_language=target_language,
-        ).first()
-        if not item:
-            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
-        if item.item_type != Item.ItemType.WORD:
-            return Response({"detail": "Refresh is only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
-
-        word_type_added = False
-        word_text_updated = False
-        normalized_word_type = normalize_word_type(item.word_type)
-        refresh_model = _word_refresh_model()
-        refresh_reasoning_effort = _word_refresh_reasoning_effort()
-        try:
-            resolved_source, resolved_target, resolved_word_type = _basic_word_metadata(
-                source_text="",
-                target_text=_refresh_target_clicked_token(item.german_text, target_language),
-                source_language=source_language,
-                target_language=target_language,
-                source_line="",
-                target_line=item.example_sentence or "",
-                model=refresh_model,
-                reasoning_effort=refresh_reasoning_effort,
-            )
-        except RuntimeError:
-            return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        resolved_word_type = normalize_word_type(resolved_word_type)
-        if not resolved_word_type:
-            return Response({"detail": "Word metadata is incomplete"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        normalized_source = _normalize_spacing(resolved_source)
-        normalized_target = _normalize_spacing(resolved_target)
-        if resolved_word_type == "noun":
-            if not _text_has_article(normalized_source, source_language):
-                return Response({"detail": "Word metadata is missing source article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            if not _text_has_article(normalized_target, target_language):
-                return Response({"detail": "Word metadata is missing target article"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        if normalized_source and normalized_source != item.spanish_text:
-            item.spanish_text = normalized_source
-            word_text_updated = True
-        if normalized_target and normalized_target != item.german_text:
-            item.german_text = normalized_target
-            word_text_updated = True
-        word_type_updated = item.word_type != resolved_word_type
-        if item.word_type != resolved_word_type:
-            word_type_added = not normalized_word_type
-            item.word_type = resolved_word_type
-
-        if word_type_added or word_type_updated or word_text_updated:
-            metadata_update_fields = ["updated_at"]
-            if word_type_added or word_type_updated:
-                metadata_update_fields.append("word_type")
-            if word_text_updated:
-                metadata_update_fields.extend(["spanish_text", "german_text"])
-            item.save(update_fields=metadata_update_fields)
-
-        dialog_occurrences_created = _scan_all_dialogs_for_word(
-            user=user,
-            item=item,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        generated = generate_word_exercise_phrases_with_chatgpt(
-            item.spanish_text,
-            item.german_text,
-            notes=item.notes or "",
-            word_type=item.word_type or "",
-            source_language=source_language,
-            target_language=target_language,
-            target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
-            model=refresh_model,
-            reasoning_effort=refresh_reasoning_effort,
-        )
-        cleaned = _sanitize_exercise_payload(generated)
-        if not cleaned["phrases"]:
-            return Response({"detail": "Exercise generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        item.exercise_phrases = cleaned
-        item.save(update_fields=["exercise_phrases", "updated_at"])
-
-        related_dialogs_map = related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
-        return Response(
-            {
-                "ok": True,
-                "spanish_text": item.spanish_text,
-                "german_text": item.german_text,
-                "word_type": item.word_type,
-                "word_type_added": word_type_added,
-                "word_text_updated": word_text_updated,
-                "exercise_phrases": cleaned,
-                "dialog_occurrences_created": dialog_occurrences_created,
-                "related_dialogs": related_dialogs_map.get(item.id, []),
-            }
-        )
-
-
-def _text_has_article(text: str, language: str) -> bool:
-    first = text.strip().split(" ", 1)[0].lower() if text.strip() else ""
-    return first in ARTICLES_BY_LANGUAGE.get(language, set())
-
-
 def _normalize_spacing(text: str) -> str:
     return " ".join((text or "").split()).strip()
-
-
-def _refresh_target_clicked_token(text: str, language: str) -> str:
-    normalized = _normalize_spacing(text)
-    if not normalized:
-        return ""
-    parts = normalized.split(" ", 1)
-    if parts[0].lower() in ARTICLES_BY_LANGUAGE.get(language, set()):
-        return parts[1].strip() if len(parts) == 2 else ""
-    return normalized
-
-
-def _scan_all_dialogs_for_word(
-    *,
-    user,
-    item: Item,
-    source_language: str,
-    target_language: str,
-) -> int:
-    candidate = ContentCandidate(
-        spanish_text=item.spanish_text,
-        german_text=item.german_text,
-        exists=True,
-        word_type=item.word_type or "",
-    )
-    created = 0
-    dialogs = apply_user_scope(SavedDialog.objects, user).filter(
-        source_language=source_language,
-        target_language=target_language,
-    )
-    for dialog in dialogs.order_by("id"):
-        turns = list(DialogTurn.objects.filter(dialog=dialog).order_by("turn_index", "id"))
-        if not turns:
-            continue
-        created += save_word_dialog_occurrences(
-            user=user,
-            dialog=dialog,
-            turns=turns,
-            word_candidates=[candidate],
-            source_language=source_language,
-            target_language=target_language,
-        )
-    return created
 
 
 def _target_contexts_for_word_exercises(*, user, item: Item, limit: int = 1) -> list[str]:
@@ -819,7 +655,7 @@ class ContentItemExercisesView(APIView):
         if item.item_type != Item.ItemType.WORD:
             return Response({"detail": "Exercises are only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
 
-        _scan_all_dialogs_for_word(
+        scan_all_dialogs_for_word(
             user=user,
             item=item,
             source_language=source_language,

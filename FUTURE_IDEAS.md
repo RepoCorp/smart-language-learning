@@ -1,9 +1,7 @@
 # Todos
 
 ## PRIORITARIO
-Conversation goals are not working
-Ask questions : botón para descomponer y si hay conversación para ese ítem indicarlo en el boton
-Que los tests the frases usen la voz de eleven labs
+Ningun otro arreglito que no sea vital!!! 
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
@@ -23,14 +21,7 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 
 ### Tier 1
 Algun security by obscurity, que igual deje el pin sencillo.
-Play all dialogs is not playing all dialogs
-Refreshing palabra que solo busque nuevos dialogos (revisar que es lo otro que hace e implementarlo separadamente tambien ) 
-Preguntas comunes: descomponer la palabra, y ajustar las preguntas pa que no quiten tanto espacio
-Guiones espacios y demás en hints
-Que errores de mayusculas y umlauts y eso los trate como errores
 In the create content window, make dialog lenght and language of required words a simple radio
-Que palabras confusas pueda preguntarse al modelo que hable sobre sus diferencias (En palabras confundidoras que añada la direfencia/relación, como con pregunta y que después del potencial varias preguntas anote la conclusión
-)
 En diálogos en item view y creo que diálogos también, que no scrolls back
 
 #### PROMPTS/MODEL WORK
@@ -44,14 +35,13 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Que el usuario pueda pedir que el item sea re-evaluado por un mejor modelo. estaba implementado en el regenerar palabra, pero no estaba funcionando bien. Añadi un todo con Codex para volverlo a implementar mas adelante.  
 Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
 Delay entre frases de ejercicio repeticion
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
 en bloques no repetir audio desde el principio si no desde el ppio de la frase, es decir ppio o despues de un punto
 En ejercicios u otra parte tambien poner ejemplos en otros contextos, no solo de donde vino la palabra
 Revisar otros dialogos de las palabras separado de rehacer palabra
-Cuando se añade turno en cualquier momento, generar el audio con voz estandar, usar siempre voz estandar en otras partes no dialogo
-Uso del espacio en dialogo y el botoncito de play cuando no esta en modo texto (y revisar si puede ser mas pequeno)
 Que la pregunta común llene el input pero permita escribir
 Recrear audio de un turno en particular que pudo haber quedado regu
 Correr todos los diálogos y regenerar los que se necesite
@@ -61,7 +51,6 @@ Spread items from same phrase considering sides
 Que los ejercicios de un helper sean otros usos del helpee
 Cómo hacer para que en el ejercicio de bloques sea más entrecomillas fácil equivocarse
 El segundo ejercicio de palabra, el teclado completo, se va pendiendo la tecla qué es y se mueve al puesto como bloque. De pronto que prenda tres opciones pero de un color no verde, y cuando uno toca la que si es se pone verde y después uno la arrastra
-Que mutear en el ejercicio no lo lo silencie  si no que pare donde estaba para continuar en la misma parte si se desmutea
 en las ventanas, como generar contenido, limpiar y que las opciones empiecen colapsadas y solo abra el area si se hace click en ella
 Que al escoger sesión procure no incluir frases y sus palabras juntas
 Que la palabra en la imagen sea completa por ejemplo herauskommen y que se muestre
@@ -95,7 +84,6 @@ Para las palabras seleccionadas añadir funcionalidad a guardar cuando son agreg
 Mejorar ejemplos de helpers y que la imagen lo represente mejor, como por ejemplo que es en el futuro o es como würde 
 Que el helper no lo traduzca como palabra si no como una explicacion o algo asi 
 Mas creatividad para la imagen 
-En el celular a veces el teclado tapa el input de las preguntas
 Mejorar UI de creacion de contenido
 Mover unselect all, abrir ejercicios y cualquier otro boton que sea el mas usado a la izquierda
 Cuando testing palabras como 'bien', que actualmente tiene como in Ordnung, añadir alguna claridad
@@ -105,7 +93,6 @@ Que pida algo de definicion del usuario para que en las conversaciones ese sea s
 Para la conversacion, en los detalles incluir quien soy yo y quien es el usuario, de pronto si guardar estas opciones en el backend
 Si helper cambia con el genero hacer tambien ejercicios de todos
 Incluir teoria de gramatica en los ejercicios
-Do not allow deleting phrases, only mark them as inactive or archived.
 Ensayar otros modelos
 Seguridad de S3
 Arreglar allowed hosts de Django

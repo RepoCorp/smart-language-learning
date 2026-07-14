@@ -8,6 +8,7 @@ def _load(name: str) -> str:
 
 
 CONVERSATION_GENERATION_PROMPT = _load("conversation_generation.txt")
+COMPARE_WORDS_INSIGHTS_PROMPT = _load("compare_words_insights.txt")
 DIALOG_CLICK_SPECIAL_REFINEMENT_PROMPT = _load("dialog_click_special_refinement.txt")
 DIALOG_CLICK_WORD_RESOLUTION_PROMPT = _load("dialog_click_word_resolution.txt")
 ITEM_CONVERSATION_REPLY_PROMPT = _load("item_conversation_reply.txt")

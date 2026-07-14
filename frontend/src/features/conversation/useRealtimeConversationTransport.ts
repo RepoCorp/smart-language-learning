@@ -39,6 +39,14 @@ export function useRealtimeConversationTransport({
   const realtimePendingAssistantTextRef = useRef<string>("");
   const realtimeCompletedTurnRef = useRef<BaseConversationTransportArgs["onConversationTurn"] extends (response: infer T) => void ? T | null : null>(null);
   const realtimeAudioStoppedRef = useRef<boolean>(false);
+  const setupMetricsRef = useRef<{
+    sessionRequestMs: number;
+    microphoneMs: number;
+    offerMs: number;
+    localDescriptionMs: number;
+    sdpConnectMs: number;
+    remoteDescriptionMs: number;
+  } | null>(null);
   const timerRef = useRef<number | null>(null);
   const maxRecordingTimeoutRef = useRef<number | null>(null);
   const autoRestartAfterAssistantRef = useRef<boolean>(true);
@@ -254,6 +262,7 @@ export function useRealtimeConversationTransport({
     roleText,
     goalDifficulty,
   }: StartConversationTransportArgs): Promise<boolean> => {
+    const setupStartedAt = performance.now();
     if (typeof window === "undefined" || typeof RTCPeerConnection === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       warnRealtime("unsupported");
       return false;
@@ -263,6 +272,18 @@ export function useRealtimeConversationTransport({
     try {
       logRealtime("setup-started", { topic, sourceLanguage, targetLanguage, goalDifficulty });
       const session = await createTopicConversationRealtimeSession(topic, notes, roleText, goalDifficulty, sourceLanguage, targetLanguage);
+      const sessionRequestMs = Math.round(performance.now() - setupStartedAt);
+      setupMetricsRef.current = {
+        sessionRequestMs,
+        microphoneMs: 0,
+        offerMs: 0,
+        localDescriptionMs: 0,
+        sdpConnectMs: 0,
+        remoteDescriptionMs: 0,
+      };
+      logRealtime("session-request-finished", {
+        elapsedMs: sessionRequestMs,
+      });
       baseInstructionsRef.current = (session.instructions || "").trim();
       logRealtime("session-response", {
         realtimeEnabled: session.realtime_enabled,
@@ -298,6 +319,18 @@ export function useRealtimeConversationTransport({
       dataChannel.addEventListener("open", () => {
         if (activeSessionTokenRef.current !== sessionToken) return;
         logRealtime("data-channel-open");
+        logRealtime("setup-finished", {
+          elapsedMs: Math.round(performance.now() - setupStartedAt),
+        });
+        logRealtime("setup-timing-summary", {
+          totalElapsedMs: Math.round(performance.now() - setupStartedAt),
+          sessionRequestMs: setupMetricsRef.current?.sessionRequestMs || 0,
+          microphoneMs: setupMetricsRef.current?.microphoneMs || 0,
+          offerMs: setupMetricsRef.current?.offerMs || 0,
+          localDescriptionMs: setupMetricsRef.current?.localDescriptionMs || 0,
+          sdpConnectMs: setupMetricsRef.current?.sdpConnectMs || 0,
+          remoteDescriptionMs: setupMetricsRef.current?.remoteDescriptionMs || 0,
+        });
         sendRealtimeSessionUpdate(
           speechSpeed,
           responseLevel,
@@ -385,8 +418,16 @@ export function useRealtimeConversationTransport({
           onError(event.error?.message || event.message || "Realtime conversation error");
         }
       });
+      const microphoneStartedAt = performance.now();
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (activeSessionTokenRef.current !== sessionToken) return mediaStream.getTracks().forEach((track) => track.stop()), false;
+      if (setupMetricsRef.current) {
+        setupMetricsRef.current.microphoneMs = Math.round(performance.now() - microphoneStartedAt);
+      }
+      logRealtime("microphone-ready", {
+        elapsedMs: setupMetricsRef.current?.microphoneMs || Math.round(performance.now() - microphoneStartedAt),
+        audioTrackCount: mediaStream.getAudioTracks().length,
+      });
       const audioTrack = mediaStream.getAudioTracks()[0];
       if (!audioTrack) {
         closeRealtimeSession();
@@ -395,8 +436,25 @@ export function useRealtimeConversationTransport({
       realtimeStreamRef.current = mediaStream;
       audioTrack.enabled = false;
       peerConnection.addTrack(audioTrack, mediaStream);
+      logRealtime("local-audio-track-added");
+      const offerStartedAt = performance.now();
       const offer = await peerConnection.createOffer();
+      if (setupMetricsRef.current) {
+        setupMetricsRef.current.offerMs = Math.round(performance.now() - offerStartedAt);
+      }
+      logRealtime("offer-created", {
+        elapsedMs: setupMetricsRef.current?.offerMs || Math.round(performance.now() - offerStartedAt),
+        sdpLength: (offer.sdp || "").length,
+      });
+      const localDescriptionStartedAt = performance.now();
       await peerConnection.setLocalDescription(offer);
+      if (setupMetricsRef.current) {
+        setupMetricsRef.current.localDescriptionMs = Math.round(performance.now() - localDescriptionStartedAt);
+      }
+      logRealtime("local-description-set", {
+        elapsedMs: setupMetricsRef.current?.localDescriptionMs || Math.round(performance.now() - localDescriptionStartedAt),
+      });
+      const sdpConnectStartedAt = performance.now();
       const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
         method: "POST",
         body: offer.sdp,
@@ -405,7 +463,22 @@ export function useRealtimeConversationTransport({
       if (!sdpResponse.ok) {
         throw new Error("Failed to connect Realtime audio session");
       }
-      await peerConnection.setRemoteDescription({ type: "answer", sdp: await sdpResponse.text() });
+      const answerSdp = await sdpResponse.text();
+      if (setupMetricsRef.current) {
+        setupMetricsRef.current.sdpConnectMs = Math.round(performance.now() - sdpConnectStartedAt);
+      }
+      logRealtime("sdp-connect-succeeded", {
+        elapsedMs: setupMetricsRef.current?.sdpConnectMs || Math.round(performance.now() - sdpConnectStartedAt),
+        answerLength: answerSdp.length,
+      });
+      const remoteDescriptionStartedAt = performance.now();
+      await peerConnection.setRemoteDescription({ type: "answer", sdp: answerSdp });
+      if (setupMetricsRef.current) {
+        setupMetricsRef.current.remoteDescriptionMs = Math.round(performance.now() - remoteDescriptionStartedAt);
+      }
+      logRealtime("remote-description-set", {
+        elapsedMs: setupMetricsRef.current?.remoteDescriptionMs || Math.round(performance.now() - remoteDescriptionStartedAt),
+      });
       return true;
     } finally {
       setConversationRealtimeConnecting(false);

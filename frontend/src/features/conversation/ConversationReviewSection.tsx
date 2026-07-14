@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n";
-import type { ContentDialogRecord } from "../../types";
+import type { ContentDialogRecord, StudyLanguageCode } from "../../types";
 import ConversationReviewTurns, { type SentenceActionStatus } from "./ConversationReviewTurns";
 
 type Props = {
@@ -10,14 +10,17 @@ type Props = {
   heading: string;
   description: string;
   dialog: ContentDialogRecord;
-  renderTargetLineWithWordLinks: (args: {
-    baseKey: string;
-    sourceText: string;
-    targetText: string;
-    dialogId?: number;
-    turnIndex?: number;
-    disableWordClicks?: boolean;
-  }) => JSX.Element;
+  sourceLanguage: StudyLanguageCode;
+  targetLanguage: StudyLanguageCode;
+  wordActionStatus: Record<string, "idle" | "saving" | "added" | "exists" | "error">;
+  requestAddWordFromConversation: (
+    key: string,
+    sourceText: string,
+    targetText: string,
+    targetToken: string,
+    dialogId?: number,
+    turnIndex?: number,
+  ) => Promise<void>;
   requestAddSentenceFromConversation: (key: string, sourceTextRaw: string, targetTextRaw: string, dialogId?: number, turnIndex?: number) => Promise<void>;
   sentenceActionStatus: Record<string, SentenceActionStatus>;
   originalUserTexts?: Record<number, string>;
@@ -48,7 +51,10 @@ export default function ConversationReviewSection({
   heading,
   description,
   dialog,
-  renderTargetLineWithWordLinks,
+  sourceLanguage,
+  targetLanguage,
+  wordActionStatus,
+  requestAddWordFromConversation,
   requestAddSentenceFromConversation,
   sentenceActionStatus,
   originalUserTexts,
@@ -72,7 +78,10 @@ export default function ConversationReviewSection({
       <p className="hint">{description}</p>
       <ConversationReviewTurns
         dialog={dialog}
-        renderTargetLineWithWordLinks={renderTargetLineWithWordLinks}
+        sourceLanguage={sourceLanguage}
+        targetLanguage={targetLanguage}
+        wordActionStatus={wordActionStatus}
+        requestAddWordFromConversation={requestAddWordFromConversation}
         requestAddSentenceFromConversation={requestAddSentenceFromConversation}
         sentenceActionStatus={sentenceActionStatus}
         readOnly={readOnly}

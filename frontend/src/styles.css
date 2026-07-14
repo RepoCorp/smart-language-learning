@@ -1360,6 +1360,7 @@ body {
   padding: 0;
   border-radius: 8px;
   line-height: 1;
+  position: relative;
 }
 
 .item-action-button-icon:hover:not(:disabled),
@@ -1367,6 +1368,32 @@ body {
   border-color: var(--color-accent);
   background: var(--color-accent-surface);
   color: var(--color-accent-strong);
+}
+
+.item-action-button-has-content {
+  border-color: #d59e29;
+  background: #fff7dc;
+  color: #7a4d00;
+  box-shadow: 0 0 0 1px rgba(213, 158, 41, 0.14);
+}
+
+.item-action-button-has-content::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #d59e29;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+.item-action-button-has-content:hover:not(:disabled),
+.item-action-button-has-content:focus-visible {
+  border-color: #b88318;
+  background: #fdeec0;
+  color: #704500;
 }
 
 .item-action-icon {
@@ -1665,6 +1692,38 @@ body {
   width: min(760px, 95vw);
   max-height: 85vh;
   overflow: hidden;
+}
+
+.compare-words-insights-section {
+  margin-top: 12px;
+}
+
+.compare-words-insights-output {
+  margin-top: 10px;
+}
+
+.compare-words-insights-text {
+  text-align: left;
+}
+
+.formatted-model-text-paragraph {
+  margin: 0;
+}
+
+.formatted-model-text-paragraph + .formatted-model-text-paragraph,
+.formatted-model-text-paragraph + .formatted-model-text-list,
+.formatted-model-text-list + .formatted-model-text-paragraph,
+.formatted-model-text-list + .formatted-model-text-list {
+  margin-top: 10px;
+}
+
+.formatted-model-text-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.compare-words-add-section {
+  margin-top: 16px;
 }
 
 .compare-words-modal-list {
@@ -2356,6 +2415,10 @@ textarea {
   border-color: #8ddfcf;
 }
 
+.conversation-support-actions {
+  margin-top: 4px;
+}
+
 .conversation-goal-success {
   margin-top: 10px;
   padding: 10px 12px;
@@ -2379,6 +2442,11 @@ textarea {
   margin-top: 4px;
   font-size: 12px;
   color: var(--color-text-soft);
+}
+
+.conversation-goal-current {
+  margin-top: 0;
+  margin-bottom: 10px;
 }
 
 .conversation-review-card {
