@@ -17,7 +17,11 @@ import { selectBestSpeechSynthesisVoice } from "../browserSpeech";
 import { deterministicIndex, deterministicTake } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
-import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
+import {
+  STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE,
+  STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE,
+} from "../studyLanguageMetadata";
+import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import CompareWordsModal from "./CompareWordsModal";
@@ -166,16 +170,8 @@ export default function NewItem({
   const { t } = useI18n();
   const { targetPromptMode, showMobileActionLabels, preferredBrowserVoiceURIByLanguage } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
-    spanish: "study.language.spanish",
-    english: "study.language.english",
-    german: "study.language.german",
-    french: "study.language.french",
-    italian: "study.language.italian",
-    portuguese: "study.language.portuguese",
-  };
-  const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
-  const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
+  const sourceLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
+  const targetLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage]);
   const preferredBrowserVoiceURI = preferredBrowserVoiceURIByLanguage[targetLanguage] || "";
   const [saving, setSaving] = useState<boolean>(false);
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
@@ -1298,15 +1294,6 @@ export default function NewItem({
     exerciseAudioRef.current = null;
   };
 
-  const speechLangByCode: Record<StudyLanguageCode, string> = {
-    spanish: "es-ES",
-    english: "en-US",
-    german: "de-DE",
-    french: "fr-FR",
-    italian: "it-IT",
-    portuguese: "pt-PT",
-  };
-
   const playFunnyImageWordAudio = (): void => {
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !targetText.trim()) {
       return;
@@ -1316,7 +1303,7 @@ export default function NewItem({
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(targetText);
-    const lang = speechLangByCode[targetLanguage] || "de-DE";
+    const lang = STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE";
     const langPrefix = lang.split("-")[0];
     utterance.lang = lang;
     utterance.rate = 0.95;
@@ -1365,7 +1352,7 @@ export default function NewItem({
             finish();
           }
         }, 50);
-        const lang = speechLangByCode[targetLanguage] || "de-DE";
+        const lang = STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE";
         utterance.lang = lang;
         utterance.rate = 0.8;
         const selectedVoice = selectBestSpeechSynthesisVoice(window.speechSynthesis.getVoices(), lang, preferredBrowserVoiceURI);

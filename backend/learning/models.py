@@ -2,15 +2,7 @@ import secrets
 
 from django.conf import settings
 from django.db import models
-
-STUDY_LANGUAGE_CHOICES = (
-    ("spanish", "Spanish"),
-    ("english", "English"),
-    ("german", "German"),
-    ("french", "French"),
-    ("italian", "Italian"),
-    ("portuguese", "Portuguese"),
-)
+from .languages import STUDY_LANGUAGE_CHOICES
 
 
 class Item(models.Model):

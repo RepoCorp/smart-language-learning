@@ -10,6 +10,13 @@ export type AuthUser = {
   is_superuser: boolean;
 };
 
+export type RegistrationRequestRecord = {
+  id: number;
+  username: string;
+  email: string;
+  created_at: string;
+};
+
 type RegistrationRequestResponse = {
   ok: boolean;
   message: string;
@@ -21,6 +28,10 @@ type AuthBootstrapStatusResponse = {
 
 type RegisteredUsersResponse = {
   users: AuthUser[];
+};
+
+type RegistrationRequestsListResponse = {
+  requests: RegistrationRequestRecord[];
 };
 
 export function getAuthToken(): string {
@@ -168,4 +179,22 @@ export async function fetchRegisteredUsers(): Promise<AuthUser[]> {
   }
   const payload = (await response.json()) as RegisteredUsersResponse;
   return payload.users;
+}
+
+export async function fetchRegistrationRequests(): Promise<RegistrationRequestRecord[]> {
+  const response = await apiFetch(`${API_BASE}/auth/registration-requests`);
+  if (!response.ok) {
+    let detail = "Failed to load registration requests";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  const payload = (await response.json()) as RegistrationRequestsListResponse;
+  return payload.requests;
 }

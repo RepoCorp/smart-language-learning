@@ -4,7 +4,8 @@ import { shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAu
 import { deterministicSort } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
-import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
+import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../studyLanguageMetadata";
+import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
@@ -324,14 +325,6 @@ export default function WordReview({
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
-    spanish: "study.language.spanish",
-    english: "study.language.english",
-    german: "study.language.german",
-    french: "study.language.french",
-    italian: "study.language.italian",
-    portuguese: "study.language.portuguese",
-  };
   const [answer, setAnswer] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
   const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>("neutral");
@@ -390,8 +383,8 @@ export default function WordReview({
   const showWarmupTranslation = useIntroRetry && Boolean(warmupContextTranslation) && (warmupInputIsCorrect || warmupAllLettersRevealed);
   const completionPhrase = completionPhraseForItem(item);
   const languageLabel = isSpanishToGerman
-    ? t(languageKeyByCode[targetLanguage])
-    : t(languageKeyByCode[sourceLanguage]);
+    ? t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage])
+    : t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
 
   const hint = hintLetter;
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;

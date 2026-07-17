@@ -15,26 +15,14 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
-from ...languages import language_display_name
+from ...languages import (
+    OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE,
+    TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE,
+    language_display_name,
+)
 
 logger = logging.getLogger(__name__)
 
-OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE = {
-    "spanish": "nova",
-    "english": "alloy",
-    "german": "onyx",
-    "french": "shimmer",
-    "italian": "echo",
-    "portuguese": "fable",
-}
-TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE = {
-    "spanish": "es",
-    "english": "en",
-    "german": "de",
-    "french": "fr",
-    "italian": "it",
-    "portuguese": "pt",
-}
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
 OPENAI_TTS_PHRASE_DEFAULT_SPEED = 1.25
 

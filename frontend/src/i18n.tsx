@@ -1,5 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
+import { studyLanguageMessages } from "./i18nStudyLanguages";
+
 export type AppLanguage = "en" | "es";
 
 const STORAGE_KEY = "app_language";
@@ -12,12 +14,7 @@ const messages = {
     "study.label": "Study pair",
     "study.source": "From",
     "study.target": "To",
-    "study.language.spanish": "Spanish",
-    "study.language.english": "English",
-    "study.language.german": "German",
-    "study.language.french": "French",
-    "study.language.italian": "Italian",
-    "study.language.portuguese": "Portuguese",
+    ...studyLanguageMessages.en,
     "stats.ready": "Ready to review: {count}",
     "stats.future": "Future reviews: {count}",
     "stats.words": "Words: {count}",
@@ -555,6 +552,11 @@ const messages = {
     "config.registeredUsersLoading": "Loading users...",
     "config.registeredUsersLoadFailed": "Failed to load registered users",
     "config.registeredUsersAdmin": "Admin",
+    "config.registrationRequestsTitle": "Registration requests",
+    "config.registrationRequestsSubtitle": "Pending requests submitted from the landing page.",
+    "config.registrationRequestsLoading": "Loading requests...",
+    "config.registrationRequestsEmpty": "No pending registration requests.",
+    "config.registrationRequestsUse": "Use request",
   },
   es: {
     "lang.english": "Inglés",
@@ -563,12 +565,7 @@ const messages = {
     "study.label": "Par de estudio",
     "study.source": "De",
     "study.target": "A",
-    "study.language.spanish": "Español",
-    "study.language.english": "Inglés",
-    "study.language.german": "Alemán",
-    "study.language.french": "Francés",
-    "study.language.italian": "Italiano",
-    "study.language.portuguese": "Portugués",
+    ...studyLanguageMessages.es,
     "stats.ready": "Listo para repasar: {count}",
     "stats.future": "Repasos futuros: {count}",
     "stats.words": "Palabras: {count}",
@@ -1106,6 +1103,11 @@ const messages = {
     "config.registeredUsersLoading": "Cargando usuarios...",
     "config.registeredUsersLoadFailed": "No se pudieron cargar los usuarios registrados",
     "config.registeredUsersAdmin": "Admin",
+    "config.registrationRequestsTitle": "Solicitudes de registro",
+    "config.registrationRequestsSubtitle": "Solicitudes pendientes enviadas desde la página de entrada.",
+    "config.registrationRequestsLoading": "Cargando solicitudes...",
+    "config.registrationRequestsEmpty": "No hay solicitudes de registro pendientes.",
+    "config.registrationRequestsUse": "Usar solicitud",
   },
 } as const;
 

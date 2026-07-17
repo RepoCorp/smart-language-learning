@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useState } from "react";
 
 import {
   createUserWithPin,
+  fetchRegistrationRequests,
   fetchRegisteredUsers,
+  type RegistrationRequestRecord,
   resetUserPin,
   type AuthUser,
 } from "../authApi";
@@ -28,19 +30,31 @@ export default function ConfigurationAdminUsersSection({
   const [resetPinError, setResetPinError] = useState("");
   const [resetPinSuccess, setResetPinSuccess] = useState("");
   const [users, setUsers] = useState<AuthUser[]>([]);
+  const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequestRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState("");
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [requestsError, setRequestsError] = useState("");
 
-  const loadUsers = async (): Promise<void> => {
+  const loadAdminData = async (): Promise<void> => {
     setLoadingUsers(true);
     setUsersError("");
+    setLoadingRequests(true);
+    setRequestsError("");
     try {
-      const registeredUsers = await fetchRegisteredUsers();
+      const [registeredUsers, pendingRequests] = await Promise.all([
+        fetchRegisteredUsers(),
+        fetchRegistrationRequests(),
+      ]);
       setUsers(registeredUsers);
+      setRegistrationRequests(pendingRequests);
     } catch (error) {
-      setUsersError(error instanceof Error ? error.message : t("config.registeredUsersLoadFailed"));
+      const message = error instanceof Error ? error.message : t("config.registeredUsersLoadFailed");
+      setUsersError(message);
+      setRequestsError(message);
     } finally {
       setLoadingUsers(false);
+      setLoadingRequests(false);
     }
   };
 
@@ -48,7 +62,7 @@ export default function ConfigurationAdminUsersSection({
     if (!canCreateUsers) {
       return;
     }
-    void loadUsers();
+    void loadAdminData();
   }, [canCreateUsers]);
 
   if (!canCreateUsers) {
@@ -66,7 +80,7 @@ export default function ConfigurationAdminUsersSection({
       setUsername("");
       setEmail("");
       setPin("");
-      void loadUsers();
+      void loadAdminData();
     } catch (error) {
       const message = error instanceof Error ? error.message : t("config.createUserFailed");
       setCreateError(message);
@@ -95,6 +109,40 @@ export default function ConfigurationAdminUsersSection({
 
   return (
     <>
+      <section className="card settings-card">
+        <h2 className="settings-title">{t("config.registrationRequestsTitle")}</h2>
+        <p className="settings-subtitle">{t("config.registrationRequestsSubtitle")}</p>
+        {loadingRequests ? <p className="hint">{t("config.registrationRequestsLoading")}</p> : null}
+        {requestsError ? <p className="error">{requestsError}</p> : null}
+        {!loadingRequests && !requestsError && registrationRequests.length === 0 ? (
+          <p className="hint">{t("config.registrationRequestsEmpty")}</p>
+        ) : null}
+        {!loadingRequests && !requestsError && registrationRequests.length > 0 ? (
+          <div className="elevenlabs-voice-list">
+            {registrationRequests.map((request) => (
+              <div key={request.id} className="elevenlabs-voice-row">
+                <div className="elevenlabs-voice-main">
+                  <strong>{request.username}</strong>
+                  <span className="hint">{request.email}</span>
+                  <span className="hint">{new Date(request.created_at).toLocaleString()}</span>
+                </div>
+                <div className="elevenlabs-voice-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => {
+                      setUsername(request.username);
+                      setEmail(request.email);
+                    }}
+                  >
+                    {t("config.registrationRequestsUse")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
       <section className="card settings-card">
         <h2 className="settings-title">{t("config.registeredUsersTitle")}</h2>
         <p className="settings-subtitle">{t("config.registeredUsersSubtitle")}</p>

@@ -1,18 +1,10 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import type { StudyLanguageCode } from "./types";
 export type { StudyLanguageCode } from "./types";
+import { SUPPORTED_STUDY_LANGUAGES } from "./studyLanguageMetadata";
 
 const SOURCE_STORAGE_KEY = "study_source_language";
 const TARGET_STORAGE_KEY = "study_target_language";
-
-const SUPPORTED_STUDY_LANGUAGES: StudyLanguageCode[] = [
-  "spanish",
-  "english",
-  "german",
-  "french",
-  "italian",
-  "portuguese",
-];
 
 interface StudyLanguagesContextValue {
   sourceLanguage: StudyLanguageCode;

@@ -13,7 +13,8 @@ import {
 } from "../../api";
 import { useI18n } from "../../i18n";
 import { usePromptPreferences } from "../../promptPreferences";
-import { type StudyLanguageCode, useStudyLanguages } from "../../studyLanguages";
+import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../../studyLanguageMetadata";
+import { useStudyLanguages } from "../../studyLanguages";
 import type { ContentDialogRecord, ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
@@ -48,14 +49,6 @@ export default function ConversationPage(): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
-    spanish: "study.language.spanish",
-    english: "study.language.english",
-    german: "study.language.german",
-    french: "study.language.french",
-    italian: "study.language.italian",
-    portuguese: "study.language.portuguese",
-  };
 
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string>("");
@@ -126,8 +119,8 @@ export default function ConversationPage(): JSX.Element {
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
-  const sourceLanguageLabel = t(languageKeyByCode[sourceLanguage]);
-  const targetLanguageLabel = t(languageKeyByCode[targetLanguage]);
+  const sourceLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
+  const targetLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage]);
   const goalDifficultyLabelByCode: Record<GoalDifficulty, Parameters<typeof t>[0]> = {
     easy: "conversation.goalDifficultyEasy",
     medium: "conversation.goalDifficultyMedium",

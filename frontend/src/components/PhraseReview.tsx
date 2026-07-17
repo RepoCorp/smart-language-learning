@@ -6,7 +6,11 @@ import { useDebugTools } from "../debugTools";
 import { deterministicSort } from "../deterministic";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
-import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
+import {
+  STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE,
+  STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE,
+} from "../studyLanguageMetadata";
+import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
@@ -101,15 +105,6 @@ function isLikelyIOSDevice(): boolean {
   }
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
-
-const speechLangByCode: Record<StudyLanguageCode, string> = {
-  spanish: "es-ES",
-  english: "en-US",
-  german: "de-DE",
-  french: "fr-FR",
-  italian: "it-IT",
-  portuguese: "pt-PT",
-};
 
 let speechVoicesReadyPromise: Promise<SpeechSynthesisVoice[]> | null = null;
 const activeSpeechUtterances = new Set<SpeechSynthesisUtterance>();
@@ -299,14 +294,6 @@ export default function PhraseReview({
   const debugTools = useDebugTools();
   const { targetPromptMode, preferredBrowserVoiceURIByLanguage } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const languageKeyByCode: Record<StudyLanguageCode, Parameters<typeof t>[0]> = {
-    spanish: "study.language.spanish",
-    english: "study.language.english",
-    german: "study.language.german",
-    french: "study.language.french",
-    italian: "study.language.italian",
-    portuguese: "study.language.portuguese",
-  };
   const [feedback, setFeedback] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
@@ -352,8 +339,8 @@ export default function PhraseReview({
     [expectedPhraseTokens, itemDeterministicKey],
   );
   const languageLabel = isSpanishToGerman
-    ? t(languageKeyByCode[targetLanguage])
-    : t(languageKeyByCode[sourceLanguage]);
+    ? t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage])
+    : t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
   const preferredBrowserVoiceURI = preferredBrowserVoiceURIByLanguage[targetLanguage] || "";
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const useRepeatPlaceholder = Boolean(item.repeatedAfterFailure);
@@ -381,7 +368,7 @@ export default function PhraseReview({
     }
     setPhraseBuilderSpeechPriming(true);
     const speechSynthesis = window.speechSynthesis;
-    const lang = speechLangByCode[targetLanguage] || "de-DE";
+    const lang = STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE";
     const langPrefix = lang.split("-")[0].toLowerCase();
     const voices = speechSynthesis.getVoices();
     const matchingVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix));
@@ -500,7 +487,7 @@ export default function PhraseReview({
     try {
       placedTokenVoiceRef.current = await speakBrowserText({
         text: trimmedPhraseText,
-        lang: speechLangByCode[targetLanguage] || "de-DE",
+        lang: STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE",
         rate: 0.95,
         preferredVoiceURI: placedTokenVoiceRef.current,
         debugLog: logSpeechDebug,

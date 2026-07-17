@@ -7,6 +7,11 @@ import type { AuthUser } from "../authApi";
 import { useDebugTools } from "../debugTools";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
+import {
+  BROWSER_VOICE_PREVIEW_TEXT_BY_CODE,
+  STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE,
+  STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE,
+} from "../studyLanguageMetadata";
 import { type StudyLanguageCode, useStudyLanguages } from "../studyLanguages";
 import type { OverviewStatsResponse } from "../types";
 import ConfigurationAccountSection from "./ConfigurationAccountSection";
@@ -44,31 +49,6 @@ export default function ConfigurationsPage({
   const activePreviewRef = useRef<SpeechSynthesisUtterance | null>(null);
   const loadedBrowserVoiceOptionsByLanguageRef = useRef<Partial<Record<StudyLanguageCode, SpeechSynthesisVoice[]>>>({});
 
-  const languageKeyByCode: Record<StudyLanguageCode, string> = {
-    spanish: "study.language.spanish",
-    english: "study.language.english",
-    german: "study.language.german",
-    french: "study.language.french",
-    italian: "study.language.italian",
-    portuguese: "study.language.portuguese",
-  };
-  const speechLangByCode: Record<StudyLanguageCode, string> = {
-    spanish: "es-ES",
-    english: "en-US",
-    german: "de-DE",
-    french: "fr-FR",
-    italian: "it-IT",
-    portuguese: "pt-PT",
-  };
-  const browserVoicePreviewTextByCode: Record<StudyLanguageCode, string> = {
-    spanish: "Hola. Esta es una prueba de voz.",
-    english: "Hello. This is a voice preview.",
-    german: "Hallo. Das ist eine Stimmprobe.",
-    french: "Bonjour. Ceci est un apercu de la voix.",
-    italian: "Ciao. Questa e una prova della voce.",
-    portuguese: "Ola. Esta e uma demonstracao de voz.",
-  };
-
   useEffect(() => {
     let mounted = true;
     const updateEvent = getOverviewStatsUpdatedEventName();
@@ -103,7 +83,7 @@ export default function ConfigurationsPage({
       return;
     }
     const speechSynthesis = window.speechSynthesis;
-    const lang = speechLangByCode[targetLanguage] || "de-DE";
+    const lang = STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE";
     const storedOptions = loadedBrowserVoiceOptionsByLanguageRef.current[targetLanguage];
     if (storedOptions && storedOptions.length > 0) {
       setBrowserVoiceOptions(storedOptions);
@@ -150,8 +130,8 @@ export default function ConfigurationsPage({
       return;
     }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(browserVoicePreviewTextByCode[targetLanguage] || browserVoicePreviewTextByCode.german);
-    utterance.lang = voice.lang || (speechLangByCode[targetLanguage] || "de-DE");
+    const utterance = new SpeechSynthesisUtterance(BROWSER_VOICE_PREVIEW_TEXT_BY_CODE[targetLanguage] || BROWSER_VOICE_PREVIEW_TEXT_BY_CODE.german);
+    utterance.lang = voice.lang || (STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE");
     utterance.voice = voice;
     utterance.rate = 0.95;
     activePreviewRef.current = utterance;
@@ -191,7 +171,7 @@ export default function ConfigurationsPage({
             >
               {supportedLanguages.map((code) => (
                 <option key={code} value={code}>
-                  {t(languageKeyByCode[code])}
+                  {t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[code])}
                 </option>
               ))}
             </select>
@@ -206,7 +186,7 @@ export default function ConfigurationsPage({
             >
               {supportedLanguages.map((code) => (
                 <option key={code} value={code}>
-                  {t(languageKeyByCode[code])}
+                  {t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[code])}
                 </option>
               ))}
             </select>
@@ -319,7 +299,7 @@ export default function ConfigurationsPage({
             ) : (
               <span className="hint">{t("config.browserVoiceUnavailable")}</span>
             )}
-            <span className="hint">{t("config.browserVoiceHint", { language: t(languageKeyByCode[targetLanguage]) })}</span>
+            <span className="hint">{t("config.browserVoiceHint", { language: t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage]) })}</span>
           </div>
         </div>
 
@@ -331,8 +311,8 @@ export default function ConfigurationsPage({
       </section>
       <ConfigurationElevenLabsSection
         authUser={authUser}
-        languageKeyByCode={languageKeyByCode}
-        previewTextByCode={browserVoicePreviewTextByCode}
+        languageKeyByCode={STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE}
+        previewTextByCode={BROWSER_VOICE_PREVIEW_TEXT_BY_CODE}
         targetLanguage={targetLanguage}
       />
       <ConfigurationAdminUsersSection canCreateUsers={canCreateUsers} />

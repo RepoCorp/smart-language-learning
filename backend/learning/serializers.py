@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from .models import STUDY_LANGUAGE_CHOICES, Item
+from .languages import STUDY_LANGUAGE_CHOICES
+from .models import Item
 
 
 class SessionRestoreStateSerializer(serializers.Serializer):

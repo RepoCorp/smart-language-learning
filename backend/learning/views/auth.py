@@ -189,3 +189,18 @@ class AuthUsersView(APIView):
         User = get_user_model()
         users = User.objects.order_by("username", "id").values("id", "username", "email", "is_superuser")
         return Response({"users": list(users)})
+
+
+class AuthRegistrationRequestsView(APIView):
+    def get(self, request: Request) -> Response:
+        request_user = get_request_user(request)
+        if request_user is None or not request_user.is_superuser:
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+
+        requests = RegistrationRequest.objects.order_by("-created_at", "-id").values(
+            "id",
+            "username",
+            "email",
+            "created_at",
+        )
+        return Response({"requests": list(requests)})

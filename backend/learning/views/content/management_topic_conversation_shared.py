@@ -2,16 +2,8 @@ from __future__ import annotations
 
 from django.conf import settings
 
+from ...languages import DEFAULT_CONVERSATION_GOAL_BY_LANGUAGE
 from .management import Request, Response, _normalized_pair, status
-
-DEFAULT_CONVERSATION_GOAL_BY_LANGUAGE = {
-    "spanish": "Saluda.",
-    "english": "Say hello.",
-    "german": "Begruesse die andere Person.",
-    "french": "Dis bonjour.",
-    "italian": "Saluta.",
-    "portuguese": "Cumprimente.",
-}
 
 
 def analysis_enabled() -> bool:
