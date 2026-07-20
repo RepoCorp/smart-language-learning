@@ -30,6 +30,7 @@ import DialogTurnsList from "./DialogTurnsList";
 import ItemActionToolbar from "./ItemActionToolbar";
 import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
+import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
 import WordReview from "./WordReview";
 
 interface NewItemProps {
@@ -245,9 +246,17 @@ export default function NewItem({
   const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
   const relatedDialogPlaybackRunRef = useRef<number>(0);
   const relatedDialogAudioRef = useRef<HTMLAudioElement | null>(null);
-  const relatedDialogsScrollRef = useRef<HTMLDivElement | null>(null);
-  const relatedDialogCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const autoplayedAudioKeyRef = useRef<string>("");
+  const {
+    registerRelatedDialogCardRef,
+    scrollToNextRelatedDialog,
+  } = useRelatedDialogsFocus({
+    showDialogsModal,
+    relatedDialogs,
+    showAllDialogs,
+    playingRelatedDialogId,
+    playingRelatedDialogTurn,
+  });
 
   useEffect(() => {
     setExercisePhrases(item.exercise_phrases || {});
@@ -321,24 +330,6 @@ export default function NewItem({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showCompareWordsModal, showExerciseModal, showDirectTestModal, showWordIntroPracticeModal, showWordLetterPracticeModal, showPhraseBuilderModal]);
-
-  useEffect(() => {
-    if (!showDialogsModal) {
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      const activeTurn = document.querySelector(".related-dialogs-modal .turn-active-highlight");
-      if (activeTurn instanceof HTMLElement) {
-        activeTurn.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
-      const firstMatch = document.querySelector(".related-dialogs-modal .turn-highlight");
-      if (firstMatch instanceof HTMLElement) {
-        firstMatch.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }, 30);
-    return () => window.clearTimeout(timeoutId);
-  }, [showDialogsModal, relatedDialogs, playingRelatedDialogTurn]);
 
   useEffect(() => {
     exerciseRunningRef.current = exerciseRunning;
@@ -565,21 +556,6 @@ export default function NewItem({
     }
     const audio = new Audio(audioUrl);
     void audio.play().catch(() => undefined);
-  };
-
-  const scrollToNextRelatedDialog = (currentDialogId?: number): void => {
-    const visibleDialogs = showAllDialogs ? relatedDialogs : relatedDialogs.slice(0, 2);
-    if (!visibleDialogs.length) {
-      return;
-    }
-    const currentIndex = currentDialogId === undefined
-      ? -1
-      : visibleDialogs.findIndex((dialog) => dialog.dialog_id === currentDialogId);
-    const nextDialog = currentIndex >= 0
-      ? visibleDialogs[(currentIndex + 1) % visibleDialogs.length]
-      : visibleDialogs[0];
-    const nextElement = relatedDialogCardRefs.current.get(nextDialog.dialog_id);
-    nextElement?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
@@ -1568,7 +1544,7 @@ export default function NewItem({
             </p>
             {!relatedDialogs.length && <p>{t("newItem.noRelatedDialogs")}</p>}
             {!!relatedDialogs.length && (
-              <div ref={relatedDialogsScrollRef} className="related-dialogs-scroll">
+              <div className="related-dialogs-scroll">
                 {(showAllDialogs ? relatedDialogs : relatedDialogs.slice(0, 2)).map((dialog) => {
                 const showDialogTargetText = targetPromptMode === "text" || Boolean(showDialogTargetTextById[dialog.dialog_id]);
                 const hideDialogTargetText = targetPromptMode === "audio" && !showDialogTargetText;
@@ -1576,13 +1552,7 @@ export default function NewItem({
                 return (
                   <div
                     key={dialog.dialog_id}
-                    ref={(element) => {
-                      if (element) {
-                        relatedDialogCardRefs.current.set(dialog.dialog_id, element);
-                      } else {
-                        relatedDialogCardRefs.current.delete(dialog.dialog_id);
-                      }
-                    }}
+                    ref={(element) => registerRelatedDialogCardRef(dialog.dialog_id, element)}
                     className="related-dialog-card"
                   >
                     <p>
@@ -1638,7 +1608,10 @@ export default function NewItem({
                             <button
                               type="button"
                               className="secondary-button exercise-action-icon-button dialog-list-action-button"
-                              onClick={() => scrollToNextRelatedDialog(dialog.dialog_id)}
+                              onClick={() => scrollToNextRelatedDialog(
+                                (showAllDialogs ? relatedDialogs : relatedDialogs.slice(0, 2)).map((entry) => entry.dialog_id),
+                                dialog.dialog_id,
+                              )}
                               aria-label={t("newItem.nextDialog")}
                               title={t("newItem.nextDialog")}
                               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.nextDialog"))}

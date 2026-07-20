@@ -19,6 +19,7 @@ import DangerousButton from "./DangerousButton";
 import DialogActionIcon from "./DialogActionIcon";
 import DialogTurnsList from "./DialogTurnsList";
 import NewItem from "./NewItem";
+import useDialogPlaybackFocus from "./useDialogPlaybackFocus";
 
 type WordActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 type PendingWordAdd = {
@@ -91,8 +92,11 @@ export default function DialogsPage(): JSX.Element {
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
   const playbackRunRef = useRef<number>(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
-  const dialogRefs = useRef<Map<number, HTMLLIElement>>(new Map());
-  const turnRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+  const {
+    registerDialogRef,
+    registerTurnRef,
+    focusDialogTurn,
+  } = useDialogPlaybackFocus();
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
   const hideDialogText = targetPromptMode === "audio" && !showDialogText;
 
@@ -199,37 +203,6 @@ export default function DialogsPage(): JSX.Element {
       }
       return [dialog, ...current];
     });
-  };
-
-  const focusDialog = (dialogId: number): void => {
-    window.setTimeout(() => {
-      const dialogElement = dialogRefs.current.get(dialogId);
-      if (!dialogElement) {
-        return;
-      }
-      dialogElement.scrollIntoView({ behavior: "smooth", block: "center" });
-      dialogElement.focus({ preventScroll: true });
-    }, 0);
-  };
-
-  const openAndFocusDialog = (dialogId: number): void => {
-    setExpandedDialogId(dialogId);
-    focusDialog(dialogId);
-  };
-
-  const turnRefKey = (dialogId: number, turnIndex: number): string => `${dialogId}:${turnIndex}`;
-
-  const focusDialogTurn = (dialogId: number, turnIndex: number): void => {
-    setExpandedDialogId(dialogId);
-    window.setTimeout(() => {
-      const turnElement = turnRefs.current.get(turnRefKey(dialogId, turnIndex));
-      if (!turnElement) {
-        focusDialog(dialogId);
-        return;
-      }
-      turnElement.scrollIntoView({ behavior: "smooth", block: "center" });
-      turnElement.focus({ preventScroll: true });
-    }, 0);
   };
 
   const ensureDialogDetail = async (
@@ -562,7 +535,6 @@ export default function DialogsPage(): JSX.Element {
 
   const playDialogWithFocusedTurns = async (dialog: ContentDialogRecord, runId: number): Promise<void> => {
     upsertVisibleDialog(dialog);
-    focusDialog(dialog.dialog_id);
     const detailedDialog = await ensureDialogDetail(dialog.dialog_id, dialog);
     if (!detailedDialog || runId !== playbackRunRef.current) {
       return;
@@ -575,7 +547,11 @@ export default function DialogsPage(): JSX.Element {
           break;
         }
         setPlayingTurn({ dialogId: detailedDialog.dialog_id, turnIndex: index });
-        focusDialogTurn(detailedDialog.dialog_id, index);
+        if (index > 0) {
+          focusDialogTurn(detailedDialog.dialog_id, index, setExpandedDialogId);
+        } else {
+          setExpandedDialogId(detailedDialog.dialog_id);
+        }
         const audioUrl = await ensureTurnAudioUrl(detailedDialog.dialog_id, index, detailedDialog.turns[index].phrase_audio_url || "");
         await playAudioUrl(audioUrl, runId);
       }
@@ -805,13 +781,7 @@ export default function DialogsPage(): JSX.Element {
               {dialogs.map((dialog) => (
                 <li
                   key={dialog.dialog_id}
-                  ref={(element) => {
-                    if (element) {
-                      dialogRefs.current.set(dialog.dialog_id, element);
-                    } else {
-                      dialogRefs.current.delete(dialog.dialog_id);
-                    }
-                  }}
+                  ref={(element) => registerDialogRef(dialog.dialog_id, element)}
                   className={`related-dialog-card dialog-list-card ${playingDialogId === dialog.dialog_id ? "dialog-list-card-playing" : ""}`}
                   tabIndex={-1}
                 >
@@ -855,12 +825,7 @@ export default function DialogsPage(): JSX.Element {
                               token,
                             )}
                             getTurnRef={(turnIndex, element) => {
-                              const key = turnRefKey(dialog.dialog_id, turnIndex);
-                              if (element) {
-                                turnRefs.current.set(key, element);
-                              } else {
-                                turnRefs.current.delete(key);
-                              }
+                              registerTurnRef(dialog.dialog_id, turnIndex, element);
                             }}
                             highlightedTurnIndex={playingTurn?.dialogId === dialog.dialog_id ? playingTurn.turnIndex : null}
                             renderLeadingAction={(turn, index) => (
