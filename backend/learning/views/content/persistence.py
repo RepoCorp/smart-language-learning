@@ -106,19 +106,6 @@ def create_phrase_if_missing(
     return item
 
 
-def enrich_notes_with_plural(notes: str, plural_german: str) -> str:
-    plural = plural_german.strip()
-    base_notes = notes.strip()
-    if not plural:
-        return base_notes
-    plural_note = f"Plural: {plural}"
-    if not base_notes:
-        return plural_note
-    if re.search(r"\bplural\b", base_notes, flags=re.IGNORECASE):
-        return base_notes
-    return f"{base_notes} {plural_note}"
-
-
 def create_word_if_missing(
     *,
     user,
@@ -162,6 +149,7 @@ def create_word_if_missing(
         target_language=target_language,
         notes=candidate.notes,
         word_type=normalized_word_type,
+        plural_german=candidate.plural_german.strip(),
         example_sentence=phrase_german,
         audio_url=audio_url,
         exercise_phrases=exercise_phrases or {},

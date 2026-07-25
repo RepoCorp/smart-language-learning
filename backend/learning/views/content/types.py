@@ -11,6 +11,7 @@ class ContentCandidate:
     notes: str = ""
     source_phrase_german: str = ""
     word_type: str = ""
+    plural_german: str = ""
 
 
 @dataclass(frozen=True)

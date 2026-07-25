@@ -1,0 +1,5 @@
+The target noun must be the grammatical subject of the sentence.
+
+Generate the shortest natural sentence in which the target noun performs the action or exists in a characteristic state.
+
+The generated question should ask who or what performs the action or is in that state.

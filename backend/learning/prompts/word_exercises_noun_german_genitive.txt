@@ -1,0 +1,9 @@
+The target noun must express possession or association.
+
+Generate the shortest natural sentence in which the target noun naturally appears in the genitive.
+
+Choose a head noun that is strongly associated with the target noun whenever possible.
+
+The generated question should ask whose.
+
+The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.

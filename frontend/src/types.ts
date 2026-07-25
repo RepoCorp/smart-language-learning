@@ -11,8 +11,16 @@ export interface ExercisePhrase {
   image_prompt?: string;
 }
 
+export interface ExercisePhraseSection {
+  key: string;
+  question_target_text?: string;
+  question_source_text?: string;
+  phrases: ExercisePhrase[];
+}
+
 export interface ItemExercisePhrases {
   phrases?: ExercisePhrase[];
+  sections?: ExercisePhraseSection[];
   first_section?: ExercisePhrase[];
   second_section?: ExercisePhrase[];
   generation_mode?: string;
@@ -32,6 +40,7 @@ export interface CompareWordRecord {
   spanish_text: string;
   german_text: string;
   word_type?: string;
+  plural_german?: string;
   audio_url?: string;
   prompt_audio_url?: string;
   exercise_phrases?: ItemExercisePhrases;
@@ -64,6 +73,7 @@ export interface SessionItem {
   example_sentence?: string;
   notes?: string;
   word_type?: string;
+  plural_german?: string;
   audio_url?: string;
   exercise_phrases?: ItemExercisePhrases;
   mode: SessionMode;
@@ -128,6 +138,7 @@ export interface ContentCandidate {
   exists: boolean;
   notes?: string;
   word_type?: string;
+  plural_german?: string;
   selection_key?: string;
 }
 
@@ -192,6 +203,7 @@ export interface ContentItemRecord {
   next_review_days?: number | null;
   audio_url?: string;
   word_type?: string;
+  plural_german?: string;
   is_learned?: boolean;
 }
 
@@ -213,6 +225,7 @@ export interface ContentItemDetailResponse {
   example_sentence?: string;
   notes?: string;
   word_type?: string;
+  plural_german?: string;
   audio_url?: string;
   created_at: string;
   exercise_phrases?: ItemExercisePhrases;

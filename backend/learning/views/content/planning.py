@@ -9,7 +9,7 @@ from .generation import (
     generate_conversation_with_chatgpt,
     generate_keywords_for_phrase_with_chatgpt,
 )
-from .persistence import enrich_notes_with_plural, item_exists
+from .persistence import item_exists
 from .selection import german_word_has_article, normalize_topic
 from .types import ContentCandidate, ContentPlan
 

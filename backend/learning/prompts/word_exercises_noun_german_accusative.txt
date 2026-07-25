@@ -1,0 +1,9 @@
+The target noun must be the direct object of the sentence.
+
+Generate the shortest natural sentence in which another subject performs a characteristic action on the target noun.
+
+Choose a verb that is strongly associated with the noun whenever possible.
+
+The generated question should ask whom or what the subject acts upon.
+
+The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.

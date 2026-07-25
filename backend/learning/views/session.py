@@ -533,6 +533,7 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "example_sentence": entry.item.example_sentence,
                 "notes": entry.item.notes,
                 "word_type": entry.item.word_type,
+                "plural_german": entry.item.plural_german,
                 "audio_url": entry.item.audio_url,
                 "prompt_audio_url": _prompt_audio_url_for_entry(entry, user=user),
                 "exercise_phrases": entry.item.exercise_phrases or {},

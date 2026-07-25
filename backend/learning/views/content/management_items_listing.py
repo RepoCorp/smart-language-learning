@@ -25,6 +25,7 @@ from .management import (
     timezone,
 )
 from .dialog_item_context import related_dialogs_by_item_ids
+from .exercise_payloads import MAX_EXERCISE_PHRASES, sanitize_exercise_payload
 from .item_questions import item_question_history
 from ...models import DialogTurn, Item, ItemDialogOccurrence
 from ..dialog_phrase_match import build_dialog_phrase_match_payload
@@ -70,7 +71,50 @@ def _deterministic_choice(values: list, *, seed: str, key_fn):
     if not values:
         return None
     return _deterministic_sort(values, seed=seed, key_fn=key_fn)[0]
-MAX_EXERCISE_PHRASES = 30
+
+
+def _funny_image_source_phrase(exercise_phrases: dict, *, word_type: str) -> dict[str, str]:
+    if not isinstance(exercise_phrases, dict):
+        return {}
+
+    normalized_word_type = str(word_type or "").strip().lower()
+    if normalized_word_type == "verb":
+        for phrase in exercise_phrases.get("phrases", []) or []:
+            if not isinstance(phrase, dict):
+                continue
+            label = str(phrase.get("label", "")).strip().lower()
+            if label == "present-1s":
+                source_text = str(phrase.get("source_text", "")).strip()
+                target_text = str(phrase.get("target_text", "")).strip()
+                if source_text and target_text:
+                    return {
+                        "label": "funny image",
+                        "source_text": source_text,
+                        "target_text": target_text,
+                    }
+
+    sections = exercise_phrases.get("sections")
+    if isinstance(sections, list):
+        for section in sections:
+            if not isinstance(section, dict) or str(section.get("key", "")).strip() != "nominative":
+                continue
+            for phrase in section.get("phrases", []) or []:
+                if not isinstance(phrase, dict):
+                    continue
+                label = str(phrase.get("label", "")).strip().lower()
+                if label == "nominative-definite":
+                    source_text = str(phrase.get("source_text", "")).strip()
+                    target_text = str(phrase.get("target_text", "")).strip()
+                    if source_text and target_text:
+                        return {
+                            "label": "funny image",
+                            "source_text": source_text,
+                            "target_text": target_text,
+                        }
+
+    return {}
+
+
 def _compare_words_payload(item: Item) -> list[dict]:
     if item.item_type != Item.ItemType.WORD:
         return []
@@ -83,6 +127,7 @@ def _compare_words_payload(item: Item) -> list[dict]:
             "spanish_text",
             "german_text",
             "word_type",
+            "plural_german",
             "audio_url",
             "exercise_phrases",
             "created_at",
@@ -163,6 +208,7 @@ class ContentWordsView(APIView):
                 "example_sentence",
                 "notes",
                 "word_type",
+                "plural_german",
                 "audio_url",
                 "created_at",
             )[:1000]
@@ -197,6 +243,7 @@ class ContentItemDetailView(APIView):
                 "example_sentence": item.example_sentence,
                 "notes": item.notes,
                 "word_type": item.word_type,
+                "plural_german": item.plural_german,
                 "audio_url": item.audio_url,
                 "exercise_phrases": item.exercise_phrases or {},
                 "created_at": item.created_at,
@@ -441,40 +488,6 @@ def _target_contexts_for_word_exercises(*, user, item: Item, limit: int = 1) -> 
     return contexts
 
 
-def _sanitize_exercise_entries(value) -> list[dict[str, str]]:
-    if not isinstance(value, list):
-        return []
-    entries: list[dict[str, str]] = []
-    for entry in value:
-        if not isinstance(entry, dict):
-            continue
-        source_text = str(entry.get("source_text", "")).strip()
-        target_text = str(entry.get("target_text", "")).strip()
-        label = str(entry.get("label", "")).strip()
-        if not source_text or not target_text:
-            continue
-        entries.append({"label": label, "source_text": source_text, "target_text": target_text})
-        if len(entries) >= MAX_EXERCISE_PHRASES:
-            break
-    return entries
-
-
-def _sanitize_exercise_payload(payload) -> dict:
-    if not isinstance(payload, dict):
-        return {"phrases": []}
-    phrases = _sanitize_exercise_entries(payload.get("phrases"))
-    if not phrases:
-        phrases = [
-            *_sanitize_exercise_entries(payload.get("first_section")),
-            *_sanitize_exercise_entries(payload.get("second_section")),
-        ]
-    cleaned = {"phrases": phrases[:MAX_EXERCISE_PHRASES]}
-    generation_mode = str(payload.get("generation_mode", "")).strip()
-    if generation_mode:
-        cleaned["generation_mode"] = generation_mode
-    return cleaned
-
-
 def _build_local_image_url(filename: str) -> str:
     relative_url = f"{settings.MEDIA_URL.rstrip('/')}/exercise-images/{filename}"
     return f"{settings.APP_BASE_URL.rstrip('/')}{relative_url}"
@@ -670,9 +683,17 @@ class ContentItemExercisesView(APIView):
             target_language=target_language,
             target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
         )
-        cleaned = _sanitize_exercise_payload(generated)
+        cleaned = sanitize_exercise_payload(generated)
         if not cleaned["phrases"]:
             return Response({"detail": "Exercise generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        existing_funny_image_phrase = {}
+        if isinstance(item.exercise_phrases, dict):
+            funny_image_phrase = item.exercise_phrases.get("funny_image_phrase")
+            if isinstance(funny_image_phrase, dict):
+                existing_funny_image_phrase = funny_image_phrase
+        if existing_funny_image_phrase:
+            cleaned["funny_image_phrase"] = existing_funny_image_phrase
 
         item.exercise_phrases = cleaned
         item.save(update_fields=["exercise_phrases", "updated_at"])
@@ -694,29 +715,45 @@ class ContentItemFunnyImageExerciseView(APIView):
         if item.item_type != Item.ItemType.WORD:
             return Response({"detail": "Image exercises are only available for word items"}, status=status.HTTP_400_BAD_REQUEST)
 
-        phrase_started_at = time.perf_counter()
-        phrase = generate_funny_image_exercise_phrase_with_chatgpt(
-            item.spanish_text,
-            item.german_text,
-            notes=item.notes or "",
-            word_type=item.word_type or "",
-            source_language=source_language,
-            target_language=target_language,
-            target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
-        )
+        exercise_phrases = dict(item.exercise_phrases or {})
+        phrase = _funny_image_source_phrase(exercise_phrases, word_type=item.word_type or "")
+        phrase_lookup_started_at = time.perf_counter()
+        if not phrase:
+            scan_all_dialogs_for_word(
+                user=user,
+                item=item,
+                source_language=source_language,
+                target_language=target_language,
+            )
+            generated = generate_word_exercise_phrases_with_chatgpt(
+                item.spanish_text,
+                item.german_text,
+                notes=item.notes or "",
+                word_type=item.word_type or "",
+                source_language=source_language,
+                target_language=target_language,
+                target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
+            )
+            cleaned = sanitize_exercise_payload(generated)
+            if cleaned.get("phrases"):
+                exercise_phrases = cleaned
+                item.exercise_phrases = cleaned
+                item.save(update_fields=["exercise_phrases", "updated_at"])
+                phrase = _funny_image_source_phrase(cleaned, word_type=item.word_type or "")
         logger.info(
             "content.exercises.funny_image_phrase_finished item_id=%s elapsed_ms=%d success=%s",
             item.id,
-            round((time.perf_counter() - phrase_started_at) * 1000),
+            round((time.perf_counter() - phrase_lookup_started_at) * 1000),
             bool(phrase),
         )
         if not phrase:
-            return Response({"detail": "Funny image phrase generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response({"detail": "Funny image phrase lookup failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         target_text = str(phrase.get("target_text", "")).strip()
         final_image_prompt = (
             "Create a funny, playful, safe illustration of this simple language-learning phrase.\n"
             f'Phrase: "{target_text}"\n'
+            "Represent the phrase in the funniest way that still makes clear sense.\n"
             "The scene should clearly correspond to the phrase, with a humorous visual implementation of the literal meaning.\n"
             f'Visibly include the exact phrase text in the image: "{target_text}".'
         ).strip()
@@ -746,7 +783,6 @@ class ContentItemFunnyImageExerciseView(APIView):
             "image_url": image_url,
             "image_prompt": final_image_prompt,
         }
-        exercise_phrases = dict(item.exercise_phrases or {})
         exercise_phrases["funny_image_phrase"] = funny_image_phrase
         item.exercise_phrases = exercise_phrases
         item.save(update_fields=["exercise_phrases", "updated_at"])

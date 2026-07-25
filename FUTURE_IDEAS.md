@@ -20,9 +20,11 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
+La frase de la imagen en nouns se ve mal
 Algun security by obscurity, que igual deje el pin sencillo.
 In the create content window, make dialog lenght and language of required words a simple radio
 En diálogos en item view y creo que diálogos también, que no scrolls back
+"Close" conversation para que cierre de forma natural.
 
 #### PROMPTS/MODEL WORK
 En pregunta mejorar las respuestas, incluyendo quitar el que dice si esta relacionado

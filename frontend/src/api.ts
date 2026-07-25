@@ -18,7 +18,6 @@ import type {
   TopicConversationHelpResponse,
   TopicConversationGoalEvaluationResponse,
   ContentTopicsResponse,
-  ItemExercisePhrases,
   OverviewStatsResponse,
   ReviewDirection,
   SessionResponse,
@@ -519,24 +518,6 @@ export async function fetchContentItemCompareWordInsights(
   return (await response.json()) as CompareWordInsightsResponse;
 }
 
-export async function generateContentItemExercises(
-  itemId: number,
-  sourceLanguage: StudyLanguageCode = "spanish",
-  targetLanguage: StudyLanguageCode = "german",
-): Promise<{ exercise_phrases?: ItemExercisePhrases }> {
-  const params = new URLSearchParams({
-    source_language: sourceLanguage,
-    target_language: targetLanguage,
-  });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/exercises?${params.toString()}`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error("Failed to generate word exercises");
-  }
-  return (await response.json()) as { exercise_phrases?: ItemExercisePhrases };
-}
-
 export async function generateContentItemFunnyImageExercise(
   itemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
@@ -617,6 +598,32 @@ export async function regenerateContentItemAudio(
   }
   const payload = (await response.json()) as { audio_url?: string };
   return payload.audio_url || "";
+}
+
+export async function regenerateContentItem(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<void> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/regenerate?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to regenerate item";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
 }
 
 export async function setContentItemLearned(

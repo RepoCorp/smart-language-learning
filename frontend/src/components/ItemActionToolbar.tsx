@@ -13,6 +13,7 @@ type ItemActionIconName =
   | "questions"
   | "compareWords"
   | "audio"
+  | "regenerateItem"
   | "refresh";
 
 function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
@@ -105,6 +106,15 @@ function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
       </svg>
     );
   }
+  if (name === "regenerateItem") {
+    return (
+      <svg {...commonProps}>
+        <path d="M12 4 6 7v5c0 3.8 2.5 7.2 6 8 3.5-.8 6-4.2 6-8V7l-6-3Z" />
+        <path d="M9.5 12h5" />
+        <path d="m12 9.5 2.5 2.5L12 14.5" />
+      </svg>
+    );
+  }
   return (
     <svg {...commonProps}>
       <path d="M20 12a8 8 0 0 1-13.7 5.7" />
@@ -133,7 +143,7 @@ type Props = {
   onOpenRelatedDialogs: () => void;
   onOpenQuestions: () => void;
   onOpenCompareWords: () => void;
-  onRegenerateAudio: () => void;
+  onRegenerateItem: () => void;
   onRefreshWordData: () => void;
   onShowTooltip: (event: TooltipEvent, label: string) => void;
   onHideTooltip: () => void;
@@ -179,7 +189,7 @@ export default function ItemActionToolbar({
   onOpenRelatedDialogs,
   onOpenQuestions,
   onOpenCompareWords,
-  onRegenerateAudio,
+  onRegenerateItem,
   onRefreshWordData,
   onShowTooltip,
   onHideTooltip,
@@ -271,15 +281,15 @@ export default function ItemActionToolbar({
         <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
           <DangerousButton
             className="secondary-button item-action-button item-action-button-icon dangerous-action-button"
-            onConfirm={onRegenerateAudio}
+            onConfirm={onRegenerateItem}
             disabled={regeneratingAudio || refreshingWord}
             {...iconButtonProps(
-              regeneratingAudio ? t("newItem.audioRegenerating") : t("newItem.regenerateAudio"),
+              regeneratingAudio ? t("newItem.itemRegenerating") : t("newItem.regenerateItem"),
               onShowTooltip,
               onHideTooltip,
             )}
           >
-            <ItemActionIcon name="audio" />
+            <ItemActionIcon name="regenerateItem" />
           </DangerousButton>
           {itemType === "word" && (
             <DangerousButton

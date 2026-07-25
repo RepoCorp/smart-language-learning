@@ -28,6 +28,40 @@ from .word_metadata import normalize_word_metadata as _normalize_word_metadata
 from ...models import DialogTurn, Item, SavedDialog
 
 
+GERMAN_NOUN_PLURAL_PROMPT = """
+Return strict JSON with this exact shape:
+{
+  "plural_target": "string"
+}
+
+Rules:
+- The selected target text is a German noun or noun phrase.
+- Return the standard nominative plural form of the noun in German.
+- Return only the plural noun phrase, without explanation.
+- Include the plural article when applicable.
+- Preserve correct capitalization.
+- If the selected text is not a noun or there is no reliable plural form, return an empty string.
+- Return JSON only, no markdown and no extra text.
+""".strip()
+
+
+def _lookup_german_noun_plural(*, target_text: str, target_line: str) -> str:
+    parsed = _call_openai_json_logged(
+        label="german_noun_plural",
+        system_prompt=GERMAN_NOUN_PLURAL_PROMPT,
+        user_input=(
+            f"Selected target text: {target_text}\n"
+            f"Target-language line context: {target_line.strip()}\n"
+        ),
+        timeout_seconds=6,
+        temperature=0.0,
+        top_p=1.0,
+    )
+    if not isinstance(parsed, dict):
+        return ""
+    return str(parsed.get("plural_target", "")).strip()[:255]
+
+
 def _without_first_word(value: str) -> str:
     parts = value.split(maxsplit=1)
     return parts[1].strip() if len(parts) == 2 else ""
@@ -401,6 +435,11 @@ class ContentWordQuickAddView(APIView):
             word_type=word_type,
         )
         if existing:
+            if word_type == "noun" and target_language == "german" and not (existing.plural_german or "").strip():
+                plural_german = _lookup_german_noun_plural(target_text=target_text, target_line=target_line)
+                if plural_german:
+                    existing.plural_german = plural_german
+                    existing.save(update_fields=["plural_german", "updated_at"])
             response_word_type = existing.word_type if existing.word_type else word_type
             if existing:
                 link_item_to_dialog_turn(
@@ -451,12 +490,17 @@ class ContentWordQuickAddView(APIView):
                 }
             )
 
+        plural_german = ""
+        if word_type == "noun" and target_language == "german":
+            plural_german = _lookup_german_noun_plural(target_text=target_text, target_line=target_line)
+
         candidate = ContentCandidate(
             spanish_text=source_text,
             german_text=target_text,
             exists=False,
             notes=final_notes,
             word_type=word_type,
+            plural_german=plural_german,
         )
         created = create_word_if_missing(
             user=user,

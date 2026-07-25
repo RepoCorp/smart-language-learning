@@ -1,18 +1,18 @@
-import { Fragment, useEffect, useRef, useState, type FocusEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from "react";
 
 import {
   askContentItemQuestion,
   fetchContentItemDetail,
   generateContentDialogTurnAudio,
-  generateContentItemExercises,
   generateContentItemFunnyImageExercise,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
+  regenerateContentItem,
   regenerateContentDialogAudio,
-  regenerateContentItemAudio,
   refreshContentItemWord,
   submitReview,
 } from "../api";
+import { generateContentItemExercises, generateContentItemNounExerciseCase } from "../apiNounExercises";
 import { selectBestSpeechSynthesisVoice } from "../browserSpeech";
 import { deterministicIndex, deterministicTake } from "../deterministic";
 import { useI18n } from "../i18n";
@@ -29,8 +29,22 @@ import DialogActionIcon from "./DialogActionIcon";
 import DialogTurnsList from "./DialogTurnsList";
 import ItemActionToolbar from "./ItemActionToolbar";
 import ItemQuestionsModal from "./ItemQuestionsModal";
+import NounExerciseSelector from "./NounExerciseSelector";
 import PhraseReview from "./PhraseReview";
+import { useNounExerciseModal } from "./useNounExerciseModal";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
+import WordExerciseActions from "./WordExerciseActions";
+import VerbExerciseSelector, {
+  buildVerbExerciseGridEntries,
+  getVerbExerciseKeysForPerson,
+  getVerbExerciseKeysForTense,
+  VERB_BY_TENSE_GENERATION_MODE,
+  VERB_PERSONS,
+  VERB_TENSES,
+  type VerbPersonKey,
+  type VerbTenseKey,
+} from "./VerbExerciseSelector";
+import { buildWordExercisePrimaryEntry } from "./wordExercisePrimaryEntry";
 import WordReview from "./WordReview";
 
 interface NewItemProps {
@@ -43,24 +57,7 @@ interface NewItemProps {
 }
 
 const MAX_EXERCISE_ENTRIES = 30;
-const VERB_BY_TENSE_GENERATION_MODE = "verb_by_tense_v1";
-const EXERCISE_PHRASE_PAUSE_MS = 650;
-const VERB_TENSES = [
-  { key: "present", label: "Present" },
-  { key: "perfect", label: "Perfect" },
-  { key: "simple-past", label: "Simple past" },
-  { key: "future", label: "Future" },
-] as const;
-const VERB_PERSONS = [
-  { key: "1s", label: "1s" },
-  { key: "2s", label: "2s" },
-  { key: "3s", label: "3s" },
-  { key: "1p", label: "1p" },
-  { key: "2p", label: "2p" },
-  { key: "3p", label: "3p" },
-] as const;
-type VerbTenseKey = typeof VERB_TENSES[number]["key"];
-type VerbPersonKey = typeof VERB_PERSONS[number]["key"];
+const EXERCISE_PHRASE_PAUSE_MS = 250;
 function ItemActionIcon({ name }: {
   name: "selectAll" | "clearAll" | "random" | "image" | "openImage" | "refresh";
 }): JSX.Element {
@@ -127,39 +124,6 @@ function ItemActionIcon({ name }: {
   );
 }
 
-const parseVerbExerciseLabel = (label: string): { tense: VerbTenseKey; person: VerbPersonKey } | null => {
-  const normalized = label.trim().toLowerCase().replace(/_/g, "-").replace(/\s+/g, "-");
-  const personAliases: Record<string, VerbPersonKey> = {
-    "1s": "1s",
-    "first-singular": "1s",
-    "1st-singular": "1s",
-    "2s": "2s",
-    "second-singular": "2s",
-    "2nd-singular": "2s",
-    "3s": "3s",
-    "third-singular": "3s",
-    "3rd-singular": "3s",
-    "1p": "1p",
-    "first-plural": "1p",
-    "1st-plural": "1p",
-    "2p": "2p",
-    "second-plural": "2p",
-    "2nd-plural": "2p",
-    "3p": "3p",
-    "third-plural": "3p",
-    "3rd-plural": "3p",
-  };
-  const match = normalized.match(/^(present|perfect|simple-past|future)-(.+)$/);
-  if (!match) {
-    return null;
-  }
-  const person = personAliases[match[2]];
-  if (!person) {
-    return null;
-  }
-  return { tense: match[1] as VerbTenseKey, person };
-};
-
 export default function NewItem({
   item,
   onContinue,
@@ -188,6 +152,7 @@ export default function NewItem({
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [itemActionTooltip, setItemActionTooltip] = useState<{ label: string; left: number; top: number } | null>(null);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
+  const [generatingNounCaseKey, setGeneratingNounCaseKey] = useState<"" | "nominative" | "accusative" | "dative">("");
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
   const [regeneratingAudio, setRegeneratingAudio] = useState<boolean>(false);
   const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] = useState<boolean>(false);
@@ -221,6 +186,8 @@ export default function NewItem({
   const [exercisePhrases, setExercisePhrases] = useState(item.exercise_phrases || {});
   const [sourceText, setSourceText] = useState<string>(item.spanish_text || "");
   const [targetText, setTargetText] = useState<string>(item.german_text || "");
+  const [notes, setNotes] = useState<string>(item.notes || "");
+  const [pluralGerman, setPluralGerman] = useState<string>(item.plural_german || "");
   const [audioUrl, setAudioUrl] = useState<string>(item.audio_url || "");
   const [wordType, setWordType] = useState<string>(item.word_type || "");
   const [dialogPhraseAnswer, setDialogPhraseAnswer] = useState<string>(item.dialog_phrase_answer || "");
@@ -264,6 +231,8 @@ export default function NewItem({
     setWordRefreshMessage("");
     setSourceText(item.spanish_text || "");
     setTargetText(item.german_text || "");
+    setNotes(item.notes || "");
+    setPluralGerman(item.plural_german || "");
     setAudioUrl(item.audio_url || "");
     setWordType(item.word_type || "");
     setDialogPhraseAnswer(item.dialog_phrase_answer || "");
@@ -275,7 +244,7 @@ export default function NewItem({
     setRelatedDialogs(item.related_dialogs || []);
     setCompareWords(item.compare_words || []);
     setCompareWordsInsights(item.compare_words_insights || "");
-  }, [item.id, item.spanish_text, item.german_text, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.dialog_phrase_turns, item.dialog_phrase_odd_index, item.related_dialogs, item.compare_words, item.compare_words_insights]);
+  }, [item.id, item.spanish_text, item.german_text, item.notes, item.plural_german, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.dialog_phrase_turns, item.dialog_phrase_odd_index, item.related_dialogs, item.compare_words, item.compare_words_insights]);
 
   useEffect(() => {
     if (!autoplayAudioOnMount || !audioUrl) {
@@ -602,6 +571,7 @@ export default function NewItem({
             example_sentence: detail.example_sentence || "",
             notes: detail.notes || "",
             word_type: detail.word_type || check.word_type || "",
+            plural_german: detail.plural_german || "",
             audio_url: detail.audio_url || "",
             exercise_phrases: detail.exercise_phrases || {},
             mode: "new",
@@ -658,6 +628,7 @@ export default function NewItem({
         example_sentence: detail.example_sentence || "",
         notes: detail.notes || "",
         word_type: detail.word_type || "",
+        plural_german: detail.plural_german || "",
         audio_url: detail.audio_url || "",
         exercise_phrases: detail.exercise_phrases || {},
         mode: "new",
@@ -803,6 +774,7 @@ export default function NewItem({
             example_sentence: detail.example_sentence || "",
             notes: detail.notes || "",
             word_type: detail.word_type || result.word_type || "",
+            plural_german: detail.plural_german || "",
             audio_url: detail.audio_url || result.audio_url || "",
             exercise_phrases: detail.exercise_phrases || {},
             mode: "new",
@@ -877,19 +849,22 @@ export default function NewItem({
       ]
     : regularWordExerciseEntries;
   const isVerbWord = item.item_type === "word" && String(wordType || "").trim().toLowerCase() === "verb";
-  const hasVerbExerciseGridEntries = generatedWordExerciseEntries.some((entry) => Boolean(parseVerbExerciseLabel(entry.label)));
+  const {
+    nounExerciseSections,
+    isNounSectionedExercise,
+  } = useNounExerciseModal({
+    itemType: item.item_type,
+    wordType,
+    exercisePhrases,
+  });
+  const verbExerciseGridEntries = buildVerbExerciseGridEntries(generatedWordExerciseEntries);
+  const hasVerbExerciseGridEntries = verbExerciseGridEntries.length > 0;
   const hasCurrentVerbExerciseGeneration = exercisePhrases?.generation_mode === VERB_BY_TENSE_GENERATION_MODE;
   const isVerbExerciseGrid = item.item_type === "word"
     && (isVerbWord || hasVerbExerciseGridEntries);
   const wordOnlyExerciseEntry = item.item_type === "word"
     ? wordExerciseEntries.find((entry) => entry.label === "word")
     : undefined;
-  const verbExerciseGridEntries = generatedWordExerciseEntries
-    .map((entry) => ({ entry, parsed: parseVerbExerciseLabel(entry.label) }))
-    .filter((itemWithParsed): itemWithParsed is { entry: { label: string; source: string; target: string }; parsed: { tense: VerbTenseKey; person: VerbPersonKey } } => Boolean(itemWithParsed.parsed));
-  const verbExerciseGridEntryBySlot = new Map(
-    verbExerciseGridEntries.map(({ entry, parsed }) => [`${parsed.person}-${parsed.tense}`, entry]),
-  );
 
   const compareExerciseWords = item.item_type === "word"
     ? compareWords
@@ -1007,19 +982,31 @@ export default function NewItem({
     return firstEntry ? [exerciseEntryKey(firstEntry)] : [];
   };
 
-  const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] => verbExerciseGridEntries
-    .filter(({ parsed }) => parsed.person === person)
-    .map(({ entry }) => exerciseEntryKey(entry));
+  const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] => getVerbExerciseKeysForPerson(
+    verbExerciseGridEntries,
+    exerciseEntryKey,
+    person,
+  );
 
-  const verbExerciseKeysForTense = (tense: VerbTenseKey): string[] => verbExerciseGridEntries
-    .filter(({ parsed }) => parsed.tense === tense)
-    .map(({ entry }) => exerciseEntryKey(entry));
+  const verbExerciseKeysForTense = (tense: VerbTenseKey): string[] => getVerbExerciseKeysForTense(
+    verbExerciseGridEntries,
+    exerciseEntryKey,
+    tense,
+  );
 
   const selectVerbExercisePerson = (person: VerbPersonKey): void => {
+    if ((person as string) === "__clear__") {
+      setSelectedExerciseKeys([]);
+      return;
+    }
     setSelectedExerciseKeys(verbExerciseKeysForPerson(person));
   };
 
   const selectVerbExerciseTense = (tense: VerbTenseKey): void => {
+    if ((tense as string) === "__clear__") {
+      setSelectedExerciseKeys([]);
+      return;
+    }
     setSelectedExerciseKeys(verbExerciseKeysForTense(tense));
   };
 
@@ -1056,6 +1043,16 @@ export default function NewItem({
         : [...current, key]
     ));
   };
+
+  const wordExercisePrimaryEntry = buildWordExercisePrimaryEntry({
+    entry: wordOnlyExerciseEntry,
+    pluralGerman,
+    notes,
+    selectedExerciseKeys,
+    exerciseRunning,
+    exerciseEntryKey,
+    onToggleEntry: toggleExerciseEntry,
+  });
 
   const selectAllExerciseEntries = (): void => {
     if (isVerbExerciseGrid) {
@@ -1142,6 +1139,22 @@ export default function NewItem({
     setShowExerciseModal(true);
   };
 
+  const generateNounExerciseCase = async (caseKey: "nominative" | "accusative" | "dative"): Promise<void> => {
+    if (generatingNounCaseKey || item.id <= 0) {
+      return;
+    }
+    setExerciseError("");
+    setGeneratingNounCaseKey(caseKey);
+    try {
+      const payload = await generateContentItemNounExerciseCase(item.id, caseKey, sourceLanguage, targetLanguage);
+      setExercisePhrases(payload.exercise_phrases || {});
+    } catch (error) {
+      setExerciseError(error instanceof Error ? error.message : t("newItem.wordRefreshError"));
+    } finally {
+      setGeneratingNounCaseKey("");
+    }
+  };
+
   const refreshWordData = async (): Promise<void> => {
     if (refreshingWord || item.item_type !== "word" || item.id <= 0) {
       return;
@@ -1160,7 +1173,7 @@ export default function NewItem({
     }
   };
 
-  const regenerateAudio = async (): Promise<void> => {
+  const regenerateItemData = async (): Promise<void> => {
     if (regeneratingAudio || refreshingWord || item.id <= 0) {
       return;
     }
@@ -1168,12 +1181,28 @@ export default function NewItem({
     setExerciseError("");
     setWordRefreshMessage("");
     try {
-      const nextAudioUrl = await regenerateContentItemAudio(item.id, sourceLanguage, targetLanguage);
-      if (nextAudioUrl) {
-        setAudioUrl(nextAudioUrl);
-      }
-    } catch {
-      setExerciseError(t("newItem.audioRegenerationError"));
+      await regenerateContentItem(item.id, sourceLanguage, targetLanguage);
+      const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
+      setSourceText(detail.spanish_text || "");
+      setTargetText(detail.german_text || "");
+      setNotes(detail.notes || "");
+      setPluralGerman(detail.plural_german || "");
+      setAudioUrl(detail.audio_url || "");
+      setWordType(detail.word_type || "");
+      setExercisePhrases(detail.exercise_phrases || {});
+      setDialogPhraseAnswer(detail.dialog_phrase_answer || "");
+      setDialogPhraseScene(detail.dialog_phrase_scene || "");
+      setDialogPhraseSceneAudioUrls(detail.dialog_phrase_scene_audio_urls || []);
+      setDialogPhraseOptions(detail.dialog_phrase_options || []);
+      setDialogPhraseTurns(detail.dialog_phrase_turns || []);
+      setDialogPhraseOddIndex(detail.dialog_phrase_odd_index ?? null);
+      setRelatedDialogs(detail.related_dialogs || []);
+      setCompareWords(detail.compare_words || []);
+      setCompareWordsInsights(detail.compare_words_insights || "");
+      setItemQuestions(detail.item_questions || []);
+      setSelectedExerciseKeys([]);
+    } catch (error) {
+      setExerciseError(error instanceof Error ? error.message : t("newItem.itemRegenerationError"));
     } finally {
       setRegeneratingAudio(false);
     }
@@ -1192,6 +1221,23 @@ export default function NewItem({
       setExerciseError(t("newItem.exercisesFunnyImageError"));
     } finally {
       setGeneratingFunnyImageExercise(false);
+    }
+  };
+
+  const regenerateWordExercises = async (): Promise<void> => {
+    if (loadingExercises || item.item_type !== "word" || item.id <= 0) {
+      return;
+    }
+    setLoadingExercises(true);
+    setExerciseError("");
+    try {
+      const payload = await generateContentItemExercises(item.id, sourceLanguage, targetLanguage);
+      setExercisePhrases(payload.exercise_phrases || {});
+      setSelectedExerciseKeys([]);
+    } catch {
+      setExerciseError(t("newItem.exercisesGenerationError"));
+    } finally {
+      setLoadingExercises(false);
     }
   };
 
@@ -1506,7 +1552,7 @@ export default function NewItem({
           onOpenRelatedDialogs={() => setShowDialogsModal(true)}
           onOpenQuestions={() => setShowQuestionsModal(true)}
           onOpenCompareWords={openCompareWordsModal}
-          onRegenerateAudio={regenerateAudio}
+          onRegenerateItem={regenerateItemData}
           onRefreshWordData={refreshWordData}
           onShowTooltip={showItemActionTooltip}
           onHideTooltip={hideItemActionTooltip}
@@ -1830,73 +1876,32 @@ export default function NewItem({
               {exerciseError && <p className="error">{exerciseError}</p>}
               {item.item_type === "word" && (
                 <>
-                  <div className="exercise-selection-actions">
-                    <button
-                      type="button"
-                      className="secondary-button exercise-action-icon-button"
-                      onClick={unselectAllExerciseEntries}
-                      disabled={exerciseRunning || selectedExerciseKeys.length === 0}
-                      aria-label={t("newItem.exercisesUnselectAll")}
-                      title={t("newItem.exercisesUnselectAll")}
-                    >
-                      <ItemActionIcon name="clearAll" />
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button exercise-action-icon-button"
-                      onClick={selectAllExerciseEntries}
-                      disabled={exerciseRunning || wordExerciseEntries.length === 0}
-                      aria-label={t("newItem.exercisesSelectAll")}
-                      title={t("newItem.exercisesSelectAll")}
-                    >
-                      <ItemActionIcon name="selectAll" />
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button exercise-action-icon-button"
-                      onClick={selectRandomExerciseEntries}
-                      disabled={exerciseRunning || wordExerciseEntries.length === 0}
-                      aria-label={t("newItem.exercisesRandomSelection")}
-                      title={t("newItem.exercisesRandomSelection")}
-                    >
-                      <ItemActionIcon name="random" />
-                    </button>
-                    {funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
-                      <button
-                        type="button"
-                        className="secondary-button exercise-action-icon-button"
-                        onClick={() => setShowFunnyImageModal(true)}
-                        aria-label={t("newItem.exercisesFunnyImageShow")}
-                        title={t("newItem.exercisesFunnyImageShow")}
-                      >
-                        <ItemActionIcon name="openImage" />
-                      </button>
-                    )}
-                    <div className="exercise-image-actions">
-                      {funnyImageExerciseEntry ? (
-                        <DangerousButton
-                          className="secondary-button dangerous-action-button exercise-action-icon-button"
-                          onConfirm={generateFunnyImageExercise}
-                          disabled={generatingFunnyImageExercise || item.id <= 0}
-                          aria-label={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
-                          title={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
-                        >
-                          <ItemActionIcon name="image" />
-                        </DangerousButton>
-                      ) : (
-                        <button
-                          type="button"
-                          className="secondary-button exercise-action-icon-button"
-                          onClick={() => void generateFunnyImageExercise()}
-                          disabled={generatingFunnyImageExercise || item.id <= 0}
-                          aria-label={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
-                          title={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
-                        >
-                          <ItemActionIcon name="image" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  <WordExerciseActions
+                    exerciseRunning={exerciseRunning}
+                    loadingExercises={loadingExercises}
+                    generatingFunnyImageExercise={generatingFunnyImageExercise}
+                    hasWordExercises={wordExerciseEntries.length > 0}
+                    hasSelectedExercises={selectedExerciseKeys.length > 0}
+                    hasFunnyImage={Boolean(funnyImageExerciseEntry)}
+                    hasOpenFunnyImage={Boolean(funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry)}
+                    canRegenerateExercises={item.id > 0}
+                    onUnselectAll={unselectAllExerciseEntries}
+                    onSelectAll={selectAllExerciseEntries}
+                    onSelectRandom={selectRandomExerciseEntries}
+                    onOpenFunnyImage={() => setShowFunnyImageModal(true)}
+                    onGenerateFunnyImage={() => {
+                      void generateFunnyImageExercise();
+                    }}
+                    onRegenerateExercises={() => {
+                      void regenerateWordExercises();
+                    }}
+                    clearAllIcon={<ItemActionIcon name="clearAll" />}
+                    selectAllIcon={<ItemActionIcon name="selectAll" />}
+                    randomIcon={<ItemActionIcon name="random" />}
+                    openImageIcon={<ItemActionIcon name="openImage" />}
+                    imageIcon={<ItemActionIcon name="image" />}
+                    refreshIcon={<ItemActionIcon name="refresh" />}
+                  />
                   {generatingFunnyImageExercise && (
                     <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>
                   )}
@@ -1912,88 +1917,36 @@ export default function NewItem({
                         <span>
                           <strong>{funnyImageExerciseSelectionEntry.target}</strong>
                           <small>{funnyImageExerciseSelectionEntry.source}</small>
-                          <em className="exercise-phrase-label">{funnyImageExerciseSelectionEntry.label}</em>
                         </span>
                       </label>
                     </div>
                   )}
                   {isVerbExerciseGrid ? (
-                    <div className="verb-exercise-wrap">
-                      {wordOnlyExerciseEntry && (
-                        <label className={`exercise-phrase-row verb-word-row ${selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry)) ? "exercise-phrase-row-selected" : ""}`}>
-                          <input
-                            type="checkbox"
-                            checked={selectedExerciseKeys.includes(exerciseEntryKey(wordOnlyExerciseEntry))}
-                            onChange={() => toggleExerciseEntry(wordOnlyExerciseEntry)}
-                            disabled={exerciseRunning}
-                          />
-                          <span>
-                            <strong>{wordOnlyExerciseEntry.target}</strong>
-                            <small>{wordOnlyExerciseEntry.source}</small>
-                            <em className="exercise-phrase-label">{wordOnlyExerciseEntry.label}</em>
-                          </span>
-                        </label>
-                      )}
-                      <div className="verb-exercise-grid" role="table" aria-label={t("newItem.exercisesTitle")}>
-                        <div className="verb-exercise-cell verb-exercise-corner" role="columnheader" />
-                        {VERB_TENSES.map((tense) => {
-                          const keys = verbExerciseKeysForTense(tense.key);
-                          const selected = keys.length > 0 && keys.every((key) => selectedExerciseKeys.includes(key));
-                          return (
-                            <button
-                              key={tense.key}
-                              type="button"
-                              className={`verb-exercise-cell verb-exercise-header ${selected ? "verb-exercise-selected" : ""}`}
-                              onClick={() => selectVerbExerciseTense(tense.key)}
-                              disabled={exerciseRunning || keys.length === 0}
-                            >
-                              {tense.label}
-                            </button>
-                          );
-                        })}
-                        {VERB_PERSONS.map((person) => {
-                          const rowKeys = verbExerciseKeysForPerson(person.key);
-                          const rowSelected = rowKeys.length > 0 && rowKeys.every((key) => selectedExerciseKeys.includes(key));
-                          return (
-                            <Fragment key={person.key}>
-                              <button
-                                key={`${person.key}-row`}
-                                type="button"
-                                className={`verb-exercise-cell verb-exercise-header verb-exercise-person ${rowSelected ? "verb-exercise-selected" : ""}`}
-                                onClick={() => selectVerbExercisePerson(person.key)}
-                                disabled={exerciseRunning || rowKeys.length === 0}
-                              >
-                                {person.label}
-                              </button>
-                              {VERB_TENSES.map((tense) => {
-                                const entry = verbExerciseGridEntryBySlot.get(`${person.key}-${tense.key}`);
-                                const key = entry ? exerciseEntryKey(entry) : `${person.key}-${tense.key}`;
-                                const selected = entry ? selectedExerciseKeys.includes(key) : false;
-                                if (!entry) {
-                                  return (
-                                    <div key={key} className="verb-exercise-cell verb-exercise-entry" role="cell">
-                                      <span className="manage-item-meta">-</span>
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <button
-                                    key={key}
-                                    type="button"
-                                    className={`verb-exercise-cell verb-exercise-entry ${selected ? "verb-exercise-selected" : ""}`}
-                                    onClick={() => toggleExerciseEntry(entry)}
-                                    disabled={exerciseRunning}
-                                  >
-                                    <strong>{entry.target}</strong>
-                                    <small>{entry.source}</small>
-                                  </button>
-                                );
-                              })}
-                            </Fragment>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <VerbExerciseSelector
+                      ariaLabel={t("newItem.exercisesTitle")}
+                      primaryEntry={wordExercisePrimaryEntry}
+                      gridEntries={verbExerciseGridEntries}
+                      selectedExerciseKeys={selectedExerciseKeys}
+                      exerciseRunning={exerciseRunning}
+                      exerciseEntryKey={exerciseEntryKey}
+                      onToggleEntry={toggleExerciseEntry}
+                      onSelectPerson={selectVerbExercisePerson}
+                      onSelectTense={selectVerbExerciseTense}
+                    />
+                  ) : isNounSectionedExercise ? (
+                    <NounExerciseSelector
+                      primaryEntry={wordExercisePrimaryEntry}
+                      sections={nounExerciseSections}
+                      selectedExerciseKeys={selectedExerciseKeys}
+                      exerciseRunning={exerciseRunning}
+                      generatingCaseKey={generatingNounCaseKey || undefined}
+                      exerciseEntryKey={exerciseEntryKey}
+                      onToggleEntry={toggleExerciseEntry}
+                      onSelectKeys={setSelectedExerciseKeys}
+                      onGenerateCase={(caseKey) => {
+                        void generateNounExerciseCase(caseKey);
+                      }}
+                    />
                   ) : (
                     <div className="exercise-phrase-list">
                       {wordExerciseEntries.map((entry) => {
@@ -2010,7 +1963,6 @@ export default function NewItem({
                             <span>
                               <strong>{entry.target}</strong>
                               <small>{entry.source}</small>
-                              {entry.label && <em className="exercise-phrase-label">{entry.label}</em>}
                             </span>
                           </label>
                         );
@@ -2037,7 +1989,6 @@ export default function NewItem({
                               <span>
                                 <strong>{entry.target}</strong>
                                 <small>{entry.source}</small>
-                                {entry.label && <em className="exercise-phrase-label">{entry.label}</em>}
                               </span>
                             </label>
                           );

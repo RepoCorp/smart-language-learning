@@ -14,6 +14,15 @@ from . import generation_conversation as _conversation
 from . import generation_words as _words
 
 logger = logging.getLogger(__name__)
+WORD_EXERCISE_MODEL = "gpt-5.6-sol"
+DEFAULT_TEMPERATURE = 1.0
+DEFAULT_TOP_P = 1.0
+DEFAULT_PRESENCE_PENALTY = 0.0
+
+
+def _supports_custom_sampling(model_name: str) -> bool:
+    normalized = (model_name or "").strip().lower()
+    return normalized != "gpt-5.6-sol"
 
 
 def call_openai_json(
@@ -42,10 +51,33 @@ def call_openai_json(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_input},
         ],
-        "temperature": temperature,
-        "top_p": top_p,
-        "presence_penalty": presence_penalty,
     }
+    if _supports_custom_sampling(model_name):
+        body["temperature"] = temperature
+        body["top_p"] = top_p
+        body["presence_penalty"] = presence_penalty
+    else:
+        if temperature != DEFAULT_TEMPERATURE:
+            logger.info(
+                "content.generate.chatgpt.sampling_omitted call_id=%s model=%s param=temperature requested=%s",
+                call_id,
+                model_name,
+                temperature,
+            )
+        if top_p != DEFAULT_TOP_P:
+            logger.info(
+                "content.generate.chatgpt.sampling_omitted call_id=%s model=%s param=top_p requested=%s",
+                call_id,
+                model_name,
+                top_p,
+            )
+        if presence_penalty != DEFAULT_PRESENCE_PENALTY:
+            logger.info(
+                "content.generate.chatgpt.sampling_omitted call_id=%s model=%s param=presence_penalty requested=%s",
+                call_id,
+                model_name,
+                presence_penalty,
+            )
     normalized_reasoning_effort = str(reasoning_effort or "").strip()
     if normalized_reasoning_effort:
         body["reasoning_effort"] = normalized_reasoning_effort
@@ -151,12 +183,14 @@ def generate_word_exercise_phrases_with_chatgpt(
     model: str | None = None,
     reasoning_effort: str | None = None,
 ) -> dict:
+    effective_model = str(model or WORD_EXERCISE_MODEL).strip() or WORD_EXERCISE_MODEL
+
     def call_openai_json_with_model(system_prompt: str, user_input: str, timeout_seconds: int = 10, **kwargs) -> dict | None:
         return call_openai_json(
             system_prompt,
             user_input,
             timeout_seconds=timeout_seconds,
-            model=model,
+            model=effective_model,
             reasoning_effort=reasoning_effort,
             **kwargs,
         )
@@ -169,7 +203,7 @@ def generate_word_exercise_phrases_with_chatgpt(
         source_language=source_language,
         target_language=target_language,
         target_contexts=target_contexts,
-        call_openai_json_fn=call_openai_json_with_model if model else call_openai_json,
+        call_openai_json_fn=call_openai_json_with_model,
     )
 
 

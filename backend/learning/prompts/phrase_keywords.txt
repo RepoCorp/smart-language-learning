@@ -18,7 +18,7 @@ Rules:
 - word_type must be one of: noun, verb, adjective, adverb, expression, other.
 - Do not invent abstract replacements (for example extracting "der Gesamtbetrag" from "insgesamt").
 - If you intentionally return a base/canonical form that is not literal in the phrase, explain the mapping clearly in notes.
-- plural_target should contain the plural form when applicable; otherwise empty string.
+- plural_target should contain the plural form with article when applicable; otherwise empty string.
 - Include relevant study notes only when useful; otherwise empty string.
 - Keep keywords unique by source_text.
 - Return JSON only, no markdown and no extra text.

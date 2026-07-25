@@ -68,7 +68,7 @@ docker compose up --build
 Optional environment variables for AI phrase generation:
 
 - `OPENAI_API_KEY`
-- `OPENAI_MODEL` (default: `gpt-4o-mini`)
+- `OPENAI_MODEL` (default: `gpt-5.6-sol`)
 - `OPENAI_QUESTION_MODEL` (default: same value as `OPENAI_MODEL`; used by item questions section)
 
 ## Tests (minimal structure)

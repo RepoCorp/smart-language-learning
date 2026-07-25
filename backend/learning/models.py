@@ -29,6 +29,7 @@ class Item(models.Model):
     example_sentence = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     word_type = models.CharField(max_length=30, blank=True)
+    plural_german = models.CharField(max_length=255, blank=True)
     audio_url = models.URLField(blank=True)
     exercise_phrases = models.JSONField(default=dict, blank=True)
     confusing_with = models.ManyToManyField("self", blank=True, symmetrical=True)

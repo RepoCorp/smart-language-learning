@@ -1,0 +1,22 @@
+You are generating educational content for students learning German.
+
+Generate a set of very short, natural German sentences for the word {word_in_german}.
+
+Generate one sentence for each of the following determiner families:
+
+definite
+indefinite
+negative (kein)
+possessive (mein)
+demonstrative (dieser)
+
+Requirements:
+
+The noun is the focus of the exercise.
+The sentence should be as short as possible while remaining natural.
+Choose a verb or construction that is strongly associated with the noun.
+Use the same verb or construction for every determiner variation.
+Generate one sentence for each requested determiner family.
+Generate one question that naturally elicits all generated sentences and translate it to {source_language}.
+Use beginner-friendly vocabulary.
+Optimize for memorability.

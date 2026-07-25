@@ -3239,14 +3239,33 @@ def test_content_item_exercises_endpoint_generates_and_saves_exercises(monkeypat
         captured_kwargs.update(kwargs)
         return {
             "phrases": [
-                {"label": "singular", "source_text": "La mesa es grande.", "target_text": "Der Tisch ist groß."},
-                {"label": "plural", "source_text": "Las mesas estan aqui.", "target_text": "Tische sind hier."},
-                {"label": "nominative", "source_text": "La mesa esta lista.", "target_text": "Der Tisch ist bereit."},
-                {"label": "dative", "source_text": "Esta en la mesa.", "target_text": "Es ist am Tisch."},
-                {"label": "accusative", "source_text": "Veo la mesa.", "target_text": "Ich sehe den Tisch."},
-                {"label": "definite", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
-                {"label": "indefinite", "source_text": "Tengo una mesa.", "target_text": "Ich habe einen Tisch."},
+                {"label": "nominative-definite", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+                {"label": "nominative-indefinite", "source_text": "Una mesa esta aqui.", "target_text": "Ein Tisch ist hier."},
             ],
+            "sections": [
+                {
+                    "key": "nominative",
+                    "question_target_text": "Welcher Tisch ist hier?",
+                    "question_source_text": "Que mesa esta aqui?",
+                    "phrases": [
+                        {"label": "nominative-definite", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+                        {"label": "nominative-indefinite", "source_text": "Una mesa esta aqui.", "target_text": "Ein Tisch ist hier."},
+                    ],
+                },
+                {
+                    "key": "accusative",
+                    "question_target_text": "Wen oder was?",
+                    "question_source_text": "¿A quién...? / ¿Qué...?",
+                    "phrases": [],
+                },
+                {
+                    "key": "dative",
+                    "question_target_text": "Wem oder fuer wen?",
+                    "question_source_text": "¿A quién...? / ¿Para quién...?",
+                    "phrases": [],
+                },
+            ],
+            "generation_mode": "noun_cases_german_v1",
         }
 
     monkeypatch.setattr(
@@ -3262,13 +3281,18 @@ def test_content_item_exercises_endpoint_generates_and_saves_exercises(monkeypat
     )
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["exercise_phrases"]["phrases"]) == 7
-    assert payload["exercise_phrases"]["phrases"][0]["label"] == "singular"
+    assert len(payload["exercise_phrases"]["phrases"]) == 2
+    assert payload["exercise_phrases"]["phrases"][0]["label"] == "nominative-definite"
+    assert payload["exercise_phrases"]["generation_mode"] == "noun_cases_german_v1"
+    assert payload["exercise_phrases"]["sections"][0]["key"] == "nominative"
+    assert payload["exercise_phrases"]["sections"][1]["key"] == "accusative"
+    assert payload["exercise_phrases"]["sections"][2]["key"] == "dative"
     assert captured_kwargs["word_type"] == "noun"
 
     item.refresh_from_db()
-    assert len((item.exercise_phrases or {}).get("phrases", [])) == 7
-    assert (item.exercise_phrases or {}).get("phrases", [])[6]["label"] == "indefinite"
+    assert len((item.exercise_phrases or {}).get("phrases", [])) == 2
+    assert (item.exercise_phrases or {}).get("phrases", [])[0]["label"] == "nominative-definite"
+    assert [section["key"] for section in (item.exercise_phrases or {}).get("sections", [])] == ["nominative", "accusative", "dative"]
 
 
 def test_word_exercise_generation_uses_prompt_for_word_type():
@@ -3281,8 +3305,10 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
         captured_prompts.append(prompt)
         captured_inputs.append(user_input)
         return {
+            "question_target_text": "Welcher Tisch ist hier?",
+            "question_source_text": "Que mesa esta aqui?",
             "phrases": [
-                {"label": "singular", "source_text": "La mesa.", "target_text": "Der Tisch."},
+                {"label": "definite", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
             ],
         }
 
@@ -3306,7 +3332,8 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
         call_openai_json_fn=fake_call_openai_json,
     )
 
-    assert "Generate noun exercise phrases" in captured_prompts[0]
+    assert "You are generating educational content for students learning German." in captured_prompts[0]
+    assert "The target noun must be the grammatical subject of the sentence." in captured_prompts[0]
     assert "Generate helper-word exercise phrases" in captured_prompts[1]
     assert "Generate exercise phrases for one vocabulary item" in captured_prompts[2]
     assert "la mesa" not in captured_inputs[0]
@@ -3314,6 +3341,10 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
     assert "Target-language word/context: der Tisch" in captured_inputs[0]
     assert "Der Tisch steht am Fenster." in captured_inputs[0]
     assert "Der Tisch ist zu laut." not in captured_inputs[0]
+    assert "{word_in_german}" not in captured_prompts[0]
+    assert "{source_language}" not in captured_prompts[0]
+    assert "der Tisch" in captured_prompts[0]
+    assert "Spanish" in captured_prompts[0]
 
 
 def test_funny_image_generation_uses_prompt_for_word_type():
@@ -3411,6 +3442,8 @@ def test_word_exercise_generation_drops_bare_vocabulary_entries():
 
     def fake_call_openai_json(prompt, user_input, **kwargs):
         return {
+            "question_target_text": "Welcher Tisch ist hier?",
+            "question_source_text": "Que mesa esta aqui?",
             "phrases": [
                 {"label": "word", "source_text": "la mesa", "target_text": "der Tisch"},
                 {"label": "plural", "source_text": "las mesas", "target_text": "die Tische"},
@@ -3426,5 +3459,88 @@ def test_word_exercise_generation_drops_bare_vocabulary_entries():
     )
 
     assert payload["phrases"] == [
-        {"label": "nominative", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+        {"label": "nominative-nominative", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
     ]
+    assert payload["generation_mode"] == "noun_cases_german_v1"
+    assert [section["key"] for section in payload["sections"]] == ["nominative", "accusative", "dative"]
+    assert payload["sections"][1]["phrases"] == []
+    assert payload["sections"][1]["question_target_text"] == "Wen oder was?"
+    assert payload["sections"][2]["question_target_text"] == "Wem oder fuer wen?"
+
+
+@pytest.mark.django_db
+def test_noun_case_endpoint_generates_requested_case_and_merges_sections(monkeypatch):
+    from learning.views.content import management_items_noun_exercise_cases as noun_case_views
+
+    user = get_user_model().objects.create_user(username="noun-case-user")
+    item = Item.objects.create(
+        user=user,
+        item_type=Item.ItemType.WORD,
+        spanish_text="la mesa",
+        german_text="der Tisch",
+        source_language="spanish",
+        target_language="german",
+        word_type="noun",
+        exercise_phrases={
+            "phrases": [
+                {"label": "nominative-definite", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+            ],
+            "sections": [
+                {
+                    "key": "nominative",
+                    "question_target_text": "Welcher Tisch ist hier?",
+                    "question_source_text": "Que mesa esta aqui?",
+                    "phrases": [
+                        {"label": "nominative-definite", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
+                    ],
+                },
+                {
+                    "key": "accusative",
+                    "question_target_text": "Wen oder was?",
+                    "question_source_text": "¿A quién...? / ¿Qué...?",
+                    "phrases": [],
+                },
+                {
+                    "key": "dative",
+                    "question_target_text": "Wem oder fuer wen?",
+                    "question_source_text": "¿A quién...? / ¿Para quién...?",
+                    "phrases": [],
+                },
+            ],
+            "generation_mode": "noun_cases_german_v1",
+        },
+    )
+
+    monkeypatch.setattr(noun_case_views, "scan_all_dialogs_for_word", lambda **kwargs: 0)
+    monkeypatch.setattr(noun_case_views, "_target_contexts_for_word_exercises", lambda **kwargs: ["Der Tisch ist hier."])
+    monkeypatch.setattr(
+        noun_case_views,
+        "generate_german_noun_case_section",
+        lambda **kwargs: {
+            "key": "accusative",
+            "question_target_text": "Wen oder was?",
+            "question_source_text": "¿A quién...? / ¿Qué...?",
+            "phrases": [
+                {"label": "accusative-definite", "source_text": "Veo la mesa.", "target_text": "Ich sehe den Tisch."},
+                {"label": "accusative-indefinite", "source_text": "Veo una mesa.", "target_text": "Ich sehe einen Tisch."},
+            ],
+        },
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/exercises/noun-case?source_language=spanish&target_language=german&case_key=accusative",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["exercise_phrases"]
+    assert [section["key"] for section in payload["sections"]] == ["nominative", "accusative", "dative"]
+    assert len(payload["sections"][1]["phrases"]) == 2
+    assert payload["sections"][1]["phrases"][0]["label"] == "accusative-definite"
+    assert payload["sections"][0]["phrases"][0]["label"] == "nominative-definite"
+    assert payload["sections"][2]["phrases"] == []
+
+    item.refresh_from_db()
+    assert item.exercise_phrases["sections"][1]["key"] == "accusative"
+    assert item.exercise_phrases["sections"][1]["phrases"][1]["label"] == "accusative-indefinite"

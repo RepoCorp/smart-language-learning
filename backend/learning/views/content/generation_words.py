@@ -10,10 +10,10 @@ from ...prompts import (
     WORD_EXERCISES_ADVERB_PROMPT,
     WORD_EXERCISES_EXPRESSION_PROMPT,
     WORD_EXERCISES_HELPER_PROMPT,
-    WORD_EXERCISES_NOUN_PROMPT,
     WORD_EXERCISES_OTHER_PROMPT,
     WORD_EXERCISES_VERB_PROMPT,
 )
+from .generation_word_noun_exercises import generate_noun_exercise_phrases
 
 logger = logging.getLogger(__name__)
 MAX_EXERCISE_WORDS_PER_PHRASE = 8
@@ -43,7 +43,6 @@ VOCAB_ENTRY_ARTICLES = {
     "unas",
 }
 WORD_EXERCISE_PROMPTS_BY_TYPE = {
-    "noun": WORD_EXERCISES_NOUN_PROMPT,
     "verb": WORD_EXERCISES_VERB_PROMPT,
     "adjective": WORD_EXERCISES_ADJECTIVE_PROMPT,
     "adverb": WORD_EXERCISES_ADVERB_PROMPT,
@@ -387,6 +386,18 @@ def generate_word_exercise_phrases_with_chatgpt(
             call_openai_json_fn=call_openai_json_fn,
         )
         return {"phrases": phrases, "generation_mode": VERB_BY_TENSE_GENERATION_MODE}
+    if (word_type or "").strip().lower() == "noun":
+        phrases = generate_noun_exercise_phrases(
+            user_input=user_input,
+            source_word=spanish_word,
+            target_word=german_word,
+            source_language=source_language,
+            target_language=target_language,
+            call_openai_json_fn=call_openai_json_fn,
+            generate_exercise_phrases_fn=_generate_exercise_phrases,
+            clean_exercise_section_fn=_clean_exercise_section,
+        )
+        return phrases
 
     phrases = _generate_exercise_phrases(
         prompt=_exercise_prompt_for_word_type(word_type),

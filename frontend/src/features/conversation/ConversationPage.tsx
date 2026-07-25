@@ -755,6 +755,7 @@ export default function ConversationPage(): JSX.Element {
             example_sentence: detail.example_sentence || "",
             notes: detail.notes || "",
             word_type: detail.word_type || check.word_type || "",
+            plural_german: detail.plural_german || "",
             audio_url: detail.audio_url || "",
             exercise_phrases: detail.exercise_phrases || {},
             mode: "new",
