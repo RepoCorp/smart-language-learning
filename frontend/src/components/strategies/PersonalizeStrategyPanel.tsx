@@ -1,4 +1,5 @@
-import { useI18n } from "../i18n";
+import { useI18n } from "../../i18n";
+import PhraseSelectionList from "./PhraseSelectionList";
 
 interface PersonalizeEntry {
   key: string;
@@ -48,25 +49,12 @@ export default function PersonalizeStrategyPanel({
       {entries.length === 0 && !isGenerating && (
         <p className="hint">{t("newItem.personalizeEmpty")}</p>
       )}
-      <div className="exercise-phrase-list">
-        {entries.map((entry) => {
-          const checked = selectedKeys.includes(entry.key);
-          return (
-            <button
-              type="button"
-              className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`}
-              key={entry.key}
-              onClick={() => onToggleEntry(entry)}
-              disabled={exerciseRunning}
-            >
-              <span>
-                <strong>{entry.target}</strong>
-                <small>{entry.source}</small>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <PhraseSelectionList
+        entries={entries}
+        selectedKeys={selectedKeys}
+        onToggleEntry={onToggleEntry}
+        disabled={exerciseRunning}
+      />
     </div>
   );
 }

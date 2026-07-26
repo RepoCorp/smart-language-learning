@@ -1,32 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 
-import { useI18n } from "../i18n";
-
-const WORD_STRATEGIES = [
-  "Repeat",
-  "Personalize",
-  "Practice",
-  "Connect",
-  "Visualize",
-  "Sing",
-  "Walk",
-  "Act",
-  "Decode",
-  "Encounter",
-  "Compare",
-] as const;
-
-const PHRASE_STRATEGIES = [
-  "Repeat",
-  "Practice",
-  "Connect",
-  "Visualize",
-  "Sing",
-  "Walk",
-  "Act",
-  "Encounter",
-  "Compare",
-] as const;
+import { useI18n } from "../../i18n";
+import { PHRASE_STRATEGIES, WORD_STRATEGIES } from "./strategyConstants";
 
 export default function StrategiesModal({
   itemType,

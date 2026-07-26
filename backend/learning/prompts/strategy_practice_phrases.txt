@@ -1,0 +1,48 @@
+You are generating practice sentences for a language learner.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Word in the source language:
+{source_text}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Additional notes:
+{notes}
+
+Generate 8 short, natural sentences in {target_name} that use the target word.
+
+Requirements:
+
+- Every sentence must contain {target_text} or a grammatically required inflected form of it.
+- Never replace the target word with a synonym.
+- Use the meaning represented by {source_text}.
+- Respect the word type: {word_type}.
+- Progress from very simple sentences to slightly more complex ones.
+- Use common, everyday vocabulary.
+- Vary the grammatical person, sentence structure, tense, or context when natural.
+- Avoid generating sentences that differ only by replacing one noun.
+- Each sentence must clearly demonstrate the meaning of the target word.
+- Provide a natural translation into {source_name}.
+- Keep each sentence concise.
+- Follow any relevant information in {notes}.
+- Do not provide grammar explanations or introductory text.
+
+Return valid JSON with this exact shape:
+{
+  "phrases": [
+    {
+      "label": "practice-1",
+      "source_text": "<natural translation in {source_name}>",
+      "target_text": "<sentence in {target_name}>"
+    }
+  ]
+}

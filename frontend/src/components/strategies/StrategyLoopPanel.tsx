@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { useI18n } from "../i18n";
+import { useI18n } from "../../i18n";
 
 export default function StrategyLoopPanel({
   body,
@@ -8,6 +8,11 @@ export default function StrategyLoopPanel({
   isRunning,
   isMuted,
   canStart,
+  canSelectEntries,
+  hasSelectedEntries,
+  onUnselectAll,
+  onSelectAll,
+  onSelectRandom,
   onStart,
   onStop,
   onToggleMute,
@@ -17,6 +22,11 @@ export default function StrategyLoopPanel({
   isRunning: boolean;
   isMuted: boolean;
   canStart: boolean;
+  canSelectEntries?: boolean;
+  hasSelectedEntries?: boolean;
+  onUnselectAll?: () => void;
+  onSelectAll?: () => void;
+  onSelectRandom?: () => void;
   onStart: () => void;
   onStop: () => void;
   onToggleMute: () => void;
@@ -30,6 +40,25 @@ export default function StrategyLoopPanel({
       </div>
 
       <div className="exercise-modal-footer">
+        {(onUnselectAll || onSelectAll || onSelectRandom) && (
+          <div className="strategy-loop-selection-actions">
+            {onUnselectAll && (
+              <button type="button" className="secondary-button" onClick={onUnselectAll} disabled={isRunning || !hasSelectedEntries}>
+                {t("newItem.exercisesUnselectAll")}
+              </button>
+            )}
+            {onSelectAll && (
+              <button type="button" className="secondary-button" onClick={onSelectAll} disabled={isRunning || !canSelectEntries}>
+                {t("newItem.exercisesSelectAll")}
+              </button>
+            )}
+            {onSelectRandom && (
+              <button type="button" className="secondary-button" onClick={onSelectRandom} disabled={isRunning || !canSelectEntries}>
+                {t("newItem.exercisesRandomSelection")}
+              </button>
+            )}
+          </div>
+        )}
         <p className="exercise-timer">
           <strong>{t("newItem.exercisesTimeLeft", { seconds: secondsLeft })}</strong>
         </p>

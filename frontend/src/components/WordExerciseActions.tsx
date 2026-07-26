@@ -8,19 +8,12 @@ interface WordExerciseActionsProps {
   loadingExercises: boolean;
   generatingFunnyImageExercise: boolean;
   hasWordExercises: boolean;
-  hasSelectedExercises: boolean;
   hasFunnyImage: boolean;
   hasOpenFunnyImage: boolean;
   canRegenerateExercises: boolean;
-  onUnselectAll: () => void;
-  onSelectAll: () => void;
-  onSelectRandom: () => void;
   onOpenFunnyImage: () => void;
   onGenerateFunnyImage: () => void;
   onRegenerateExercises: () => void;
-  clearAllIcon: ReactNode;
-  selectAllIcon: ReactNode;
-  randomIcon: ReactNode;
   openImageIcon: ReactNode;
   imageIcon: ReactNode;
   refreshIcon: ReactNode;
@@ -31,19 +24,12 @@ export default function WordExerciseActions({
   loadingExercises,
   generatingFunnyImageExercise,
   hasWordExercises,
-  hasSelectedExercises,
   hasFunnyImage,
   hasOpenFunnyImage,
   canRegenerateExercises,
-  onUnselectAll,
-  onSelectAll,
-  onSelectRandom,
   onOpenFunnyImage,
   onGenerateFunnyImage,
   onRegenerateExercises,
-  clearAllIcon,
-  selectAllIcon,
-  randomIcon,
   openImageIcon,
   imageIcon,
   refreshIcon,
@@ -52,36 +38,6 @@ export default function WordExerciseActions({
 
   return (
     <div className="exercise-selection-actions">
-      <button
-        type="button"
-        className="secondary-button exercise-action-icon-button"
-        onClick={onUnselectAll}
-        disabled={exerciseRunning || !hasSelectedExercises}
-        aria-label={t("newItem.exercisesUnselectAll")}
-        title={t("newItem.exercisesUnselectAll")}
-      >
-        {clearAllIcon}
-      </button>
-      <button
-        type="button"
-        className="secondary-button exercise-action-icon-button"
-        onClick={onSelectAll}
-        disabled={exerciseRunning || !hasWordExercises}
-        aria-label={t("newItem.exercisesSelectAll")}
-        title={t("newItem.exercisesSelectAll")}
-      >
-        {selectAllIcon}
-      </button>
-      <button
-        type="button"
-        className="secondary-button exercise-action-icon-button"
-        onClick={onSelectRandom}
-        disabled={exerciseRunning || !hasWordExercises}
-        aria-label={t("newItem.exercisesRandomSelection")}
-        title={t("newItem.exercisesRandomSelection")}
-      >
-        {randomIcon}
-      </button>
       {hasOpenFunnyImage && (
         <button
           type="button"

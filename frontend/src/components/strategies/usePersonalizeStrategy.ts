@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { personalizeContentItemPhrase } from "../apiStrategies";
-import type { ItemExercisePhrases, StudyLanguageCode } from "../types";
+import { personalizeContentItemPhrase } from "../../apiStrategies";
+import type { ItemExercisePhrases, StudyLanguageCode } from "../../types";
 
 type PersonalizeEntry = {
   label: string;
@@ -73,6 +73,29 @@ export function usePersonalizeStrategy({
     ));
   };
 
+  const unselectAll = (): void => {
+    setSelectedKeys([]);
+  };
+
+  const selectAll = (): void => {
+    setSelectedKeys(entries.map(personalizeEntryKey));
+  };
+
+  const selectRandom = (): void => {
+    if (entries.length <= 2) {
+      setSelectedKeys(entries.map(personalizeEntryKey));
+      return;
+    }
+    const pool = [...entries];
+    const selected: string[] = [];
+    while (pool.length > 0 && selected.length < 2) {
+      const index = Math.floor(Math.random() * pool.length);
+      const [entry] = pool.splice(index, 1);
+      selected.push(personalizeEntryKey(entry));
+    }
+    setSelectedKeys(selected);
+  };
+
   const generatePhrase = async (): Promise<void> => {
     if (isGenerating || itemType !== "word" || itemId <= 0) {
       return;
@@ -102,6 +125,9 @@ export function usePersonalizeStrategy({
     error,
     isGenerating,
     toggleEntry,
+    unselectAll,
+    selectAll,
+    selectRandom,
     generatePhrase,
   };
 }

@@ -3223,13 +3223,22 @@ textarea {
   margin-top: 10px;
 }
 
+.strategy-loop-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 @media (max-width: 768px), (pointer: coarse) {
   .word-strategies-body .strategy-repeat-panel .exercise-modal-scroll {
     flex: 0 0 auto;
     min-height: auto;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
     max-height: min(46vh, 360px);
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
   }
 
   .word-strategies-body .strategy-repeat-panel .exercise-modal-footer {

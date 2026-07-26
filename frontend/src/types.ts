@@ -26,6 +26,7 @@ export interface ItemExercisePhrases {
   generation_mode?: string;
   funny_image_phrase?: ExercisePhrase;
   personalize_phrases?: ExercisePhrase[];
+  practice_phrases?: ExercisePhrase[];
 }
 
 export interface DialogPhraseTurn {
@@ -256,6 +257,10 @@ export interface ContentItemRefreshWordResponse {
 export interface ContentItemPersonalizeResponse {
   source_text: string;
   target_text: string;
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemPracticeResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 

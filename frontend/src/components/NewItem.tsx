@@ -29,15 +29,14 @@ import DialogActionIcon from "./DialogActionIcon";
 import DialogTurnsList from "./DialogTurnsList";
 import ItemActionToolbar from "./ItemActionToolbar";
 import ItemQuestionsModal from "./ItemQuestionsModal";
-import NounExerciseSelector from "./NounExerciseSelector";
 import PhraseReview from "./PhraseReview";
-import PersonalizeStrategyPanel from "./PersonalizeStrategyPanel";
-import StrategiesModal from "./StrategiesModal";
-import StrategyLoopPanel from "./StrategyLoopPanel";
+import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
+import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
+import { DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY } from "./strategies/strategyConstants";
 import { useNounExerciseModal } from "./useNounExerciseModal";
-import { usePersonalizeStrategy } from "./usePersonalizeStrategy";
+import { usePersonalizeStrategy } from "./strategies/usePersonalizeStrategy";
+import { usePracticeStrategy } from "./strategies/usePracticeStrategy";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
-import WordExerciseActions from "./WordExerciseActions";
 import VerbExerciseSelector, {
   buildVerbExerciseGridEntries,
   getVerbExerciseKeysForPerson,
@@ -48,7 +47,6 @@ import VerbExerciseSelector, {
   type VerbPersonKey,
   type VerbTenseKey,
 } from "./VerbExerciseSelector";
-import { buildWordExercisePrimaryEntry } from "./wordExercisePrimaryEntry";
 import WordReview from "./WordReview";
 
 interface NewItemProps {
@@ -62,8 +60,6 @@ interface NewItemProps {
 
 const MAX_EXERCISE_ENTRIES = 30;
 const EXERCISE_PHRASE_PAUSE_MS = 250;
-const DEFAULT_STRATEGY = "Repeat";
-const PERSONALIZE_STRATEGY = "Personalize";
 function ItemActionIcon({ name }: {
   name: "selectAll" | "clearAll" | "random" | "image" | "openImage" | "refresh";
 }): JSX.Element {
@@ -835,6 +831,16 @@ export default function NewItem({
     setExercisePhrases,
     errorMessage: t("newItem.personalizeError"),
   });
+  const practiceStrategy = usePracticeStrategy({
+    itemId: item.id,
+    itemType: item.item_type,
+    exercisePhrases,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage: t("newItem.practiceError"),
+    enabled: showExerciseModal && selectedStrategy === PRACTICE_STRATEGY,
+  });
   const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
   const legacyExerciseEntries = [
     ...sanitizeExerciseEntries(exercisePhrases?.first_section),
@@ -926,8 +932,11 @@ export default function NewItem({
     ? [{ source: sourceText, target: targetText }]
     : allWordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
   const selectedPersonalizeEntries = personalizeStrategy.entries.filter((entry) => personalizeStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
+  const selectedPracticeEntries = practiceStrategy.entries.filter((entry) => practiceStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
   const selectedStrategyEntries = selectedStrategy === PERSONALIZE_STRATEGY
     ? selectedPersonalizeEntries
+    : selectedStrategy === PRACTICE_STRATEGY
+      ? selectedPracticeEntries
     : selectedRepeatExerciseEntries;
   const selectedExerciseEntries = selectedStrategyEntries;
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
@@ -1075,16 +1084,6 @@ export default function NewItem({
         : [...current, key]
     ));
   };
-
-  const wordExercisePrimaryEntry = buildWordExercisePrimaryEntry({
-    entry: wordOnlyExerciseEntry,
-    pluralGerman,
-    notes,
-    selectedExerciseKeys,
-    exerciseRunning,
-    exerciseEntryKey,
-    onToggleEntry: toggleExerciseEntry,
-  });
 
   const selectAllExerciseEntries = (): void => {
     if (isVerbExerciseGrid) {
@@ -1889,7 +1888,7 @@ export default function NewItem({
         </div>
       )}
       {showExerciseModal && (item.item_type === "word" || item.item_type === "phrase") && (
-        <StrategiesModal
+        <ItemStrategiesModal
           itemType={item.item_type}
           sourceText={sourceText}
           targetText={targetText}
@@ -1897,198 +1896,87 @@ export default function NewItem({
           selectedStrategy={selectedStrategy}
           onSelectedStrategyChange={setSelectedStrategy}
           onClose={closeExerciseModal}
-          strategyContent={(
-            selectedStrategy === PERSONALIZE_STRATEGY && item.item_type === "word" ? (
-              <StrategyLoopPanel
-                secondsLeft={exerciseSecondsLeft}
-                isRunning={exerciseRunning}
-                isMuted={exerciseMuted}
-                canStart={exerciseLines.length > 0}
-                onStart={startExercise}
-                onStop={stopExercise}
-                onToggleMute={() => setExerciseMuted((value) => !value)}
-                body={(
-                  <div>
-                    <PersonalizeStrategyPanel
-                      inputValue={personalizeStrategy.inputValue}
-                      onInputChange={personalizeStrategy.setInputValue}
-                      onGenerate={() => {
-                        void personalizeStrategy.generatePhrase();
-                      }}
-                      isGenerating={personalizeStrategy.isGenerating}
-                      error={personalizeStrategy.error}
-                      entries={personalizeStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) }))}
-                      selectedKeys={personalizeStrategy.selectedKeys}
-                      onToggleEntry={personalizeStrategy.toggleEntry}
-                      exerciseRunning={exerciseRunning}
-                    />
-                  </div>
-                )}
-              />
-            ) : selectedStrategy === DEFAULT_STRATEGY ? (
-            <StrategyLoopPanel
-              secondsLeft={exerciseSecondsLeft}
-              isRunning={exerciseRunning}
-              isMuted={exerciseMuted}
-              canStart={exerciseLines.length > 0}
-              onStart={startExercise}
-              onStop={stopExercise}
-              onToggleMute={() => setExerciseMuted((value) => !value)}
-              body={(
-                <div className={isVerbExerciseGrid ? "verb-exercise-modal" : ""}>
-                {loadingExercises && <p className="hint">{t("newItem.exercisesGenerating")}</p>}
-                {exerciseError && <p className="error">{exerciseError}</p>}
-                {item.item_type === "word" && (
-                  <>
-                    <WordExerciseActions
-                      exerciseRunning={exerciseRunning}
-                      loadingExercises={loadingExercises}
-                      generatingFunnyImageExercise={generatingFunnyImageExercise}
-                      hasWordExercises={wordExerciseEntries.length > 0}
-                      hasSelectedExercises={selectedExerciseKeys.length > 0}
-                      hasFunnyImage={Boolean(funnyImageExerciseEntry)}
-                      hasOpenFunnyImage={Boolean(funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry)}
-                      canRegenerateExercises={item.id > 0}
-                      onUnselectAll={unselectAllExerciseEntries}
-                      onSelectAll={selectAllExerciseEntries}
-                      onSelectRandom={selectRandomExerciseEntries}
-                      onOpenFunnyImage={() => setShowFunnyImageModal(true)}
-                      onGenerateFunnyImage={() => {
-                        void generateFunnyImageExercise();
-                      }}
-                      onRegenerateExercises={() => {
-                        void regenerateWordExercises();
-                      }}
-                      clearAllIcon={<ItemActionIcon name="clearAll" />}
-                      selectAllIcon={<ItemActionIcon name="selectAll" />}
-                      randomIcon={<ItemActionIcon name="random" />}
-                      openImageIcon={<ItemActionIcon name="openImage" />}
-                      imageIcon={<ItemActionIcon name="image" />}
-                      refreshIcon={<ItemActionIcon name="refresh" />}
-                    />
-                    {generatingFunnyImageExercise && (
-                      <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>
-                    )}
-                    {funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
-                      <div className="funny-image-phrase-row">
-                        <button
-                          type="button"
-                          className={`exercise-phrase-row ${selectedExerciseKeys.includes(exerciseEntryKey(funnyImageExerciseSelectionEntry)) ? "exercise-phrase-row-selected" : ""}`}
-                          onClick={() => toggleExerciseEntry(funnyImageExerciseSelectionEntry)}
-                          disabled={exerciseRunning}
-                        >
-                          <span>
-                            <strong>{funnyImageExerciseSelectionEntry.target}</strong>
-                            <small>{funnyImageExerciseSelectionEntry.source}</small>
-                          </span>
-                        </button>
-                      </div>
-                    )}
-                    {isVerbExerciseGrid ? (
-                      <VerbExerciseSelector
-                        ariaLabel={t("newItem.exercisesTitle")}
-                        primaryEntry={wordExercisePrimaryEntry}
-                        gridEntries={verbExerciseGridEntries}
-                        selectedExerciseKeys={selectedExerciseKeys}
-                        exerciseRunning={exerciseRunning}
-                        exerciseEntryKey={exerciseEntryKey}
-                        onToggleEntry={toggleExerciseEntry}
-                        onSelectPerson={selectVerbExercisePerson}
-                        onSelectTense={selectVerbExerciseTense}
-                      />
-                    ) : isNounSectionedExercise ? (
-                      <NounExerciseSelector
-                        primaryEntry={wordExercisePrimaryEntry}
-                        sections={nounExerciseSections}
-                        selectedExerciseKeys={selectedExerciseKeys}
-                        exerciseRunning={exerciseRunning}
-                        generatingCaseKey={generatingNounCaseKey || undefined}
-                        exerciseEntryKey={exerciseEntryKey}
-                        onToggleEntry={toggleExerciseEntry}
-                        onSelectKeys={setSelectedExerciseKeys}
-                        onGenerateCase={(caseKey) => {
-                          void generateNounExerciseCase(caseKey);
-                        }}
-                      />
-                    ) : (
-                      <div className="exercise-phrase-list">
-                        {wordExerciseEntries.map((entry) => {
-                          const key = exerciseEntryKey(entry);
-                          const checked = selectedExerciseKeys.includes(key);
-                          return (
-                            <button
-                              type="button"
-                              className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`}
-                              key={key}
-                              onClick={() => toggleExerciseEntry(entry)}
-                              disabled={exerciseRunning}
-                            >
-                              <span>
-                                <strong>{entry.target}</strong>
-                                <small>{entry.source}</small>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {!!compareExerciseEntries.length && (
-                      <div className="compare-exercise-section">
-                        <p className="compare-exercise-title">
-                          <strong>{t("newItem.compareExerciseTitle")}</strong>
-                        </p>
-                        <div className="compare-exercise-list">
-                          {compareExerciseEntries.map((entry) => {
-                            const key = exerciseEntryKey(entry);
-                            const checked = selectedExerciseKeys.includes(key);
-                            return (
-                              <button
-                                type="button"
-                                className={`exercise-phrase-row ${checked ? "exercise-phrase-row-selected" : ""}`}
-                                key={key}
-                                onClick={() => toggleExerciseEntry(entry)}
-                                disabled={exerciseRunning}
-                              >
-                                <span>
-                                  <strong>{entry.target}</strong>
-                                  <small>{entry.source}</small>
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-                {item.item_type === "word" && wordExerciseEntries.length === 0 && (
-                  <p className="hint">{t("newItem.exercisesUnavailable")}</p>
-                )}
-                {item.item_type === "phrase" && (
-                  <div className="exercise-section-grid">
-                    <div className="exercise-section-card exercise-section-card-selected">
-                      <strong>{t("newItem.exercisesPhraseTitle")}</strong>
-                      <ul>
-                        <li>{targetText}</li>
-                      </ul>
-                      <div className="exercise-translation-group">
-                        {sourceLanguageLabel}: {sourceText}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                </div>
-              )}
+          exerciseSecondsLeft={exerciseSecondsLeft}
+          exerciseRunning={exerciseRunning}
+          exerciseMuted={exerciseMuted}
+          canStart={exerciseLines.length > 0}
+          onStart={startExercise}
+          onStop={stopExercise}
+          onToggleMute={() => setExerciseMuted((value) => !value)}
+          formsContent={(
+            <FormsStrategyPanel
+              itemType={item.item_type}
+              targetText={targetText}
+              sourceText={sourceText}
+              sourceLanguageLabel={sourceLanguageLabel}
+              loadingExercises={loadingExercises}
+              exerciseError={exerciseError}
+              exerciseRunning={exerciseRunning}
+              generatingFunnyImageExercise={generatingFunnyImageExercise}
+              wordExerciseEntries={wordExerciseEntries}
+              selectedExerciseKeys={selectedExerciseKeys}
+              funnyImageExerciseSelectionEntry={funnyImageExerciseSelectionEntry}
+              funnyImageExerciseImageUrl={funnyImageExerciseEntry?.image_url}
+              isVerbExerciseGrid={isVerbExerciseGrid}
+              isNounSectionedExercise={isNounSectionedExercise}
+              pluralGerman={pluralGerman}
+              notes={notes}
+              wordOnlyExerciseEntry={wordOnlyExerciseEntry}
+              verbExerciseGridEntries={verbExerciseGridEntries}
+              nounExerciseSections={nounExerciseSections}
+              generatingNounCaseKey={generatingNounCaseKey}
+              compareExerciseEntries={compareExerciseEntries}
+              onToggleEntry={toggleExerciseEntry}
+              onSelectPerson={selectVerbExercisePerson}
+              onSelectTense={selectVerbExerciseTense}
+              onSelectKeys={setSelectedExerciseKeys}
+              onGenerateCase={(caseKey) => {
+                void generateNounExerciseCase(caseKey);
+              }}
+              onOpenFunnyImage={() => setShowFunnyImageModal(true)}
+              onGenerateFunnyImage={() => {
+                void generateFunnyImageExercise();
+              }}
+              onRegenerateExercises={() => {
+                void regenerateWordExercises();
+              }}
+              canRegenerateExercises={item.id > 0}
+              openImageIcon={<ItemActionIcon name="openImage" />}
+              imageIcon={<ItemActionIcon name="image" />}
+              refreshIcon={<ItemActionIcon name="refresh" />}
+              exerciseEntryKey={exerciseEntryKey}
             />
-            ) : (
-              <div className="word-strategies-placeholder-card">
-                <p className="word-strategies-placeholder-title">
-                  <strong>{selectedStrategy}</strong>
-                </p>
-                <p className="hint">{t("newItem.strategiesPlaceholder", { strategy: selectedStrategy })}</p>
-              </div>
-            )
           )}
+          formsSelection={{
+            canSelectEntries: wordExerciseEntries.length > 0 || compareExerciseEntries.length > 0 || item.item_type === "phrase",
+            hasSelectedEntries: selectedExerciseKeys.length > 0 || item.item_type === "phrase",
+            unselectAll: unselectAllExerciseEntries,
+            selectAll: selectAllExerciseEntries,
+            selectRandom: selectRandomExerciseEntries,
+          }}
+          personalizeStrategy={{
+            inputValue: personalizeStrategy.inputValue,
+            setInputValue: personalizeStrategy.setInputValue,
+            generatePhrase: personalizeStrategy.generatePhrase,
+            isGenerating: personalizeStrategy.isGenerating,
+            error: personalizeStrategy.error,
+            entries: personalizeStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) })),
+            selectedKeys: personalizeStrategy.selectedKeys,
+            toggleEntry: personalizeStrategy.toggleEntry,
+            unselectAll: personalizeStrategy.unselectAll,
+            selectAll: personalizeStrategy.selectAll,
+            selectRandom: personalizeStrategy.selectRandom,
+          }}
+          practiceStrategy={{
+            entries: practiceStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) })),
+            selectedKeys: practiceStrategy.selectedKeys,
+            toggleEntry: practiceStrategy.toggleEntry,
+            isLoading: practiceStrategy.isLoading,
+            error: practiceStrategy.error,
+            unselectAll: practiceStrategy.unselectAll,
+            selectAll: practiceStrategy.selectAll,
+            selectRandom: practiceStrategy.selectRandom,
+          }}
         />
       )}
       {showFunnyImageModal && funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
