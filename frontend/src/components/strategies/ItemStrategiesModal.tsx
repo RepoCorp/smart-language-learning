@@ -1,11 +1,12 @@
 import { useI18n } from "../../i18n";
+import ActStrategyPanel from "./ActStrategyPanel";
 import ConnectStrategyPanel from "./ConnectStrategyPanel";
 import PersonalizeStrategyPanel from "./PersonalizeStrategyPanel";
 import PracticeStrategyPanel from "./PracticeStrategyPanel";
 import StrategiesModal from "./StrategiesModal";
 import StrategyLoopPanel from "./StrategyLoopPanel";
 import VisualizeStrategyPanel from "./VisualizeStrategyPanel";
-import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategyConstants";
+import { ACT_STRATEGY, CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategyConstants";
 
 type StrategyEntry = { label?: string; source: string; target: string };
 
@@ -33,6 +34,7 @@ export default function ItemStrategiesModal({
   practiceStrategy,
   connectStrategy,
   visualizeStrategy,
+  actStrategy,
 }: {
   itemType: "word" | "phrase";
   sourceText: string;
@@ -115,6 +117,16 @@ export default function ItemStrategiesModal({
     entry: (StrategyEntry & { key: string }) | null;
     selectedKeys: string[];
     toggleEntry: (entry: StrategyEntry & { key: string }) => void;
+    isLoading: boolean;
+    error: string;
+    unselectAll: () => void;
+    selectAll: () => void;
+    selectRandom: () => void;
+  };
+  actStrategy: {
+    entry: (StrategyEntry & { key: string; actions: string[] }) | null;
+    selectedKeys: string[];
+    toggleEntry: (entry: StrategyEntry & { key: string; actions: string[] }) => void;
     isLoading: boolean;
     error: string;
     unselectAll: () => void;
@@ -268,6 +280,36 @@ export default function ItemStrategiesModal({
             exerciseRunning={exerciseRunning}
             isLoading={visualizeStrategy.isLoading}
             error={visualizeStrategy.error}
+          />
+        )}
+      />
+    );
+  } else if (selectedStrategy === ACT_STRATEGY && itemType === "word") {
+    strategyContent = (
+      <StrategyLoopPanel
+        secondsLeft={exerciseSecondsLeft}
+        isRunning={exerciseRunning}
+        isMuted={exerciseMuted}
+        canStart={canStart}
+        canSelectEntries={Boolean(actStrategy.entry)}
+        hasSelectedEntries={actStrategy.selectedKeys.length > 0}
+        onUnselectAll={actStrategy.unselectAll}
+        onSelectAll={actStrategy.selectAll}
+        onSelectRandom={actStrategy.selectRandom}
+        onStart={onStart}
+        onStop={onStop}
+        onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
+        body={(
+          <ActStrategyPanel
+            entry={actStrategy.entry}
+            selectedKeys={actStrategy.selectedKeys}
+            onToggleEntry={actStrategy.toggleEntry}
+            exerciseRunning={exerciseRunning}
+            isLoading={actStrategy.isLoading}
+            error={actStrategy.error}
           />
         )}
       />

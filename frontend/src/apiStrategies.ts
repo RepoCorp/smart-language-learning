@@ -1,11 +1,39 @@
 import { API_BASE, apiFetch } from "./apiCore";
 import type {
+  ContentItemActResponse,
   ContentItemConnectResponse,
   ContentItemPersonalizeResponse,
   ContentItemPracticeResponse,
   ContentItemVisualizeResponse,
   StudyLanguageCode,
 } from "./types";
+
+export async function generateContentItemActExercise(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemActResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/act?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate act exercise";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemActResponse;
+}
 
 export async function personalizeContentItemPhrase(
   itemId: number,

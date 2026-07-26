@@ -12,6 +12,7 @@ from .management import (
     ContentTopicDeleteView,
 )
 from .management_items import (
+    ContentItemActView,
     ContentItemCompareWordDetailView,
     ContentItemCompareWordsInsightsView,
     ContentItemCompareWordsSearchView,
@@ -43,6 +44,7 @@ from .topics import ContentTopicContextsView, ContentTopicsView, save_topic
 
 __all__ = [
     "ContentConfirmView",
+    "ContentItemActView",
     "ContentItemCompareWordDetailView",
     "ContentItemCompareWordsInsightsView",
     "ContentItemCompareWordsSearchView",

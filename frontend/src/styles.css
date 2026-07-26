@@ -3368,6 +3368,25 @@ textarea {
   color: var(--color-text);
 }
 
+.act-strategy-actions-card {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-bg);
+  padding: 12px 14px;
+}
+
+.act-strategy-actions-title {
+  margin: 0 0 8px 0;
+}
+
+.act-strategy-actions-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .personalize-strategy-form {
   display: flex;
   flex-direction: column;

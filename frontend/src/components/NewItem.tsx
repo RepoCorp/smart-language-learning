@@ -32,7 +32,8 @@ import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
-import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategies/strategyConstants";
+import { ACT_STRATEGY, CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategies/strategyConstants";
+import { useActStrategy } from "./strategies/useActStrategy";
 import { useConnectStrategy } from "./strategies/useConnectStrategy";
 import { useNounExerciseModal } from "./useNounExerciseModal";
 import { usePersonalizeStrategy } from "./strategies/usePersonalizeStrategy";
@@ -863,6 +864,16 @@ export default function NewItem({
     errorMessage: t("newItem.visualizeError"),
     enabled: showExerciseModal && selectedStrategy === VISUALIZE_STRATEGY,
   });
+  const actStrategy = useActStrategy({
+    itemId: item.id,
+    itemType: item.item_type,
+    exercisePhrases,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage: t("newItem.actError"),
+    enabled: showExerciseModal && selectedStrategy === ACT_STRATEGY,
+  });
   const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
   const legacyExerciseEntries = [
     ...sanitizeExerciseEntries(exercisePhrases?.first_section),
@@ -965,6 +976,9 @@ export default function NewItem({
   const selectedVisualizeEntries = visualizeStrategy.entry && visualizeStrategy.selectedKeys.includes(visualizeStrategy.entry.key)
     ? [visualizeStrategy.entry]
     : [];
+  const selectedActEntries = actStrategy.entry && actStrategy.selectedKeys.includes(actStrategy.entry.key)
+    ? [actStrategy.entry]
+    : [];
   const selectedStrategyEntries = selectedStrategy === PERSONALIZE_STRATEGY
     ? selectedPersonalizeEntries
     : selectedStrategy === PRACTICE_STRATEGY
@@ -973,6 +987,8 @@ export default function NewItem({
         ? selectedConnectEntries
         : selectedStrategy === VISUALIZE_STRATEGY
           ? selectedVisualizeEntries
+          : selectedStrategy === ACT_STRATEGY
+            ? selectedActEntries
           : selectedRepeatExerciseEntries;
   const selectedExerciseEntries = selectedStrategyEntries;
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
@@ -1986,6 +2002,7 @@ export default function NewItem({
               || selectedStrategy === PRACTICE_STRATEGY
               || selectedStrategy === CONNECT_STRATEGY
               || selectedStrategy === VISUALIZE_STRATEGY
+              || selectedStrategy === ACT_STRATEGY
             )
           }
           regeneratingContent={
@@ -1995,6 +2012,8 @@ export default function NewItem({
                 ? connectStrategy.isLoading
                 : selectedStrategy === VISUALIZE_STRATEGY
                   ? visualizeStrategy.isLoading
+                  : selectedStrategy === ACT_STRATEGY
+                    ? actStrategy.isLoading
                   : loadingExercises
           }
           onRegenerateContent={() => {
@@ -2008,6 +2027,10 @@ export default function NewItem({
             }
             if (selectedStrategy === VISUALIZE_STRATEGY) {
               void visualizeStrategy.generate();
+              return;
+            }
+            if (selectedStrategy === ACT_STRATEGY) {
+              void actStrategy.generate();
               return;
             }
             void regenerateWordExercises();
@@ -2044,6 +2067,7 @@ export default function NewItem({
           }}
           connectStrategy={connectStrategy}
           visualizeStrategy={visualizeStrategy}
+          actStrategy={actStrategy}
         />
       )}
       {showFunnyImageModal && funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (

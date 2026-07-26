@@ -1,0 +1,46 @@
+You are creating a short acting exercise to help a student remember a vocabulary word.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Meaning in the source language:
+{source_text}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Additional notes:
+{notes}
+
+Create one very short acting exercise.
+
+Requirements:
+
+- The exercise should naturally reinforce the meaning of {target_text}.
+- The student should perform one simple physical action or a short sequence of actions.
+- The actions should be easy to perform almost anywhere without special props.
+- If an imaginary object is needed, clearly indicate that it is imaginary.
+- The student should say one short sentence in {target_name} containing {target_text} (or the correct grammatical inflection).
+- Never replace the target word with a synonym.
+- The sentence should use simple vocabulary and grammar.
+- The exercise should take no more than 15 seconds.
+- Make it enjoyable and memorable.
+- The exercise should be appropriate for all ages.
+
+Provide a natural translation of the spoken sentence into {source_name}.
+
+Return valid JSON only.
+
+{
+  "actions": [
+    ""
+  ],
+  "target": "",
+  "source": ""
+}

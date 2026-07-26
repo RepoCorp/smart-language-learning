@@ -28,6 +28,12 @@ export interface ItemExercisePhrases {
   personalize_phrases?: ExercisePhrase[];
   practice_phrases?: ExercisePhrase[];
   visualize_phrase?: ExercisePhrase;
+  act_exercise?: {
+    label?: string;
+    source_text: string;
+    target_text: string;
+    actions?: string[];
+  };
   connect_groups?: {
     same_family?: Array<{
       target_text: string;
@@ -286,6 +292,10 @@ export interface ContentItemConnectResponse {
 }
 
 export interface ContentItemVisualizeResponse {
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemActResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 

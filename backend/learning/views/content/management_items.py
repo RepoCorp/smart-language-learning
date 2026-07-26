@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .management_items_act import ContentItemActView
 from .management_items_listing import (
     ContentItemCompareWordDetailView,
     ContentItemCompareWordsSearchView,
@@ -28,6 +29,7 @@ __all__ = [
     "ContentItemCompareWordsView",
     "ContentItemCompareWordDetailView",
     "ContentItemCompareWordsInsightsView",
+    "ContentItemActView",
     "ContentItemConnectView",
     "ContentItemExercisesView",
     "ContentItemNounExerciseCaseView",

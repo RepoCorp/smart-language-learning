@@ -1,5 +1,6 @@
 from .content import (
     ContentConfirmView,
+    ContentItemActView,
     ContentItemCompareWordDetailView,
     ContentItemCompareWordsInsightsView,
     ContentItemCompareWordsSearchView,
@@ -59,6 +60,7 @@ from .configuration import ElevenLabsVoiceDisableView, ElevenLabsVoicePreviewVie
 
 __all__ = [
     "ContentConfirmView",
+    "ContentItemActView",
     "ContentItemCompareWordDetailView",
     "ContentItemCompareWordsInsightsView",
     "ContentItemCompareWordsSearchView",
