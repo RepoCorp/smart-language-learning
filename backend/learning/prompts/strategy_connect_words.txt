@@ -1,0 +1,58 @@
+You are helping a student build semantic connections in a foreign language.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Meaning in the source language:
+{source_text}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Additional notes:
+{notes}
+
+Generate:
+
+1. Up to 5 words from the same word family.
+2. Up to 5 related, contrasting, or commonly confused words.
+
+Requirements:
+
+- Every generated word must be appropriate for the student's level unless {notes} specifies otherwise.
+- Each word must include:
+  - its translation into {source_name}
+  - one short, natural sentence in {target_name}
+  - the translation of that sentence into {source_name}
+- The example sentence should clearly demonstrate the meaning of the word.
+- Keep the sentences short and use common everyday vocabulary.
+- Do not repeat nearly identical sentences.
+- Do not include grammar explanations.
+- For each related, contrasting, or commonly confused word, add one short explanation in {source_name} saying why it is related, contrasting, or easy to confuse with the target word, and give a practical hint to distinguish it.
+
+Return valid JSON with this exact shape:
+{
+  "same_family": [
+    {
+      "target_text": "<target word>",
+      "source_text": "<translation in {source_name}>",
+      "example_target_text": "<short sentence in {target_name}>",
+      "example_source_text": "<translation of the sentence in {source_name}>"
+    }
+  ],
+  "related_or_confusing": [
+    {
+      "target_text": "<target word>",
+      "source_text": "<translation in {source_name}>",
+      "example_target_text": "<short sentence in {target_name}>",
+      "example_source_text": "<translation of the sentence in {source_name}>",
+      "explanation_text": "<short explanation in {source_name} of why this word is related, contrasting, or confusing, plus a hint to distinguish it>"
+    }
+  ]
+}

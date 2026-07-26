@@ -10,13 +10,10 @@ interface WordExerciseActionsProps {
   hasWordExercises: boolean;
   hasFunnyImage: boolean;
   hasOpenFunnyImage: boolean;
-  canRegenerateExercises: boolean;
   onOpenFunnyImage: () => void;
   onGenerateFunnyImage: () => void;
-  onRegenerateExercises: () => void;
   openImageIcon: ReactNode;
   imageIcon: ReactNode;
-  refreshIcon: ReactNode;
 }
 
 export default function WordExerciseActions({
@@ -26,13 +23,10 @@ export default function WordExerciseActions({
   hasWordExercises,
   hasFunnyImage,
   hasOpenFunnyImage,
-  canRegenerateExercises,
   onOpenFunnyImage,
   onGenerateFunnyImage,
-  onRegenerateExercises,
   openImageIcon,
   imageIcon,
-  refreshIcon,
 }: WordExerciseActionsProps): JSX.Element {
   const { t } = useI18n();
 
@@ -54,7 +48,7 @@ export default function WordExerciseActions({
           <DangerousButton
             className="secondary-button dangerous-action-button exercise-action-icon-button"
             onConfirm={onGenerateFunnyImage}
-            disabled={generatingFunnyImageExercise || !canRegenerateExercises}
+            disabled={generatingFunnyImageExercise || !hasWordExercises}
             aria-label={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
             title={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
           >
@@ -65,7 +59,7 @@ export default function WordExerciseActions({
             type="button"
             className="secondary-button exercise-action-icon-button"
             onClick={onGenerateFunnyImage}
-            disabled={generatingFunnyImageExercise || !canRegenerateExercises}
+            disabled={generatingFunnyImageExercise || !hasWordExercises}
             aria-label={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
             title={generatingFunnyImageExercise ? t("newItem.exercisesFunnyImageGenerating") : t("newItem.exercisesFunnyImageGenerate")}
           >
@@ -73,15 +67,6 @@ export default function WordExerciseActions({
           </button>
         )}
       </div>
-      <DangerousButton
-        className="secondary-button dangerous-action-button exercise-action-icon-button"
-        onConfirm={onRegenerateExercises}
-        disabled={exerciseRunning || loadingExercises || !canRegenerateExercises}
-        aria-label={loadingExercises ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
-        title={loadingExercises ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
-      >
-        {refreshIcon}
-      </DangerousButton>
     </div>
   );
 }

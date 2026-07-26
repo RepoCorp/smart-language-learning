@@ -1,5 +1,5 @@
 import { API_BASE, apiFetch } from "./apiCore";
-import type { ContentItemPersonalizeResponse, ContentItemPracticeResponse, StudyLanguageCode } from "./types";
+import type { ContentItemConnectResponse, ContentItemPersonalizeResponse, ContentItemPracticeResponse, StudyLanguageCode } from "./types";
 
 export async function personalizeContentItemPhrase(
   itemId: number,
@@ -56,4 +56,31 @@ export async function generateContentItemPracticePhrases(
     throw new Error(detail);
   }
   return (await response.json()) as ContentItemPracticeResponse;
+}
+
+export async function generateContentItemConnectWords(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemConnectResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/connect?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate connected words";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemConnectResponse;
 }

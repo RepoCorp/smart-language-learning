@@ -1,9 +1,10 @@
 import { useI18n } from "../../i18n";
+import ConnectStrategyPanel from "./ConnectStrategyPanel";
 import PersonalizeStrategyPanel from "./PersonalizeStrategyPanel";
 import PracticeStrategyPanel from "./PracticeStrategyPanel";
 import StrategiesModal from "./StrategiesModal";
 import StrategyLoopPanel from "./StrategyLoopPanel";
-import { DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY } from "./strategyConstants";
+import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY } from "./strategyConstants";
 
 type StrategyEntry = { label?: string; source: string; target: string };
 
@@ -22,10 +23,14 @@ export default function ItemStrategiesModal({
   onStart,
   onStop,
   onToggleMute,
+  canRegenerateContent,
+  regeneratingContent,
+  onRegenerateContent,
   formsContent,
   formsSelection,
   personalizeStrategy,
   practiceStrategy,
+  connectStrategy,
 }: {
   itemType: "word" | "phrase";
   sourceText: string;
@@ -41,6 +46,9 @@ export default function ItemStrategiesModal({
   onStart: () => void;
   onStop: () => void;
   onToggleMute: () => void;
+  canRegenerateContent: boolean;
+  regeneratingContent: boolean;
+  onRegenerateContent: () => void;
   formsContent: JSX.Element;
   formsSelection: {
     canSelectEntries: boolean;
@@ -72,6 +80,35 @@ export default function ItemStrategiesModal({
     selectAll: () => void;
     selectRandom: () => void;
   };
+  connectStrategy: {
+    sameFamily: Array<{
+      key: string;
+      targetWord: string;
+      sourceWord: string;
+      exampleTarget: string;
+      exampleSource: string;
+    }>;
+    relatedOrConfusing: Array<{
+      key: string;
+      targetWord: string;
+      sourceWord: string;
+      exampleTarget: string;
+      exampleSource: string;
+    }>;
+    selectedKeys: string[];
+    toggleEntry: (entry: {
+      key: string;
+      targetWord: string;
+      sourceWord: string;
+      exampleTarget: string;
+      exampleSource: string;
+    }) => void;
+    isLoading: boolean;
+    error: string;
+    unselectAll: () => void;
+    selectAll: () => void;
+    selectRandom: () => void;
+  };
 }): JSX.Element {
   const { t } = useI18n();
 
@@ -91,6 +128,9 @@ export default function ItemStrategiesModal({
         onStart={onStart}
         onStop={onStop}
         onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
         body={(
           <PersonalizeStrategyPanel
             inputValue={personalizeStrategy.inputValue}
@@ -123,6 +163,9 @@ export default function ItemStrategiesModal({
         onStart={onStart}
         onStop={onStop}
         onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
         body={formsContent}
       />
     );
@@ -141,6 +184,9 @@ export default function ItemStrategiesModal({
         onStart={onStart}
         onStop={onStop}
         onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
         body={(
           <PracticeStrategyPanel
             entries={practiceStrategy.entries}
@@ -149,6 +195,37 @@ export default function ItemStrategiesModal({
             exerciseRunning={exerciseRunning}
             isLoading={practiceStrategy.isLoading}
             error={practiceStrategy.error}
+          />
+        )}
+      />
+    );
+  } else if (selectedStrategy === CONNECT_STRATEGY && itemType === "word") {
+    strategyContent = (
+      <StrategyLoopPanel
+        secondsLeft={exerciseSecondsLeft}
+        isRunning={exerciseRunning}
+        isMuted={exerciseMuted}
+        canStart={canStart}
+        canSelectEntries={connectStrategy.sameFamily.length > 0 || connectStrategy.relatedOrConfusing.length > 0}
+        hasSelectedEntries={connectStrategy.selectedKeys.length > 0}
+        onUnselectAll={connectStrategy.unselectAll}
+        onSelectAll={connectStrategy.selectAll}
+        onSelectRandom={connectStrategy.selectRandom}
+        onStart={onStart}
+        onStop={onStop}
+        onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
+        body={(
+          <ConnectStrategyPanel
+            sameFamily={connectStrategy.sameFamily}
+            relatedOrConfusing={connectStrategy.relatedOrConfusing}
+            selectedKeys={connectStrategy.selectedKeys}
+            onToggleEntry={connectStrategy.toggleEntry}
+            exerciseRunning={exerciseRunning}
+            isLoading={connectStrategy.isLoading}
+            error={connectStrategy.error}
           />
         )}
       />

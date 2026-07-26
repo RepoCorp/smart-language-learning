@@ -32,7 +32,8 @@ import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
-import { DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY } from "./strategies/strategyConstants";
+import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY } from "./strategies/strategyConstants";
+import { useConnectStrategy } from "./strategies/useConnectStrategy";
 import { useNounExerciseModal } from "./useNounExerciseModal";
 import { usePersonalizeStrategy } from "./strategies/usePersonalizeStrategy";
 import { usePracticeStrategy } from "./strategies/usePracticeStrategy";
@@ -841,6 +842,16 @@ export default function NewItem({
     errorMessage: t("newItem.practiceError"),
     enabled: showExerciseModal && selectedStrategy === PRACTICE_STRATEGY,
   });
+  const connectStrategy = useConnectStrategy({
+    itemId: item.id,
+    itemType: item.item_type,
+    exercisePhrases,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage: t("newItem.connectError"),
+    enabled: showExerciseModal && selectedStrategy === CONNECT_STRATEGY,
+  });
   const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
   const legacyExerciseEntries = [
     ...sanitizeExerciseEntries(exercisePhrases?.first_section),
@@ -933,10 +944,19 @@ export default function NewItem({
     : allWordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
   const selectedPersonalizeEntries = personalizeStrategy.entries.filter((entry) => personalizeStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
   const selectedPracticeEntries = practiceStrategy.entries.filter((entry) => practiceStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
+  const selectedConnectEntries = connectStrategy.allEntries
+    .filter((entry) => connectStrategy.selectedKeys.includes(entry.key))
+    .map((entry) => ({
+      label: "connect",
+      source: entry.exampleSource,
+      target: entry.exampleTarget,
+    }));
   const selectedStrategyEntries = selectedStrategy === PERSONALIZE_STRATEGY
     ? selectedPersonalizeEntries
     : selectedStrategy === PRACTICE_STRATEGY
       ? selectedPracticeEntries
+      : selectedStrategy === CONNECT_STRATEGY
+        ? selectedConnectEntries
     : selectedRepeatExerciseEntries;
   const selectedExerciseEntries = selectedStrategyEntries;
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
@@ -1937,16 +1957,16 @@ export default function NewItem({
               onGenerateFunnyImage={() => {
                 void generateFunnyImageExercise();
               }}
-              onRegenerateExercises={() => {
-                void regenerateWordExercises();
-              }}
-              canRegenerateExercises={item.id > 0}
               openImageIcon={<ItemActionIcon name="openImage" />}
               imageIcon={<ItemActionIcon name="image" />}
-              refreshIcon={<ItemActionIcon name="refresh" />}
               exerciseEntryKey={exerciseEntryKey}
             />
           )}
+          canRegenerateContent={item.item_type === "word" && item.id > 0}
+          regeneratingContent={loadingExercises}
+          onRegenerateContent={() => {
+            void regenerateWordExercises();
+          }}
           formsSelection={{
             canSelectEntries: wordExerciseEntries.length > 0 || compareExerciseEntries.length > 0 || item.item_type === "phrase",
             hasSelectedEntries: selectedExerciseKeys.length > 0 || item.item_type === "phrase",
@@ -1977,6 +1997,7 @@ export default function NewItem({
             selectAll: practiceStrategy.selectAll,
             selectRandom: practiceStrategy.selectRandom,
           }}
+          connectStrategy={connectStrategy}
         />
       )}
       {showFunnyImageModal && funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (

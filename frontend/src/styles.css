@@ -3223,11 +3223,25 @@ textarea {
   margin-top: 10px;
 }
 
+.strategy-loop-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .strategy-loop-selection-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 8px;
+}
+
+.strategy-loop-danger-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-left: 12px;
+  border-left: 1px solid rgba(180, 35, 24, 0.2);
 }
 
 @media (max-width: 768px), (pointer: coarse) {
@@ -3245,12 +3259,92 @@ textarea {
     position: static;
     margin-top: 8px;
   }
+
+  .strategy-loop-footer-row {
+    gap: 8px;
+  }
+
+  .strategy-loop-danger-actions {
+    padding-left: 8px;
+  }
 }
 
 .personalize-strategy-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.practice-strategy-panel,
+.connect-strategy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.connect-strategy-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connect-strategy-section-title,
+.connect-strategy-word,
+.connect-strategy-translation,
+.connect-strategy-example-target,
+.connect-strategy-example-source {
+  margin: 0;
+}
+
+.connect-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.connect-strategy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: left;
+  font: inherit;
+}
+
+.connect-strategy-card:disabled {
+  opacity: 0.72;
+}
+
+.connect-strategy-card-selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.14);
+  background: var(--color-accent-surface);
+}
+
+.connect-strategy-word {
+  font-size: 1rem;
+}
+
+.connect-strategy-translation,
+.connect-strategy-example-source {
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.connect-strategy-example-target {
+  margin-top: 2px;
+}
+
+.connect-strategy-explanation {
+  margin: 4px 0 0 0;
+  color: #7a3e00;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .personalize-strategy-form {

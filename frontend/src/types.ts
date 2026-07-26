@@ -27,6 +27,22 @@ export interface ItemExercisePhrases {
   funny_image_phrase?: ExercisePhrase;
   personalize_phrases?: ExercisePhrase[];
   practice_phrases?: ExercisePhrase[];
+  connect_groups?: {
+    same_family?: Array<{
+      target_text: string;
+      source_text: string;
+      example_target_text: string;
+      example_source_text: string;
+      explanation_text?: string;
+    }>;
+    related_or_confusing?: Array<{
+      target_text: string;
+      source_text: string;
+      example_target_text: string;
+      example_source_text: string;
+      explanation_text?: string;
+    }>;
+  };
 }
 
 export interface DialogPhraseTurn {
@@ -261,6 +277,10 @@ export interface ContentItemPersonalizeResponse {
 }
 
 export interface ContentItemPracticeResponse {
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemConnectResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 

@@ -41,11 +41,8 @@ export default function FormsStrategyPanel({
   onGenerateCase,
   onOpenFunnyImage,
   onGenerateFunnyImage,
-  onRegenerateExercises,
-  canRegenerateExercises,
   openImageIcon,
   imageIcon,
-  refreshIcon,
   exerciseEntryKey,
 }: {
   itemType: SessionItem["item_type"];
@@ -81,11 +78,8 @@ export default function FormsStrategyPanel({
   onGenerateCase: (caseKey: "nominative" | "accusative" | "dative") => void;
   onOpenFunnyImage: () => void;
   onGenerateFunnyImage: () => void;
-  onRegenerateExercises: () => void;
-  canRegenerateExercises: boolean;
   openImageIcon: JSX.Element;
   imageIcon: JSX.Element;
-  refreshIcon: JSX.Element;
   exerciseEntryKey: (entry: ExerciseEntry) => string;
 }): JSX.Element {
   const { t } = useI18n();
@@ -112,13 +106,10 @@ export default function FormsStrategyPanel({
             hasWordExercises={wordExerciseEntries.length > 0}
             hasFunnyImage={Boolean(funnyImageExerciseSelectionEntry)}
             hasOpenFunnyImage={Boolean(funnyImageExerciseImageUrl && funnyImageExerciseSelectionEntry)}
-            canRegenerateExercises={canRegenerateExercises}
             onOpenFunnyImage={onOpenFunnyImage}
             onGenerateFunnyImage={onGenerateFunnyImage}
-            onRegenerateExercises={onRegenerateExercises}
             openImageIcon={openImageIcon}
             imageIcon={imageIcon}
-            refreshIcon={refreshIcon}
           />
           {generatingFunnyImageExercise && (
             <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>

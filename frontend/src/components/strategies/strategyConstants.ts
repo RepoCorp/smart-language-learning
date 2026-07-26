@@ -1,12 +1,13 @@
 export const DEFAULT_STRATEGY = "Forms";
 export const PERSONALIZE_STRATEGY = "Personalize";
 export const PRACTICE_STRATEGY = "Practice";
+export const CONNECT_STRATEGY = "Connect";
 
 export const WORD_STRATEGIES = [
   DEFAULT_STRATEGY,
   PERSONALIZE_STRATEGY,
   PRACTICE_STRATEGY,
-  "Connect",
+  CONNECT_STRATEGY,
   "Visualize",
   "Sing",
   "Walk",
@@ -19,7 +20,7 @@ export const WORD_STRATEGIES = [
 export const PHRASE_STRATEGIES = [
   DEFAULT_STRATEGY,
   PRACTICE_STRATEGY,
-  "Connect",
+  CONNECT_STRATEGY,
   "Visualize",
   "Sing",
   "Walk",
