@@ -14,6 +14,7 @@ from .management_items_listing import (
 )
 from .management_items_compare_words_insights import ContentItemCompareWordsInsightsView
 from .management_items_connect import ContentItemConnectView
+from .management_items_decode import ContentItemDecodeView
 from .management_items_noun_exercise_cases import ContentItemNounExerciseCaseView
 from .management_items_personalize import ContentItemPersonalizeView
 from .management_items_practice import ContentItemPracticeView
@@ -21,6 +22,7 @@ from .management_items_question import ContentItemQuestionView
 from .management_items_quick_add import ContentPhraseQuickAddView, ContentWordQuickAddView
 from .management_items_regenerate import ContentItemRegenerateView
 from .management_items_visualize import ContentItemVisualizeView
+from .management_items_walk import ContentItemWalkView
 from .management_items_word_refresh import ContentItemRefreshWordView
 
 __all__ = [
@@ -31,11 +33,13 @@ __all__ = [
     "ContentItemCompareWordsInsightsView",
     "ContentItemActView",
     "ContentItemConnectView",
+    "ContentItemDecodeView",
     "ContentItemExercisesView",
     "ContentItemNounExerciseCaseView",
     "ContentItemPersonalizeView",
     "ContentItemPracticeView",
     "ContentItemVisualizeView",
+    "ContentItemWalkView",
     "ContentItemFunnyImageExerciseView",
     "ContentItemMarkLearnedView",
     "ContentItemRefreshWordView",

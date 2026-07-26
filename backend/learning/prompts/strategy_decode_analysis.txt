@@ -1,0 +1,67 @@
+You are helping a student understand and remember the structure of a vocabulary word.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Meaning in the source language:
+{source_text}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Additional notes:
+{notes}
+
+Analyze the target word and explain how it can be broken into meaningful parts.
+
+Requirements:
+
+- Identify prefixes, roots, suffixes, and the dictionary lemma whenever appropriate.
+- If the word belongs to a recognizable word family, identify the most useful related word.
+- If there is a useful memory decomposition that differs from the linguistic analysis, include it separately.
+- Never invent false linguistic relationships.
+- If no useful memory decomposition exists, return null for the memory section.
+- Clearly distinguish between:
+  - linguistic analysis
+  - memory aid
+- Keep explanations concise and easy to understand.
+- Do not discuss historical etymology unless it directly helps the learner.
+
+For every related word you mention:
+
+- Provide its meaning in {source_name}.
+- Explain why it is useful for understanding or remembering the target word.
+- Provide one short sentence in {target_name}.
+- Provide the translation of that sentence into {source_name}.
+- Use simple vocabulary and grammar.
+
+Return valid JSON only.
+
+{
+  "linguistic": {
+    "prefix": "",
+    "root": "",
+    "suffix": "",
+    "lemma": "",
+    "explanation": ""
+  },
+  "memory": {
+    "decomposition": "",
+    "explanation": ""
+  },
+  "related": [
+    {
+      "target": "",
+      "source": "",
+      "why": "",
+      "sentence": "",
+      "translation": ""
+    }
+  ]
+}

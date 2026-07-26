@@ -1,12 +1,14 @@
 import { useI18n } from "../../i18n";
 import ActStrategyPanel from "./ActStrategyPanel";
 import ConnectStrategyPanel from "./ConnectStrategyPanel";
+import DecodeStrategyPanel from "./DecodeStrategyPanel";
 import PersonalizeStrategyPanel from "./PersonalizeStrategyPanel";
 import PracticeStrategyPanel from "./PracticeStrategyPanel";
 import StrategiesModal from "./StrategiesModal";
 import StrategyLoopPanel from "./StrategyLoopPanel";
 import VisualizeStrategyPanel from "./VisualizeStrategyPanel";
-import { ACT_STRATEGY, CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategyConstants";
+import WalkStrategyPanel from "./WalkStrategyPanel";
+import { ACT_STRATEGY, CONNECT_STRATEGY, DECODE_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY, WALK_STRATEGY } from "./strategyConstants";
 
 type StrategyEntry = { label?: string; source: string; target: string };
 
@@ -35,6 +37,8 @@ export default function ItemStrategiesModal({
   connectStrategy,
   visualizeStrategy,
   actStrategy,
+  walkStrategy,
+  decodeStrategy,
 }: {
   itemType: "word" | "phrase";
   sourceText: string;
@@ -127,6 +131,53 @@ export default function ItemStrategiesModal({
     entry: (StrategyEntry & { key: string; actions: string[] }) | null;
     selectedKeys: string[];
     toggleEntry: (entry: StrategyEntry & { key: string; actions: string[] }) => void;
+    isLoading: boolean;
+    error: string;
+    unselectAll: () => void;
+    selectAll: () => void;
+    selectRandom: () => void;
+  };
+  walkStrategy: {
+    entries: Array<StrategyEntry & { key: string }>;
+    selectedKeys: string[];
+    toggleEntry: (entry: StrategyEntry) => void;
+    isLoading: boolean;
+    error: string;
+    unselectAll: () => void;
+    selectAll: () => void;
+    selectRandom: () => void;
+  };
+  decodeStrategy: {
+    analysis: {
+      linguistic: {
+        prefix?: string;
+        root?: string;
+        suffix?: string;
+        lemma?: string;
+        explanation?: string;
+      } | null;
+      memory: {
+        decomposition?: string;
+        explanation?: string;
+      } | null;
+      related: Array<{
+        key: string;
+        targetWord: string;
+        sourceWord: string;
+        why: string;
+        exampleTarget: string;
+        exampleSource: string;
+      }>;
+    };
+    selectedKeys: string[];
+    toggleEntry: (entry: {
+      key: string;
+      targetWord: string;
+      sourceWord: string;
+      why: string;
+      exampleTarget: string;
+      exampleSource: string;
+    }) => void;
     isLoading: boolean;
     error: string;
     unselectAll: () => void;
@@ -310,6 +361,68 @@ export default function ItemStrategiesModal({
             exerciseRunning={exerciseRunning}
             isLoading={actStrategy.isLoading}
             error={actStrategy.error}
+          />
+        )}
+      />
+    );
+  } else if (selectedStrategy === WALK_STRATEGY && itemType === "word") {
+    strategyContent = (
+      <StrategyLoopPanel
+        secondsLeft={exerciseSecondsLeft}
+        isRunning={exerciseRunning}
+        isMuted={exerciseMuted}
+        canStart={canStart}
+        canSelectEntries={walkStrategy.entries.length > 0}
+        hasSelectedEntries={walkStrategy.selectedKeys.length > 0}
+        onUnselectAll={walkStrategy.unselectAll}
+        onSelectAll={walkStrategy.selectAll}
+        onSelectRandom={walkStrategy.selectRandom}
+        onStart={onStart}
+        onStop={onStop}
+        onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
+        body={(
+          <WalkStrategyPanel
+            entries={walkStrategy.entries}
+            selectedKeys={walkStrategy.selectedKeys}
+            onToggleEntry={walkStrategy.toggleEntry}
+            exerciseRunning={exerciseRunning}
+            isLoading={walkStrategy.isLoading}
+            error={walkStrategy.error}
+          />
+        )}
+      />
+    );
+  } else if (selectedStrategy === DECODE_STRATEGY && itemType === "word") {
+    strategyContent = (
+      <StrategyLoopPanel
+        secondsLeft={exerciseSecondsLeft}
+        isRunning={exerciseRunning}
+        isMuted={exerciseMuted}
+        canStart={canStart}
+        canSelectEntries={decodeStrategy.analysis.related.length > 0}
+        hasSelectedEntries={decodeStrategy.selectedKeys.length > 0}
+        onUnselectAll={decodeStrategy.unselectAll}
+        onSelectAll={decodeStrategy.selectAll}
+        onSelectRandom={decodeStrategy.selectRandom}
+        onStart={onStart}
+        onStop={onStop}
+        onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
+        body={(
+          <DecodeStrategyPanel
+            linguistic={decodeStrategy.analysis.linguistic}
+            memory={decodeStrategy.analysis.memory}
+            related={decodeStrategy.analysis.related}
+            selectedKeys={decodeStrategy.selectedKeys}
+            onToggleEntry={decodeStrategy.toggleEntry}
+            exerciseRunning={exerciseRunning}
+            isLoading={decodeStrategy.isLoading}
+            error={decodeStrategy.error}
           />
         )}
       />

@@ -3387,6 +3387,22 @@ textarea {
   gap: 6px;
 }
 
+.decode-analysis-card {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-bg);
+  padding: 12px 14px;
+}
+
+.decode-analysis-parts {
+  display: grid;
+  gap: 4px;
+}
+
+.decode-analysis-parts p {
+  margin: 0;
+}
+
 .personalize-strategy-form {
   display: flex;
   flex-direction: column;

@@ -34,6 +34,27 @@ export interface ItemExercisePhrases {
     target_text: string;
     actions?: string[];
   };
+  walk_sentences?: ExercisePhrase[];
+  decode_analysis?: {
+    linguistic?: {
+      prefix?: string;
+      root?: string;
+      suffix?: string;
+      lemma?: string;
+      explanation?: string;
+    } | null;
+    memory?: {
+      decomposition?: string;
+      explanation?: string;
+    } | null;
+    related?: Array<{
+      target: string;
+      source: string;
+      why: string;
+      sentence: string;
+      translation: string;
+    }>;
+  };
   connect_groups?: {
     same_family?: Array<{
       target_text: string;
@@ -296,6 +317,14 @@ export interface ContentItemVisualizeResponse {
 }
 
 export interface ContentItemActResponse {
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemWalkResponse {
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemDecodeResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 

@@ -32,13 +32,15 @@ import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
-import { ACT_STRATEGY, CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategies/strategyConstants";
+import { ACT_STRATEGY, CONNECT_STRATEGY, DECODE_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY, WALK_STRATEGY } from "./strategies/strategyConstants";
 import { useActStrategy } from "./strategies/useActStrategy";
 import { useConnectStrategy } from "./strategies/useConnectStrategy";
+import { useDecodeStrategy } from "./strategies/useDecodeStrategy";
 import { useNounExerciseModal } from "./useNounExerciseModal";
 import { usePersonalizeStrategy } from "./strategies/usePersonalizeStrategy";
 import { usePracticeStrategy } from "./strategies/usePracticeStrategy";
 import { useVisualizeStrategy } from "./strategies/useVisualizeStrategy";
+import { useWalkStrategy } from "./strategies/useWalkStrategy";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
 import VerbExerciseSelector, {
   buildVerbExerciseGridEntries,
@@ -874,6 +876,26 @@ export default function NewItem({
     errorMessage: t("newItem.actError"),
     enabled: showExerciseModal && selectedStrategy === ACT_STRATEGY,
   });
+  const walkStrategy = useWalkStrategy({
+    itemId: item.id,
+    itemType: item.item_type,
+    exercisePhrases,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage: t("newItem.walkError"),
+    enabled: showExerciseModal && selectedStrategy === WALK_STRATEGY,
+  });
+  const decodeStrategy = useDecodeStrategy({
+    itemId: item.id,
+    itemType: item.item_type,
+    exercisePhrases,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage: t("newItem.decodeError"),
+    enabled: showExerciseModal && selectedStrategy === DECODE_STRATEGY,
+  });
   const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
   const legacyExerciseEntries = [
     ...sanitizeExerciseEntries(exercisePhrases?.first_section),
@@ -979,6 +1001,14 @@ export default function NewItem({
   const selectedActEntries = actStrategy.entry && actStrategy.selectedKeys.includes(actStrategy.entry.key)
     ? [actStrategy.entry]
     : [];
+  const selectedWalkEntries = walkStrategy.entries.filter((entry) => walkStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
+  const selectedDecodeEntries = decodeStrategy.analysis.related
+    .filter((entry) => decodeStrategy.selectedKeys.includes(entry.key))
+    .map((entry) => ({
+      label: "decode",
+      source: entry.exampleSource,
+      target: entry.exampleTarget,
+    }));
   const selectedStrategyEntries = selectedStrategy === PERSONALIZE_STRATEGY
     ? selectedPersonalizeEntries
     : selectedStrategy === PRACTICE_STRATEGY
@@ -989,6 +1019,10 @@ export default function NewItem({
           ? selectedVisualizeEntries
           : selectedStrategy === ACT_STRATEGY
             ? selectedActEntries
+            : selectedStrategy === WALK_STRATEGY
+              ? selectedWalkEntries
+              : selectedStrategy === DECODE_STRATEGY
+                ? selectedDecodeEntries
           : selectedRepeatExerciseEntries;
   const selectedExerciseEntries = selectedStrategyEntries;
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
@@ -2003,6 +2037,8 @@ export default function NewItem({
               || selectedStrategy === CONNECT_STRATEGY
               || selectedStrategy === VISUALIZE_STRATEGY
               || selectedStrategy === ACT_STRATEGY
+              || selectedStrategy === WALK_STRATEGY
+              || selectedStrategy === DECODE_STRATEGY
             )
           }
           regeneratingContent={
@@ -2014,6 +2050,10 @@ export default function NewItem({
                   ? visualizeStrategy.isLoading
                   : selectedStrategy === ACT_STRATEGY
                     ? actStrategy.isLoading
+                    : selectedStrategy === WALK_STRATEGY
+                      ? walkStrategy.isLoading
+                      : selectedStrategy === DECODE_STRATEGY
+                        ? decodeStrategy.isLoading
                   : loadingExercises
           }
           onRegenerateContent={() => {
@@ -2031,6 +2071,14 @@ export default function NewItem({
             }
             if (selectedStrategy === ACT_STRATEGY) {
               void actStrategy.generate();
+              return;
+            }
+            if (selectedStrategy === WALK_STRATEGY) {
+              void walkStrategy.generate();
+              return;
+            }
+            if (selectedStrategy === DECODE_STRATEGY) {
+              void decodeStrategy.generate();
               return;
             }
             void regenerateWordExercises();
@@ -2068,6 +2116,17 @@ export default function NewItem({
           connectStrategy={connectStrategy}
           visualizeStrategy={visualizeStrategy}
           actStrategy={actStrategy}
+          walkStrategy={{
+            entries: walkStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) })),
+            selectedKeys: walkStrategy.selectedKeys,
+            toggleEntry: walkStrategy.toggleEntry,
+            isLoading: walkStrategy.isLoading,
+            error: walkStrategy.error,
+            unselectAll: walkStrategy.unselectAll,
+            selectAll: walkStrategy.selectAll,
+            selectRandom: walkStrategy.selectRandom,
+          }}
+          decodeStrategy={decodeStrategy}
         />
       )}
       {showFunnyImageModal && funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (

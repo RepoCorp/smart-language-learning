@@ -1,0 +1,53 @@
+You are creating a walking exercise to help a student memorize a vocabulary word.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Meaning in the source language:
+{source_text}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Additional notes:
+{notes}
+
+Create a walking exercise.
+
+Requirements:
+
+- Generate exactly 5 short sentences.
+- Every sentence must contain {target_text} or the grammatically correct inflected form.
+- Never replace the target word with a synonym.
+- Clearly demonstrate the meaning represented by {source_text}.
+- Use simple, everyday vocabulary.
+- Use simple grammar.
+- Keep each sentence short enough to be spoken comfortably while walking.
+- Prefer sentences with a natural spoken rhythm.
+- Avoid tongue twisters and awkward pronunciation whenever possible.
+- Vary the sentence types when natural (e.g. statement, question, command, exclamation).
+- Vary the contexts so the sentences are not repetitive.
+- Avoid sentences that differ only by replacing one noun.
+- The sentences should be easy to remember and pronounce.
+- The sentences should be appropriate for all ages.
+
+Provide a natural translation of each sentence into {source_name}.
+
+Do not explain grammar.
+
+Return valid JSON only.
+
+{
+  "sentences": [
+    {
+      "target": "",
+      "source": ""
+    }
+  ]
+}

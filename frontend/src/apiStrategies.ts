@@ -4,7 +4,9 @@ import type {
   ContentItemConnectResponse,
   ContentItemPersonalizeResponse,
   ContentItemPracticeResponse,
+  ContentItemDecodeResponse,
   ContentItemVisualizeResponse,
+  ContentItemWalkResponse,
   StudyLanguageCode,
 } from "./types";
 
@@ -144,4 +146,58 @@ export async function generateContentItemVisualizePhrase(
     throw new Error(detail);
   }
   return (await response.json()) as ContentItemVisualizeResponse;
+}
+
+export async function generateContentItemWalkSentences(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemWalkResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/walk?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate walk exercise";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemWalkResponse;
+}
+
+export async function generateContentItemDecodeAnalysis(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemDecodeResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/decode?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate decode analysis";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemDecodeResponse;
 }

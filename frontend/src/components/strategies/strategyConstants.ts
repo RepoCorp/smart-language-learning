@@ -4,6 +4,8 @@ export const PRACTICE_STRATEGY = "Practice";
 export const CONNECT_STRATEGY = "Connect";
 export const VISUALIZE_STRATEGY = "Visualize";
 export const ACT_STRATEGY = "Act";
+export const WALK_STRATEGY = "Walk";
+export const DECODE_STRATEGY = "Decode";
 
 export const WORD_STRATEGIES = [
   DEFAULT_STRATEGY,
@@ -13,8 +15,8 @@ export const WORD_STRATEGIES = [
   VISUALIZE_STRATEGY,
   ACT_STRATEGY,
   "Sing",
-  "Walk",
-  "Decode",
+  WALK_STRATEGY,
+  DECODE_STRATEGY,
   "Encounter",
   "Compare",
 ] as const;
@@ -26,7 +28,7 @@ export const PHRASE_STRATEGIES = [
   VISUALIZE_STRATEGY,
   ACT_STRATEGY,
   "Sing",
-  "Walk",
+  WALK_STRATEGY,
   "Encounter",
   "Compare",
 ] as const;
