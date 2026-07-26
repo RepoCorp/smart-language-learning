@@ -1,0 +1,33 @@
+You are helping a student learn a foreign language.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Student sentence in the source language:
+
+{source_text}
+
+Translate the sentence naturally into {target_name}.
+- The translation MUST contain the target word exactly as requested, or the correct grammatical inflection if required.
+- Never replace the target word with a synonym.
+- Always use the requested target word whenever it is grammatically possible.
+- Preserve the original meaning as closely as possible.
+- If the sentence cannot naturally be translated using the target word, make the smallest possible adjustment while preserving the student's original intent.
+- Use natural, everyday language.
+- Do not explain grammar.
+- Do not add extra information.
+
+Return valid JSON with this exact shape:
+{
+  "source_text": "<the final source sentence you used>",
+  "target_text": "<the translated target sentence>"
+}

@@ -25,6 +25,7 @@ export interface ItemExercisePhrases {
   second_section?: ExercisePhrase[];
   generation_mode?: string;
   funny_image_phrase?: ExercisePhrase;
+  personalize_phrases?: ExercisePhrase[];
 }
 
 export interface DialogPhraseTurn {
@@ -250,6 +251,12 @@ export interface ContentItemRefreshWordResponse {
   ok: boolean;
   dialog_occurrences_created?: number;
   related_dialogs?: SessionItem["related_dialogs"];
+}
+
+export interface ContentItemPersonalizeResponse {
+  source_text: string;
+  target_text: string;
+  exercise_phrases?: ItemExercisePhrases;
 }
 
 export interface ContentItemConversationResponse {

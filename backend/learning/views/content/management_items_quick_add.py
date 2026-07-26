@@ -45,7 +45,13 @@ Rules:
 """.strip()
 
 
-def _lookup_german_noun_plural(*, target_text: str, target_line: str) -> str:
+def _lookup_german_noun_plural(
+    *,
+    target_text: str,
+    target_line: str,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
+) -> str:
     parsed = _call_openai_json_logged(
         label="german_noun_plural",
         system_prompt=GERMAN_NOUN_PLURAL_PROMPT,
@@ -56,6 +62,8 @@ def _lookup_german_noun_plural(*, target_text: str, target_line: str) -> str:
         timeout_seconds=6,
         temperature=0.0,
         top_p=1.0,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
     if not isinstance(parsed, dict):
         return ""

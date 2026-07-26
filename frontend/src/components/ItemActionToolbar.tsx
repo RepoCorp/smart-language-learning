@@ -196,6 +196,7 @@ export default function ItemActionToolbar({
 }: Props): JSX.Element {
   const { t } = useI18n();
   const highlightClassName = "item-action-button-has-content";
+  const openPracticeLabel = t("newItem.openStrategies");
 
   return (
     <div className={showMobileActionLabels ? "mobile-action-labels-expanded" : undefined}>
@@ -206,7 +207,7 @@ export default function ItemActionToolbar({
             className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
             onClick={onOpenExercises}
             disabled={loadingExercises}
-            {...iconButtonProps(t("newItem.openExercises"), onShowTooltip, onHideTooltip)}
+            {...iconButtonProps(openPracticeLabel, onShowTooltip, onHideTooltip)}
           >
             <ItemActionIcon name="exercise" />
           </button>

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from .dialog_click_resolution import resolve_dialog_click_word_pair
+from .generation import WORD_EXERCISE_MODEL
 from .management import APIView, Request, Response, _normalized_pair, apply_user_scope, get_request_user, status
 from .management_items_quick_add import _lookup_german_noun_plural
 from .core import create_audio_file, normalize_word_pair_for_item_save
+from .word_metadata import normalize_word_metadata as _normalize_word_metadata
 from ...models import Item, ItemDialogOccurrence
 
 
@@ -80,6 +82,17 @@ class ContentItemRegenerateView(APIView):
             source_line=source_context,
             target_line=target_context,
             clicked_target_token=item.german_text,
+            model=WORD_EXERCISE_MODEL,
+        )
+        source_text, target_text, word_type = _normalize_word_metadata(
+            source_text=source_text,
+            target_text=target_text,
+            word_type=word_type,
+            source_language=source_language,
+            target_language=target_language,
+            source_line=source_context,
+            target_line=target_context,
+            model=WORD_EXERCISE_MODEL,
         )
         source_text, target_text = normalize_word_pair_for_item_save(
             spanish_text=source_text,
@@ -94,7 +107,11 @@ class ContentItemRegenerateView(APIView):
 
         plural_german = item.plural_german or ""
         if word_type == "noun" and target_language == "german":
-            plural_german = _lookup_german_noun_plural(target_text=target_text, target_line=target_context) or plural_german
+            plural_german = _lookup_german_noun_plural(
+                target_text=target_text,
+                target_line=target_context,
+                model=WORD_EXERCISE_MODEL,
+            ) or plural_german
 
         audio_text = f"{target_text}. {target_context}".strip() if target_context else target_text
         audio_url = create_audio_file(audio_text, "word", target_language=target_language)

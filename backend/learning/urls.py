@@ -24,6 +24,7 @@ from .views import (
     ContentItemNounExerciseCaseView,
     ContentItemFunnyImageExerciseView,
     ContentItemMarkLearnedView,
+    ContentItemPersonalizeView,
     ContentItemQuestionView,
     ContentItemRegenerateView,
     ContentItemRefreshWordView,
@@ -92,6 +93,7 @@ urlpatterns = [
     path("content/items/<int:item_id>/compare-words/<int:linked_item_id>", ContentItemCompareWordDetailView.as_view(), name="content-item-compare-word-detail"),
     path("content/items/<int:item_id>/exercises", ContentItemExercisesView.as_view(), name="content-item-exercises"),
     path("content/items/<int:item_id>/exercises/noun-case", ContentItemNounExerciseCaseView.as_view(), name="content-item-noun-exercise-case"),
+    path("content/items/<int:item_id>/strategies/personalize", ContentItemPersonalizeView.as_view(), name="content-item-personalize"),
     path(
         "content/items/<int:item_id>/exercises/funny-image",
         ContentItemFunnyImageExerciseView.as_view(),

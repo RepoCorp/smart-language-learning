@@ -24,6 +24,8 @@ def resolve_dialog_click_word_pair(
     source_line: str = "",
     target_line: str = "",
     clicked_target_token: str = "",
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, str, str, str]:
     target_context = _target_context_for_click(
         user=user,
@@ -42,6 +44,8 @@ def resolve_dialog_click_word_pair(
             target_language=target_language,
             clicked_word=clicked_word,
             target_context=target_context,
+            model=model,
+            reasoning_effort=reasoning_effort,
         )
     )
     resolved_source, resolved_target, note = _refine_click_resolution_if_needed(
@@ -54,6 +58,8 @@ def resolve_dialog_click_word_pair(
         target_text=resolved_target,
         word_type=word_type,
         note=note,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
     return resolved_source, resolved_target, word_type, note
 
@@ -64,6 +70,8 @@ def _request_click_word_resolution(
     target_language: str,
     clicked_word: str,
     target_context: str,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict | None:
     parsed = _call_openai_json_logged(
         label="resolve_dialog_click_word_metadata",
@@ -78,6 +86,8 @@ def _request_click_word_resolution(
         temperature=0.0,
         top_p=1.0,
         presence_penalty=0.0,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
     return parsed
 
@@ -105,6 +115,8 @@ def _refine_click_resolution_if_needed(
     target_text: str,
     word_type: str,
     note: str,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, str, str]:
     if word_type not in {"helper", "expression"}:
         return source_text, target_text, note
@@ -118,6 +130,8 @@ def _refine_click_resolution_if_needed(
         target_text=target_text,
         word_type=word_type,
         note=note,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
 
 
@@ -132,6 +146,8 @@ def refine_special_click_resolution(
     target_text: str,
     word_type: str,
     note: str,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, str, str]:
     parsed = _call_openai_json_logged(
         label=f"refine_{word_type}_click_resolution",
@@ -150,6 +166,8 @@ def refine_special_click_resolution(
         temperature=0.0,
         top_p=1.0,
         presence_penalty=0.0,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
     if not isinstance(parsed, dict):
         return source_text, target_text, note
@@ -211,6 +229,8 @@ def _call_openai_json_logged(
     temperature: float,
     top_p: float,
     presence_penalty: float = 0.0,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict | None:
     logger.info(
         "content.dialog_click_resolution.model.request label=%s system_prompt=%s user_input=%s",
@@ -225,6 +245,8 @@ def _call_openai_json_logged(
         temperature=temperature,
         top_p=top_p,
         presence_penalty=presence_penalty,
+        model=model,
+        reasoning_effort=reasoning_effort,
     )
     logger.info("content.dialog_click_resolution.model.response label=%s parsed=%s", label, parsed)
     return parsed
