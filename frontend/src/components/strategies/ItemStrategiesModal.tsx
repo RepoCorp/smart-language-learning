@@ -4,7 +4,8 @@ import PersonalizeStrategyPanel from "./PersonalizeStrategyPanel";
 import PracticeStrategyPanel from "./PracticeStrategyPanel";
 import StrategiesModal from "./StrategiesModal";
 import StrategyLoopPanel from "./StrategyLoopPanel";
-import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY } from "./strategyConstants";
+import VisualizeStrategyPanel from "./VisualizeStrategyPanel";
+import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategyConstants";
 
 type StrategyEntry = { label?: string; source: string; target: string };
 
@@ -31,6 +32,7 @@ export default function ItemStrategiesModal({
   personalizeStrategy,
   practiceStrategy,
   connectStrategy,
+  visualizeStrategy,
 }: {
   itemType: "word" | "phrase";
   sourceText: string;
@@ -103,6 +105,16 @@ export default function ItemStrategiesModal({
       exampleTarget: string;
       exampleSource: string;
     }) => void;
+    isLoading: boolean;
+    error: string;
+    unselectAll: () => void;
+    selectAll: () => void;
+    selectRandom: () => void;
+  };
+  visualizeStrategy: {
+    entry: (StrategyEntry & { key: string }) | null;
+    selectedKeys: string[];
+    toggleEntry: (entry: StrategyEntry & { key: string }) => void;
     isLoading: boolean;
     error: string;
     unselectAll: () => void;
@@ -226,6 +238,36 @@ export default function ItemStrategiesModal({
             exerciseRunning={exerciseRunning}
             isLoading={connectStrategy.isLoading}
             error={connectStrategy.error}
+          />
+        )}
+      />
+    );
+  } else if (selectedStrategy === VISUALIZE_STRATEGY && itemType === "word") {
+    strategyContent = (
+      <StrategyLoopPanel
+        secondsLeft={exerciseSecondsLeft}
+        isRunning={exerciseRunning}
+        isMuted={exerciseMuted}
+        canStart={canStart}
+        canSelectEntries={Boolean(visualizeStrategy.entry)}
+        hasSelectedEntries={visualizeStrategy.selectedKeys.length > 0}
+        onUnselectAll={visualizeStrategy.unselectAll}
+        onSelectAll={visualizeStrategy.selectAll}
+        onSelectRandom={visualizeStrategy.selectRandom}
+        onStart={onStart}
+        onStop={onStop}
+        onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
+        body={(
+          <VisualizeStrategyPanel
+            entry={visualizeStrategy.entry}
+            selectedKeys={visualizeStrategy.selectedKeys}
+            onToggleEntry={visualizeStrategy.toggleEntry}
+            exerciseRunning={exerciseRunning}
+            isLoading={visualizeStrategy.isLoading}
+            error={visualizeStrategy.error}
           />
         )}
       />

@@ -82,6 +82,22 @@ export function useConnectStrategy({
     [sameFamily, relatedOrConfusing],
   );
 
+  const generate = async (): Promise<void> => {
+    if (itemType !== "word" || itemId <= 0 || isLoading) {
+      return;
+    }
+    setIsLoading(true);
+    setError("");
+    try {
+      const payload = await generateContentItemConnectWords(itemId, sourceLanguage, targetLanguage);
+      setExercisePhrases(payload.exercise_phrases || {});
+    } catch (generationError) {
+      setError(generationError instanceof Error ? generationError.message : errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     setSelectedKeys(allEntries.map((entry) => entry.key));
     setError("");
@@ -100,16 +116,7 @@ export function useConnectStrategy({
     attemptedGenerationRef.current = attemptKey;
 
     void (async () => {
-      setIsLoading(true);
-      setError("");
-      try {
-        const payload = await generateContentItemConnectWords(itemId, sourceLanguage, targetLanguage);
-        setExercisePhrases(payload.exercise_phrases || {});
-      } catch (generationError) {
-        setError(generationError instanceof Error ? generationError.message : errorMessage);
-      } finally {
-        setIsLoading(false);
-      }
+      await generate();
     })();
   }, [enabled, itemId, itemType, allEntries.length, isLoading, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage]);
 
@@ -151,6 +158,7 @@ export function useConnectStrategy({
     selectedKeys,
     error,
     isLoading,
+    generate,
     toggleEntry,
     unselectAll,
     selectAll,

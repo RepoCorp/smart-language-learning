@@ -30,6 +30,7 @@ from .views import (
     ContentItemQuestionView,
     ContentItemRegenerateView,
     ContentItemRefreshWordView,
+    ContentItemVisualizeView,
     ContentItemsView,
     ContentPhraseQuickAddView,
     ContentPreviewView,
@@ -98,6 +99,7 @@ urlpatterns = [
     path("content/items/<int:item_id>/exercises/noun-case", ContentItemNounExerciseCaseView.as_view(), name="content-item-noun-exercise-case"),
     path("content/items/<int:item_id>/strategies/personalize", ContentItemPersonalizeView.as_view(), name="content-item-personalize"),
     path("content/items/<int:item_id>/strategies/practice", ContentItemPracticeView.as_view(), name="content-item-practice"),
+    path("content/items/<int:item_id>/strategies/visualize", ContentItemVisualizeView.as_view(), name="content-item-visualize"),
     path(
         "content/items/<int:item_id>/exercises/funny-image",
         ContentItemFunnyImageExerciseView.as_view(),

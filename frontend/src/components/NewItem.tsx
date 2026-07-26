@@ -32,11 +32,12 @@ import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
-import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY } from "./strategies/strategyConstants";
+import { CONNECT_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY } from "./strategies/strategyConstants";
 import { useConnectStrategy } from "./strategies/useConnectStrategy";
 import { useNounExerciseModal } from "./useNounExerciseModal";
 import { usePersonalizeStrategy } from "./strategies/usePersonalizeStrategy";
 import { usePracticeStrategy } from "./strategies/usePracticeStrategy";
+import { useVisualizeStrategy } from "./strategies/useVisualizeStrategy";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
 import VerbExerciseSelector, {
   buildVerbExerciseGridEntries,
@@ -852,6 +853,16 @@ export default function NewItem({
     errorMessage: t("newItem.connectError"),
     enabled: showExerciseModal && selectedStrategy === CONNECT_STRATEGY,
   });
+  const visualizeStrategy = useVisualizeStrategy({
+    itemId: item.id,
+    itemType: item.item_type,
+    exercisePhrases,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage: t("newItem.visualizeError"),
+    enabled: showExerciseModal && selectedStrategy === VISUALIZE_STRATEGY,
+  });
   const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
   const legacyExerciseEntries = [
     ...sanitizeExerciseEntries(exercisePhrases?.first_section),
@@ -951,13 +962,18 @@ export default function NewItem({
       source: entry.exampleSource,
       target: entry.exampleTarget,
     }));
+  const selectedVisualizeEntries = visualizeStrategy.entry && visualizeStrategy.selectedKeys.includes(visualizeStrategy.entry.key)
+    ? [visualizeStrategy.entry]
+    : [];
   const selectedStrategyEntries = selectedStrategy === PERSONALIZE_STRATEGY
     ? selectedPersonalizeEntries
     : selectedStrategy === PRACTICE_STRATEGY
       ? selectedPracticeEntries
       : selectedStrategy === CONNECT_STRATEGY
         ? selectedConnectEntries
-    : selectedRepeatExerciseEntries;
+        : selectedStrategy === VISUALIZE_STRATEGY
+          ? selectedVisualizeEntries
+          : selectedRepeatExerciseEntries;
   const selectedExerciseEntries = selectedStrategyEntries;
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
   const wordPracticeItemBase: SessionItem = {
@@ -1962,9 +1978,38 @@ export default function NewItem({
               exerciseEntryKey={exerciseEntryKey}
             />
           )}
-          canRegenerateContent={item.item_type === "word" && item.id > 0}
-          regeneratingContent={loadingExercises}
+          canRegenerateContent={
+            item.item_type === "word"
+            && item.id > 0
+            && (
+              selectedStrategy === DEFAULT_STRATEGY
+              || selectedStrategy === PRACTICE_STRATEGY
+              || selectedStrategy === CONNECT_STRATEGY
+              || selectedStrategy === VISUALIZE_STRATEGY
+            )
+          }
+          regeneratingContent={
+            selectedStrategy === PRACTICE_STRATEGY
+              ? practiceStrategy.isLoading
+              : selectedStrategy === CONNECT_STRATEGY
+                ? connectStrategy.isLoading
+                : selectedStrategy === VISUALIZE_STRATEGY
+                  ? visualizeStrategy.isLoading
+                  : loadingExercises
+          }
           onRegenerateContent={() => {
+            if (selectedStrategy === PRACTICE_STRATEGY) {
+              void practiceStrategy.generate();
+              return;
+            }
+            if (selectedStrategy === CONNECT_STRATEGY) {
+              void connectStrategy.generate();
+              return;
+            }
+            if (selectedStrategy === VISUALIZE_STRATEGY) {
+              void visualizeStrategy.generate();
+              return;
+            }
             void regenerateWordExercises();
           }}
           formsSelection={{
@@ -1998,6 +2043,7 @@ export default function NewItem({
             selectRandom: practiceStrategy.selectRandom,
           }}
           connectStrategy={connectStrategy}
+          visualizeStrategy={visualizeStrategy}
         />
       )}
       {showFunnyImageModal && funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (

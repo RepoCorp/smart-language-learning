@@ -19,6 +19,7 @@ from .management_items_practice import ContentItemPracticeView
 from .management_items_question import ContentItemQuestionView
 from .management_items_quick_add import ContentPhraseQuickAddView, ContentWordQuickAddView
 from .management_items_regenerate import ContentItemRegenerateView
+from .management_items_visualize import ContentItemVisualizeView
 from .management_items_word_refresh import ContentItemRefreshWordView
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "ContentItemNounExerciseCaseView",
     "ContentItemPersonalizeView",
     "ContentItemPracticeView",
+    "ContentItemVisualizeView",
     "ContentItemFunnyImageExerciseView",
     "ContentItemMarkLearnedView",
     "ContentItemRefreshWordView",

@@ -3347,6 +3347,27 @@ textarea {
   line-height: 1.4;
 }
 
+.visualize-strategy-image-card {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.visualize-strategy-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.visualize-strategy-word {
+  margin: 0;
+  padding: 10px 12px 12px;
+  text-align: center;
+  font-size: 1.15rem;
+  color: var(--color-text);
+}
+
 .personalize-strategy-form {
   display: flex;
   flex-direction: column;

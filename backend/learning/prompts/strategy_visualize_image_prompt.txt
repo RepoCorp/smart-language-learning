@@ -1,0 +1,43 @@
+You are creating an image generation prompt for a language learning application.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Meaning in the source language:
+{source_text}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Sentence:
+{sentence}
+
+Additional notes:
+{notes}
+
+Your goal is to create an image that helps the student remember the target word for a long time.
+
+The image must faithfully represent the sentence while making it visually memorable.
+{word_friend_requirement_block}
+Image guidelines:
+
+- Create ONE clear scene.
+- The target word should be the main focus of the image.
+- Make the scene colorful and visually appealing.
+- Exaggerate size, facial expressions, or actions when appropriate.
+- Prefer one memorable absurd element rather than many unrelated details.
+- The absurdity should make the image easier to remember, not harder to understand.
+- Make sure the image clearly communicates the meaning of the sentence.
+{word_friend_guideline_block}
+- Avoid unnecessary background details.
+- Avoid clutter.
+- Do not include written words, letters, numbers, signs, captions, speech bubbles, or labels.
+- The image must be appropriate for all ages.
+
+Return only the image prompt as plain text.

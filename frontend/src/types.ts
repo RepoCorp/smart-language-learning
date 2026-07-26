@@ -27,6 +27,7 @@ export interface ItemExercisePhrases {
   funny_image_phrase?: ExercisePhrase;
   personalize_phrases?: ExercisePhrase[];
   practice_phrases?: ExercisePhrase[];
+  visualize_phrase?: ExercisePhrase;
   connect_groups?: {
     same_family?: Array<{
       target_text: string;
@@ -281,6 +282,10 @@ export interface ContentItemPracticeResponse {
 }
 
 export interface ContentItemConnectResponse {
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemVisualizeResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 

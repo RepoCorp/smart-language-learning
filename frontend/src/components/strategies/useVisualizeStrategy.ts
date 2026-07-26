@@ -1,36 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { generateContentItemPracticePhrases } from "../../apiStrategies";
+import { generateContentItemVisualizePhrase } from "../../apiStrategies";
 import type { ItemExercisePhrases, StudyLanguageCode } from "../../types";
 
-type PracticeEntry = {
+type VisualizeEntry = {
+  key: string;
   label: string;
   source: string;
   target: string;
+  imageUrl?: string;
+  imagePrompt?: string;
 };
 
-function practiceEntryKey(entry: PracticeEntry): string {
-  return `${entry.label || ""}|||${entry.source}|||${entry.target}`;
-}
-
-function sanitizePracticeEntries(
-  exercisePhrases: ItemExercisePhrases | undefined,
-): PracticeEntry[] {
-  const entries = exercisePhrases?.practice_phrases;
-  if (!Array.isArray(entries)) {
-    return [];
+function sanitizeVisualizeEntry(exercisePhrases: ItemExercisePhrases | undefined): VisualizeEntry | null {
+  const entry = exercisePhrases?.visualize_phrase;
+  if (!entry) {
+    return null;
   }
-  return entries
-    .map((entry) => ({
-      label: String(entry?.label || "").trim() || "practice",
-      source: String(entry?.source_text || "").trim(),
-      target: String(entry?.target_text || "").trim(),
-    }))
-    .filter((entry) => entry.source && entry.target)
-    .slice(0, 8);
+  const source = String(entry.source_text || "").trim();
+  const target = String(entry.target_text || "").trim();
+  if (!source || !target) {
+    return null;
+  }
+  return {
+    key: `visualize|||${source}|||${target}`,
+    label: String(entry.label || "").trim() || "visualize",
+    source,
+    target,
+    imageUrl: String(entry.image_url || "").trim() || undefined,
+    imagePrompt: String(entry.image_prompt || "").trim() || undefined,
+  };
 }
 
-export function usePracticeStrategy({
+export function useVisualizeStrategy({
   itemId,
   itemType,
   exercisePhrases,
@@ -54,8 +56,8 @@ export function usePracticeStrategy({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const attemptedGenerationRef = useRef<string>("");
 
-  const entries = useMemo(
-    () => sanitizePracticeEntries(exercisePhrases),
+  const entry = useMemo(
+    () => sanitizeVisualizeEntry(exercisePhrases),
     [exercisePhrases],
   );
 
@@ -66,7 +68,7 @@ export function usePracticeStrategy({
     setIsLoading(true);
     setError("");
     try {
-      const payload = await generateContentItemPracticePhrases(itemId, sourceLanguage, targetLanguage);
+      const payload = await generateContentItemVisualizePhrase(itemId, sourceLanguage, targetLanguage);
       setExercisePhrases(payload.exercise_phrases || {});
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : errorMessage);
@@ -76,14 +78,14 @@ export function usePracticeStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(entries.map(practiceEntryKey));
+    setSelectedKeys(entry ? [entry.key] : []);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";
-  }, [itemId, entries]);
+  }, [itemId, entry]);
 
   useEffect(() => {
-    if (!enabled || itemType !== "word" || itemId <= 0 || entries.length > 0 || isLoading) {
+    if (!enabled || itemType !== "word" || itemId <= 0 || entry || isLoading) {
       return;
     }
     const attemptKey = `${itemId}:${sourceLanguage}:${targetLanguage}`;
@@ -95,15 +97,10 @@ export function usePracticeStrategy({
     void (async () => {
       await generate();
     })();
-  }, [enabled, itemId, itemType, entries.length, isLoading, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage]);
+  }, [enabled, itemId, itemType, entry, isLoading, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage]);
 
-  const toggleEntry = (entry: PracticeEntry): void => {
-    const key = practiceEntryKey(entry);
-    setSelectedKeys((current) => (
-      current.includes(key)
-        ? current.filter((selectedKey) => selectedKey !== key)
-        : [...current, key]
-    ));
+  const toggleEntry = (nextEntry: VisualizeEntry): void => {
+    setSelectedKeys((current) => (current.includes(nextEntry.key) ? [] : [nextEntry.key]));
   };
 
   const unselectAll = (): void => {
@@ -111,26 +108,15 @@ export function usePracticeStrategy({
   };
 
   const selectAll = (): void => {
-    setSelectedKeys(entries.map(practiceEntryKey));
+    setSelectedKeys(entry ? [entry.key] : []);
   };
 
   const selectRandom = (): void => {
-    if (entries.length <= 2) {
-      setSelectedKeys(entries.map(practiceEntryKey));
-      return;
-    }
-    const pool = [...entries];
-    const selected: string[] = [];
-    while (pool.length > 0 && selected.length < 2) {
-      const index = Math.floor(Math.random() * pool.length);
-      const [entry] = pool.splice(index, 1);
-      selected.push(practiceEntryKey(entry));
-    }
-    setSelectedKeys(selected);
+    setSelectedKeys(entry ? [entry.key] : []);
   };
 
   return {
-    entries,
+    entry,
     selectedKeys,
     error,
     isLoading,

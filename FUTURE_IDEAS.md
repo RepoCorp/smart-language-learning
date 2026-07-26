@@ -20,7 +20,8 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
-La frase de la imagen en nouns se ve mal
+Remove phrase from image. De pronto solo la primera letra?
+Quitar la selección de frase para imagen y cuando esta abierta decir solo la frase al presionar reproducir
 Algun security by obscurity, que igual deje el pin sencillo.
 In the create content window, make dialog lenght and language of required words a simple radio
 En diálogos en item view y creo que diálogos también, que no scrolls back
@@ -37,6 +38,8 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Que funcione en landscape
+Escribir encima de la imagen?
 Que el usuario pueda pedir que el item sea re-evaluado por un mejor modelo. estaba implementado en el regenerar palabra, pero no estaba funcionando bien. Añadi un todo con Codex para volverlo a implementar mas adelante.  
 Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
 Delay entre frases de ejercicio repeticion

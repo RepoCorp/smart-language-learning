@@ -1,0 +1,255 @@
+from __future__ import annotations
+
+import json
+import logging
+import time
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest, urlopen
+
+from django.conf import settings
+
+from ...languages import language_display_name
+from ...models import Item
+from ...prompts import STRATEGY_VISUALIZE_IMAGE_PROMPT, STRATEGY_VISUALIZE_PHRASE_PROMPT
+from .generation import WORD_EXERCISE_MODEL
+from .management import (
+    APIView,
+    Request,
+    Response,
+    _call_openai_json_logged,
+    _normalized_pair,
+    _render_prompt,
+    apply_user_scope,
+    get_request_user,
+    status,
+)
+from .management_items_listing import _generate_openai_image, _save_exercise_image
+from .word_friends import build_word_friend_prompt_notes
+
+logger = logging.getLogger(__name__)
+
+
+def _call_openai_text_logged(
+    *,
+    label: str,
+    system_prompt: str,
+    user_input: str,
+    timeout_seconds: int = 12,
+    model: str | None = None,
+    temperature: float = 1.0,
+    top_p: float = 1.0,
+    presence_penalty: float = 0.0,
+) -> str:
+    api_key = settings.OPENAI_API_KEY
+    if not api_key:
+        logger.warning("content.visualize.text.skipped label=%s reason=missing_api_key", label)
+        return ""
+
+    model_name = str(model or WORD_EXERCISE_MODEL).strip() or WORD_EXERCISE_MODEL
+    logger.info(
+        "content.visualize.text.request label=%s model=%s system_prompt=%s user_input=%s",
+        label,
+        model_name,
+        system_prompt,
+        user_input,
+    )
+    body = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input},
+        ],
+        "temperature": temperature,
+        "top_p": top_p,
+        "presence_penalty": presence_penalty,
+    }
+    request = UrlRequest(
+        "https://api.openai.com/v1/chat/completions",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "content.visualize.text.request_failed label=%s model=%s error=%s",
+            label,
+            model_name,
+            repr(exc),
+        )
+        return ""
+    logger.info(
+        "content.visualize.text.raw_response label=%s model=%s payload=%s",
+        label,
+        model_name,
+        json.dumps(payload, ensure_ascii=False),
+    )
+    try:
+        content = str(payload["choices"][0]["message"]["content"]).strip()
+    except (KeyError, IndexError, TypeError):
+        logger.warning(
+            "content.visualize.text.parse_failed label=%s model=%s payload=%s",
+            label,
+            model_name,
+            json.dumps(payload, ensure_ascii=False),
+        )
+        return ""
+    logger.info(
+        "content.visualize.text.content label=%s model=%s content=%s",
+        label,
+        model_name,
+        content,
+    )
+    return content
+
+
+def _merge_visualize_phrase(
+    *,
+    exercise_phrases: dict,
+    source_text: str,
+    target_text: str,
+    image_prompt: str,
+    image_url: str,
+) -> dict:
+    payload = dict(exercise_phrases or {})
+    payload["visualize_phrase"] = {
+        "label": "visualize",
+        "source_text": source_text[:400],
+        "target_text": target_text[:400],
+        "image_prompt": image_prompt[:4000],
+        "image_url": image_url,
+    }
+    return payload
+
+
+class ContentItemVisualizeView(APIView):
+    def post(self, request: Request, item_id: int) -> Response:
+        request_started_at = time.perf_counter()
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        item = apply_user_scope(Item.objects, user).filter(
+            id=item_id,
+            item_type=Item.ItemType.WORD,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not item:
+            return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        source_name = language_display_name(source_language)
+        target_name = language_display_name(target_language)
+        parsed = _call_openai_json_logged(
+            label="content_item_visualize",
+            system_prompt=_render_prompt(
+                STRATEGY_VISUALIZE_PHRASE_PROMPT,
+                source_name=source_name,
+                target_name=target_name,
+                source_text=item.spanish_text,
+                target_text=item.german_text,
+                word_type=item.word_type or "",
+                notes=item.notes or "",
+            ),
+            user_input=(
+                f"Item source text: {item.spanish_text}\n"
+                f"Item target text: {item.german_text}\n"
+                f"Item word type: {item.word_type or ''}\n"
+                f"Item notes: {item.notes or ''}\n"
+            ),
+            timeout_seconds=12,
+            model=WORD_EXERCISE_MODEL,
+            temperature=1.0,
+            top_p=1.0,
+            presence_penalty=0.0,
+        )
+        if not isinstance(parsed, dict):
+            return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        target_text = str(parsed.get("target", "")).strip()
+        source_text = str(parsed.get("source", "")).strip()
+        if not source_text or not target_text:
+            return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        word_friend_notes = build_word_friend_prompt_notes(item.german_text)
+        notes_value = str(item.notes or "").strip()
+        if word_friend_notes:
+            notes_value = f"{notes_value}\n\n{word_friend_notes}".strip() if notes_value else word_friend_notes
+        image_prompt = _call_openai_text_logged(
+            label="content_item_visualize_image_prompt",
+            system_prompt=_render_prompt(
+                STRATEGY_VISUALIZE_IMAGE_PROMPT,
+                source_name=source_name,
+                target_name=target_name,
+                source_text=item.spanish_text,
+                target_text=item.german_text,
+                word_type=item.word_type or "",
+                sentence=target_text,
+                notes=notes_value,
+                word_friend_requirement_block=(
+                    "\nIf a Word Friend is provided in the additional notes, it MUST appear in the scene.\n"
+                    if word_friend_notes
+                    else "\n"
+                ),
+                word_friend_guideline_block=(
+                    "- The Word Friend should blend naturally into the scene."
+                    if word_friend_notes
+                    else ""
+                ),
+            ),
+            user_input=(
+                f"Item source text: {item.spanish_text}\n"
+                f"Item target text: {item.german_text}\n"
+                f"Sentence: {target_text}\n"
+                f"Item word type: {item.word_type or ''}\n"
+                f"Item notes: {notes_value}\n"
+            ),
+            timeout_seconds=12,
+            model=WORD_EXERCISE_MODEL,
+            temperature=1.0,
+            top_p=1.0,
+            presence_penalty=0.0,
+        )
+        if not image_prompt:
+            return Response({"detail": "Failed to generate visualize image prompt"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        image_started_at = time.perf_counter()
+        image_bytes = _generate_openai_image(image_prompt)
+        logger.info(
+            "content.visualize.image_generation_finished item_id=%s elapsed_ms=%d bytes=%d",
+            item.id,
+            round((time.perf_counter() - image_started_at) * 1000),
+            len(image_bytes or b""),
+        )
+        if not image_bytes:
+            return Response({"detail": "Failed to generate visualize image"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        save_started_at = time.perf_counter()
+        image_url = _save_exercise_image(image_bytes)
+        logger.info(
+            "content.visualize.image_save_finished item_id=%s elapsed_ms=%d success=%s",
+            item.id,
+            round((time.perf_counter() - save_started_at) * 1000),
+            bool(image_url),
+        )
+        if not image_url:
+            return Response({"detail": "Failed to save visualize image"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        exercise_phrases = _merge_visualize_phrase(
+            exercise_phrases=item.exercise_phrases or {},
+            source_text=source_text,
+            target_text=target_text,
+            image_prompt=image_prompt,
+            image_url=image_url,
+        )
+        item.exercise_phrases = exercise_phrases
+        item.save(update_fields=["exercise_phrases", "updated_at"])
+        logger.info(
+            "content.visualize.request_finished item_id=%s elapsed_ms=%d",
+            item.id,
+            round((time.perf_counter() - request_started_at) * 1000),
+        )
+        return Response({"exercise_phrases": exercise_phrases})
