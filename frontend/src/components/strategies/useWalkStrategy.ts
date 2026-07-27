@@ -75,7 +75,7 @@ export function useWalkStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(entries.map(walkEntryKey));
+    setSelectedKeys([]);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";

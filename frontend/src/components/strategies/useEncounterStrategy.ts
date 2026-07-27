@@ -80,7 +80,7 @@ export function useEncounterStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(entries.map(encounterEntryKey));
+    setSelectedKeys([]);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";

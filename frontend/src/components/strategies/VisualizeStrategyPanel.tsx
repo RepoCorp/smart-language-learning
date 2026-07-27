@@ -8,6 +8,7 @@ export default function VisualizeStrategyPanel({
   exerciseRunning,
   isLoading,
   error,
+  onPlayImageWord,
 }: {
   entry: PhraseSelectionEntry | null;
   selectedKeys: string[];
@@ -15,6 +16,7 @@ export default function VisualizeStrategyPanel({
   exerciseRunning: boolean;
   isLoading: boolean;
   error: string;
+  onPlayImageWord: () => void;
 }): JSX.Element {
   const { t } = useI18n();
 
@@ -28,7 +30,14 @@ export default function VisualizeStrategyPanel({
       )}
       {!!entry?.imageUrl && (
         <div className="visualize-strategy-image-card">
-          <img src={entry.imageUrl} alt={entry.target} className="visualize-strategy-image" />
+          <button
+            type="button"
+            className="funny-image-large-button"
+            onClick={onPlayImageWord}
+            aria-label={entry.target}
+          >
+            <img src={entry.imageUrl} alt={entry.target} className="visualize-strategy-image" />
+          </button>
           <p className="visualize-strategy-word">
             <strong>{entry.target}</strong>
           </p>

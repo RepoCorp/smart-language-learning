@@ -59,7 +59,7 @@ export function usePersonalizeStrategy({
 
   useEffect(() => {
     setInputValue("");
-    setSelectedKeys(entries.map(personalizeEntryKey));
+    setSelectedKeys([]);
     setError("");
     setIsGenerating(false);
   }, [itemId, entries]);

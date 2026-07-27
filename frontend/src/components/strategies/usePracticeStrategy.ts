@@ -76,7 +76,7 @@ export function usePracticeStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(entries.map(practiceEntryKey));
+    setSelectedKeys([]);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";

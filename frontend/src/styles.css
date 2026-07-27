@@ -3213,10 +3213,14 @@ textarea {
 }
 
 .word-strategies-body .strategy-repeat-panel .exercise-modal-scroll {
-  flex: 0 0 auto;
-  min-height: auto;
-  overflow: visible;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
   max-height: min(52vh, 520px);
+  padding-bottom: 8px;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .word-strategies-body .strategy-repeat-panel .exercise-modal-footer {
@@ -3246,11 +3250,12 @@ textarea {
 
 @media (max-width: 768px), (pointer: coarse) {
   .word-strategies-body .strategy-repeat-panel .exercise-modal-scroll {
-    flex: 0 0 auto;
-    min-height: auto;
+    flex: 0 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: auto;
     max-height: min(46vh, 360px);
+    padding-bottom: 10px;
     touch-action: pan-x pan-y;
     -webkit-overflow-scrolling: touch;
   }
@@ -3348,10 +3353,23 @@ textarea {
 }
 
 .visualize-strategy-image-card {
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--color-border-strong);
   border-radius: 12px;
   overflow: hidden;
   background: var(--color-bg);
+}
+
+.visualize-strategy-image-card .funny-image-large-button {
+  display: block;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.visualize-strategy-image-card .funny-image-large-button img {
+  max-height: min(42vh, 420px);
 }
 
 .visualize-strategy-image {

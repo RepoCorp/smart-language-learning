@@ -99,7 +99,7 @@ export function useConnectStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(allEntries.map((entry) => entry.key));
+    setSelectedKeys([]);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";

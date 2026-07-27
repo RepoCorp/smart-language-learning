@@ -78,7 +78,7 @@ export function useVisualizeStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(entry ? [entry.key] : []);
+    setSelectedKeys([]);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";

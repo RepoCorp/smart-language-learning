@@ -43,6 +43,7 @@ export default function ItemStrategiesModal({
   decodeStrategy,
   encounterStrategy,
   compareStrategy,
+  onPlayVisualizeWord,
 }: {
   itemType: "word" | "phrase";
   sourceText: string;
@@ -228,6 +229,7 @@ export default function ItemStrategiesModal({
     selectAll: () => void;
     selectRandom: () => void;
   };
+  onPlayVisualizeWord: () => void;
 }): JSX.Element {
   const { t } = useI18n();
 
@@ -375,6 +377,7 @@ export default function ItemStrategiesModal({
             exerciseRunning={exerciseRunning}
             isLoading={visualizeStrategy.isLoading}
             error={visualizeStrategy.error}
+            onPlayImageWord={onPlayVisualizeWord}
           />
         )}
       />

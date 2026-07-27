@@ -22,6 +22,8 @@ Generate ONE short sentence in {target_name}.
 
 Requirements:
 
+- It is critical that the sentence be as simple as possible while still meeting the requirements below.
+- Prefer the simplest sentence that somehow works rather than a richer or more expressive sentence.
 - The sentence must contain {target_text} or the grammatically correct inflected form.
 - Never replace the target word with a synonym.
 - The sentence must clearly express the meaning represented by {source_text}.
@@ -32,7 +34,7 @@ Requirements:
 - Avoid abstract concepts whenever possible.
 - The sentence should naturally lend itself to a single clear illustration.
 - Use simple vocabulary and grammar.
-- Keep the sentence reasonably short.
+- Keep the sentence extremely short whenever possible.
 - The sentence should be appropriate for all ages.
 
 When creating the memorable scene, prefer one of these techniques:

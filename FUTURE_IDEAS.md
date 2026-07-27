@@ -38,6 +38,9 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Strategies para frases
+Que se hizo el botón de reset test actual?
+Related dialogs no deja poner modo solo audio
 Que funcione en landscape
 Escribir encima de la imagen?
 Que el usuario pueda pedir que el item sea re-evaluado por un mejor modelo. estaba implementado en el regenerar palabra, pero no estaba funcionando bien. Añadi un todo con Codex para volverlo a implementar mas adelante.  

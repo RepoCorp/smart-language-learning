@@ -108,7 +108,7 @@ export function useCompareStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(entries.map(compareEntryKey));
+    setSelectedKeys([]);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";

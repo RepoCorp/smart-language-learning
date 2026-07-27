@@ -96,7 +96,7 @@ export function useDecodeStrategy({
   };
 
   useEffect(() => {
-    setSelectedKeys(analysis.related.map((entry) => entry.key));
+    setSelectedKeys([]);
     setError("");
     setIsLoading(false);
     attemptedGenerationRef.current = "";

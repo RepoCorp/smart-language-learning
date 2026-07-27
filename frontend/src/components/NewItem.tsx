@@ -161,6 +161,8 @@ export default function NewItem({
   const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
   const [itemActionTooltip, setItemActionTooltip] = useState<{ label: string; left: number; top: number } | null>(null);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
+  const [suppressInitialStrategyAutogeneration, setSuppressInitialStrategyAutogeneration] = useState<boolean>(false);
+  const [initialModalStrategy, setInitialModalStrategy] = useState<string>(DEFAULT_STRATEGY);
   const [generatingNounCaseKey, setGeneratingNounCaseKey] = useState<"" | "nominative" | "accusative" | "dative">("");
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
   const [regeneratingAudio, setRegeneratingAudio] = useState<boolean>(false);
@@ -846,7 +848,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.practiceError"),
-    enabled: showExerciseModal && selectedStrategy === PRACTICE_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === PRACTICE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const connectStrategy = useConnectStrategy({
     itemId: item.id,
@@ -856,7 +858,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.connectError"),
-    enabled: showExerciseModal && selectedStrategy === CONNECT_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === CONNECT_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const visualizeStrategy = useVisualizeStrategy({
     itemId: item.id,
@@ -866,7 +868,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.visualizeError"),
-    enabled: showExerciseModal && selectedStrategy === VISUALIZE_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === VISUALIZE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const actStrategy = useActStrategy({
     itemId: item.id,
@@ -876,7 +878,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.actError"),
-    enabled: showExerciseModal && selectedStrategy === ACT_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === ACT_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const walkStrategy = useWalkStrategy({
     itemId: item.id,
@@ -886,7 +888,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.walkError"),
-    enabled: showExerciseModal && selectedStrategy === WALK_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === WALK_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const decodeStrategy = useDecodeStrategy({
     itemId: item.id,
@@ -896,7 +898,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.decodeError"),
-    enabled: showExerciseModal && selectedStrategy === DECODE_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === DECODE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const encounterStrategy = useEncounterStrategy({
     itemId: item.id,
@@ -906,7 +908,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.encounterError"),
-    enabled: showExerciseModal && selectedStrategy === ENCOUNTER_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === ENCOUNTER_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const compareStrategy = useCompareStrategy({
     itemId: item.id,
@@ -916,7 +918,7 @@ export default function NewItem({
     targetLanguage,
     setExercisePhrases,
     errorMessage: t("newItem.compareError"),
-    enabled: showExerciseModal && selectedStrategy === COMPARE_STRATEGY,
+    enabled: showExerciseModal && selectedStrategy === COMPARE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
   });
   const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
   const legacyExerciseEntries = [
@@ -1132,14 +1134,6 @@ export default function NewItem({
     return deterministicTake(keys, count, `${itemDeterministicKey}:exercise-keys:${count}`, (key) => key);
   };
 
-  const initialExerciseEntryKeys = (): string[] => {
-    if (wordOnlyExerciseEntry) {
-      return [exerciseEntryKey(wordOnlyExerciseEntry)];
-    }
-    const firstEntry = allWordExerciseEntries[0];
-    return firstEntry ? [exerciseEntryKey(firstEntry)] : [];
-  };
-
   const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] => getVerbExerciseKeysForPerson(
     verbExerciseGridEntries,
     exerciseEntryKey,
@@ -1168,40 +1162,33 @@ export default function NewItem({
     setSelectedExerciseKeys(verbExerciseKeysForTense(tense));
   };
 
-  const selectDeterministicVerbExerciseGroup = (): void => {
-    const groups = [
-      ...VERB_PERSONS.map((person) => verbExerciseKeysForPerson(person.key)),
-      ...VERB_TENSES.map((tense) => verbExerciseKeysForTense(tense.key)),
-    ].filter((keys) => keys.length > 0);
-    if (!groups.length) {
-      setSelectedExerciseKeys([]);
-      return;
-    }
-    const selectedGroupIndex = deterministicIndex(groups.length, `${itemDeterministicKey}:verb-group`);
-    setSelectedExerciseKeys(groups[selectedGroupIndex]);
-  };
-
   useEffect(() => {
     if (!showExerciseModal || item.item_type !== "word") {
       setSelectedExerciseKeys([]);
       return;
     }
-    if (isVerbExerciseGrid) {
-      selectDeterministicVerbExerciseGroup();
-    } else {
-      setSelectedExerciseKeys(initialExerciseEntryKeys());
-    }
+    setSelectedExerciseKeys([]);
   }, [showExerciseModal, item.id, item.item_type, isVerbExerciseGrid, itemDeterministicKey, compareWords]);
 
   useEffect(() => {
     if (!showExerciseModal) {
       setSelectedStrategy(DEFAULT_STRATEGY);
+      setSuppressInitialStrategyAutogeneration(false);
       return;
     }
     if (item.item_type !== "word" && selectedStrategy === PERSONALIZE_STRATEGY) {
       setSelectedStrategy(DEFAULT_STRATEGY);
     }
   }, [showExerciseModal, item.item_type, selectedStrategy]);
+
+  useEffect(() => {
+    if (!showExerciseModal || !suppressInitialStrategyAutogeneration) {
+      return;
+    }
+    if (selectedStrategy !== initialModalStrategy) {
+      setSuppressInitialStrategyAutogeneration(false);
+    }
+  }, [showExerciseModal, suppressInitialStrategyAutogeneration, selectedStrategy, initialModalStrategy]);
 
   const toggleExerciseEntry = (entry: { label?: string; source: string; target: string }): void => {
     const key = exerciseEntryKey(entry);
@@ -1239,58 +1226,93 @@ export default function NewItem({
     return compareWordExerciseEntries(word, word.exercise_phrases).length <= 1;
   };
 
+  const ensureWordExerciseContentLoaded = async (): Promise<void> => {
+    if (loadingExercises || item.item_type !== "word") {
+      return;
+    }
+    let nextCompareWords = compareWords;
+    setLoadingExercises(true);
+    setExerciseError("");
+    try {
+      const shouldGenerateCurrentWordExercises = item.id > 0
+        && (
+          generatedWordExerciseEntries.length === 0
+          || (isVerbWord && (!hasVerbExerciseGridEntries || !hasCurrentVerbExerciseGeneration))
+        );
+      const missingCompareWords = nextCompareWords.filter((word) => word.id > 0 && compareWordNeedsExerciseGeneration(word));
+      if (shouldGenerateCurrentWordExercises) {
+        const payload = await generateContentItemExercises(item.id, sourceLanguage, targetLanguage);
+        setExercisePhrases(payload.exercise_phrases || {});
+      }
+      if (missingCompareWords.length > 0) {
+        const generatedCompareWords = await Promise.all(
+          missingCompareWords.map(async (word) => {
+            const payload = await generateContentItemExercises(word.id, sourceLanguage, targetLanguage);
+            return {
+              id: word.id,
+              exercise_phrases: payload.exercise_phrases || {},
+            };
+          }),
+        );
+        const generatedCompareWordMap = new Map(
+          generatedCompareWords.map((word) => [word.id, word.exercise_phrases]),
+        );
+        setCompareWords((current) => current.map((word) => (
+          generatedCompareWordMap.has(word.id)
+            ? { ...word, exercise_phrases: generatedCompareWordMap.get(word.id) || {} }
+            : word
+        )));
+      }
+    } catch {
+      setExerciseError(t("newItem.exercisesGenerationError"));
+    } finally {
+      setLoadingExercises(false);
+    }
+  };
+
   const openExerciseModal = async (): Promise<void> => {
     if (showExerciseModal) {
       return;
     }
     setExerciseError("");
-    if (item.item_type === "word") {
-      let nextCompareWords = compareWords;
-      setLoadingExercises(true);
+    if (item.item_type === "word" && item.id > 0) {
       try {
-        if (item.id > 0) {
-          const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
-          nextCompareWords = detail.compare_words || [];
-          setCompareWords(nextCompareWords);
-          setCompareWordsInsights(detail.compare_words_insights || "");
-        }
-        const shouldGenerateCurrentWordExercises = item.id > 0
-          && (
-            generatedWordExerciseEntries.length === 0
-            || (isVerbWord && (!hasVerbExerciseGridEntries || !hasCurrentVerbExerciseGeneration))
-          );
-        const missingCompareWords = nextCompareWords.filter((word) => word.id > 0 && compareWordNeedsExerciseGeneration(word));
-        if (shouldGenerateCurrentWordExercises) {
-          const payload = await generateContentItemExercises(item.id, sourceLanguage, targetLanguage);
-          setExercisePhrases(payload.exercise_phrases || {});
-        }
-        if (missingCompareWords.length > 0) {
-          const generatedCompareWords = await Promise.all(
-            missingCompareWords.map(async (word) => {
-              const payload = await generateContentItemExercises(word.id, sourceLanguage, targetLanguage);
-              return {
-                id: word.id,
-                exercise_phrases: payload.exercise_phrases || {},
-              };
-            }),
-          );
-          const generatedCompareWordMap = new Map(
-            generatedCompareWords.map((word) => [word.id, word.exercise_phrases]),
-          );
-          setCompareWords((current) => current.map((word) => (
-            generatedCompareWordMap.has(word.id)
-              ? { ...word, exercise_phrases: generatedCompareWordMap.get(word.id) || {} }
-              : word
-          )));
-        }
+        const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
+        setCompareWords(detail.compare_words || []);
+        setCompareWordsInsights(detail.compare_words_insights || "");
       } catch {
-        setExerciseError(t("newItem.exercisesGenerationError"));
-      } finally {
-        setLoadingExercises(false);
+        setExerciseError(t("manage.error.load"));
       }
     }
+    setInitialModalStrategy(selectedStrategy);
+    setSuppressInitialStrategyAutogeneration(true);
     setShowExerciseModal(true);
   };
+
+  useEffect(() => {
+    if (
+      !showExerciseModal
+      || item.item_type !== "word"
+      || selectedStrategy !== DEFAULT_STRATEGY
+      || suppressInitialStrategyAutogeneration
+    ) {
+      return;
+    }
+    void ensureWordExerciseContentLoaded();
+  }, [
+    showExerciseModal,
+    item.item_type,
+    selectedStrategy,
+    suppressInitialStrategyAutogeneration,
+    item.id,
+    sourceLanguage,
+    targetLanguage,
+    compareWords,
+    generatedWordExerciseEntries.length,
+    isVerbWord,
+    hasVerbExerciseGridEntries,
+    hasCurrentVerbExerciseGeneration,
+  ]);
 
   const generateNounExerciseCase = async (caseKey: "nominative" | "accusative" | "dative"): Promise<void> => {
     if (generatingNounCaseKey || item.id <= 0) {
@@ -2170,6 +2192,7 @@ export default function NewItem({
           }}
           connectStrategy={connectStrategy}
           visualizeStrategy={visualizeStrategy}
+          onPlayVisualizeWord={playFunnyImageWordAudio}
           actStrategy={actStrategy}
           walkStrategy={{
             entries: walkStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) })),
