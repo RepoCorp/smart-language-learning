@@ -1,0 +1,49 @@
+You are helping a student recognize where a vocabulary word is commonly encountered in real life.
+
+Source language:
+{source_name}
+
+Target language:
+{target_name}
+
+Meaning in the source language:
+{source_text}
+
+Target word:
+{target_text}
+
+Word type:
+{word_type}
+
+Additional notes:
+{notes}
+
+Identify the most common real-world situations where the student is likely to encounter this word.
+
+Requirements:
+
+- Generate between 5 and 8 common situations.
+- Prioritize situations that an everyday language learner is likely to experience.
+- Include a variety of contexts (conversation, signs, websites, forms, transportation, shopping, work, travel, media, etc.) whenever appropriate.
+- For each situation:
+  - provide a short title
+  - explain briefly where the student would encounter the word
+  - provide one authentic sentence in {target_name} containing {target_text} (or the correct grammatical inflection)
+  - never replace the target word with a synonym
+  - provide a natural translation into {source_name}
+- Use authentic language rather than textbook examples.
+- Keep explanations concise.
+- Do not explain grammar.
+
+Return valid JSON only.
+
+{
+  "situations": [
+    {
+      "title": "",
+      "description": "",
+      "target": "",
+      "source": ""
+    }
+  ]
+}

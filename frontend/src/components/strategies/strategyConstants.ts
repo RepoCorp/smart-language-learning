@@ -6,6 +6,8 @@ export const VISUALIZE_STRATEGY = "Visualize";
 export const ACT_STRATEGY = "Act";
 export const WALK_STRATEGY = "Walk";
 export const DECODE_STRATEGY = "Decode";
+export const ENCOUNTER_STRATEGY = "Encounter";
+export const COMPARE_STRATEGY = "Compare";
 
 export const WORD_STRATEGIES = [
   DEFAULT_STRATEGY,
@@ -17,8 +19,8 @@ export const WORD_STRATEGIES = [
   "Sing",
   WALK_STRATEGY,
   DECODE_STRATEGY,
-  "Encounter",
-  "Compare",
+  ENCOUNTER_STRATEGY,
+  COMPARE_STRATEGY,
 ] as const;
 
 export const PHRASE_STRATEGIES = [
@@ -29,6 +31,5 @@ export const PHRASE_STRATEGIES = [
   ACT_STRATEGY,
   "Sing",
   WALK_STRATEGY,
-  "Encounter",
-  "Compare",
+  ENCOUNTER_STRATEGY,
 ] as const;

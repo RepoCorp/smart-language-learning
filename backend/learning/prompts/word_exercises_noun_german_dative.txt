@@ -2,6 +2,8 @@ The target noun must be the indirect object of the sentence.
 
 Generate the shortest natural sentence in which another subject directs an action toward, gives something to, helps, thanks, follows, or otherwise relates to the target noun through a verb that naturally requires the dative.
 
+Do not use the verb "helfen".
+
 The generated question should ask to whom or for whom the action is directed.
 
 The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.

@@ -55,6 +55,24 @@ export interface ItemExercisePhrases {
       translation: string;
     }>;
   };
+  encounter_situations?: Array<{
+    label?: string;
+    title: string;
+    description: string;
+    source_text: string;
+    target_text: string;
+  }>;
+  compare_strategy?: Array<{
+    label?: string;
+    target_text: string;
+    source_text: string;
+    difference_text: string;
+    mistake_text: string;
+    target_example_text: string;
+    target_translation_text: string;
+    comparison_example_text: string;
+    comparison_translation_text: string;
+  }>;
   connect_groups?: {
     same_family?: Array<{
       target_text: string;
@@ -251,6 +269,7 @@ export interface ContentItemRecord {
   word_type?: string;
   plural_german?: string;
   is_learned?: boolean;
+  is_new?: boolean;
 }
 
 export interface ContentItemsResponse {
@@ -260,6 +279,7 @@ export interface ContentItemsResponse {
   has_more?: boolean;
   next_page?: number | null;
   section?: string;
+  review_state?: string;
   query?: string;
 }
 
@@ -325,6 +345,14 @@ export interface ContentItemWalkResponse {
 }
 
 export interface ContentItemDecodeResponse {
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemEncounterResponse {
+  exercise_phrases?: ItemExercisePhrases;
+}
+
+export interface ContentItemCompareResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 

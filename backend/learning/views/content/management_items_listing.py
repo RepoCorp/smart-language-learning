@@ -27,6 +27,7 @@ from .management import (
 from .dialog_item_context import related_dialogs_by_item_ids
 from .exercise_payloads import MAX_EXERCISE_PHRASES, sanitize_exercise_payload
 from .item_questions import item_question_history
+from ...item_states import filter_new_items, is_new_item
 from ...models import DialogTurn, Item, ItemDialogOccurrence
 from ..dialog_phrase_match import build_dialog_phrase_match_payload
 from .core import (
@@ -142,6 +143,7 @@ class ContentItemsView(APIView):
         source_language, target_language = _normalized_pair(request)
         now = timezone.now()
         section = (request.query_params.get("section", "all") or "all").strip().lower()
+        review_state = (request.query_params.get("review_state", "all") or "all").strip().lower()
         query = (request.query_params.get("q", "") or "").strip()
         page = _safe_positive_int(request.query_params.get("page"), 1)
         page_size = _safe_positive_int(request.query_params.get("page_size"), DEFAULT_MANAGE_PAGE_SIZE, maximum=MAX_MANAGE_PAGE_SIZE)
@@ -155,6 +157,8 @@ class ContentItemsView(APIView):
             queryset = queryset.filter(item_type=Item.ItemType.WORD)
         elif section == "phrases":
             queryset = queryset.filter(item_type=Item.ItemType.PHRASE)
+        if review_state == "new":
+            queryset = filter_new_items(queryset)
         if query:
             queryset = queryset.filter(Q(spanish_text__icontains=query) | Q(german_text__icontains=query))
 
@@ -171,6 +175,7 @@ class ContentItemsView(APIView):
                 "next_review_days": _next_review_days(item, now),
                 "audio_url": item.audio_url,
                 "is_learned": item.is_learned,
+                "is_new": is_new_item(item),
             }
             for item in rows
         ]
@@ -181,6 +186,7 @@ class ContentItemsView(APIView):
             "has_more": has_more,
             "next_page": page + 1 if has_more else None,
             "section": section,
+            "review_state": review_state,
             "query": query,
         })
 

@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..auth import apply_user_scope, get_request_user
+from ..item_states import filter_new_items
 from ..models import Item
 
 
@@ -23,13 +24,10 @@ class OverviewStatsView(APIView):
         ).filter(
             Q(last_reviewed_at_es_to_de__isnull=False) | Q(last_reviewed_at_de_to_es__isnull=False),
         ).count()
-        not_started = apply_user_scope(Item.objects, user).filter(
-            is_learned=False,
+        not_started = filter_new_items(apply_user_scope(Item.objects, user).filter(
             source_language=source_language,
             target_language=target_language,
-            last_reviewed_at_es_to_de__isnull=True,
-            last_reviewed_at_de_to_es__isnull=True,
-        ).count()
+        )).count()
         difficult_items = apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             is_difficult=True,

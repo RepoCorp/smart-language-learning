@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 import json
 
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from learning.models import DialogTurn, DisabledElevenLabsVoice, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic, UserAuthToken
@@ -1018,6 +1019,65 @@ def test_content_items_endpoint_lists_items_for_language_pair():
     ids = [item["id"] for item in response.json()["items"]]
     assert first.id in ids
     assert len(ids) == 1
+
+
+@pytest.mark.django_db
+def test_content_items_endpoint_can_filter_new_items_with_shared_definition():
+    new_item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="nuevo",
+        german_text="neu",
+        source_language="spanish",
+        target_language="german",
+        is_learned=False,
+    )
+    started_item = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="ya empece",
+        german_text="ich habe schon angefangen",
+        source_language="spanish",
+        target_language="german",
+        is_learned=False,
+        last_reviewed_at_es_to_de=timezone.now(),
+    )
+    learned_item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="aprendido",
+        german_text="gelernt",
+        source_language="spanish",
+        target_language="german",
+        is_learned=True,
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/content/items",
+        {
+            "source_language": "spanish",
+            "target_language": "german",
+            "review_state": "new",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["review_state"] == "new"
+    assert [item["id"] for item in payload["items"]] == [new_item.id]
+    assert payload["items"][0]["is_new"] is True
+
+    all_response = client.get(
+        "/api/content/items",
+        {
+            "source_language": "spanish",
+            "target_language": "german",
+        },
+    )
+
+    assert all_response.status_code == 200
+    all_items = {item["id"]: item for item in all_response.json()["items"]}
+    assert all_items[new_item.id]["is_new"] is True
+    assert all_items[started_item.id]["is_new"] is False
+    assert all_items[learned_item.id]["is_new"] is False
 
 
 @pytest.mark.django_db

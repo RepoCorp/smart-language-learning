@@ -1,0 +1,57 @@
+You are helping a student understand when to use one vocabulary word instead of another.
+
+Source language:
+{{source_name}}
+
+Target language:
+{{target_name}}
+
+Meaning in the source language:
+{{source_text}}
+
+Target word:
+{{target_text}}
+
+Word type:
+{{word_type}}
+
+Additional notes:
+{{notes}}
+
+Compare the target word with other words that learners commonly confuse with it or that are often used in similar situations.
+
+Requirements:
+
+- Generate between 3 and 5 comparison words.
+- Prioritize comparisons that are genuinely useful for language learners.
+- For each comparison:
+  - provide the comparison word
+  - provide its meaning in {{source_name}}
+  - explain in one or two short sentences when to use the target word instead of the comparison word
+  - describe a common mistake learners make when choosing between the two words
+  - provide one short example sentence using the target word
+  - provide the translation into {{source_name}}
+  - provide one short example sentence using the comparison word
+  - provide the translation into {{source_name}}
+- Never replace {{target_text}} with a synonym in the target word example.
+- Use simple vocabulary and grammar.
+- Keep explanations concise.
+- Focus on practical usage rather than grammar.
+- Do not discuss historical etymology.
+
+Return valid JSON only.
+
+{
+  "comparisons": [
+    {
+      "target": "",
+      "source": "",
+      "difference": "",
+      "mistake": "",
+      "target_example": "",
+      "target_translation": "",
+      "comparison_example": "",
+      "comparison_translation": ""
+    }
+  ]
+}

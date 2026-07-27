@@ -291,6 +291,7 @@ export async function fetchContentItems(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   section = "all",
+  reviewState = "all",
   page = 1,
   pageSize = 25,
   query = "",
@@ -299,6 +300,7 @@ export async function fetchContentItems(
     source_language: sourceLanguage,
     target_language: targetLanguage,
     section,
+    review_state: reviewState,
     page: String(page),
     page_size: String(pageSize),
   });

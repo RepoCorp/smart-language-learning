@@ -2,9 +2,11 @@ import { API_BASE, apiFetch } from "./apiCore";
 import type {
   ContentItemActResponse,
   ContentItemConnectResponse,
+  ContentItemCompareResponse,
   ContentItemPersonalizeResponse,
   ContentItemPracticeResponse,
   ContentItemDecodeResponse,
+  ContentItemEncounterResponse,
   ContentItemVisualizeResponse,
   ContentItemWalkResponse,
   StudyLanguageCode,
@@ -121,6 +123,33 @@ export async function generateContentItemConnectWords(
   return (await response.json()) as ContentItemConnectResponse;
 }
 
+export async function generateContentItemCompareWords(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemCompareResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/compare?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate comparisons";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemCompareResponse;
+}
+
 export async function generateContentItemVisualizePhrase(
   itemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
@@ -200,4 +229,31 @@ export async function generateContentItemDecodeAnalysis(
     throw new Error(detail);
   }
   return (await response.json()) as ContentItemDecodeResponse;
+}
+
+export async function generateContentItemEncounterSituations(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemEncounterResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/encounter?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate encounter situations";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as ContentItemEncounterResponse;
 }

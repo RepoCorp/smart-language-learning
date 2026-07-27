@@ -1,14 +1,16 @@
 import { useI18n } from "../../i18n";
 import ActStrategyPanel from "./ActStrategyPanel";
+import CompareStrategyPanel from "./CompareStrategyPanel";
 import ConnectStrategyPanel from "./ConnectStrategyPanel";
 import DecodeStrategyPanel from "./DecodeStrategyPanel";
+import EncounterStrategyPanel from "./EncounterStrategyPanel";
 import PersonalizeStrategyPanel from "./PersonalizeStrategyPanel";
 import PracticeStrategyPanel from "./PracticeStrategyPanel";
 import StrategiesModal from "./StrategiesModal";
 import StrategyLoopPanel from "./StrategyLoopPanel";
 import VisualizeStrategyPanel from "./VisualizeStrategyPanel";
 import WalkStrategyPanel from "./WalkStrategyPanel";
-import { ACT_STRATEGY, CONNECT_STRATEGY, DECODE_STRATEGY, DEFAULT_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY, WALK_STRATEGY } from "./strategyConstants";
+import { ACT_STRATEGY, COMPARE_STRATEGY, CONNECT_STRATEGY, DECODE_STRATEGY, DEFAULT_STRATEGY, ENCOUNTER_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY, WALK_STRATEGY } from "./strategyConstants";
 
 type StrategyEntry = { label?: string; source: string; target: string };
 
@@ -39,6 +41,8 @@ export default function ItemStrategiesModal({
   actStrategy,
   walkStrategy,
   decodeStrategy,
+  encounterStrategy,
+  compareStrategy,
 }: {
   itemType: "word" | "phrase";
   sourceText: string;
@@ -177,6 +181,46 @@ export default function ItemStrategiesModal({
       why: string;
       exampleTarget: string;
       exampleSource: string;
+    }) => void;
+    isLoading: boolean;
+    error: string;
+    unselectAll: () => void;
+    selectAll: () => void;
+    selectRandom: () => void;
+  };
+  encounterStrategy: {
+    entries: Array<StrategyEntry & { key: string; title: string; description: string }>;
+    selectedKeys: string[];
+    toggleEntry: (entry: StrategyEntry & { key: string; title: string; description: string }) => void;
+    isLoading: boolean;
+    error: string;
+    unselectAll: () => void;
+    selectAll: () => void;
+    selectRandom: () => void;
+  };
+  compareStrategy: {
+    entries: Array<{
+      key: string;
+      targetWord: string;
+      sourceWord: string;
+      difference: string;
+      mistake: string;
+      targetExample: string;
+      targetTranslation: string;
+      comparisonExample: string;
+      comparisonTranslation: string;
+    }>;
+    selectedKeys: string[];
+    toggleEntry: (entry: {
+      key: string;
+      targetWord: string;
+      sourceWord: string;
+      difference: string;
+      mistake: string;
+      targetExample: string;
+      targetTranslation: string;
+      comparisonExample: string;
+      comparisonTranslation: string;
     }) => void;
     isLoading: boolean;
     error: string;
@@ -423,6 +467,66 @@ export default function ItemStrategiesModal({
             exerciseRunning={exerciseRunning}
             isLoading={decodeStrategy.isLoading}
             error={decodeStrategy.error}
+          />
+        )}
+      />
+    );
+  } else if (selectedStrategy === ENCOUNTER_STRATEGY && itemType === "word") {
+    strategyContent = (
+      <StrategyLoopPanel
+        secondsLeft={exerciseSecondsLeft}
+        isRunning={exerciseRunning}
+        isMuted={exerciseMuted}
+        canStart={canStart}
+        canSelectEntries={encounterStrategy.entries.length > 0}
+        hasSelectedEntries={encounterStrategy.selectedKeys.length > 0}
+        onUnselectAll={encounterStrategy.unselectAll}
+        onSelectAll={encounterStrategy.selectAll}
+        onSelectRandom={encounterStrategy.selectRandom}
+        onStart={onStart}
+        onStop={onStop}
+        onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
+        body={(
+          <EncounterStrategyPanel
+            entries={encounterStrategy.entries}
+            selectedKeys={encounterStrategy.selectedKeys}
+            onToggleEntry={encounterStrategy.toggleEntry}
+            exerciseRunning={exerciseRunning}
+            isLoading={encounterStrategy.isLoading}
+            error={encounterStrategy.error}
+          />
+        )}
+      />
+    );
+  } else if (selectedStrategy === COMPARE_STRATEGY && itemType === "word") {
+    strategyContent = (
+      <StrategyLoopPanel
+        secondsLeft={exerciseSecondsLeft}
+        isRunning={exerciseRunning}
+        isMuted={exerciseMuted}
+        canStart={canStart}
+        canSelectEntries={compareStrategy.entries.length > 0}
+        hasSelectedEntries={compareStrategy.selectedKeys.length > 0}
+        onUnselectAll={compareStrategy.unselectAll}
+        onSelectAll={compareStrategy.selectAll}
+        onSelectRandom={compareStrategy.selectRandom}
+        onStart={onStart}
+        onStop={onStop}
+        onToggleMute={onToggleMute}
+        canRegenerateContent={canRegenerateContent}
+        regeneratingContent={regeneratingContent}
+        onRegenerateContent={onRegenerateContent}
+        body={(
+          <CompareStrategyPanel
+            entries={compareStrategy.entries}
+            selectedKeys={compareStrategy.selectedKeys}
+            onToggleEntry={compareStrategy.toggleEntry}
+            exerciseRunning={exerciseRunning}
+            isLoading={compareStrategy.isLoading}
+            error={compareStrategy.error}
           />
         )}
       />
