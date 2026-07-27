@@ -3196,6 +3196,15 @@ textarea {
   margin: 0 0 6px;
 }
 
+.testing-action-description {
+  margin: 0;
+}
+
+.testing-action-content {
+  margin-top: 12px;
+  min-width: 0;
+}
+
 .strategy-repeat-panel {
   display: flex;
   flex-direction: column;

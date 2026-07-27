@@ -136,10 +136,7 @@ type Props = {
   hasQuestions: boolean;
   hasCompareWordsContent: boolean;
   onOpenExercises: () => void;
-  onOpenTest: () => void;
-  onOpenWordIntroPractice: () => void;
-  onOpenWordLetterPractice: () => void;
-  onOpenPhraseBuilder: () => void;
+  onOpenTesting: () => void;
   onOpenRelatedDialogs: () => void;
   onOpenQuestions: () => void;
   onOpenCompareWords: () => void;
@@ -182,10 +179,7 @@ export default function ItemActionToolbar({
   hasQuestions,
   hasCompareWordsContent,
   onOpenExercises,
-  onOpenTest,
-  onOpenWordIntroPractice,
-  onOpenWordLetterPractice,
-  onOpenPhraseBuilder,
+  onOpenTesting,
   onOpenRelatedDialogs,
   onOpenQuestions,
   onOpenCompareWords,
@@ -196,7 +190,7 @@ export default function ItemActionToolbar({
 }: Props): JSX.Element {
   const { t } = useI18n();
   const highlightClassName = "item-action-button-has-content";
-  const openPracticeLabel = t("newItem.openStrategies");
+  const openStrategiesLabel = t("newItem.openStrategies");
 
   return (
     <div className={showMobileActionLabels ? "mobile-action-labels-expanded" : undefined}>
@@ -207,49 +201,19 @@ export default function ItemActionToolbar({
             className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
             onClick={onOpenExercises}
             disabled={loadingExercises}
-            {...iconButtonProps(openPracticeLabel, onShowTooltip, onHideTooltip)}
+            {...iconButtonProps(openStrategiesLabel, onShowTooltip, onHideTooltip)}
           >
             <ItemActionIcon name="exercise" />
           </button>
           <button
             type="button"
             className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-            onClick={onOpenTest}
+            onClick={onOpenTesting}
             disabled={loadingExercises}
-            {...iconButtonProps(t("newItem.openItemTest"), onShowTooltip, onHideTooltip)}
+            {...iconButtonProps(t("newItem.openTesting"), onShowTooltip, onHideTooltip)}
           >
             <ItemActionIcon name="test" />
           </button>
-          {itemType === "word" && (
-            <button
-              type="button"
-              className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-              onClick={onOpenWordIntroPractice}
-              {...iconButtonProps(t("newItem.openWordIntroPractice"), onShowTooltip, onHideTooltip)}
-            >
-              <ItemActionIcon name="warmup" />
-            </button>
-          )}
-          {itemType === "word" && (
-            <button
-              type="button"
-              className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-              onClick={onOpenWordLetterPractice}
-              {...iconButtonProps(t("newItem.openWordLetterPractice"), onShowTooltip, onHideTooltip)}
-            >
-              <ItemActionIcon name="letters" />
-            </button>
-          )}
-          {itemType === "phrase" && (
-            <button
-              type="button"
-              className="secondary-button item-action-button item-action-button-icon item-action-button-primary"
-              onClick={onOpenPhraseBuilder}
-              {...iconButtonProps(t("newItem.openPhraseBuilder"), onShowTooltip, onHideTooltip)}
-            >
-              <ItemActionIcon name="builder" />
-            </button>
-          )}
         </div>
         <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
           <button
