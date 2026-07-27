@@ -113,8 +113,8 @@ def _merge_visualize_phrase(
     exercise_phrases: dict,
     source_text: str,
     target_text: str,
-    image_prompt: str,
-    image_url: str,
+    image_prompt: str = "",
+    image_url: str = "",
 ) -> dict:
     payload = dict(exercise_phrases or {})
     payload["visualize_phrase"] = {
@@ -132,6 +132,7 @@ class ContentItemVisualizeView(APIView):
         request_started_at = time.perf_counter()
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
+        generation_stage = str(request.query_params.get("stage", "full")).strip().lower()
         item = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             item_type=Item.ItemType.WORD,
@@ -143,36 +144,63 @@ class ContentItemVisualizeView(APIView):
 
         source_name = language_display_name(source_language)
         target_name = language_display_name(target_language)
-        parsed = _call_openai_json_logged(
-            label="content_item_visualize",
-            system_prompt=_render_prompt(
-                STRATEGY_VISUALIZE_PHRASE_PROMPT,
-                source_name=source_name,
-                target_name=target_name,
-                source_text=item.spanish_text,
-                target_text=item.german_text,
-                word_type=item.word_type or "",
-                notes=item.notes or "",
-            ),
-            user_input=(
-                f"Item source text: {item.spanish_text}\n"
-                f"Item target text: {item.german_text}\n"
-                f"Item word type: {item.word_type or ''}\n"
-                f"Item notes: {item.notes or ''}\n"
-            ),
-            timeout_seconds=12,
-            model=WORD_EXERCISE_MODEL,
-            temperature=1.0,
-            top_p=1.0,
-            presence_penalty=0.0,
-        )
-        if not isinstance(parsed, dict):
-            return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        stored_visualize_entry = item.exercise_phrases.get("visualize_phrase") if isinstance(item.exercise_phrases, dict) else None
+        source_text = ""
+        target_text = ""
 
-        target_text = str(parsed.get("target", "")).strip()
-        source_text = str(parsed.get("source", "")).strip()
-        if not source_text or not target_text:
-            return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        if generation_stage == "image_only":
+            if isinstance(stored_visualize_entry, dict):
+                source_text = str(stored_visualize_entry.get("source_text", "")).strip()
+                target_text = str(stored_visualize_entry.get("target_text", "")).strip()
+            if not source_text or not target_text:
+                return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_409_CONFLICT)
+        else:
+            parsed = _call_openai_json_logged(
+                label="content_item_visualize",
+                system_prompt=_render_prompt(
+                    STRATEGY_VISUALIZE_PHRASE_PROMPT,
+                    source_name=source_name,
+                    target_name=target_name,
+                    source_text=item.spanish_text,
+                    target_text=item.german_text,
+                    word_type=item.word_type or "",
+                    notes=item.notes or "",
+                ),
+                user_input=(
+                    f"Item source text: {item.spanish_text}\n"
+                    f"Item target text: {item.german_text}\n"
+                    f"Item word type: {item.word_type or ''}\n"
+                    f"Item notes: {item.notes or ''}\n"
+                ),
+                timeout_seconds=12,
+                model=WORD_EXERCISE_MODEL,
+                temperature=1.0,
+                top_p=1.0,
+                presence_penalty=0.0,
+            )
+            if not isinstance(parsed, dict):
+                return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+            target_text = str(parsed.get("target", "")).strip()
+            source_text = str(parsed.get("source", "")).strip()
+            if not source_text or not target_text:
+                return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+            exercise_phrases = _merge_visualize_phrase(
+                exercise_phrases=item.exercise_phrases or {},
+                source_text=source_text,
+                target_text=target_text,
+            )
+            item.exercise_phrases = exercise_phrases
+            item.save(update_fields=["exercise_phrases", "updated_at"])
+            if generation_stage == "phrase_only":
+                logger.info(
+                    "content.visualize.request_finished item_id=%s stage=%s elapsed_ms=%d",
+                    item.id,
+                    generation_stage,
+                    round((time.perf_counter() - request_started_at) * 1000),
+                )
+                return Response({"exercise_phrases": exercise_phrases})
 
         word_friend_notes = build_word_friend_prompt_notes(item.german_text)
         notes_value = str(item.notes or "").strip()
@@ -248,8 +276,9 @@ class ContentItemVisualizeView(APIView):
         item.exercise_phrases = exercise_phrases
         item.save(update_fields=["exercise_phrases", "updated_at"])
         logger.info(
-            "content.visualize.request_finished item_id=%s elapsed_ms=%d",
+            "content.visualize.request_finished item_id=%s stage=%s elapsed_ms=%d",
             item.id,
+            generation_stage,
             round((time.perf_counter() - request_started_at) * 1000),
         )
         return Response({"exercise_phrases": exercise_phrases})

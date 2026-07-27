@@ -28,15 +28,15 @@ def _placeholder_question_source_text(case_key: str, source_language: str) -> st
     normalized_source = (source_language or "").strip().lower()
     if normalized_source == "spanish":
         if case_key == "accusative":
-            return "¿A quién...? / ¿Qué...?"
+            return "¿Qué...?"
         if case_key == "dative":
-            return "¿A quién...? / ¿Para quién...?"
+            return "¿Para quién...?"
         if case_key == "genitive":
             return "¿De quién...?"
     if case_key == "accusative":
-        return "Whom or what?"
+        return "What?"
     if case_key == "dative":
-        return "To whom or for whom?"
+        return "For whom?"
     if case_key == "genitive":
         return "Whose?"
     return ""
@@ -44,9 +44,9 @@ def _placeholder_question_source_text(case_key: str, source_language: str) -> st
 
 def _placeholder_question_target_text(case_key: str) -> str:
     if case_key == "accusative":
-        return "Wen oder was?"
+        return "Was?"
     if case_key == "dative":
-        return "Wem oder fuer wen?"
+        return "Fuer wen?"
     if case_key == "genitive":
         return "Wessen?"
     return ""

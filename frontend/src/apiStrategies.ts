@@ -154,10 +154,12 @@ export async function generateContentItemVisualizePhrase(
   itemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  stage: "full" | "phrase_only" | "image_only" = "full",
 ): Promise<ContentItemVisualizeResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
+    stage,
   });
   const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/visualize?${params.toString()}`, {
     method: "POST",

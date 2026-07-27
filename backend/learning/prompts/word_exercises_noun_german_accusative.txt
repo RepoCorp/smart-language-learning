@@ -4,6 +4,8 @@ Generate the shortest natural sentence in which another subject performs a chara
 
 Choose a verb that is strongly associated with the noun whenever possible.
 
-The generated question should ask whom or what the subject acts upon.
+The generated question must ask only "what", not "whom".
+
+Only use sentence patterns for which the natural answer question starts with "What ...?".
 
 The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.

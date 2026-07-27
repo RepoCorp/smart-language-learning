@@ -7,6 +7,7 @@ export default function VisualizeStrategyPanel({
   onToggleEntry,
   exerciseRunning,
   isLoading,
+  isGeneratingImage,
   error,
   onPlayImageWord,
 }: {
@@ -15,6 +16,7 @@ export default function VisualizeStrategyPanel({
   onToggleEntry: (entry: PhraseSelectionEntry) => void;
   exerciseRunning: boolean;
   isLoading: boolean;
+  isGeneratingImage: boolean;
   error: string;
   onPlayImageWord: () => void;
 }): JSX.Element {
@@ -24,6 +26,7 @@ export default function VisualizeStrategyPanel({
     <div className="practice-strategy-panel">
       <p className="hint exercise-modal-description">{t("newItem.visualizeDescription")}</p>
       {isLoading && <p className="hint">{t("newItem.visualizeGenerating")}</p>}
+      {!isLoading && isGeneratingImage && !!entry && <p className="hint">{t("newItem.visualizeGeneratingImage")}</p>}
       {error && <p className="error">{error}</p>}
       {!isLoading && !error && !entry && (
         <p className="hint">{t("newItem.visualizeEmpty")}</p>

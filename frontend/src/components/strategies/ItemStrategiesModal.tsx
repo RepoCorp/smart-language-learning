@@ -127,6 +127,7 @@ export default function ItemStrategiesModal({
     selectedKeys: string[];
     toggleEntry: (entry: StrategyEntry & { key: string }) => void;
     isLoading: boolean;
+    isGeneratingImage: boolean;
     error: string;
     unselectAll: () => void;
     selectAll: () => void;
@@ -376,6 +377,7 @@ export default function ItemStrategiesModal({
             onToggleEntry={visualizeStrategy.toggleEntry}
             exerciseRunning={exerciseRunning}
             isLoading={visualizeStrategy.isLoading}
+            isGeneratingImage={visualizeStrategy.isGeneratingImage}
             error={visualizeStrategy.error}
             onPlayImageWord={onPlayVisualizeWord}
           />

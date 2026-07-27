@@ -4,6 +4,8 @@ Generate the shortest natural sentence in which another subject directs an actio
 
 Do not use the verb "helfen".
 
-The generated question should ask to whom or for whom the action is directed.
+The generated question must ask only "for whom", not "to whom".
+
+Only use sentence patterns for which the natural answer question starts with "For whom ...?".
 
 The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.

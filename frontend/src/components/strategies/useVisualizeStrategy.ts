@@ -54,7 +54,9 @@ export function useVisualizeStrategy({
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
   const attemptedGenerationRef = useRef<string>("");
+  const imageRequestIdRef = useRef<number>(0);
 
   const entry = useMemo(
     () => sanitizeVisualizeEntry(exercisePhrases),
@@ -66,10 +68,41 @@ export function useVisualizeStrategy({
       return;
     }
     setIsLoading(true);
+    setIsGeneratingImage(false);
     setError("");
     try {
-      const payload = await generateContentItemVisualizePhrase(itemId, sourceLanguage, targetLanguage);
-      setExercisePhrases(payload.exercise_phrases || {});
+      const payload = await generateContentItemVisualizePhrase(itemId, sourceLanguage, targetLanguage, "phrase_only");
+      const phrasePayload = payload.exercise_phrases || {};
+      setExercisePhrases(phrasePayload);
+      const visualizePhrase = phrasePayload.visualize_phrase;
+      const hasPhrase = Boolean(
+        visualizePhrase
+        && String(visualizePhrase.source_text || "").trim()
+        && String(visualizePhrase.target_text || "").trim(),
+      );
+      if (hasPhrase) {
+        const requestId = imageRequestIdRef.current + 1;
+        imageRequestIdRef.current = requestId;
+        setIsGeneratingImage(true);
+        void (async () => {
+          try {
+            const imagePayload = await generateContentItemVisualizePhrase(itemId, sourceLanguage, targetLanguage, "image_only");
+            if (imageRequestIdRef.current !== requestId) {
+              return;
+            }
+            setExercisePhrases(imagePayload.exercise_phrases || phrasePayload);
+          } catch (generationError) {
+            if (imageRequestIdRef.current !== requestId) {
+              return;
+            }
+            setError(generationError instanceof Error ? generationError.message : errorMessage);
+          } finally {
+            if (imageRequestIdRef.current === requestId) {
+              setIsGeneratingImage(false);
+            }
+          }
+        })();
+      }
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : errorMessage);
     } finally {
@@ -81,7 +114,9 @@ export function useVisualizeStrategy({
     setSelectedKeys([]);
     setError("");
     setIsLoading(false);
+    setIsGeneratingImage(false);
     attemptedGenerationRef.current = "";
+    imageRequestIdRef.current += 1;
   }, [itemId, entry]);
 
   useEffect(() => {
@@ -120,6 +155,7 @@ export function useVisualizeStrategy({
     selectedKeys,
     error,
     isLoading,
+    isGeneratingImage,
     generate,
     toggleEntry,
     unselectAll,
