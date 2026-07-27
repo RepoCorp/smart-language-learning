@@ -69,13 +69,13 @@ export default function FormsStrategyPanel({
     questionSourceText?: string;
     phrases: Array<{ label?: string; source_text: string; target_text: string }>;
   }>;
-  generatingNounCaseKey?: "" | "nominative" | "accusative" | "dative";
+  generatingNounCaseKey?: "" | "nominative" | "accusative" | "dative" | "genitive";
   compareExerciseEntries: ExerciseEntry[];
   onToggleEntry: (entry: ExerciseEntry) => void;
   onSelectPerson: (person: VerbPersonKey) => void;
   onSelectTense: (tense: VerbTenseKey) => void;
   onSelectKeys: (keys: string[]) => void;
-  onGenerateCase: (caseKey: "nominative" | "accusative" | "dative") => void;
+  onGenerateCase: (caseKey: "nominative" | "accusative" | "dative" | "genitive") => void;
   onOpenFunnyImage: () => void;
   onGenerateFunnyImage: () => void;
   openImageIcon: JSX.Element;

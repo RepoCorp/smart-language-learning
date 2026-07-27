@@ -163,7 +163,7 @@ export default function NewItem({
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
   const [suppressInitialStrategyAutogeneration, setSuppressInitialStrategyAutogeneration] = useState<boolean>(false);
   const [initialModalStrategy, setInitialModalStrategy] = useState<string>(DEFAULT_STRATEGY);
-  const [generatingNounCaseKey, setGeneratingNounCaseKey] = useState<"" | "nominative" | "accusative" | "dative">("");
+  const [generatingNounCaseKey, setGeneratingNounCaseKey] = useState<"" | "nominative" | "accusative" | "dative" | "genitive">("");
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
   const [regeneratingAudio, setRegeneratingAudio] = useState<boolean>(false);
   const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] = useState<boolean>(false);
@@ -1314,7 +1314,7 @@ export default function NewItem({
     hasCurrentVerbExerciseGeneration,
   ]);
 
-  const generateNounExerciseCase = async (caseKey: "nominative" | "accusative" | "dative"): Promise<void> => {
+  const generateNounExerciseCase = async (caseKey: "nominative" | "accusative" | "dative" | "genitive"): Promise<void> => {
     if (generatingNounCaseKey || item.id <= 0) {
       return;
     }

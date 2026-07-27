@@ -54,7 +54,7 @@ class ContentItemNounExerciseCaseView(APIView):
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         case_key = (request.query_params.get("case_key", "") or "").strip().lower()
-        if case_key not in {"nominative", "accusative", "dative"}:
+        if case_key not in {"nominative", "accusative", "dative", "genitive"}:
             return Response({"detail": "Unsupported noun case"}, status=status.HTTP_400_BAD_REQUEST)
 
         item = apply_user_scope(Item.objects, user).filter(

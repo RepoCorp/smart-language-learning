@@ -21,7 +21,7 @@ export async function generateContentItemExercises(
 
 export async function generateContentItemNounExerciseCase(
   itemId: number,
-  caseKey: "nominative" | "accusative" | "dative",
+  caseKey: "nominative" | "accusative" | "dative" | "genitive",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<{ exercise_phrases?: ItemExercisePhrases }> {

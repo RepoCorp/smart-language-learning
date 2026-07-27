@@ -13,7 +13,7 @@ interface NounExerciseSelectorProps {
   exerciseEntryKey: (entry: WordExerciseGridPrimaryEntry["entry"]) => string;
   onToggleEntry: (entry: WordExerciseGridPrimaryEntry["entry"]) => void;
   onSelectKeys: (keys: string[]) => void;
-  onGenerateCase: (caseKey: "nominative" | "accusative" | "dative") => void;
+  onGenerateCase: (caseKey: "nominative" | "accusative" | "dative" | "genitive") => void;
 }
 
 const DETERMINER_ROWS = [
@@ -89,7 +89,7 @@ export default function NounExerciseSelector({
   const selectColumn = (sectionKey: string): void => {
     const keys = keysForSection(sectionKey);
     if (keys.length === 0) {
-      if (sectionKey === "nominative" || sectionKey === "accusative" || sectionKey === "dative") {
+      if (sectionKey === "nominative" || sectionKey === "accusative" || sectionKey === "dative" || sectionKey === "genitive") {
         onGenerateCase(sectionKey);
       }
       return;
@@ -117,7 +117,7 @@ export default function NounExerciseSelector({
         secondaryActionLabel: keysForSection(section.key).length > 0 ? "Regenerate case" : undefined,
         secondaryActionDisabled: generatingCaseKey === section.key || exerciseRunning,
         secondaryActionRequiresConfirm: keysForSection(section.key).length > 0,
-        onSecondaryActionClick: keysForSection(section.key).length > 0 && (section.key === "nominative" || section.key === "accusative" || section.key === "dative")
+        onSecondaryActionClick: keysForSection(section.key).length > 0 && (section.key === "nominative" || section.key === "accusative" || section.key === "dative" || section.key === "genitive")
           ? () => onGenerateCase(section.key)
           : undefined,
       }))}

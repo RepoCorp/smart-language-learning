@@ -7,6 +7,7 @@ from ...prompts import (
     WORD_EXERCISES_NOUN_GERMAN_ACCUSATIVE_PROMPT,
     WORD_EXERCISES_NOUN_GERMAN_COMMON_PROMPT,
     WORD_EXERCISES_NOUN_GERMAN_DATIVE_PROMPT,
+    WORD_EXERCISES_NOUN_GERMAN_GENITIVE_PROMPT,
     WORD_EXERCISES_NOUN_GERMAN_NOMINATIVE_PROMPT,
     WORD_EXERCISES_NOUN_PROMPT,
 )
@@ -17,8 +18,9 @@ GERMAN_NOUN_CASE_PROMPTS = {
     "nominative": WORD_EXERCISES_NOUN_GERMAN_NOMINATIVE_PROMPT,
     "accusative": WORD_EXERCISES_NOUN_GERMAN_ACCUSATIVE_PROMPT,
     "dative": WORD_EXERCISES_NOUN_GERMAN_DATIVE_PROMPT,
+    "genitive": WORD_EXERCISES_NOUN_GERMAN_GENITIVE_PROMPT,
 }
-GERMAN_NOUN_CASE_ORDER = ["nominative", "accusative", "dative"]
+GERMAN_NOUN_CASE_ORDER = ["nominative", "accusative", "dative", "genitive"]
 GERMAN_NOUN_GENERATION_MODE = "noun_cases_german_v1"
 
 
@@ -29,10 +31,14 @@ def _placeholder_question_source_text(case_key: str, source_language: str) -> st
             return "¿A quién...? / ¿Qué...?"
         if case_key == "dative":
             return "¿A quién...? / ¿Para quién...?"
+        if case_key == "genitive":
+            return "¿De quién...?"
     if case_key == "accusative":
         return "Whom or what?"
     if case_key == "dative":
         return "To whom or for whom?"
+    if case_key == "genitive":
+        return "Whose?"
     return ""
 
 
@@ -41,6 +47,8 @@ def _placeholder_question_target_text(case_key: str) -> str:
         return "Wen oder was?"
     if case_key == "dative":
         return "Wem oder fuer wen?"
+    if case_key == "genitive":
+        return "Wessen?"
     return ""
 
 
