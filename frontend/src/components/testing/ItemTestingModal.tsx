@@ -55,6 +55,11 @@ export default function ItemTestingModal({
         label: t("newItem.wordLetterPracticeTitle"),
         description: t("newItem.testingLetterPracticeDescription"),
       },
+      {
+        key: "parts",
+        label: t("newItem.wordPartsPracticeTitle"),
+        description: t("newItem.testingWordPartsDescription"),
+      },
     ];
   }, [itemType, t]);
 

@@ -30,6 +30,7 @@ import DialogTurnsList from "./DialogTurnsList";
 import ItemActionToolbar from "./ItemActionToolbar";
 import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
+import WordPartsReview from "./WordPartsReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
 import ItemTestingModal from "./testing/ItemTestingModal";
@@ -1094,6 +1095,9 @@ export default function NewItem({
     ...wordPracticeItemBase,
     repeatPracticeStep: "word_cloze",
   };
+  const wordPartsPracticeItem: SessionItem = {
+    ...wordPracticeItemBase,
+  };
   const phraseBuilderItem: SessionItem = {
     ...item,
     spanish_text: sourceText,
@@ -2001,6 +2005,12 @@ export default function NewItem({
               <WordReview
                 key={`testing-word-letter-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
                 item={wordLetterPracticeItem}
+                onAnswered={async () => closeTestingModal()}
+              />
+            ) : selectedTestingAction === "parts" && item.item_type === "word" ? (
+              <WordPartsReview
+                key={`testing-word-parts-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
+                item={wordPartsPracticeItem}
                 onAnswered={async () => closeTestingModal()}
               />
             ) : selectedTestingAction === "builder" && item.item_type === "phrase" ? (

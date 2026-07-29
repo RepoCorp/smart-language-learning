@@ -3205,6 +3205,31 @@ textarea {
   min-width: 0;
 }
 
+.word-parts-review {
+  gap: 10px;
+}
+
+.word-parts-target-zone {
+  padding-bottom: 2px;
+}
+
+.word-parts-slots {
+  row-gap: 8px;
+}
+
+.word-parts-separator {
+  align-self: center;
+  white-space: pre-wrap;
+}
+
+.word-parts-slot {
+  min-width: 48px;
+}
+
+.word-parts-bank {
+  gap: 10px;
+}
+
 .strategy-repeat-panel {
   display: flex;
   flex-direction: column;
