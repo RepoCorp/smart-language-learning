@@ -405,6 +405,7 @@ export interface TopicConversationStartResponse {
   notes?: string;
   role_text?: string;
   goal_difficulty?: "easy" | "medium" | "hard";
+  goals?: string[];
   goal_text: string;
   opening_text?: string;
   opening_translation_text?: string;
@@ -434,6 +435,9 @@ export interface TopicConversationGoalEvaluationResponse {
   goal_achieved: boolean;
   goal_achievement_message?: string;
   next_goal_suggestion?: string;
+  next_goal_index?: number;
+  all_goals_completed?: boolean;
+  current_goal_text?: string;
 }
 
 export interface OverviewStatsResponse {

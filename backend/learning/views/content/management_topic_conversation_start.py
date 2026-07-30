@@ -18,10 +18,11 @@ from .management_topic_conversation_shared import (
     conversation_audio_enabled,
     conversation_inline_audio_enabled,
     conversation_realtime_enabled,
-    default_conversation_goal,
+    default_conversation_goals,
     validate_conversation_start_fields,
     validate_conversation_start_payload,
 )
+from .topic_pool import resolve_topic_choice
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,10 @@ def build_realtime_conversation_instructions(
     role_line = role_text or "No specific learner role"
     notes_line = notes or "No temporary notes"
     return (
-        "You are a patient spoken language tutor.\n"
-        f"The learner speaks {source_name} and is practicing {target_name}.\n"
+        "You are another person in a live spoken conversation.\n"
+        f"The other person speaks {source_name} and is practicing {target_name}.\n"
         f"Conversation topic: {topic}\n"
-        f"Learner role: {role_line}\n"
+        f"The other person's role: {role_line}\n"
         f"Temporary notes: {notes_line}\n"
         f"Always reply in natural {target_name}.\n"
         "Use simple vocabulary and simple grammar.\n"
@@ -52,8 +53,9 @@ def build_realtime_conversation_instructions(
         "Use 1 or 2 short sentences maximum.\n"
         f"Do not switch to {source_name} unless the learner explicitly asks for it.\n"
         "Do not explain grammar unless asked.\n"
-        "Do not correct the learner's mistakes unless the learner explicitly asks for correction or help with the sentence.\n"
-        "If the learner makes mistakes, keep the conversation moving naturally instead of correcting them.\n"
+        "Do not correct the other person's mistakes unless they explicitly ask for correction or help with the sentence.\n"
+        "Do not repeat their sentence in corrected form as your reply.\n"
+        "If they make mistakes, keep the conversation moving naturally instead of correcting them.\n"
         "Ask at most one short follow-up question when it helps keep the conversation moving.\n"
         f"If the learner is clearly saying goodbye or ending the conversation, reply with a short natural goodbye in {target_name}.\n"
         "In that goodbye case, do not force another question and do not try to continue the conversation.\n"
@@ -157,6 +159,12 @@ class ContentTopicConversationStartView(APIView):
     def post(self, request: Request) -> Response:
         request_started_at = time.perf_counter()
         source_language, target_language, topic, notes, role_text, goal_difficulty = validate_conversation_start_fields(request)
+        topic = resolve_topic_choice(
+            user=get_request_user(request),
+            topic=topic,
+            source_language=source_language,
+            target_language=target_language,
+        )
         validation_error = validate_conversation_start_payload(
             topic=topic,
             notes=notes,
@@ -167,7 +175,8 @@ class ContentTopicConversationStartView(APIView):
             return validation_error
 
         goal_elapsed_ms = 0
-        goal_text = default_conversation_goal(source_language)
+        goals = default_conversation_goals(source_language, goal_difficulty)
+        goal_text = goals[0] if goals else ""
         selected_goal_difficulty = goal_difficulty
         opening_text = ""
         opening_translation_text = ""
@@ -223,6 +232,7 @@ class ContentTopicConversationStartView(APIView):
                 "notes": notes,
                 "role_text": role_text,
                 "goal_difficulty": selected_goal_difficulty,
+                "goals": goals,
                 "goal_text": goal_text,
                 "opening_text": opening_text,
                 "opening_translation_text": opening_translation_text,
@@ -235,6 +245,12 @@ class ContentTopicConversationRealtimeSessionView(APIView):
     def post(self, request: Request) -> Response:
         request_started_at = time.perf_counter()
         source_language, target_language, topic, notes, role_text, goal_difficulty = validate_conversation_start_fields(request)
+        topic = resolve_topic_choice(
+            user=get_request_user(request),
+            topic=topic,
+            source_language=source_language,
+            target_language=target_language,
+        )
         logger.info(
             "content.topic_conversation.realtime_session_requested topic=%s source_language=%s target_language=%s goal_difficulty=%s notes_length=%s role_length=%s realtime_enabled=%s",
             topic,

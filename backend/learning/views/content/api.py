@@ -17,6 +17,7 @@ from .core import (
     save_dialog_turns,
     select_dialog_speaker_voice_ids,
 )
+from .topic_pool import resolve_topic_choice
 from .topics import save_topic
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class ContentPreviewView(APIView):
         serializer = ContentTopicSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        topic = serializer.validated_data["topic"].strip()
+        requested_topic = serializer.validated_data["topic"].strip()
         context = serializer.validated_data.get("context", "").strip()
         conversation_details = serializer.validated_data.get("conversation_details", "").strip()
         required_words = serializer.validated_data.get("required_words", "").strip()
@@ -36,6 +37,12 @@ class ContentPreviewView(APIView):
         dialog_length = serializer.validated_data.get("dialog_length", "standard")
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
+        topic = resolve_topic_choice(
+            user=user,
+            topic=requested_topic,
+            source_language=source_language,
+            target_language=target_language,
+        )
         save_topic(
             user=user,
             topic=topic,

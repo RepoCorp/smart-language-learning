@@ -9,11 +9,13 @@ type Args = {
   topic: string;
   notes: string;
   roleText: string;
-  goalText: string;
+  goalTexts: string[];
+  currentGoalIndex: number;
   turns: ContentItemConversationResponse[];
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
-  onGoalChange: (goal: string) => void;
+  onGoalAdvance: (nextGoalIndex: number, nextGoalText: string) => void;
+  onGoalsCompleted: () => void;
 };
 
 export function useConversationGoalEvaluation({
@@ -21,11 +23,13 @@ export function useConversationGoalEvaluation({
   topic,
   notes,
   roleText,
-  goalText,
+  goalTexts,
+  currentGoalIndex,
   turns,
   sourceLanguage,
   targetLanguage,
-  onGoalChange,
+  onGoalAdvance,
+  onGoalsCompleted,
 }: Args): { goalAchievementMessage: string; evaluating: boolean; clearGoalAchievementMessage: () => void } {
   const [goalAchievementMessage, setGoalAchievementMessage] = useState<string>("");
   const [evaluating, setEvaluating] = useState<boolean>(false);
@@ -50,7 +54,8 @@ export function useConversationGoalEvaluation({
   }, [turns.length]);
 
   useEffect(() => {
-    if (!enabled || !goalText.trim() || turns.length === 0) {
+    const currentGoalText = goalTexts[currentGoalIndex] || "";
+    if (!enabled || !currentGoalText.trim() || turns.length === 0) {
       return;
     }
     if (turns.length <= lastEvaluatedTurnCountRef.current) {
@@ -74,7 +79,8 @@ export function useConversationGoalEvaluation({
       topic,
       notes,
       roleText,
-      goalText,
+      goalTexts,
+      currentGoalIndex,
       latestUserText,
       turns.slice(0, latestTurnIndex).map((turn) => ({
         user_text: turn.user_text,
@@ -87,10 +93,13 @@ export function useConversationGoalEvaluation({
         return;
       }
       const achievementMessage = (response.goal_achievement_message || "").trim();
-      const nextGoalSuggestion = (response.next_goal_suggestion || "").trim();
       setGoalAchievementMessage(achievementMessage);
-      if (response.goal_achieved && nextGoalSuggestion) {
-        onGoalChange(nextGoalSuggestion);
+      if (response.goal_achieved && response.all_goals_completed) {
+        onGoalsCompleted();
+        return;
+      }
+      if (response.goal_achieved) {
+        onGoalAdvance(response.next_goal_index ?? currentGoalIndex + 1, (response.current_goal_text || "").trim());
       }
     }).catch(() => {
       if (requestIdRef.current !== requestId) {
@@ -104,9 +113,11 @@ export function useConversationGoalEvaluation({
     });
   }, [
     enabled,
-    goalText,
+    currentGoalIndex,
+    goalTexts,
     notes,
-    onGoalChange,
+    onGoalAdvance,
+    onGoalsCompleted,
     roleText,
     sourceLanguage,
     targetLanguage,

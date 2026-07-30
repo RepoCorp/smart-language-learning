@@ -4,15 +4,47 @@ import { confirmContent, fetchContentItemDetail, fetchContentTopicContexts, fetc
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentPreviewResponse, SessionItem } from "../types";
-import DialogActionIcon from "./DialogActionIcon";
-import DialogTurnsList from "./DialogTurnsList";
 import NewItem from "./NewItem";
-import TargetPhraseText from "./TargetPhraseText";
+import ContentCreateFormCard from "./contentCreate/ContentCreateFormCard";
+import ContentPreviewCard from "./contentCreate/ContentPreviewCard";
+import SavedDialogCard from "./contentCreate/SavedDialogCard";
 
 const CREATE_NEW_OPTION = "__create_new__";
+const RANDOM_TOPIC_OPTION = "__random_topic__";
 type DialogLength = "standard" | "short_three";
 type RequiredWordsLanguage = "source" | "target";
 type PhraseActionStatus = "idle" | "saving" | "added" | "exists" | "error";
+
+function buildSessionItemFromDetail(
+  detail: Awaited<ReturnType<typeof fetchContentItemDetail>>,
+  fallbackWordType = "",
+): SessionItem {
+  return {
+    id: detail.id,
+    item_type: detail.item_type,
+    spanish_text: detail.spanish_text,
+    german_text: detail.german_text,
+    example_sentence: detail.example_sentence || "",
+    notes: detail.notes || "",
+    word_type: detail.word_type || fallbackWordType,
+    plural_german: detail.plural_german || "",
+    audio_url: detail.audio_url || "",
+    exercise_phrases: detail.exercise_phrases || {},
+    mode: "new",
+    direction: null,
+    options: [],
+    dialog_phrase_answer: detail.dialog_phrase_answer || "",
+    dialog_phrase_scene: detail.dialog_phrase_scene || "",
+    dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+    dialog_phrase_options: detail.dialog_phrase_options || [],
+    dialog_phrase_turns: detail.dialog_phrase_turns || [],
+    dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
+    related_dialogs: detail.related_dialogs || [],
+    compare_words: detail.compare_words || [],
+    compare_words_insights: detail.compare_words_insights || "",
+    item_questions: detail.item_questions || [],
+  };
+}
 
 export default function ContentCreatePage(): JSX.Element {
   const { t } = useI18n();
@@ -63,7 +95,7 @@ export default function ContentCreatePage(): JSX.Element {
           return;
         }
         setPreviousTopics(response.topics || []);
-        setSelectedTopic("");
+        setSelectedTopic(RANDOM_TOPIC_OPTION);
         setCustomTopic("");
         setPreviousContexts([]);
         setSelectedContext("");
@@ -85,7 +117,7 @@ export default function ContentCreatePage(): JSX.Element {
       } catch {
         if (active) {
           setPreviousTopics([]);
-          setSelectedTopic("");
+          setSelectedTopic(RANDOM_TOPIC_OPTION);
           setCustomTopic("");
           setPreviousContexts([]);
           setSelectedContext("");
@@ -118,8 +150,10 @@ export default function ContentCreatePage(): JSX.Element {
     let active = true;
 
     const loadContexts = async (): Promise<void> => {
-      if (!selectedTopic.trim() || selectedTopic === CREATE_NEW_OPTION) {
+      if (!selectedTopic.trim() || selectedTopic === CREATE_NEW_OPTION || selectedTopic === RANDOM_TOPIC_OPTION) {
         setPreviousContexts([]);
+        setSelectedContext("");
+        setCustomContext("");
         return;
       }
       try {
@@ -145,16 +179,10 @@ export default function ContentCreatePage(): JSX.Element {
     };
   }, [selectedTopic, sourceLanguage, targetLanguage]);
 
-  const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
-  const shouldCreateNewContext = selectedContext === CREATE_NEW_OPTION;
-
-  const resolvedTopic = (shouldCreateNewTopic ? customTopic : selectedTopic).trim();
-  const resolvedContext = (shouldCreateNewContext ? customContext : selectedContext).trim();
+  const resolvedTopic = (selectedTopic === CREATE_NEW_OPTION ? customTopic : selectedTopic).trim();
+  const resolvedContext = (selectedContext === CREATE_NEW_OPTION ? customContext : selectedContext).trim();
 
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
-  const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
-  const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
-    speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
 
   const onGeneratePreview = async (): Promise<void> => {
     setError("");
@@ -296,31 +324,7 @@ export default function ContentCreatePage(): JSX.Element {
         setLoadingLinkedWord(true);
         try {
           const detail = await fetchContentItemDetail(check.id, sourceLanguage, targetLanguage);
-          setOpenedLinkedWord({
-            id: detail.id,
-            item_type: detail.item_type,
-            spanish_text: detail.spanish_text,
-            german_text: detail.german_text,
-            example_sentence: detail.example_sentence || "",
-            notes: detail.notes || "",
-            word_type: detail.word_type || check.word_type || "",
-            plural_german: detail.plural_german || "",
-            audio_url: detail.audio_url || "",
-            exercise_phrases: detail.exercise_phrases || {},
-            mode: "new",
-            direction: null,
-            options: [],
-            dialog_phrase_answer: detail.dialog_phrase_answer || "",
-            dialog_phrase_scene: detail.dialog_phrase_scene || "",
-            dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
-            dialog_phrase_options: detail.dialog_phrase_options || [],
-            dialog_phrase_turns: detail.dialog_phrase_turns || [],
-            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
-            related_dialogs: detail.related_dialogs || [],
-            compare_words: detail.compare_words || [],
-            compare_words_insights: detail.compare_words_insights || "",
-            item_questions: detail.item_questions || [],
-          });
+          setOpenedLinkedWord(buildSessionItemFromDetail(detail, check.word_type || ""));
           setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
         } finally {
           setLoadingLinkedWord(false);
@@ -385,31 +389,7 @@ export default function ContentCreatePage(): JSX.Element {
     setLoadingLinkedWord(true);
     try {
       const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
-      setOpenedLinkedWord({
-        id: detail.id,
-        item_type: detail.item_type,
-        spanish_text: detail.spanish_text,
-        german_text: detail.german_text,
-        example_sentence: detail.example_sentence || "",
-        notes: detail.notes || "",
-        word_type: detail.word_type || "",
-        plural_german: detail.plural_german || "",
-        audio_url: detail.audio_url || "",
-        exercise_phrases: detail.exercise_phrases || {},
-        mode: "new",
-        direction: null,
-        options: [],
-        dialog_phrase_answer: detail.dialog_phrase_answer || "",
-        dialog_phrase_scene: detail.dialog_phrase_scene || "",
-        dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
-        dialog_phrase_options: detail.dialog_phrase_options || [],
-        dialog_phrase_turns: detail.dialog_phrase_turns || [],
-        dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
-        related_dialogs: detail.related_dialogs || [],
-        compare_words: detail.compare_words || [],
-        compare_words_insights: detail.compare_words_insights || "",
-        item_questions: detail.item_questions || [],
-      });
+      setOpenedLinkedWord(buildSessionItemFromDetail(detail));
     } finally {
       setLoadingLinkedWord(false);
     }
@@ -455,243 +435,68 @@ export default function ContentCreatePage(): JSX.Element {
       <h1>{t("content.title")}</h1>
       <p>{t("content.description")}</p>
 
-      <section className="card content-create-form">
-        <div className={`content-form-section content-topic-section${resolvedTopic ? "" : " content-topic-section-required"}`}>
-          <label htmlFor="topic-select" className="prompt content-required-label">
-            {t("content.topic.label")}
-            <span>{t("content.topic.requiredBadge")}</span>
-          </label>
-          <select
-            id="topic-select"
-            value={selectedTopic}
-            onChange={(e) => setSelectedTopic(e.target.value)}
-            disabled={loading || saving}
-            aria-invalid={!resolvedTopic}
-          >
-            <option value="">{previousTopics.length ? t("content.topic.select") : t("content.topic.none")}</option>
-            {previousTopics.map((savedTopic) => (
-              <option key={savedTopic} value={savedTopic}>
-                {savedTopic}
-              </option>
-            ))}
-            <option value={CREATE_NEW_OPTION}>{t("content.topic.createNew")}</option>
-          </select>
-          {shouldCreateNewTopic && (
-            <>
-              <label htmlFor="topic-input" className="prompt">{t("content.topic.newLabel")}</label>
-              <input
-                id="topic-input"
-                value={customTopic}
-                onChange={(e) => setCustomTopic(e.target.value)}
-                placeholder={t("content.topic.placeholder")}
-                disabled={loading || saving}
-                aria-invalid={!resolvedTopic}
-              />
-            </>
-          )}
-          {!resolvedTopic && <p className="content-required-hint">{t("content.topic.requiredHint")}</p>}
-        </div>
-        <div className="content-form-section">
-          <label htmlFor="topic-context-select" className="prompt">{t("content.context.label")}</label>
-          <select
-            id="topic-context-select"
-            value={selectedContext}
-            onChange={(e) => setSelectedContext(e.target.value)}
-            disabled={loading || saving}
-          >
-            <option value="">{t("content.context.none")}</option>
-            {previousContexts.map((savedContext) => (
-              <option key={savedContext} value={savedContext}>
-                {savedContext}
-              </option>
-            ))}
-            <option value={CREATE_NEW_OPTION}>{t("content.context.createNew")}</option>
-          </select>
-          {shouldCreateNewContext && (
-            <input
-              id="topic-context-input"
-              value={customContext}
-              onChange={(e) => setCustomContext(e.target.value)}
-              placeholder={t("content.context.placeholder")}
-              disabled={loading || saving}
-            />
-          )}
-        </div>
-        <div className="content-form-section">
-          <p className="prompt" id="dialog-length-label">{t("content.length.label")}</p>
-          <div className="content-radio-options" role="radiogroup" aria-labelledby="dialog-length-label">
-            {(["standard", "short_three"] as DialogLength[]).map((length) => (
-              <label
-                key={length}
-                className={`content-radio-option${dialogLength === length ? " content-radio-option-selected" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="dialog-length"
-                  value={length}
-                  checked={dialogLength === length}
-                  onChange={() => setDialogLength(length)}
-                  disabled={loading || saving}
-                />
-                {length === "standard" ? t("content.length.standard") : t("content.length.shortThree")}
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="content-form-section">
-          <label htmlFor="required-words-input" className="prompt">{t("content.requiredWords.label")}</label>
-          <div className="content-radio-options" role="radiogroup" aria-label={t("content.requiredWords.label")}>
-            {(["target", "source"] as RequiredWordsLanguage[]).map((language) => (
-              <label
-                key={language}
-                className={`content-radio-option${requiredWordsLanguage === language ? " content-radio-option-selected" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="required-words-language"
-                  value={language}
-                  checked={requiredWordsLanguage === language}
-                  onChange={() => setRequiredWordsLanguage(language)}
-                  disabled={loading || saving}
-                />
-                {language === "target" ? t("content.requiredWords.languageTarget") : t("content.requiredWords.languageSource")}
-              </label>
-            ))}
-          </div>
-          <input
-            id="required-words-input"
-            value={requiredWords}
-            onChange={(e) => setRequiredWords(e.target.value)}
-            placeholder={t("content.requiredWords.placeholder")}
-            disabled={loading || saving}
-          />
-          <p className="hint">{t("content.requiredWords.hint")}</p>
-        </div>
-        <div className="content-form-section">
-          <label htmlFor="conversation-details-input" className="prompt">{t("content.details.label")}</label>
-          <textarea
-            id="conversation-details-input"
-            value={conversationDetails}
-            onChange={(e) => setConversationDetails(e.target.value)}
-            placeholder={t("content.details.placeholder")}
-            disabled={loading || saving}
-            rows={4}
-          />
-          <p className="hint">{t("content.details.hint")}</p>
-        </div>
-        <div className="actions">
-          <button onClick={() => void onGeneratePreview()} disabled={loading || saving || !resolvedTopic}>
-            {loading ? t("content.generating") : t("content.generate")}
-          </button>
-        </div>
-      </section>
+      <ContentCreateFormCard
+        selectedTopic={selectedTopic}
+        customTopic={customTopic}
+        selectedContext={selectedContext}
+        customContext={customContext}
+        conversationDetails={conversationDetails}
+        requiredWords={requiredWords}
+        requiredWordsLanguage={requiredWordsLanguage}
+        dialogLength={dialogLength}
+        previousTopics={previousTopics}
+        previousContexts={previousContexts}
+        loading={loading}
+        saving={saving}
+        resolvedTopic={resolvedTopic}
+        onSelectedTopicChange={setSelectedTopic}
+        onCustomTopicChange={setCustomTopic}
+        onSelectedContextChange={setSelectedContext}
+        onCustomContextChange={setCustomContext}
+        onConversationDetailsChange={setConversationDetails}
+        onRequiredWordsChange={setRequiredWords}
+        onRequiredWordsLanguageChange={setRequiredWordsLanguage}
+        onDialogLengthChange={setDialogLength}
+        onGeneratePreview={() => {
+          void onGeneratePreview();
+        }}
+      />
 
       {error && <p className="error">{error}</p>}
       {result && <p>{result}</p>}
 
       {preview && (
-        <section className="card">
-          <h2>{t("content.preview.title")}</h2>
-          <ul className="conversation-preview-list">
-            {preview.dialog_turns.map((turn, index) => {
-              const speaker = speakerForTurn(turn.speaker, index);
-              return (
-                <li
-                  key={`${turn.source_text.toLowerCase()}|||${turn.target_text.toLowerCase()}|||${index}`}
-                  className={`conversation-turn ${speaker === "a" ? "speaker-a" : "speaker-b"}`}
-                >
-                  <p className="conversation-speaker">{speaker === "a" ? t("content.preview.personA") : t("content.preview.personB")}</p>
-                  <TargetPhraseText as="p" className="conversation-line" variant="dialog" text={turn.target_text} />
-                  <p className="conversation-line">{turn.source_text}</p>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="actions">
-            <button onClick={() => void onAcceptDialog()} disabled={saving || loading}>
-              {saving ? t("content.saving") : t("content.preview.acceptDialog")}
-            </button>
-            <button
-              onClick={() => {
-                setPreview(null);
-              }}
-              disabled={saving || loading}
-            >
-              {t("content.preview.discardDialog")}
-            </button>
-          </div>
-        </section>
+        <ContentPreviewCard
+          preview={preview}
+          saving={saving}
+          loading={loading}
+          onAccept={() => {
+            void onAcceptDialog();
+          }}
+          onDiscard={() => setPreview(null)}
+        />
       )}
 
       {savedDialogTurns.length > 0 && (
-        <section className="card">
-          <p><strong>{t("content.result.dialogTitle")}</strong></p>
-          <p className="hint">{t("content.result.dialogWordHint")}</p>
-          {!!savedDialogTurns.some((turn) => turn.phrase_audio_url) && (
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={() => void playSavedDialogTurns()} disabled={playingSavedDialog}>
-                {playingSavedDialog ? t("dialogs.nowPlaying") : t("dialogs.playDialog")}
-              </button>
-            </div>
-          )}
-          {savedDialogTurns.length > 0 && (
-            <DialogTurnsList
-              dialogId={savedDialogId || -1}
-              turns={savedDialogTurns}
-              sourceLanguage={sourceLanguage}
-              targetLanguage={targetLanguage}
-              tokenStatus={wordActionStatus}
-              statusKeyPrefixBase="saved"
-              onOpenItem={openPhraseItem}
-              onTokenClick={(statusKey, token, turnIndex, sourceText, targetText) => void requestAddWordFromDialogToken(
-                statusKey,
-                token,
-                turnIndex,
-                sourceText,
-                targetText,
-              )}
-              renderLeadingAction={(turn) => turn.phrase_audio_url ? (
-                <button
-                  type="button"
-                  className="secondary-button exercise-action-icon-button dialog-inline-action-button"
-                  onClick={() => playAudioUrl(turn.phrase_audio_url)}
-                  aria-label={t("newItem.playTurnAudio")}
-                  title={t("newItem.playTurnAudio")}
-                >
-                  <DialogActionIcon name="play" />
-                </button>
-              ) : null}
-              renderTurnActions={(turn, index) => {
-                const phraseKey = wholeTurnPhraseKey(index);
-                return (
-                  <>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => void addWholeTurnPhraseFromDialog(turn, index)}
-                      disabled={!savedDialogId || phraseActionStatus[phraseKey] === "saving"}
-                    >
-                      {phraseActionStatus[phraseKey] === "saving"
-                        ? t("newItem.sentenceAddSaving")
-                        : t("content.preview.savePhrase")}
-                    </button>
-                    {phraseActionStatus[phraseKey] === "added" && (
-                      <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
-                    )}
-                    {phraseActionStatus[phraseKey] === "exists" && (
-                      <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
-                    )}
-                    {phraseActionStatus[phraseKey] === "error" && (
-                      <span className="turn-token-status">
-                        {phraseActionError[phraseKey] || t("newItem.sentenceAddError")}
-                      </span>
-                    )}
-                  </>
-                );
-              }}
-            />
-          )}
-        </section>
+        <SavedDialogCard
+          savedDialogId={savedDialogId}
+          savedDialogTurns={savedDialogTurns}
+          sourceLanguage={sourceLanguage}
+          targetLanguage={targetLanguage}
+          playingSavedDialog={playingSavedDialog}
+          wordActionStatus={wordActionStatus}
+          phraseActionStatus={phraseActionStatus}
+          phraseActionError={phraseActionError}
+          onPlaySavedDialog={() => {
+            void playSavedDialogTurns();
+          }}
+          onPlayTurnAudio={playAudioUrl}
+          onOpenItem={openPhraseItem}
+          onTokenClick={(statusKey, token, turnIndex, sourceText, targetText) => {
+            void requestAddWordFromDialogToken(statusKey, token, turnIndex, sourceText, targetText);
+          }}
+          onSavePhrase={addWholeTurnPhraseFromDialog}
+        />
       )}
 
       {pendingWordAdd && (

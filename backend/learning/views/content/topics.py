@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from ...auth import apply_user_scope, get_request_user
 from ...models import SavedTopic, SavedTopicContext
+from .topic_pool import RANDOM_TOPIC_OPTION
 
 DEFAULT_TOPICS_PAGE_SIZE = 25
 MAX_TOPICS_PAGE_SIZE = 100
@@ -105,7 +106,7 @@ class ContentTopicContextsView(APIView):
         topic = " ".join((request.query_params.get("topic", "") or "").split()).strip()
         source_language = (request.query_params.get("source_language", "spanish") or "spanish").strip().lower()
         target_language = (request.query_params.get("target_language", "german") or "german").strip().lower()
-        if not topic:
+        if not topic or topic == RANDOM_TOPIC_OPTION:
             return Response({"contexts": []})
 
         contexts = list(

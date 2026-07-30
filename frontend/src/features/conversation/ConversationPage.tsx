@@ -18,10 +18,18 @@ import { useStudyLanguages } from "../../studyLanguages";
 import type { ContentDialogRecord, ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
+import {
+  getInitialConversationResponseLevel,
+  getInitialConversationSpeechSpeed,
+  setStoredConversationResponseLevel,
+  setStoredConversationSpeechSpeed,
+} from "./conversationPreferences";
+import ConversationSetupCard from "./ConversationSetupCard";
 import ConversationReviewSection from "./ConversationReviewSection";
 import { CONVERSATION_SEND_ENABLE_DELAY_SECONDS } from "./conversationConstants";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
 import { buildFinishedConversationTranscript, buildGeneratedReviewOriginalUserTexts } from "./conversationReviewTranscript";
+import { CREATE_NEW_OPTION, RANDOM_TOPIC_OPTION } from "./conversationSetupOptions";
 import ConversationTurns from "./ConversationTurns";
 import { useConversationGoalEvaluation } from "./useConversationGoalEvaluation";
 import { useConversationReviewPreparation } from "./useConversationReviewPreparation";
@@ -34,7 +42,6 @@ import {
   useConversationTransport,
 } from "./useConversationTransport";
 
-const CREATE_NEW_OPTION = "__create_new__";
 const CONVERSATION_ASSISTANT_HINT_LIMIT = 3;
 
 interface ConversationTurn extends ContentItemConversationResponse {}
@@ -51,21 +58,24 @@ export default function ConversationPage(): JSX.Element {
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
 
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<string>("");
+  const [selectedTopic, setSelectedTopic] = useState<string>(RANDOM_TOPIC_OPTION);
   const [customTopic, setCustomTopic] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [goalDifficulty, setGoalDifficulty] = useState<GoalDifficulty>("medium");
   const [selectedConversationMode, setSelectedConversationMode] = useState<ConversationTransport>("realtime");
-  const [speechSpeed, setSpeechSpeed] = useState<ConversationSpeechSpeed>("normal");
-  const [responseLevel, setResponseLevel] = useState<ConversationResponseLevel>("A2");
+  const [speechSpeed, setSpeechSpeed] = useState<ConversationSpeechSpeed>(getInitialConversationSpeechSpeed);
+  const [responseLevel, setResponseLevel] = useState<ConversationResponseLevel>(getInitialConversationResponseLevel);
   const [loadingTopics, setLoadingTopics] = useState<boolean>(false);
 
   const [started, setStarted] = useState<boolean>(false);
   const [activeTopic, setActiveTopic] = useState<string>("");
+  const [activeTopicWasRandom, setActiveTopicWasRandom] = useState<boolean>(false);
   const [activeNotes, setActiveNotes] = useState<string>("");
   const [activeRole, setActiveRole] = useState<string>("");
   const [activeGoalDifficulty, setActiveGoalDifficulty] = useState<GoalDifficulty>("medium");
+  const [conversationGoals, setConversationGoals] = useState<string[]>([]);
+  const [currentGoalIndex, setCurrentGoalIndex] = useState<number>(0);
   const [conversationGoal, setConversationGoal] = useState<string>("");
   const [openingText, setOpeningText] = useState<string>("");
   const [openingAudioUrl, setOpeningAudioUrl] = useState<string>("");
@@ -149,11 +159,18 @@ export default function ConversationPage(): JSX.Element {
     topic: activeTopic,
     notes: activeNotes,
     roleText: activeRole,
-    goalText: conversationGoal,
+    goalTexts: conversationGoals,
+    currentGoalIndex,
     turns: conversationTurns,
     sourceLanguage,
     targetLanguage,
-    onGoalChange: setConversationGoal,
+    onGoalAdvance: (nextGoalIndex, nextGoalText) => {
+      setCurrentGoalIndex(nextGoalIndex);
+      setConversationGoal(nextGoalText);
+    },
+    onGoalsCompleted: () => {
+      finishConversation();
+    },
   });
 
   useEffect(() => {
@@ -166,9 +183,13 @@ export default function ConversationPage(): JSX.Element {
           return;
         }
         setPreviousTopics(response.topics || []);
+        setSelectedTopic(RANDOM_TOPIC_OPTION);
+        setCustomTopic("");
       } catch {
         if (active) {
           setPreviousTopics([]);
+          setSelectedTopic(RANDOM_TOPIC_OPTION);
+          setCustomTopic("");
         }
       } finally {
         if (active) {
@@ -189,6 +210,16 @@ export default function ConversationPage(): JSX.Element {
     if (nextVisible) {
       window.setTimeout(scrollConversationToBottom, 0);
     }
+  };
+
+  const updateSpeechSpeed = (speed: ConversationSpeechSpeed): void => {
+    setSpeechSpeed(speed);
+    setStoredConversationSpeechSpeed(speed);
+  };
+
+  const updateResponseLevel = (level: ConversationResponseLevel): void => {
+    setResponseLevel(level);
+    setStoredConversationResponseLevel(level);
   };
 
   const toggleUserTurnTranslation = async (index: number): Promise<void> => {
@@ -492,19 +523,41 @@ export default function ConversationPage(): JSX.Element {
     setHelpOpen(false);
   };
 
+  const finishConversation = (): void => {
+    stopRecording(false);
+    closeRealtimeSession();
+    setConversationError("");
+    setConversationPendingAssistantText("");
+    setConversationPendingUserTurn(false);
+    setAssistantSpeaking(false);
+    hideAssistantTurnHelper();
+    setConversationFinished(true);
+    setConversationEnded(false);
+    setConversationReviewDialog(null);
+    clearGoalAchievementMessage();
+  };
+
   const applyConversationStartState = (
     payload: Awaited<ReturnType<typeof startTopicConversation>>,
     fallbackTopic: string,
     fallbackNotes: string,
     fallbackRole: string,
     fallbackGoalDifficulty: GoalDifficulty,
+    fallbackTopicWasRandom: boolean,
   ): void => {
     setStarted(true);
     setActiveTopic(payload.topic || fallbackTopic);
+    setActiveTopicWasRandom(fallbackTopicWasRandom);
     setActiveNotes(payload.notes || fallbackNotes);
     setActiveRole(payload.role_text || fallbackRole);
     setActiveGoalDifficulty(payload.goal_difficulty || fallbackGoalDifficulty);
-    setConversationGoal(payload.goal_text || "");
+    const nextGoals = Array.isArray(payload.goals)
+      ? payload.goals.map((goal) => String(goal || "").trim()).filter(Boolean)
+      : [];
+    const normalizedGoals = nextGoals.length ? nextGoals : [payload.goal_text || ""].filter(Boolean);
+    setConversationGoals(normalizedGoals);
+    setCurrentGoalIndex(0);
+    setConversationGoal(normalizedGoals[0] || "");
     setOpeningText(payload.opening_text || "");
     setOpeningAudioUrl(payload.opening_audio_url || "");
     setOpeningTranslation(payload.opening_translation_text || "");
@@ -606,6 +659,7 @@ export default function ConversationPage(): JSX.Element {
           trimmedNotes,
           trimmedRole,
           goalDifficulty,
+          selectedTopic === RANDOM_TOPIC_OPTION,
         );
         logRealtime("start-finished", {
           elapsedMs: Math.round(performance.now() - startStartedAt),
@@ -621,6 +675,7 @@ export default function ConversationPage(): JSX.Element {
         trimmedNotes,
         trimmedRole,
         goalDifficulty,
+        selectedTopic === RANDOM_TOPIC_OPTION,
       );
       logRealtime("start-timing-summary", {
         totalElapsedMs: Math.round(performance.now() - startStartedAt),
@@ -657,6 +712,10 @@ export default function ConversationPage(): JSX.Element {
     setHelpOpen(false);
     setHelpHistory([]);
     setStarted(false);
+    setActiveTopicWasRandom(false);
+    setConversationGoals([]);
+    setCurrentGoalIndex(0);
+    setConversationGoal("");
     setConversationTurns([]);
     setConversationTranslationVisible({});
     setConversationCorrectionVisible({});
@@ -699,17 +758,7 @@ export default function ConversationPage(): JSX.Element {
     if (typeof window !== "undefined" && !window.confirm(t("conversation.endConfirm"))) {
       return;
     }
-    stopRecording(false);
-    closeRealtimeSession();
-    setConversationError("");
-    setConversationPendingAssistantText("");
-    setConversationPendingUserTurn(false);
-    setAssistantSpeaking(false);
-    hideAssistantTurnHelper();
-    setConversationFinished(true);
-    setConversationEnded(false);
-    setConversationReviewDialog(null);
-    clearGoalAchievementMessage();
+    finishConversation();
   };
 
   const requestAddWordFromTurnToken = async (
@@ -963,130 +1012,28 @@ export default function ConversationPage(): JSX.Element {
       <p>{t("conversation.description")}</p>
 
       <section className="card">
-        <div className="content-form-section">
-          <label htmlFor="conversation-topic-select" className="prompt">{t("content.topic.label")}</label>
-          {!resolvedTopic && <p className="content-required-hint">{t("content.topic.requiredHint")}</p>}
-          <select
-            id="conversation-topic-select"
-            value={selectedTopic}
-            onChange={(event) => setSelectedTopic(event.target.value)}
-            disabled={loadingTopics || conversationLoading || started}
-          >
-            <option value="">{previousTopics.length ? t("content.topic.select") : t("content.topic.none")}</option>
-            {previousTopics.map((savedTopic) => (
-              <option key={savedTopic} value={savedTopic}>{savedTopic}</option>
-            ))}
-            <option value={CREATE_NEW_OPTION}>{t("content.topic.createNew")}</option>
-          </select>
-          {shouldCreateNewTopic && (
-            <>
-              <label htmlFor="conversation-topic-input" className="prompt">{t("content.topic.newLabel")}</label>
-              <input
-                id="conversation-topic-input"
-                value={customTopic}
-                onChange={(event) => setCustomTopic(event.target.value)}
-                placeholder={t("content.topic.placeholder")}
-                disabled={conversationLoading || started}
-              />
-            </>
-          )}
-          <div className="conversation-notes-wrap">
-            <label htmlFor="conversation-notes" className="prompt">{t("conversation.notesLabel")}</label>
-            <textarea
-              id="conversation-notes"
-              className="conversation-notes-input"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder={t("conversation.notesPlaceholder")}
-              rows={4}
-              disabled={conversationLoading || started}
-            />
-          </div>
-          <div className="conversation-notes-wrap">
-            <label htmlFor="conversation-role" className="prompt">{t("conversation.roleLabel")}</label>
-            <input
-              id="conversation-role"
-              type="text"
-              className="conversation-role-input"
-              value={role}
-              onChange={(event) => setRole(event.target.value)}
-              placeholder={t("conversation.rolePlaceholder")}
-              maxLength={240}
-              disabled={conversationLoading || started}
-            />
-          </div>
-          <div className="conversation-notes-wrap">
-            <label className="prompt conversation-goal-difficulty-label">{t("conversation.goalDifficultyLabel")}</label>
-            <div className="exercise-audio-mode">
-              <label className={`exercise-radio-option ${goalDifficulty === "easy" ? "exercise-radio-option-selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="goal-difficulty"
-                  checked={goalDifficulty === "easy"}
-                  onChange={() => setGoalDifficulty("easy")}
-                  disabled={conversationLoading || started}
-                />
-                <span>{t("conversation.goalDifficultyEasy")}</span>
-              </label>
-              <label className={`exercise-radio-option ${goalDifficulty === "medium" ? "exercise-radio-option-selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="goal-difficulty"
-                  checked={goalDifficulty === "medium"}
-                  onChange={() => setGoalDifficulty("medium")}
-                  disabled={conversationLoading || started}
-                />
-                <span>{t("conversation.goalDifficultyMedium")}</span>
-              </label>
-              <label className={`exercise-radio-option ${goalDifficulty === "hard" ? "exercise-radio-option-selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="goal-difficulty"
-                  checked={goalDifficulty === "hard"}
-                  onChange={() => setGoalDifficulty("hard")}
-                  disabled={conversationLoading || started}
-                />
-                <span>{t("conversation.goalDifficultyHard")}</span>
-              </label>
-            </div>
-          </div>
-          <div className="conversation-notes-wrap">
-            <label className="prompt conversation-goal-difficulty-label">{t("conversation.modeLabel")}</label>
-            <div className="exercise-audio-mode">
-              <label className={`exercise-radio-option ${selectedConversationMode === "realtime" ? "exercise-radio-option-selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="conversation-mode"
-                  checked={selectedConversationMode === "realtime"}
-                  onChange={() => setSelectedConversationMode("realtime")}
-                  disabled={conversationLoading || started}
-                />
-                <span>{t("conversation.modeLive")}</span>
-              </label>
-              <label className={`exercise-radio-option ${selectedConversationMode === "http" ? "exercise-radio-option-selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="conversation-mode"
-                  checked={selectedConversationMode === "http"}
-                  onChange={() => setSelectedConversationMode("http")}
-                  disabled={conversationLoading || started}
-                />
-                <span>{t("conversation.modeNaturalVoices")}</span>
-              </label>
-            </div>
-          </div>
-          {!started && (
-            <div className="actions">
-              <button
-                type="button"
-                onClick={() => void startConversation()}
-                disabled={conversationLoading || loadingTopics || !resolvedTopic}
-              >
-                {conversationLoading ? t("conversation.starting") : t("conversation.start")}
-              </button>
-            </div>
-          )}
-        </div>
+        <ConversationSetupCard
+          previousTopics={previousTopics}
+          selectedTopic={selectedTopic}
+          customTopic={customTopic}
+          notes={notes}
+          role={role}
+          goalDifficulty={goalDifficulty}
+          selectedConversationMode={selectedConversationMode}
+          loadingTopics={loadingTopics}
+          conversationLoading={conversationLoading}
+          started={started}
+          resolvedTopic={resolvedTopic}
+          onSelectedTopicChange={setSelectedTopic}
+          onCustomTopicChange={setCustomTopic}
+          onNotesChange={setNotes}
+          onRoleChange={setRole}
+          onGoalDifficultyChange={setGoalDifficulty}
+          onConversationModeChange={setSelectedConversationMode}
+          onStart={() => {
+            void startConversation();
+          }}
+        />
 
         {started && !conversationFinished && (
           <>
@@ -1111,8 +1058,8 @@ export default function ConversationPage(): JSX.Element {
                 onEndConversation: endConversation,
                 onOpenHelp: openHelpModal,
                 onPause: () => setPaused(true),
-                onResponseLevelChange: setResponseLevel,
-                onSpeechSpeedChange: setSpeechSpeed,
+                onResponseLevelChange: updateResponseLevel,
+                onSpeechSpeedChange: updateSpeechSpeed,
                 onStartRecording: startConversationRecording,
                 onStopRecording: () => stopRecording(true),
               }}
@@ -1132,6 +1079,10 @@ export default function ConversationPage(): JSX.Element {
                   pendingAssistantText: conversationPendingAssistantText,
                 }}
                 visibility={{
+                  topic: activeTopic,
+                  topicWasRandom: activeTopicWasRandom,
+                  goals: conversationGoals,
+                  currentGoalIndex,
                   assistantHintsRemaining: Math.max(0, CONVERSATION_ASSISTANT_HINT_LIMIT - assistantHintsUsed),
                   assistantRevealUsed: assistantRevealUsedByTurn,
                   assistantSpeaking,
@@ -1154,7 +1105,6 @@ export default function ConversationPage(): JSX.Element {
                 }}
                 conversationTurns={conversationTurns}
                 goalAchievementMessage={goalAchievementMessage}
-                currentGoal={conversationGoal}
               />
               {conversationError && <p className="error">{conversationError}</p>}
             </ConversationActiveControls>

@@ -22,6 +22,10 @@ type DisplayState = {
 };
 
 type VisibilityState = {
+  topic: string;
+  topicWasRandom: boolean;
+  goals: string[];
+  currentGoalIndex: number;
   assistantHintsRemaining: number;
   assistantRevealUsed: Record<number, boolean>;
   assistantSpeaking: boolean;
@@ -57,7 +61,6 @@ type Props = {
   actions: TurnActions;
   conversationTurns: ConversationTurn[];
   goalAchievementMessage: string;
-  currentGoal: string;
 };
 
 export default function ConversationTurns({
@@ -68,12 +71,20 @@ export default function ConversationTurns({
   actions,
   conversationTurns,
   goalAchievementMessage,
-  currentGoal,
 }: Props): JSX.Element {
   const { t } = useI18n();
 
   return (
     <div ref={historyRef} className="item-questions-history item-chat-thread item-conversation-history">
+      {visibility.topic && (
+        <div className="conversation-topic-banner">
+          {visibility.topicWasRandom && (
+            <p className="conversation-topic-banner-kicker">{t("content.topic.random")}</p>
+          )}
+          <p className="conversation-topic-banner-title">{visibility.topic}</p>
+        </div>
+      )}
+
       {opening.text && (
         <div className="item-chat-entry item-chat-message item-chat-assistant">
           <p className="item-chat-bubble" />
@@ -157,14 +168,28 @@ export default function ConversationTurns({
           </div>
         </div>
       )}
-      {currentGoal && (
+      {visibility.goals.length > 0 && (
         <div className="conversation-goal-success conversation-goal-current">
           {goalAchievementMessage && (
             <p className="conversation-goal-success-message">{goalAchievementMessage}</p>
           )}
           <p className="conversation-goal-success-next">
-            <strong>{t("conversation.goalLabel")}</strong> {currentGoal}
+            <strong>{t("conversation.goalLabel")}</strong> {Math.min(visibility.currentGoalIndex + 1, visibility.goals.length)}/{visibility.goals.length}
           </p>
+          <ol className="conversation-goal-list">
+            {visibility.goals.map((goal, index) => {
+              const completed = index < visibility.currentGoalIndex;
+              const current = index === visibility.currentGoalIndex;
+              return (
+                <li
+                  key={`${goal}-${index}`}
+                  className={`conversation-goal-list-item${completed ? " conversation-goal-list-item-completed" : ""}${current ? " conversation-goal-list-item-current" : ""}`}
+                >
+                  {goal}
+                </li>
+              );
+            })}
+          </ol>
         </div>
       )}
     </div>

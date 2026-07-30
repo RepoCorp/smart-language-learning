@@ -25,6 +25,7 @@ export function useConversationScroll({
   conversationLoading,
   conversationRecording,
 }: UseConversationScrollParams): UseConversationScrollResult {
+  const STICKY_CONTROLS_CLEARANCE_PX = 132;
   const historyRef = useRef<HTMLDivElement | null>(null);
   const helpModalRef = useRef<HTMLDivElement | null>(null);
   const previousStartedRef = useRef<boolean>(started);
@@ -36,6 +37,14 @@ export function useConversationScroll({
     }
     window.requestAnimationFrame(() => {
       historyElement.scrollTo({ top: historyElement.scrollHeight, behavior: "smooth" });
+      window.requestAnimationFrame(() => {
+        const historyRect = historyElement.getBoundingClientRect();
+        const visibleBottom = window.innerHeight - STICKY_CONTROLS_CLEARANCE_PX;
+        const overflow = historyRect.bottom - visibleBottom;
+        if (overflow > 0) {
+          window.scrollBy({ top: overflow, behavior: "smooth" });
+        }
+      });
     });
   };
 
@@ -51,11 +60,7 @@ export function useConversationScroll({
   }, [helpOpen, helpHistoryCount, helpLoading]);
 
   useEffect(() => {
-    const historyElement = historyRef.current;
-    if (!historyElement) {
-      return;
-    }
-    historyElement.scrollTo({ top: historyElement.scrollHeight, behavior: "smooth" });
+    scrollConversationToBottom();
   }, [conversationTurnsCount, conversationLoading, conversationRecording]);
 
   useEffect(() => {
@@ -67,7 +72,6 @@ export function useConversationScroll({
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
         scrollConversationToBottom();
       });
     });

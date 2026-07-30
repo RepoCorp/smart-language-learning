@@ -13,13 +13,17 @@ import {
   submitReview,
 } from "../api";
 import { generateContentItemExercises, generateContentItemNounExerciseCase } from "../apiNounExercises";
-import { selectBestSpeechSynthesisVoice } from "../browserSpeech";
 import { deterministicIndex, deterministicTake } from "../deterministic";
+import {
+  BROWSER_EXERCISE_PHRASE_PAUSE_MS,
+  pauseBrowserExercisePhrases,
+  playBrowserExerciseWord,
+  speakBrowserExerciseLinesOnce,
+} from "../exerciseBrowserSpeech";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import {
   STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE,
-  STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE,
 } from "../studyLanguageMetadata";
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
@@ -68,7 +72,6 @@ interface NewItemProps {
 }
 
 const MAX_EXERCISE_ENTRIES = 30;
-const EXERCISE_PHRASE_PAUSE_MS = 250;
 
 function ItemActionIcon({ name }: {
   name: "selectAll" | "clearAll" | "random" | "image" | "openImage" | "refresh";
@@ -1472,10 +1475,9 @@ export default function NewItem({
   };
 
   const pauseBetweenExercisePhrases = async (runId: number): Promise<void> => {
-    if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
-      return;
-    }
-    await new Promise<void>((resolve) => window.setTimeout(resolve, EXERCISE_PHRASE_PAUSE_MS));
+    await pauseBrowserExercisePhrases(runId, () => (
+      exerciseRunRef.current === runId && exerciseRunningRef.current
+    ));
   };
 
   const playAudioSourcesOnce = async (sources: string[], runId: number): Promise<void> => {
@@ -1485,7 +1487,7 @@ export default function NewItem({
         continue;
       }
       if (exerciseMutedRef.current) {
-        await new Promise<void>((resolve) => window.setTimeout(resolve, EXERCISE_PHRASE_PAUSE_MS));
+        await new Promise<void>((resolve) => window.setTimeout(resolve, BROWSER_EXERCISE_PHRASE_PAUSE_MS));
         continue;
       }
       await new Promise<void>((resolve) => {
@@ -1501,78 +1503,23 @@ export default function NewItem({
   };
 
   const playFunnyImageWordAudio = (): void => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !targetText.trim()) {
+    if (!targetText.trim()) {
       return;
     }
     if (exerciseRunningRef.current) {
       stopExercise(false);
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(targetText);
-    const lang = STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE";
-    const langPrefix = lang.split("-")[0];
-    utterance.lang = lang;
-    utterance.rate = 0.95;
-
-    const matchingVoices = window.speechSynthesis
-      .getVoices()
-      .filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
-    const selectedVoice = selectBestSpeechSynthesisVoice(matchingVoices, lang, preferredBrowserVoiceURI);
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
-    window.speechSynthesis.speak(utterance);
+    playBrowserExerciseWord(targetText, targetLanguage, preferredBrowserVoiceURI);
   };
 
   const speakLinesOnce = async (lines: string[], runId: number): Promise<void> => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      return;
-    }
-    window.speechSynthesis.cancel();
-    if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
-      return;
-    }
-    if (exerciseMutedRef.current) {
-      await new Promise<void>((resolve) => window.setTimeout(resolve, EXERCISE_PHRASE_PAUSE_MS));
-      return;
-    }
-    const combinedLine = lines
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .join(". ");
-    if (!combinedLine) {
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(combinedLine);
-      let settled = false;
-      let muteCheck: number | null = null;
-      const finish = (): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        if (muteCheck !== null) {
-          window.clearInterval(muteCheck);
-        }
-        resolve();
-      };
-      muteCheck = window.setInterval(() => {
-        if (exerciseRunRef.current !== runId || !exerciseRunningRef.current || exerciseMutedRef.current) {
-          window.speechSynthesis.cancel();
-          finish();
-        }
-      }, 50);
-      const lang = STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE[targetLanguage] || "de-DE";
-      utterance.lang = lang;
-      utterance.rate = 0.85;
-      const selectedVoice = selectBestSpeechSynthesisVoice(window.speechSynthesis.getVoices(), lang, preferredBrowserVoiceURI);
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-      utterance.onend = finish;
-      utterance.onerror = finish;
-      window.speechSynthesis.speak(utterance);
+    await speakBrowserExerciseLinesOnce({
+      lines,
+      runId,
+      isRunning: () => exerciseRunRef.current === runId && exerciseRunningRef.current,
+      isMuted: () => exerciseMutedRef.current,
+      targetLanguage,
+      preferredBrowserVoiceURI,
     });
   };
 
@@ -1610,9 +1557,7 @@ export default function NewItem({
         if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
           return;
         }
-        if (!usesBrowserSpeechLoop) {
-          await pauseBetweenExercisePhrases(runId);
-        }
+        await pauseBetweenExercisePhrases(runId);
         if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
           return;
         }
