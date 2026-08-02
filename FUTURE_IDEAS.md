@@ -119,6 +119,7 @@ Usar servicio de autenticacion de Azure
 Add settings to deploy files, like updated roles permissions, env...
 escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
 Actualizar `aws-deploy/ecs-task-backend.json` y `aws-deploy/ecs-task-frontend.json`; ahora el script usa ARNs de task definitions porque esos archivos estan obsoletos.
+Cambiar RDS a privado y preparar acceso administrativo por bastion/Session Manager o VPN para poder inspeccionar datos sin dejar la base publica
 Que primero genere una frase y después a esa misma frase le haga las conjugaciones
 Create a script, using AWS deployment service, to create all the initial setup
 Alguna forma de preguntar conjugaciones en tests

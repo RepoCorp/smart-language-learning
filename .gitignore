@@ -6,3 +6,5 @@ backend/media/audio/*
 backend/media/exercise-images/*
 frontend/node_modules/*
 frontend/dist/
+/low-cost-deploy/backend.env
+/low-cost-deploy/deploy.env

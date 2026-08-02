@@ -124,3 +124,11 @@ A minimal, practical ECS Fargate blueprint is included in:
 
 - [aws-deploy/README.md](aws-deploy/README.md)
 - [aws-deploy/deploy-checklist.md](aws-deploy/deploy-checklist.md)
+
+## Lower-cost deployment option
+
+If this app is only being used by one person or a very small number of users, there is also a cheaper deployment path that keeps the current AWS documentation intact:
+
+- [low-cost-deploy/README.md](low-cost-deploy/README.md)
+
+That option is based on a single small VM plus Docker Compose, instead of ECS + ALB + RDS.

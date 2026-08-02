@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n";
 import DialogActionIcon from "../DialogActionIcon";
@@ -41,9 +41,15 @@ export default function SavedDialogCard({
   onSavePhrase: (turn: SavedTurn, turnIndex: number) => Promise<void>;
 }): JSX.Element {
   const { t } = useI18n();
-  const [open, setOpen] = useState<boolean>(false);
+  const [open, setOpen] = useState<boolean>(true);
 
   const wholeTurnPhraseKey = (turnIndex: number): string => `saved-${turnIndex}-whole-phrase`;
+
+  useEffect(() => {
+    if (savedDialogTurns.length > 0) {
+      setOpen(true);
+    }
+  }, [savedDialogTurns]);
 
   return (
     <section className="card content-create-card">
