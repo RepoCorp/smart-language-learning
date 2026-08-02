@@ -6,6 +6,7 @@ import { useRealtimeConversationTransport } from "./useRealtimeConversationTrans
 
 export type {
   ConversationResponseLevel,
+  ConversationPhase,
   ConversationSpeechSpeed,
   ConversationTransport,
   GoalDifficulty,

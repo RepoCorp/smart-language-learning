@@ -5,6 +5,7 @@ export type ConversationTransport = "http" | "realtime";
 export type GoalDifficulty = "easy" | "medium" | "hard";
 export type ConversationSpeechSpeed = "normal" | "slow" | "super_slow";
 export type ConversationResponseLevel = "A1" | "A2" | "B1";
+export type ConversationPhase = "active" | "closing";
 
 export type ConversationHistoryEntry = {
   user_text: string;
@@ -20,13 +21,13 @@ export type BaseConversationTransportArgs = {
   onPendingUserTurnChange: (pending: boolean) => void;
   onConversationTurn: (response: ContentItemConversationResponse) => void;
   onPendingAssistantTextChange: (text: string) => void;
-  onConversationGoalChange: (goal: string) => void;
   playAudioUrl: (audioUrl?: string) => void;
   conversationHistory: ConversationHistoryEntry[];
   activeTopic: string;
   activeNotes: string;
   activeRole: string;
   conversationGoal: string;
+  conversationPhase: ConversationPhase;
   speechSpeed: ConversationSpeechSpeed;
   responseLevel: ConversationResponseLevel;
 };
@@ -36,4 +37,5 @@ export type StartConversationTransportArgs = {
   notes: string;
   roleText: string;
   goalDifficulty: GoalDifficulty;
+  goalText: string;
 };

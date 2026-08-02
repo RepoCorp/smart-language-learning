@@ -7,6 +7,7 @@ import {
 } from "./conversationConstants";
 import type {
   BaseConversationTransportArgs,
+  ConversationPhase,
   ConversationResponseLevel,
   ConversationSpeechSpeed,
   StartConversationTransportArgs,
@@ -21,6 +22,8 @@ export function useRealtimeConversationTransport({
   onPendingUserTurnChange,
   onConversationTurn,
   onPendingAssistantTextChange,
+  conversationGoal,
+  conversationPhase,
   speechSpeed,
   responseLevel,
 }: BaseConversationTransportArgs) {
@@ -55,6 +58,13 @@ export function useRealtimeConversationTransport({
   const timedOutSubmissionRef = useRef<boolean>(false);
   const consecutiveTimeoutCountRef = useRef<number>(0);
 
+  const buildPhaseInstruction = (phase: ConversationPhase): string => {
+    if (phase === "closing") {
+      return "The learner has already achieved the conversation goal. Gently guide the conversation toward a natural ending over the next 1 or 2 turns. Be warm and brief. Do not introduce new subtopics. If appropriate, invite a simple goodbye or give a short natural goodbye.";
+    }
+    return "Keep the conversation going naturally. Unless the learner is clearly ending the conversation, do not start wrapping up, do not say goodbye, and do not steer toward closing yet.";
+  };
+
   const buildSpeedInstruction = (speed: ConversationSpeechSpeed): string => {
     if (speed === "super_slow") {
       return "Speak extremely slowly, like you are talking to a beginner who is just starting to learn the language. Keep that very slow pace for the entire response from beginning to end. Do not speed up at the end of the sentence. Use very short phrases, pause often, separate ideas clearly, and articulate each word carefully.";
@@ -75,16 +85,24 @@ export function useRealtimeConversationTransport({
     return "Use an A2 level. Use simple vocabulary and simple grammar.";
   };
 
-  const buildRealtimeInstructions = (speed: ConversationSpeechSpeed, level: ConversationResponseLevel): string => {
+  const buildRealtimeInstructions = (speed: ConversationSpeechSpeed, level: ConversationResponseLevel, phase: ConversationPhase): string => {
     const baseInstructions = baseInstructionsRef.current.trim();
+    const phaseInstruction = buildPhaseInstruction(phase);
     const speedInstruction = buildSpeedInstruction(speed);
     const levelInstruction = buildLevelInstruction(level);
-    return [baseInstructions, levelInstruction, speedInstruction].filter(Boolean).join("\n");
+    return [
+      baseInstructions,
+      conversationGoal ? `The current learner goal below replaces any earlier goal.\nCurrent learner goal: ${conversationGoal}` : "",
+      phaseInstruction,
+      levelInstruction,
+      speedInstruction,
+    ].filter(Boolean).join("\n");
   };
 
   const sendRealtimeSessionUpdate = (
     speed: ConversationSpeechSpeed,
     level: ConversationResponseLevel,
+    phase: ConversationPhase,
     transcriptionModel: string,
   ): void => {
     const dataChannel = dataChannelRef.current;
@@ -95,7 +113,7 @@ export function useRealtimeConversationTransport({
       type: "session.update",
       session: {
         type: "realtime",
-        instructions: buildRealtimeInstructions(speed, level),
+        instructions: buildRealtimeInstructions(speed, level, phase),
         output_modalities: ["audio"],
         audio: { input: { transcription: { model: transcriptionModel }, turn_detection: null } },
       },
@@ -161,8 +179,8 @@ export function useRealtimeConversationTransport({
     if (!conversationRealtimeReady) {
       return;
     }
-    sendRealtimeSessionUpdate(speechSpeed, responseLevel, "gpt-4o-mini-transcribe");
-  }, [conversationRealtimeReady, responseLevel, speechSpeed]);
+    sendRealtimeSessionUpdate(speechSpeed, responseLevel, conversationPhase, "gpt-4o-mini-transcribe");
+  }, [conversationGoal, conversationPhase, conversationRealtimeReady, responseLevel, speechSpeed]);
 
   const startRecording = async (conversationLoading: boolean): Promise<void> => {
     if (conversationRecording || conversationLoading) {
@@ -236,7 +254,7 @@ export function useRealtimeConversationTransport({
       dataChannel.send(JSON.stringify({
         type: "response.create",
         response: {
-          instructions: buildRealtimeInstructions(speechSpeed, responseLevel),
+          instructions: buildRealtimeInstructions(speechSpeed, responseLevel, conversationPhase),
         },
       }));
       if (timedOutSubmissionRef.current) {
@@ -261,6 +279,7 @@ export function useRealtimeConversationTransport({
     notes,
     roleText,
     goalDifficulty,
+    goalText,
   }: StartConversationTransportArgs): Promise<boolean> => {
     const setupStartedAt = performance.now();
     if (typeof window === "undefined" || typeof RTCPeerConnection === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -271,7 +290,16 @@ export function useRealtimeConversationTransport({
     const sessionToken = activeSessionTokenRef.current + 1;
     try {
       logRealtime("setup-started", { topic, sourceLanguage, targetLanguage, goalDifficulty });
-      const session = await createTopicConversationRealtimeSession(topic, notes, roleText, goalDifficulty, sourceLanguage, targetLanguage);
+      const session = await createTopicConversationRealtimeSession(
+        topic,
+        notes,
+        roleText,
+        goalDifficulty,
+        goalText,
+        conversationPhase,
+        sourceLanguage,
+        targetLanguage,
+      );
       const sessionRequestMs = Math.round(performance.now() - setupStartedAt);
       setupMetricsRef.current = {
         sessionRequestMs,
@@ -334,6 +362,7 @@ export function useRealtimeConversationTransport({
         sendRealtimeSessionUpdate(
           speechSpeed,
           responseLevel,
+          conversationPhase,
           session.transcription_model || "gpt-4o-mini-transcribe",
         );
         setConversationRealtimeReady(true);

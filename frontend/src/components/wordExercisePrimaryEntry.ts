@@ -14,6 +14,26 @@ export function parsePluralFromNotes(notes: string): string {
   return pluralValue.trim().replace(/[.;,\s]+$/g, "");
 }
 
+export function buildGermanPluralExerciseEntry(
+  entry?: WordExerciseSelectableEntry,
+  pluralGerman = "",
+  notes = "",
+): WordExerciseSelectableEntry | undefined {
+  if (!entry) {
+    return undefined;
+  }
+
+  const pluralTarget = String(pluralGerman || "").trim() || parsePluralFromNotes(notes);
+  if (!pluralTarget) {
+    return undefined;
+  }
+
+  return {
+    ...entry,
+    target: pluralTarget,
+  };
+}
+
 interface BuildWordExercisePrimaryEntryArgs {
   entry?: WordExerciseSelectableEntry;
   pluralGerman?: string;
@@ -46,5 +66,29 @@ export function buildWordExercisePrimaryEntry({
     onClick: () => onToggleEntry(entry),
     disabled: exerciseRunning,
     detailText: pluralText ? `Plural: ${pluralText}` : "",
+  };
+}
+
+export function buildGermanPluralPrimaryEntry({
+  entry,
+  pluralGerman = "",
+  notes = "",
+  selectedExerciseKeys,
+  exerciseRunning,
+  exerciseEntryKey,
+  onToggleEntry,
+}: BuildWordExercisePrimaryEntryArgs): WordExerciseGridPrimaryEntry | undefined {
+  const pluralEntry = buildGermanPluralExerciseEntry(entry, pluralGerman, notes);
+  if (!pluralEntry) {
+    return undefined;
+  }
+  const key = exerciseEntryKey(pluralEntry);
+
+  return {
+    entry: pluralEntry,
+    selected: selectedExerciseKeys.includes(key),
+    onClick: () => onToggleEntry(pluralEntry),
+    disabled: exerciseRunning,
+    detailText: "Plural",
   };
 }

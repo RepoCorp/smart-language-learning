@@ -18,10 +18,10 @@ from .management_topic_conversation_shared import (
     conversation_audio_enabled,
     conversation_inline_audio_enabled,
     conversation_realtime_enabled,
-    default_conversation_goals,
     validate_conversation_start_fields,
     validate_conversation_start_payload,
 )
+from .management_topic_conversation_goal_generation import generate_conversation_goal
 from .topic_pool import resolve_topic_choice
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ def build_realtime_conversation_instructions(
     topic: str,
     notes: str,
     role_text: str,
+    goal_text: str,
     source_language: str,
     target_language: str,
 ) -> str:
@@ -45,6 +46,7 @@ def build_realtime_conversation_instructions(
         f"Conversation topic: {topic}\n"
         f"The other person's role: {role_line}\n"
         f"Temporary notes: {notes_line}\n"
+        f"Learner's conversation goal: {goal_text}\n"
         f"Always reply in natural {target_name}.\n"
         "Use simple vocabulary and simple grammar.\n"
         "Prefer common everyday words.\n"
@@ -61,6 +63,22 @@ def build_realtime_conversation_instructions(
         "In that goodbye case, do not force another question and do not try to continue the conversation.\n"
         "Do not end or close the session on your own.\n"
         "If the audio is unclear or empty, briefly ask the learner to repeat it.\n"
+    )
+
+
+def build_realtime_phase_instruction(conversation_phase: str) -> str:
+    normalized_phase = str(conversation_phase).strip().lower() or "active"
+    if normalized_phase == "closing":
+        return (
+            "The learner has already achieved the conversation goal.\n"
+            "Gently guide the conversation toward a natural ending over the next 1 or 2 turns.\n"
+            "Be warm and brief.\n"
+            "Do not introduce new subtopics.\n"
+            "If appropriate, invite a simple goodbye or give a short natural goodbye.\n"
+        )
+    return (
+        "Keep the conversation going naturally.\n"
+        "Unless the learner is clearly ending the conversation, do not start wrapping up, do not say goodbye, and do not steer toward closing yet.\n"
     )
 
 
@@ -174,14 +192,32 @@ class ContentTopicConversationStartView(APIView):
         if validation_error is not None:
             return validation_error
 
-        goal_elapsed_ms = 0
-        goals = default_conversation_goals(source_language, goal_difficulty)
-        goal_text = goals[0] if goals else ""
-        selected_goal_difficulty = goal_difficulty
+        goal_started_at = time.perf_counter()
+        try:
+            goal_text, selected_goal_difficulty = generate_conversation_goal(
+                topic=topic,
+                notes=notes,
+                role_text=role_text,
+                goal_difficulty=goal_difficulty,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError as exc:
+            logger.warning(
+                "content.topic_conversation.start_failed stage=goal_generation topic=%s error=%s",
+                topic,
+                str(exc),
+            )
+            return Response(
+                {"detail": "Could not create a conversation goal. Please try again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        goal_elapsed_ms = int((time.perf_counter() - goal_started_at) * 1000)
+        goals = [goal_text]
         opening_text = ""
         opening_translation_text = ""
         logger.info(
-            "content.topic_conversation.start_stage stage=default_goal elapsed_ms=%s topic=%s goal_difficulty=%s",
+            "content.topic_conversation.start_stage stage=goal_generation elapsed_ms=%s topic=%s goal_difficulty=%s",
             goal_elapsed_ms,
             topic,
             goal_difficulty,
@@ -245,6 +281,8 @@ class ContentTopicConversationRealtimeSessionView(APIView):
     def post(self, request: Request) -> Response:
         request_started_at = time.perf_counter()
         source_language, target_language, topic, notes, role_text, goal_difficulty = validate_conversation_start_fields(request)
+        conversation_phase = str(request.data.get("conversation_phase", "active")).strip().lower() or "active"
+        goal_text = str(request.data.get("goal_text", "")).strip()
         topic = resolve_topic_choice(
             user=get_request_user(request),
             topic=topic,
@@ -282,9 +320,10 @@ class ContentTopicConversationRealtimeSessionView(APIView):
             topic=topic,
             notes=notes,
             role_text=role_text,
+            goal_text=goal_text,
             source_language=source_language,
             target_language=target_language,
-        )
+        ) + build_realtime_phase_instruction(conversation_phase)
 
         try:
             client_secret_started_at = time.perf_counter()

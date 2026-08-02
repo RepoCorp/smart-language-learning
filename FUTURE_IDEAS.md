@@ -20,17 +20,13 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
-Que el noun plural sea su propio espacio
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
-Velocidad
 No guardó las frases de practice
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?
 Quitar la selección de frase para imagen y cuando esta abierta decir solo la frase al presionar reproducir
 Algun security by obscurity, que igual deje el pin sencillo.
-In the create content window, make dialog lenght and language of required words a simple radio
 En diálogos en item view y creo que diálogos también, que no scrolls back
-"Close" conversation para que cierre de forma natural.
 
 #### PROMPTS/MODEL WORK
 En pregunta mejorar las respuestas, incluyendo quitar el que dice si esta relacionado
@@ -43,6 +39,7 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Buscar en diálogos
 Como hacer que encuentre los diálogos en las distintas formas del verbo o sustantivo
 Hacer preguntas a las estrategias
 Strategies para frases

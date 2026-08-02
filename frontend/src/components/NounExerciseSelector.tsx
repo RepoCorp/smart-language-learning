@@ -6,6 +6,7 @@ import WordExerciseGrid, {
 
 interface NounExerciseSelectorProps {
   primaryEntry?: WordExerciseGridPrimaryEntry;
+  extraPrimaryEntries?: WordExerciseGridPrimaryEntry[];
   sections: ExercisePhraseSection[];
   selectedExerciseKeys: string[];
   exerciseRunning: boolean;
@@ -36,6 +37,7 @@ function sectionExerciseEntries(section: ExercisePhraseSection): WordExerciseSel
 
 export default function NounExerciseSelector({
   primaryEntry,
+  extraPrimaryEntries,
   sections,
   selectedExerciseKeys,
   exerciseRunning,
@@ -105,6 +107,7 @@ export default function NounExerciseSelector({
       columnMinWidth="180px"
       rowHeaderWidth="22px"
       primaryEntry={primaryEntry}
+      extraPrimaryEntries={extraPrimaryEntries}
       columns={sections.map((section) => ({
         key: section.key,
         label: keysForSection(section.key).length === 0

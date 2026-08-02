@@ -41,6 +41,7 @@ from .views import (
     ContentPreviewView,
     ContentTopicConversationStartView,
     ContentTopicConversationGoalEvaluationView,
+    ContentTopicConversationGoalRegenerateView,
     ContentTopicConversationHelpView,
     ContentTopicConversationRealtimeSessionView,
     ContentTopicConversationReviewView,
@@ -124,6 +125,7 @@ urlpatterns = [
     path("content/conversation/review", ContentTopicConversationReviewView.as_view(), name="content-topic-conversation-review"),
     path("content/conversation/help", ContentTopicConversationHelpView.as_view(), name="content-topic-conversation-help"),
     path("content/conversation/goal-evaluate", ContentTopicConversationGoalEvaluationView.as_view(), name="content-topic-conversation-goal-evaluate"),
+    path("content/conversation/goal-regenerate", ContentTopicConversationGoalRegenerateView.as_view(), name="content-topic-conversation-goal-regenerate"),
     path("content/conversation/turn", ContentTopicConversationTurnView.as_view(), name="content-topic-conversation-turn"),
     path(
         "content/conversation/user-translation",

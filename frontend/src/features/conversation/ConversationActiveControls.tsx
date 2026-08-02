@@ -78,23 +78,40 @@ export default function ConversationActiveControls({
                 {t("newItem.conversationStartRecording")}
               </button>
             )}
-            {!status.conversationPaused && (
+            <div className="conversation-primary-secondary-actions">
+              {!status.conversationPaused && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={controls.onPause}
+                  disabled={status.conversationLoading || status.conversationRealtimeConnecting}
+                >
+                  {t("conversation.pause")}
+                </button>
+              )}
               <button
                 type="button"
-                className="secondary-button"
-                onClick={controls.onPause}
+                className="dangerous-action-button"
+                onClick={controls.onEndConversation}
                 disabled={status.conversationLoading || status.conversationRealtimeConnecting}
               >
-                {t("conversation.pause")}
+                {t("conversation.end")}
               </button>
-            )}
+            </div>
           </div>
           {status.conversationPaused && !status.conversationRecording && <p className="hint">{t("conversation.paused")}</p>}
           {status.conversationLoading && <p className="hint">{t("newItem.conversationProcessing")}</p>}
           {status.conversationRealtimeConnecting && <p className="hint">{t("conversation.realtimeConnecting")}</p>}
         </div>
 
-        <details className="conversation-secondary-controls">
+        <details
+          className="conversation-secondary-controls"
+          onToggle={(event) => {
+            if (event.currentTarget.open && !status.conversationPaused) {
+              controls.onPause();
+            }
+          }}
+        >
           <summary className="conversation-secondary-summary">
             <span className="conversation-secondary-summary-copy">
               <span className="conversation-secondary-summary-title">
@@ -112,14 +129,6 @@ export default function ConversationActiveControls({
               disabled={status.conversationLoading || status.conversationRealtimeConnecting || controls.helpLoading}
             >
               {t("conversation.helpOpen")}
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={controls.onEndConversation}
-              disabled={status.conversationLoading || status.conversationRealtimeConnecting}
-            >
-              {t("conversation.end")}
             </button>
           </div>
           {status.showSpeechSpeedControl && (

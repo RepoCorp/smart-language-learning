@@ -58,10 +58,27 @@ def _speech_speed_instruction(speed: str) -> str:
     return ""
 
 
-def _effective_notes(*, notes: str, response_level: str, speech_speed: str) -> str:
+def _conversation_phase_instruction(phase: str) -> str:
+    normalized_phase = str(phase).strip().lower() or "active"
+    if normalized_phase == "closing":
+        return (
+            "The learner has already achieved the conversation goal. "
+            "Gently guide the conversation toward a natural ending over the next 1 or 2 turns. "
+            "Be warm and brief. Do not introduce new subtopics. "
+            "If appropriate, invite a simple goodbye or give a short natural goodbye."
+        )
+    return (
+        "Keep the conversation going naturally. Unless the learner is clearly ending the conversation, "
+        "do not start wrapping up, do not say goodbye, and do not steer toward closing yet."
+    )
+
+
+def _effective_notes(*, notes: str, goal_text: str, response_level: str, speech_speed: str, conversation_phase: str) -> str:
     return "\n".join(
         part for part in [
             notes.strip(),
+            f"Learner's conversation goal: {goal_text.strip()}" if goal_text.strip() else "",
+            _conversation_phase_instruction(conversation_phase),
             _response_level_instruction(response_level),
             _speech_speed_instruction(speech_speed),
         ] if part
@@ -81,13 +98,16 @@ class ContentTopicConversationTurnView(APIView):
         notes = str(request.data.get("notes", "")).strip()
         role_text = str(request.data.get("role_text", "")).strip()
         goal_text = str(request.data.get("goal_text", "")).strip()
+        conversation_phase = str(request.data.get("conversation_phase", "active")).strip().lower() or "active"
         skip_goal_evaluation = str(request.data.get("skip_goal_evaluation", "")).strip().lower() in {"1", "true", "yes", "on"}
         response_level = str(request.data.get("response_level", "A2")).strip().upper() or "A2"
         speech_speed = str(request.data.get("speech_speed", "normal")).strip().lower() or "normal"
         effective_notes = _effective_notes(
             notes=notes,
+            goal_text=goal_text,
             response_level=response_level,
             speech_speed=speech_speed,
+            conversation_phase=conversation_phase,
         )
         if not topic:
             return Response({"detail": "topic is required"}, status=status.HTTP_400_BAD_REQUEST)

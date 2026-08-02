@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from .management import APIView, Request, Response, _normalized_pair, _parse_item_conversation_history, status
+from .management_topic_conversation_goal_generation import generate_conversation_goal
+from .management_topic_conversation_shared import validate_conversation_start_fields, validate_conversation_start_payload
 from .topic_conversation_models import evaluate_goal_achievement as evaluate_goal_achievement_with_question_model
 
 
@@ -63,3 +65,31 @@ class ContentTopicConversationGoalEvaluationView(APIView):
                 "current_goal_text": current_goal_text,
             }
         )
+
+
+class ContentTopicConversationGoalRegenerateView(APIView):
+    def post(self, request: Request) -> Response:
+        source_language, target_language, topic, notes, role_text, goal_difficulty = validate_conversation_start_fields(request)
+        validation_error = validate_conversation_start_payload(
+            topic=topic,
+            notes=notes,
+            role_text=role_text,
+            goal_difficulty=goal_difficulty,
+        )
+        if validation_error is not None:
+            return validation_error
+        try:
+            goal_text, selected_difficulty = generate_conversation_goal(
+                topic=topic,
+                notes=notes,
+                role_text=role_text,
+                goal_difficulty=goal_difficulty,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError:
+            return Response(
+                {"detail": "Could not create a conversation goal. Please try again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response({"goal_text": goal_text, "goal_difficulty": selected_difficulty})

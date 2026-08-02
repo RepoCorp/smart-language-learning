@@ -17,6 +17,7 @@ import type {
   TopicConversationRealtimeSessionResponse,
   TopicConversationHelpResponse,
   TopicConversationGoalEvaluationResponse,
+  TopicConversationGoalRegenerateResponse,
   ContentTopicsResponse,
   OverviewStatsResponse,
   ReviewDirection,
@@ -726,6 +727,7 @@ export async function sendTopicConversationAudio(
   notes: string,
   roleText: string,
   goalText: string,
+  conversationPhase: "active" | "closing",
   audioBlob: Blob,
   history: Array<{ user_text: string; assistant_text: string }>,
   speechSpeed: "normal" | "slow" | "super_slow" = "normal",
@@ -755,6 +757,7 @@ export async function sendTopicConversationAudio(
   formData.append("notes", notes);
   formData.append("role_text", roleText);
   formData.append("goal_text", goalText);
+  formData.append("conversation_phase", conversationPhase);
   formData.append("skip_goal_evaluation", "true");
   formData.append("speech_speed", speechSpeed);
   formData.append("response_level", responseLevel);
@@ -821,11 +824,45 @@ export async function evaluateTopicConversationGoal(
   return (await response.json()) as TopicConversationGoalEvaluationResponse;
 }
 
+export async function regenerateTopicConversationGoal(
+  topic: string,
+  notes: string,
+  roleText: string,
+  goalDifficulty: "easy" | "medium" | "hard",
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<TopicConversationGoalRegenerateResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/conversation/goal-regenerate?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, notes, role_text: roleText, goal_difficulty: goalDifficulty }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to regenerate conversation goal";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep generic detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as TopicConversationGoalRegenerateResponse;
+}
+
 export async function createTopicConversationRealtimeSession(
   topic: string,
   notes: string,
   roleText: string,
   goalDifficulty: "easy" | "medium" | "hard",
+  goalText: string,
+  conversationPhase: "active" | "closing" = "active",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<TopicConversationRealtimeSessionResponse> {
@@ -836,7 +873,14 @@ export async function createTopicConversationRealtimeSession(
   const response = await apiFetch(`${API_BASE}/content/conversation/realtime-session?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, notes, role_text: roleText, goal_difficulty: goalDifficulty }),
+    body: JSON.stringify({
+      topic,
+      notes,
+      role_text: roleText,
+      goal_difficulty: goalDifficulty,
+      goal_text: goalText,
+      conversation_phase: conversationPhase,
+    }),
   });
   if (!response.ok) {
     let detail = "Failed to create Realtime conversation session";

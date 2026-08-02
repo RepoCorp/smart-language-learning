@@ -52,6 +52,7 @@ interface WordExerciseGridProps {
   columns: WordExerciseGridHeader[];
   rows: WordExerciseGridRow[];
   primaryEntry?: WordExerciseGridPrimaryEntry;
+  extraPrimaryEntries?: WordExerciseGridPrimaryEntry[];
   className?: string;
   targetClassName?: string;
   columnMinWidth?: string;
@@ -151,6 +152,7 @@ export default function WordExerciseGrid({
   columns,
   rows,
   primaryEntry,
+  extraPrimaryEntries = [],
   className = "",
   targetClassName = "",
   columnMinWidth = "132px",
@@ -159,23 +161,29 @@ export default function WordExerciseGrid({
   const gridStyle: CSSProperties = {
     gridTemplateColumns: `${rowHeaderWidth} repeat(${columns.length}, minmax(${columnMinWidth}, 1fr))`,
   };
+  const primaryEntries = [primaryEntry, ...extraPrimaryEntries].filter((entry): entry is WordExerciseGridPrimaryEntry => Boolean(entry));
 
   return (
     <div className={`word-exercise-wrap ${className}`.trim()}>
-      {primaryEntry ? (
-        <button
-          type="button"
-          className={`word-exercise-cell word-exercise-entry word-exercise-primary-button ${primaryEntry.selected ? "word-exercise-selected" : ""}`}
-          onClick={primaryEntry.onClick}
-          disabled={primaryEntry.disabled}
-        >
-          <span className={`word-exercise-target-text ${targetClassName}`.trim()}>{primaryEntry.entry.target}</span>
-          {primaryEntry.detailText ? (
-            <span className="word-exercise-detail-text">{primaryEntry.detailText}</span>
-          ) : null}
-          <small>{primaryEntry.entry.source}</small>
-        </button>
-      ) : null}
+      {!!primaryEntries.length && (
+        <div className="word-exercise-primary-row">
+          {primaryEntries.map((entry) => (
+            <button
+              key={`${entry.entry.target}-${entry.entry.source}-${entry.detailText || ""}`}
+              type="button"
+              className={`word-exercise-cell word-exercise-entry word-exercise-primary-button ${entry.selected ? "word-exercise-selected" : ""}`}
+              onClick={entry.onClick}
+              disabled={entry.disabled}
+            >
+              <span className={`word-exercise-target-text ${targetClassName}`.trim()}>{entry.entry.target}</span>
+              {entry.detailText ? (
+                <span className="word-exercise-detail-text">{entry.detailText}</span>
+              ) : null}
+              <small>{entry.entry.source}</small>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="word-exercise-grid" role="table" aria-label={ariaLabel} style={gridStyle}>
         <div className="word-exercise-cell word-exercise-corner" role="columnheader" />
         {columns.map((column) => (

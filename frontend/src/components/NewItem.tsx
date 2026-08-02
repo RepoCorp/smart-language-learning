@@ -38,6 +38,7 @@ import WordPartsReview from "./WordPartsReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
 import ItemTestingModal from "./testing/ItemTestingModal";
+import { buildGermanPluralExerciseEntry } from "./wordExercisePrimaryEntry";
 import { ACT_STRATEGY, COMPARE_STRATEGY, CONNECT_STRATEGY, DECODE_STRATEGY, DEFAULT_STRATEGY, ENCOUNTER_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY, WALK_STRATEGY } from "./strategies/strategyConstants";
 import { useActStrategy } from "./strategies/useActStrategy";
 import { useCompareStrategy } from "./strategies/useCompareStrategy";
@@ -976,6 +977,9 @@ export default function NewItem({
   const wordOnlyExerciseEntry = item.item_type === "word"
     ? wordExerciseEntries.find((entry) => entry.label === "word")
     : undefined;
+  const nounPluralExerciseEntry = isNounSectionedExercise
+    ? buildGermanPluralExerciseEntry(wordOnlyExerciseEntry, pluralGerman, notes)
+    : undefined;
 
   const compareExerciseWords = item.item_type === "word"
     ? compareWords
@@ -1014,7 +1018,11 @@ export default function NewItem({
     ? compareExerciseWords.flatMap((word) => compareWordExerciseEntries(word, word.exercise_phrases))
     : [];
   const allWordExerciseEntries = item.item_type === "word"
-    ? [...wordExerciseEntries, ...compareExerciseEntries]
+    ? [
+        ...wordExerciseEntries,
+        ...(nounPluralExerciseEntry ? [nounPluralExerciseEntry] : []),
+        ...compareExerciseEntries,
+      ]
     : wordExerciseEntries;
   const selectedRepeatExerciseEntries = item.item_type === "phrase"
     ? [{ source: sourceText, target: targetText }]

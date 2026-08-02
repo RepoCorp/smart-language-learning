@@ -6,11 +6,13 @@ import type { StudyLanguageCode } from "../../studyLanguages";
 
 type Args = {
   enabled: boolean;
+  assistantSpeaking: boolean;
   topic: string;
   notes: string;
   roleText: string;
   goalTexts: string[];
   currentGoalIndex: number;
+  resetKey: number;
   turns: ContentItemConversationResponse[];
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
@@ -20,11 +22,13 @@ type Args = {
 
 export function useConversationGoalEvaluation({
   enabled,
+  assistantSpeaking,
   topic,
   notes,
   roleText,
   goalTexts,
   currentGoalIndex,
+  resetKey,
   turns,
   sourceLanguage,
   targetLanguage,
@@ -35,6 +39,30 @@ export function useConversationGoalEvaluation({
   const [evaluating, setEvaluating] = useState<boolean>(false);
   const requestIdRef = useRef<number>(0);
   const lastEvaluatedTurnCountRef = useRef<number>(0);
+  const pendingResultRef = useRef<null | {
+    goalAchieved: boolean;
+    allGoalsCompleted: boolean;
+    nextGoalIndex: number;
+    currentGoalText: string;
+    achievementMessage: string;
+  }>(null);
+
+  const applyGoalResult = (
+    goalAchieved: boolean,
+    allGoalsCompleted: boolean,
+    nextGoalIndex: number,
+    nextGoalText: string,
+    achievementMessage: string,
+  ): void => {
+    setGoalAchievementMessage(achievementMessage);
+    if (goalAchieved && allGoalsCompleted) {
+      onGoalsCompleted();
+      return;
+    }
+    if (goalAchieved) {
+      onGoalAdvance(nextGoalIndex, nextGoalText);
+    }
+  };
 
   useEffect(() => {
     if (enabled) {
@@ -42,6 +70,7 @@ export function useConversationGoalEvaluation({
     }
     requestIdRef.current += 1;
     lastEvaluatedTurnCountRef.current = 0;
+    pendingResultRef.current = null;
     setGoalAchievementMessage("");
     setEvaluating(false);
   }, [enabled]);
@@ -49,9 +78,36 @@ export function useConversationGoalEvaluation({
   useEffect(() => {
     if (turns.length === 0) {
       lastEvaluatedTurnCountRef.current = 0;
+      pendingResultRef.current = null;
       setEvaluating(false);
     }
   }, [turns.length]);
+
+  useEffect(() => {
+    requestIdRef.current += 1;
+    lastEvaluatedTurnCountRef.current = turns.length;
+    pendingResultRef.current = null;
+    setGoalAchievementMessage("");
+    setEvaluating(false);
+  }, [resetKey]);
+
+  useEffect(() => {
+    if (assistantSpeaking) {
+      return;
+    }
+    const pendingResult = pendingResultRef.current;
+    if (!pendingResult) {
+      return;
+    }
+    pendingResultRef.current = null;
+    applyGoalResult(
+      pendingResult.goalAchieved,
+      pendingResult.allGoalsCompleted,
+      pendingResult.nextGoalIndex,
+      pendingResult.currentGoalText,
+      pendingResult.achievementMessage,
+    );
+  }, [assistantSpeaking, onGoalAdvance, onGoalsCompleted]);
 
   useEffect(() => {
     const currentGoalText = goalTexts[currentGoalIndex] || "";
@@ -93,18 +149,27 @@ export function useConversationGoalEvaluation({
         return;
       }
       const achievementMessage = (response.goal_achievement_message || "").trim();
-      setGoalAchievementMessage(achievementMessage);
-      if (response.goal_achieved && response.all_goals_completed) {
-        onGoalsCompleted();
+      const goalAchieved = Boolean(response.goal_achieved);
+      const allGoalsCompleted = Boolean(response.all_goals_completed);
+      const nextGoalIndex = response.next_goal_index ?? currentGoalIndex + 1;
+      const nextGoalText = (response.current_goal_text || "").trim();
+
+      if (assistantSpeaking) {
+        pendingResultRef.current = {
+          goalAchieved,
+          allGoalsCompleted,
+          nextGoalIndex,
+          currentGoalText: nextGoalText,
+          achievementMessage,
+        };
         return;
       }
-      if (response.goal_achieved) {
-        onGoalAdvance(response.next_goal_index ?? currentGoalIndex + 1, (response.current_goal_text || "").trim());
-      }
+      applyGoalResult(goalAchieved, allGoalsCompleted, nextGoalIndex, nextGoalText, achievementMessage);
     }).catch(() => {
       if (requestIdRef.current !== requestId) {
         return;
       }
+      pendingResultRef.current = null;
       setGoalAchievementMessage("");
     }).finally(() => {
       if (requestIdRef.current === requestId) {
@@ -112,6 +177,7 @@ export function useConversationGoalEvaluation({
       }
     });
   }, [
+    assistantSpeaking,
     enabled,
     currentGoalIndex,
     goalTexts,

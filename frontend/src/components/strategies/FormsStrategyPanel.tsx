@@ -3,7 +3,7 @@ import type { SessionItem } from "../../types";
 import NounExerciseSelector from "../NounExerciseSelector";
 import VerbExerciseSelector, { type VerbPersonKey, type VerbTenseKey } from "../VerbExerciseSelector";
 import WordExerciseActions from "../WordExerciseActions";
-import { buildWordExercisePrimaryEntry } from "../wordExercisePrimaryEntry";
+import { buildGermanPluralPrimaryEntry, buildWordExercisePrimaryEntry } from "../wordExercisePrimaryEntry";
 import PhraseSelectionList from "./PhraseSelectionList";
 
 type ExerciseEntry = {
@@ -85,13 +85,22 @@ export default function FormsStrategyPanel({
   const { t } = useI18n();
   const wordExercisePrimaryEntry = buildWordExercisePrimaryEntry({
     entry: wordOnlyExerciseEntry,
+    pluralGerman: isNounSectionedExercise ? "" : pluralGerman,
+    notes: isNounSectionedExercise ? "" : notes,
+    selectedExerciseKeys,
+    exerciseRunning,
+    exerciseEntryKey,
+    onToggleEntry,
+  });
+  const nounPluralPrimaryEntry = isNounSectionedExercise ? buildGermanPluralPrimaryEntry({
+    entry: wordOnlyExerciseEntry,
     pluralGerman,
     notes,
     selectedExerciseKeys,
     exerciseRunning,
     exerciseEntryKey,
     onToggleEntry,
-  });
+  }) : undefined;
 
   return (
     <div className={isVerbExerciseGrid ? "verb-exercise-modal" : ""}>
@@ -139,6 +148,7 @@ export default function FormsStrategyPanel({
           ) : isNounSectionedExercise ? (
             <NounExerciseSelector
               primaryEntry={wordExercisePrimaryEntry}
+              extraPrimaryEntries={nounPluralPrimaryEntry ? [nounPluralPrimaryEntry] : []}
               sections={nounExerciseSections}
               selectedExerciseKeys={selectedExerciseKeys}
               exerciseRunning={exerciseRunning}

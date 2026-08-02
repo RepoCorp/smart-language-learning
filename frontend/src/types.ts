@@ -440,6 +440,11 @@ export interface TopicConversationGoalEvaluationResponse {
   current_goal_text?: string;
 }
 
+export interface TopicConversationGoalRegenerateResponse {
+  goal_text: string;
+  goal_difficulty?: "easy" | "medium" | "hard";
+}
+
 export interface OverviewStatsResponse {
   ready_to_review: number;
   future_reviews: number;

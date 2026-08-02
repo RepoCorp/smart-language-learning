@@ -2424,6 +2424,42 @@ textarea {
   border-color: #8ddfcf;
 }
 
+.conversation-goal-banner {
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 62%, var(--color-accent-strong));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 90%, var(--color-accent-surface));
+}
+
+.conversation-goal-banner-label {
+  margin: 0 0 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+
+.conversation-goal-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.conversation-goal-regenerate {
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.conversation-goal-banner-text {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 .conversation-controls-card {
   position: sticky;
   bottom: 8px;
@@ -2444,6 +2480,11 @@ textarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+}
+
+.conversation-primary-secondary-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .conversation-secondary-controls {
@@ -2506,53 +2547,53 @@ textarea {
   margin-top: 4px;
 }
 
-.conversation-goal-success {
-  margin-top: 10px;
-  padding: 10px 12px;
+.conversation-goal-progress {
+  margin: 0 0 10px 0;
+  padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid #8ddfcf;
-  background: var(--color-accent-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, var(--color-accent-strong));
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-accent-surface));
 }
 
-.conversation-goal-success-message,
-.conversation-goal-success-next {
+.conversation-goal-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.conversation-goal-progress-label,
+.conversation-goal-progress-value {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+
+.conversation-goal-progress-text {
   margin: 0;
-}
-
-.conversation-goal-success-message {
   font-size: 13px;
-  font-weight: 700;
   color: var(--color-text);
 }
 
-.conversation-goal-success-next {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--color-text-soft);
+.conversation-goal-progress-bar {
+  margin-top: 8px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 82%, transparent);
+  overflow: hidden;
 }
 
-.conversation-goal-current {
-  margin-top: 0;
-  margin-bottom: 10px;
+.conversation-goal-progress-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-accent-strong) 80%, #ffffff);
+  transition: width 180ms ease;
 }
 
-.conversation-goal-list {
-  margin: 8px 0 0 18px;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.conversation-goal-list-item {
-  color: var(--color-text-soft);
-}
-
-.conversation-goal-list-item-current {
-  color: var(--color-text);
-  font-weight: 700;
-}
-
-.conversation-goal-list-item-completed {
+.conversation-goal-progress-complete .conversation-goal-progress-value {
   color: var(--color-accent-strong);
 }
 
@@ -3950,10 +3991,16 @@ textarea {
   overflow-x: auto;
 }
 
+.word-exercise-primary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .word-exercise-primary-button,
 .verb-word-row {
   width: min(100%, 520px);
-  margin-bottom: 8px;
 }
 
 .word-exercise-grid,

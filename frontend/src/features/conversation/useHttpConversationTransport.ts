@@ -19,13 +19,13 @@ export function useHttpConversationTransport({
   onAssistantSpeakingChange,
   onPendingUserTurnChange,
   onConversationTurn,
-  onConversationGoalChange,
   playAudioUrl,
   conversationHistory,
   activeTopic,
   activeNotes,
   activeRole,
   conversationGoal,
+  conversationPhase,
   speechSpeed,
   responseLevel,
 }: BaseConversationTransportArgs) {
@@ -81,6 +81,7 @@ export function useHttpConversationTransport({
         activeNotes,
         activeRole,
         conversationGoal,
+        conversationPhase,
         audioBlob,
         conversationHistory,
         speechSpeed,
@@ -90,9 +91,6 @@ export function useHttpConversationTransport({
       );
       onConversationTurn(response);
       onPendingUserTurnChange(false);
-      if (response.goal_achieved && response.next_goal_suggestion) {
-        onConversationGoalChange(response.next_goal_suggestion);
-      }
       if (response.assistant_audio_url) {
         onAssistantSpeakingChange(true);
         const audio = new Audio(response.assistant_audio_url);

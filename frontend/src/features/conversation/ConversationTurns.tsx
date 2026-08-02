@@ -24,8 +24,8 @@ type DisplayState = {
 type VisibilityState = {
   topic: string;
   topicWasRandom: boolean;
-  goals: string[];
-  currentGoalIndex: number;
+  goal: string;
+  goalRegenerating: boolean;
   assistantHintsRemaining: number;
   assistantRevealUsed: Record<number, boolean>;
   assistantSpeaking: boolean;
@@ -50,6 +50,7 @@ type TurnActions = {
   toggleUserTurnTranslation: (index: number) => Promise<void>;
   toggleUserTurnCorrection: (index: number) => Promise<void>;
   showAssistantTurnHint: (index: number) => void;
+  regenerateGoal: () => Promise<void>;
   requestAddSentenceFromConversation: (key: string, sourceTextRaw: string, targetTextRaw: string) => Promise<void>;
 };
 
@@ -60,7 +61,6 @@ type Props = {
   visibility: VisibilityState;
   actions: TurnActions;
   conversationTurns: ConversationTurn[];
-  goalAchievementMessage: string;
 };
 
 export default function ConversationTurns({
@@ -70,7 +70,6 @@ export default function ConversationTurns({
   visibility,
   actions,
   conversationTurns,
-  goalAchievementMessage,
 }: Props): JSX.Element {
   const { t } = useI18n();
 
@@ -82,6 +81,23 @@ export default function ConversationTurns({
             <p className="conversation-topic-banner-kicker">{t("content.topic.random")}</p>
           )}
           <p className="conversation-topic-banner-title">{visibility.topic}</p>
+        </div>
+      )}
+
+      {visibility.goal && (
+        <div className="conversation-goal-banner">
+          <div className="conversation-goal-banner-header">
+            <p className="conversation-goal-banner-label">{t("conversation.goalLabel")}</p>
+            <button
+              type="button"
+              className="secondary-button conversation-goal-regenerate"
+              onClick={() => void actions.regenerateGoal()}
+              disabled={visibility.goalRegenerating || visibility.assistantSpeaking}
+            >
+              {visibility.goalRegenerating ? t("conversation.goalRegenerating") : t("conversation.goalRegenerate")}
+            </button>
+          </div>
+          <p className="conversation-goal-banner-text">{visibility.goal}</p>
         </div>
       )}
 
@@ -166,30 +182,6 @@ export default function ConversationTurns({
           <div className="item-chat-message item-chat-assistant">
             <p className="item-chat-bubble" />
           </div>
-        </div>
-      )}
-      {visibility.goals.length > 0 && (
-        <div className="conversation-goal-success conversation-goal-current">
-          {goalAchievementMessage && (
-            <p className="conversation-goal-success-message">{goalAchievementMessage}</p>
-          )}
-          <p className="conversation-goal-success-next">
-            <strong>{t("conversation.goalLabel")}</strong> {Math.min(visibility.currentGoalIndex + 1, visibility.goals.length)}/{visibility.goals.length}
-          </p>
-          <ol className="conversation-goal-list">
-            {visibility.goals.map((goal, index) => {
-              const completed = index < visibility.currentGoalIndex;
-              const current = index === visibility.currentGoalIndex;
-              return (
-                <li
-                  key={`${goal}-${index}`}
-                  className={`conversation-goal-list-item${completed ? " conversation-goal-list-item-completed" : ""}${current ? " conversation-goal-list-item-current" : ""}`}
-                >
-                  {goal}
-                </li>
-              );
-            })}
-          </ol>
         </div>
       )}
     </div>

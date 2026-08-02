@@ -6,6 +6,7 @@ import {
   fetchTopicConversationUserLiteralTranslation,
   fetchContentTopics,
   generateTopicConversationReview,
+  regenerateTopicConversationGoal,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
   sendTopicConversationHelpRequest,
@@ -35,6 +36,7 @@ import { useConversationGoalEvaluation } from "./useConversationGoalEvaluation";
 import { useConversationReviewPreparation } from "./useConversationReviewPreparation";
 import { useConversationScroll } from "./useConversationScroll";
 import {
+  type ConversationPhase,
   type ConversationResponseLevel,
   type ConversationSpeechSpeed,
   type ConversationTransport,
@@ -77,6 +79,9 @@ export default function ConversationPage(): JSX.Element {
   const [conversationGoals, setConversationGoals] = useState<string[]>([]);
   const [currentGoalIndex, setCurrentGoalIndex] = useState<number>(0);
   const [conversationGoal, setConversationGoal] = useState<string>("");
+  const [conversationPhase, setConversationPhase] = useState<ConversationPhase>("active");
+  const [goalRegenerating, setGoalRegenerating] = useState<boolean>(false);
+  const [goalResetKey, setGoalResetKey] = useState<number>(0);
   const [openingText, setOpeningText] = useState<string>("");
   const [openingAudioUrl, setOpeningAudioUrl] = useState<string>("");
   const [openingTranslation, setOpeningTranslation] = useState<string>("");
@@ -152,24 +157,26 @@ export default function ConversationPage(): JSX.Element {
     targetLanguage,
   });
   const {
-    goalAchievementMessage,
     clearGoalAchievementMessage,
   } = useConversationGoalEvaluation({
-    enabled: started && !conversationFinished,
+    enabled: started && !conversationFinished && conversationPhase === "active",
+    assistantSpeaking,
     topic: activeTopic,
     notes: activeNotes,
     roleText: activeRole,
     goalTexts: conversationGoals,
     currentGoalIndex,
+    resetKey: goalResetKey,
     turns: conversationTurns,
     sourceLanguage,
     targetLanguage,
-    onGoalAdvance: (nextGoalIndex, nextGoalText) => {
+    onGoalAdvance: (nextGoalIndex, _nextGoalText) => {
       setCurrentGoalIndex(nextGoalIndex);
-      setConversationGoal(nextGoalText);
+      setConversationPhase("closing");
     },
     onGoalsCompleted: () => {
-      finishConversation();
+      setCurrentGoalIndex(conversationGoals.length);
+      setConversationPhase("closing");
     },
   });
 
@@ -410,13 +417,13 @@ export default function ConversationPage(): JSX.Element {
       setConversationTurns((current) => [...current, response]);
     },
     onPendingAssistantTextChange: setConversationPendingAssistantText,
-    onConversationGoalChange: setConversationGoal,
     playAudioUrl,
     conversationHistory: conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
     activeTopic,
     activeNotes,
     activeRole,
     conversationGoal,
+    conversationPhase,
     speechSpeed,
     responseLevel,
   });
@@ -518,6 +525,40 @@ export default function ConversationPage(): JSX.Element {
     setHelpOpen(true);
   };
 
+  const regenerateConversationGoal = async (): Promise<void> => {
+    if (!activeTopic || goalRegenerating || assistantSpeaking) {
+      return;
+    }
+    setPaused(true);
+    setGoalRegenerating(true);
+    setConversationError("");
+    try {
+      const response = await regenerateTopicConversationGoal(
+        activeTopic,
+        activeNotes,
+        activeRole,
+        activeGoalDifficulty,
+        sourceLanguage,
+        targetLanguage,
+      );
+      const nextGoal = (response.goal_text || "").trim();
+      if (!nextGoal) {
+        throw new Error("Could not create a conversation goal. Please try again.");
+      }
+      setConversationGoal(nextGoal);
+      setConversationGoals([nextGoal]);
+      setCurrentGoalIndex(0);
+      setConversationPhase("active");
+      setGoalResetKey((current) => current + 1);
+      clearGoalAchievementMessage();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      setConversationError(detail || t("newItem.questionsError"));
+    } finally {
+      setGoalRegenerating(false);
+    }
+  };
+
   const closeHelpModal = (): void => {
     setHelpError("");
     setHelpOpen(false);
@@ -558,6 +599,7 @@ export default function ConversationPage(): JSX.Element {
     setConversationGoals(normalizedGoals);
     setCurrentGoalIndex(0);
     setConversationGoal(normalizedGoals[0] || "");
+    setConversationPhase("active");
     setOpeningText(payload.opening_text || "");
     setOpeningAudioUrl(payload.opening_audio_url || "");
     setOpeningTranslation(payload.opening_translation_text || "");
@@ -627,6 +669,7 @@ export default function ConversationPage(): JSX.Element {
           notes: payload.notes || trimmedNotes,
           roleText: payload.role_text || trimmedRole,
           goalDifficulty: payload.goal_difficulty || goalDifficulty,
+          goalText: payload.goal_text || "",
         }).catch((error) => {
           warnRealtime("live-setup-failed", {
             reason: error instanceof Error ? error.message : String(error),
@@ -716,6 +759,7 @@ export default function ConversationPage(): JSX.Element {
     setConversationGoals([]);
     setCurrentGoalIndex(0);
     setConversationGoal("");
+    setConversationPhase("active");
     setConversationTurns([]);
     setConversationTranslationVisible({});
     setConversationCorrectionVisible({});
@@ -1081,8 +1125,8 @@ export default function ConversationPage(): JSX.Element {
                 visibility={{
                   topic: activeTopic,
                   topicWasRandom: activeTopicWasRandom,
-                  goals: conversationGoals,
-                  currentGoalIndex,
+                  goal: conversationGoal,
+                  goalRegenerating,
                   assistantHintsRemaining: Math.max(0, CONVERSATION_ASSISTANT_HINT_LIMIT - assistantHintsUsed),
                   assistantRevealUsed: assistantRevealUsedByTurn,
                   assistantSpeaking,
@@ -1101,10 +1145,10 @@ export default function ConversationPage(): JSX.Element {
                   toggleUserTurnTranslation,
                   toggleUserTurnCorrection,
                   showAssistantTurnHint,
+                  regenerateGoal: regenerateConversationGoal,
                   requestAddSentenceFromConversation,
                 }}
                 conversationTurns={conversationTurns}
-                goalAchievementMessage={goalAchievementMessage}
               />
               {conversationError && <p className="error">{conversationError}</p>}
             </ConversationActiveControls>
