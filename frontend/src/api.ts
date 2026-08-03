@@ -247,6 +247,7 @@ export async function confirmContent(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   selectedTurnIndexes?: number[],
+  proficiencyLevel: "A1" | "A2" | "B1" | "B2" = "A2",
 ): Promise<ContentConfirmResponse> {
   const response = await apiFetch(`${API_BASE}/content/confirm`, {
     method: "POST",
@@ -258,6 +259,7 @@ export async function confirmContent(
       target_language: targetLanguage,
       dialog_turns: dialogTurns,
       selected_turn_indexes: selectedTurnIndexes,
+      proficiency_level: proficiencyLevel,
     }),
   });
   if (!response.ok) {
@@ -325,6 +327,7 @@ export async function fetchContentDialogs(
   topic = "",
   context = "",
   search = "",
+  proficiencyLevel = "",
 ): Promise<ContentDialogsResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
@@ -340,6 +343,9 @@ export async function fetchContentDialogs(
   }
   if (search.trim()) {
     params.set("search", search.trim());
+  }
+  if (proficiencyLevel.trim()) {
+    params.set("proficiency_level", proficiencyLevel.trim());
   }
   const response = await apiFetch(`${API_BASE}/content/dialogs?${params.toString()}`);
   if (!response.ok) {

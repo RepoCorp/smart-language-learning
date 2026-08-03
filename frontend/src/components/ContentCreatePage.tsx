@@ -244,6 +244,7 @@ export default function ContentCreatePage(): JSX.Element {
         preview.source_language || sourceLanguage,
         preview.target_language || targetLanguage,
         [],
+        preview.proficiency_level || proficiencyLevel,
       );
       setResult(t("content.result.dialogAccepted"));
       setSavedDialogTurns(response.saved_dialog_turns || []);

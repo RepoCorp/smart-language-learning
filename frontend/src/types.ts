@@ -213,6 +213,7 @@ export interface ContentPreviewResponse {
   context?: string;
   source_language?: StudyLanguageCode;
   target_language?: StudyLanguageCode;
+  proficiency_level?: "A1" | "A2" | "B1" | "B2";
   dialog_turns: Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>;
 }
 
@@ -239,6 +240,7 @@ export interface ContentDialogRecord {
   dialog_id: number;
   topic: string;
   context: string;
+  proficiency_level: "A1" | "A2" | "B1" | "B2";
   audio_url: string;
   created_at: string;
   turn_count?: number;

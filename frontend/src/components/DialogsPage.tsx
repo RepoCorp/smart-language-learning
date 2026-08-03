@@ -51,6 +51,7 @@ export default function DialogsPage(): JSX.Element {
     search,
     topic,
     context,
+    level,
     page,
     hasMore,
     loading,
@@ -59,6 +60,7 @@ export default function DialogsPage(): JSX.Element {
     setSearch,
     setTopic,
     setContext,
+    setLevel,
     setPage,
     fetchAllFilteredDialogs,
   } = useDialogsCatalog(sourceLanguage, targetLanguage);
@@ -600,12 +602,14 @@ export default function DialogsPage(): JSX.Element {
           search={search}
           topic={topic}
           context={context}
+          level={level}
           topics={topics}
           contexts={contexts}
           loading={loading}
           onSearchChange={setSearch}
           onTopicChange={setTopic}
           onContextChange={setContext}
+          onLevelChange={setLevel}
         />
         <div className="actions">
           {!playingAll ? (

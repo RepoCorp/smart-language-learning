@@ -46,6 +46,7 @@ def normalize_word_pair_for_item_save(
     german_text: str,
     source_language: str,
     target_language: str,
+    proficiency_level: str = "A2",
 ) -> tuple[str, str]:
     source_text_norm = " ".join((spanish_text or "").split()).strip()
     target_text_norm = " ".join((german_text or "").split()).strip()
@@ -173,6 +174,7 @@ def save_dialog(
     target_language: str,
     turns: list[dict[str, str]],
     audio_url: str,
+    proficiency_level: str = "A2",
 ) -> SavedDialog:
     return SavedDialog.objects.create(
         user=user,
@@ -180,6 +182,7 @@ def save_dialog(
         context=context,
         source_language=source_language,
         target_language=target_language,
+        proficiency_level=proficiency_level,
         turns=turns,
         audio_url=audio_url,
     )

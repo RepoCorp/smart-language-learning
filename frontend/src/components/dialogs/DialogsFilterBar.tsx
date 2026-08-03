@@ -4,24 +4,28 @@ interface DialogsFilterBarProps {
   search: string;
   topic: string;
   context: string;
+  level: string;
   topics: string[];
   contexts: string[];
   loading: boolean;
   onSearchChange: (value: string) => void;
   onTopicChange: (value: string) => void;
   onContextChange: (value: string) => void;
+  onLevelChange: (value: string) => void;
 }
 
 export default function DialogsFilterBar({
   search,
   topic,
   context,
+  level,
   topics,
   contexts,
   loading,
   onSearchChange,
   onTopicChange,
   onContextChange,
+  onLevelChange,
 }: DialogsFilterBarProps): JSX.Element {
   const { t } = useI18n();
 
@@ -35,6 +39,13 @@ export default function DialogsFilterBar({
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={t("dialogs.searchFilterPlaceholder")}
         />
+      </label>
+      <label className="form-field">
+        <span>{t("content.level.label")}</span>
+        <select value={level} onChange={(event) => onLevelChange(event.target.value)} disabled={loading}>
+          <option value="">{t("dialogs.levelFilterPlaceholder")}</option>
+          {['A1', 'A2', 'B1', 'B2'].map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
       </label>
       <label className="form-field">
         <span>{t("dialogs.topicFilter")}</span>

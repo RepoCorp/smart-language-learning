@@ -88,6 +88,7 @@ class ContentPreviewView(APIView):
                 "context": context,
                 "source_language": source_language,
                 "target_language": target_language,
+                "proficiency_level": proficiency_level,
                 "dialog_turns": dialog_turns,
             }
         )
@@ -103,6 +104,7 @@ class ContentConfirmView(APIView):
         context = serializer.validated_data.get("context", "").strip()
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
+        proficiency_level = serializer.validated_data.get("proficiency_level", "A2")
         save_topic(
             user=user,
             topic=topic,
@@ -138,6 +140,7 @@ class ContentConfirmView(APIView):
             target_language=target_language,
             turns=dialog_turns,
             audio_url="",
+            proficiency_level=proficiency_level,
         )
         dialog_speaker_voice_ids = select_dialog_speaker_voice_ids(target_language, seed=f"dialog:{saved_dialog.id}")
         created_turns = save_dialog_turns(saved_dialog, dialog_turns, speaker_voice_ids=dialog_speaker_voice_ids)
@@ -187,6 +190,7 @@ class ContentConfirmView(APIView):
                 "topic": topic,
                 "source_language": source_language,
                 "target_language": target_language,
+                "proficiency_level": proficiency_level,
                 "saved_dialog_id": saved_dialog.id,
                 "saved_dialog_turns": [
                     {

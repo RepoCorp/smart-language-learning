@@ -118,6 +118,7 @@ class SavedDialog(models.Model):
     context = models.CharField(max_length=400, blank=True)
     source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
     target_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="german")
+    proficiency_level = models.CharField(max_length=2, default="A2")
     turns = models.JSONField(default=list, blank=True)
     audio_url = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

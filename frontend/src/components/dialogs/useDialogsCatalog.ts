@@ -31,6 +31,7 @@ interface UseDialogsCatalogResult {
   search: string;
   topic: string;
   context: string;
+  level: string;
   page: number;
   hasMore: boolean;
   loading: boolean;
@@ -39,6 +40,7 @@ interface UseDialogsCatalogResult {
   setSearch: (value: string) => void;
   setTopic: (value: string) => void;
   setContext: (value: string) => void;
+  setLevel: (value: string) => void;
   setPage: Dispatch<SetStateAction<number>>;
   fetchAllFilteredDialogs: () => Promise<ContentDialogRecord[]>;
 }
@@ -54,6 +56,7 @@ export default function useDialogsCatalog(
   const [search, setSearchValue] = useState("");
   const [topic, setTopicValue] = useState("");
   const [context, setContextValue] = useState("");
+  const [level, setLevelValue] = useState("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -91,7 +94,7 @@ export default function useDialogsCatalog(
     let active = true;
     setLoading(true);
     setError("");
-    void fetchContentDialogs(sourceLanguage, targetLanguage, page, DIALOGS_PAGE_SIZE, topic, context, search)
+    void fetchContentDialogs(sourceLanguage, targetLanguage, page, DIALOGS_PAGE_SIZE, topic, context, search, level)
       .then((payload) => {
         if (!active) return;
         setDialogs((current) => payload.dialogs.map((dialog) => (
@@ -109,7 +112,7 @@ export default function useDialogsCatalog(
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [sourceLanguage, targetLanguage, topic, context, search, page, t]);
+  }, [sourceLanguage, targetLanguage, topic, context, search, level, page, t]);
 
   const setSearch = (value: string): void => {
     setSearchValue(value);
@@ -124,13 +127,14 @@ export default function useDialogsCatalog(
     setContextValue(value);
     setPage(1);
   };
+  const setLevel = (value: string): void => { setLevelValue(value); setPage(1); };
   const fetchAllFilteredDialogs = async (): Promise<ContentDialogRecord[]> => {
     const allDialogs: ContentDialogRecord[] = [];
     let currentPage = 1;
     let hasMorePages = true;
     while (hasMorePages) {
       const payload = await fetchContentDialogs(
-        sourceLanguage, targetLanguage, currentPage, DIALOGS_PAGE_SIZE, topic, context, search,
+        sourceLanguage, targetLanguage, currentPage, DIALOGS_PAGE_SIZE, topic, context, search, level,
       );
       allDialogs.push(...payload.dialogs);
       hasMorePages = Boolean(payload.has_more);
@@ -140,7 +144,7 @@ export default function useDialogsCatalog(
   };
 
   return {
-    dialogs, setDialogs, topics, contexts, search, topic, context, page, hasMore, loading, error, setError,
-    setSearch, setTopic, setContext, setPage, fetchAllFilteredDialogs,
+    dialogs, setDialogs, topics, contexts, search, topic, context, level, page, hasMore, loading, error, setError,
+    setSearch, setTopic, setContext, setLevel, setPage, fetchAllFilteredDialogs,
   };
 }
