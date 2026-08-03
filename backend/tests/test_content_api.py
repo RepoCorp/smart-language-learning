@@ -599,6 +599,29 @@ def test_content_preview_passes_short_three_dialog_length(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_preview_passes_proficiency_level(monkeypatch):
+    from learning.views.content import api as api_views
+
+    captured = {}
+
+    def fake_generate_conversation(topic, proficiency_level="A2", **kwargs):
+        captured["proficiency_level"] = proficiency_level
+        return [{"speaker": "a", "spanish_text": "Hola.", "german_text": "Hallo.", "notes": ""}]
+
+    monkeypatch.setattr(api_views, "generate_conversation_with_chatgpt", fake_generate_conversation)
+
+    client = APIClient()
+    response = client.post(
+        "/api/content/preview",
+        {"topic": "shopping", "proficiency_level": "B2"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert captured["proficiency_level"] == "B2"
+
+
+@pytest.mark.django_db
 def test_content_preview_passes_required_dialog_words(monkeypatch):
     from learning.views.content import api as api_views
 

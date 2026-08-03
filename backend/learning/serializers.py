@@ -104,6 +104,11 @@ class ContentTopicSerializer(serializers.Serializer):
         required=False,
         default="standard",
     )
+    proficiency_level = serializers.ChoiceField(
+        choices=["A1", "A2", "B1", "B2"],
+        required=False,
+        default="A2",
+    )
     source_language = serializers.ChoiceField(
         choices=STUDY_LANGUAGE_CHOICES,
         required=False,

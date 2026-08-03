@@ -13,6 +13,7 @@ const CREATE_NEW_OPTION = "__create_new__";
 const RANDOM_TOPIC_OPTION = "__random_topic__";
 type DialogLength = "standard" | "short_three";
 type RequiredWordsLanguage = "source" | "target";
+type ProficiencyLevel = "A1" | "A2" | "B1" | "B2";
 type PhraseActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 
 function buildSessionItemFromDetail(
@@ -57,6 +58,7 @@ export default function ContentCreatePage(): JSX.Element {
   const [requiredWords, setRequiredWords] = useState<string>("");
   const [requiredWordsLanguage, setRequiredWordsLanguage] = useState<RequiredWordsLanguage>("target");
   const [dialogLength, setDialogLength] = useState<DialogLength>("standard");
+  const [proficiencyLevel, setProficiencyLevel] = useState<ProficiencyLevel>("A2");
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -104,6 +106,7 @@ export default function ContentCreatePage(): JSX.Element {
         setRequiredWords("");
         setRequiredWordsLanguage("target");
         setDialogLength("standard");
+        setProficiencyLevel("A2");
         setPreview(null);
         setResult("");
         setSavedDialogTurns([]);
@@ -126,6 +129,7 @@ export default function ContentCreatePage(): JSX.Element {
           setRequiredWords("");
           setRequiredWordsLanguage("target");
           setDialogLength("standard");
+          setProficiencyLevel("A2");
           setPreview(null);
           setResult("");
           setSavedDialogTurns([]);
@@ -211,6 +215,7 @@ export default function ContentCreatePage(): JSX.Element {
         required,
         requiredWordsLanguage,
         dialogLength,
+        proficiencyLevel,
         sourceLanguage,
         targetLanguage,
       );
@@ -444,6 +449,7 @@ export default function ContentCreatePage(): JSX.Element {
         requiredWords={requiredWords}
         requiredWordsLanguage={requiredWordsLanguage}
         dialogLength={dialogLength}
+        proficiencyLevel={proficiencyLevel}
         previousTopics={previousTopics}
         previousContexts={previousContexts}
         loading={loading}
@@ -457,6 +463,7 @@ export default function ContentCreatePage(): JSX.Element {
         onRequiredWordsChange={setRequiredWords}
         onRequiredWordsLanguageChange={setRequiredWordsLanguage}
         onDialogLengthChange={setDialogLength}
+        onProficiencyLevelChange={setProficiencyLevel}
         onGeneratePreview={() => {
           void onGeneratePreview();
         }}

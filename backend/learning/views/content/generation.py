@@ -235,6 +235,7 @@ def generate_conversation_with_chatgpt(
     required_words: str = "",
     required_words_language: str = "target",
     dialog_length: str = "standard",
+    proficiency_level: str = "A2",
     source_language: str = "spanish",
     target_language: str = "german",
 ) -> list[dict[str, str]] | None:
@@ -245,6 +246,7 @@ def generate_conversation_with_chatgpt(
         required_words=required_words,
         required_words_language=required_words_language,
         dialog_length=dialog_length,
+        proficiency_level=proficiency_level,
         source_language=source_language,
         target_language=target_language,
         call_openai_json_fn=call_openai_json,

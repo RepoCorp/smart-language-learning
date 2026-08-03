@@ -215,6 +215,7 @@ export async function previewContent(
   requiredWords = "",
   requiredWordsLanguage: "source" | "target" = "target",
   dialogLength: "standard" | "short_three" = "standard",
+  proficiencyLevel: "A1" | "A2" | "B1" | "B2" = "A2",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentPreviewResponse> {
@@ -228,6 +229,7 @@ export async function previewContent(
       required_words: requiredWords,
       required_words_language: requiredWordsLanguage,
       dialog_length: dialogLength,
+      proficiency_level: proficiencyLevel,
       source_language: sourceLanguage,
       target_language: targetLanguage,
     }),

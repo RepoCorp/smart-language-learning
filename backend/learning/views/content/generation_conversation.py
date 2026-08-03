@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from uuid import uuid4
 
 from ...languages import language_display_name
 from ...prompts import CONVERSATION_GENERATION_PROMPT
 from ...text import normalize_text_for_matching
+from .generation_conversation_prompt import build_conversation_prompt
+from .generation_conversation_required_words import (
+    required_words_instruction,
+    translate_required_words_to_target,
+)
 
 logger = logging.getLogger(__name__)
 STYLE_SEEDS = ("casual", "polite", "urgent", "friendly", "problem-solving", "small-talk")
@@ -45,90 +49,6 @@ def _extract_keywords(text: str) -> list[str]:
         seen.add(word)
         ordered_unique.append(word)
     return ordered_unique
-
-
-def _required_word_terms(required_words: str) -> list[str]:
-    raw_terms = re.split(r"[,;\n]+", required_words or "")
-    terms: list[str] = []
-    seen: set[str] = set()
-    for raw_term in raw_terms:
-        term = " ".join(str(raw_term or "").split()).strip()
-        if not term:
-            continue
-        normalized = term.casefold()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        terms.append(term)
-    return terms
-
-
-def _required_words_instruction(required_words: str, target_language: str) -> str:
-    terms = _required_word_terms(required_words)
-    if not terms:
-        return "Required target-language words/phrases: none."
-    target_name = _language_label(target_language)
-    return (
-        f"Required {target_name} words/phrases: {'; '.join(terms)}. "
-        "Include every listed item in target_text at least once, using it exactly as written unless a tiny natural inflection is required."
-    )
-
-
-def _translate_required_words_to_target(
-    *,
-    required_words: str,
-    required_words_language: str,
-    source_language: str,
-    target_language: str,
-    call_openai_json_fn,
-) -> str | None:
-    terms = _required_word_terms(required_words)
-    if not terms:
-        return ""
-    if required_words_language != "source":
-        return "; ".join(terms)
-    source_name = _language_label(source_language)
-    target_name = _language_label(target_language)
-    parsed = call_openai_json_fn(
-        f"""
-Translate required language-learning vocabulary from {source_name} into {target_name}.
-
-Return strict JSON:
-{{
-  "target_words": [
-    "string"
-  ]
-}}
-
-Rules:
-- Return exactly one target_words entry for each source word or phrase, in the same order.
-- Each target_words entry must be only the translated vocabulary item, not a sentence.
-- Use the natural dictionary or phrase translation that would fit a beginner dialog.
-- Include articles for nouns when that is natural in {target_name}.
-- JSON only.
-""".strip(),
-        (
-            f"Source language: {source_name}\n"
-            f"Target language: {target_name}\n"
-            f"Source words/phrases: {'; '.join(terms)}"
-        ),
-        timeout_seconds=10,
-        temperature=0.2,
-        top_p=1.0,
-    )
-    if not isinstance(parsed, dict):
-        return None
-    raw_translations = parsed.get("target_words")
-    if not isinstance(raw_translations, list):
-        return None
-    translated_terms = []
-    for raw_translation in raw_translations:
-        translation = " ".join(str(raw_translation or "").split()).strip()
-        if translation:
-            translated_terms.append(translation)
-    if len(translated_terms) != len(terms):
-        return None
-    return "; ".join(translated_terms)
 
 
 def _allows_greeting(topic: str, context: str) -> bool:
@@ -173,48 +93,6 @@ def _validate_conversation(
     if _is_monotonous(phrases):
         return False, "monotonous_turn_starters"
     return True, "ok"
-
-
-def _build_conversation_prompt(
-    topic: str,
-    context: str,
-    conversation_details: str,
-    required_words: str,
-    dialog_length: str,
-    scenario_description: str,
-    source_language: str,
-    target_language: str,
-    style_seed: str,
-    creativity_seed: str
-) -> str:
-    normalized_context = " ".join(context.split()).strip()
-    normalized_details = " ".join(conversation_details.split()).strip()
-    context_value = normalized_context or "not provided"
-    situation_detail = normalized_context or "not provided"
-    length_requirement = (
-        "Exactly 3 very short dialogue turns/phrases total."
-        if dialog_length == "short_three"
-        else "6 to 12 very simple dialogue turns/phrases total."
-    )
-    parts = [
-        f"Topic: {topic}",
-        f"Context: {context_value}",
-        f"Selected scenario: {scenario_description}",
-        f"Situation detail: {situation_detail}",
-        f"Length requirement: {length_requirement}",
-        _required_words_instruction(required_words, target_language),
-        f"Extra user details (temporary, do not treat as saved context): {normalized_details or 'not provided'}",
-        (
-            "Language mapping: use 'source_text' for "
-            f"{_language_label(source_language)} and 'target_text' for {_language_label(target_language)}."
-        ),
-        f"Style seed: {style_seed}",
-        f"Variation seed: {creativity_seed}",
-        "Conversation style: practical, common real-life wording first; add light variation without unusual twists.",
-        "If extra user details are provided, they must be clearly reflected in at least two turns.",
-        "Variety constraints: avoid overused templates and avoid reusing the same key verb/noun in consecutive turns unless necessary.",
-    ]
-    return "\n".join(parts)
 
 
 def _generate_scenario_pool_with_chatgpt(
@@ -295,6 +173,7 @@ def generate_conversation_with_chatgpt(
     required_words: str = "",
     required_words_language: str = "target",
     dialog_length: str = "standard",
+    proficiency_level: str = "A2",
     source_language: str = "spanish",
     target_language: str = "german",
     *,
@@ -303,7 +182,7 @@ def generate_conversation_with_chatgpt(
 ) -> list[dict[str, str]] | None:
     style_seed = choice_fn(STYLE_SEEDS)
     creativity_seed = uuid4().hex[:8]
-    target_required_words = _translate_required_words_to_target(
+    target_required_words = translate_required_words_to_target(
         required_words=required_words,
         required_words_language=required_words_language,
         source_language=source_language,
@@ -335,15 +214,16 @@ def generate_conversation_with_chatgpt(
 
     parsed = call_openai_json_fn(
         CONVERSATION_GENERATION_PROMPT,
-        _build_conversation_prompt(
+        build_conversation_prompt(
             topic=topic,
             context=context,
             conversation_details=conversation_details,
-            required_words=target_required_words,
+            required_words_instruction=required_words_instruction(target_required_words, target_language),
             dialog_length=dialog_length,
+            proficiency_level=proficiency_level,
             scenario_description=selected_scenario,
-            source_language=source_language,
-            target_language=target_language,
+            source_language_name=_language_label(source_language),
+            target_language_name=_language_label(target_language),
             style_seed=style_seed,
             creativity_seed=creativity_seed,
         ),

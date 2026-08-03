@@ -35,6 +35,7 @@ class ContentPreviewView(APIView):
         required_words = serializer.validated_data.get("required_words", "").strip()
         required_words_language = serializer.validated_data.get("required_words_language", "target")
         dialog_length = serializer.validated_data.get("dialog_length", "standard")
+        proficiency_level = serializer.validated_data.get("proficiency_level", "A2")
         source_language = serializer.validated_data.get("source_language", "spanish")
         target_language = serializer.validated_data.get("target_language", "german")
         topic = resolve_topic_choice(
@@ -55,6 +56,7 @@ class ContentPreviewView(APIView):
             "topic": topic,
             "context": context,
             "conversation_details": conversation_details,
+            "proficiency_level": proficiency_level,
             "source_language": source_language,
             "target_language": target_language,
         }

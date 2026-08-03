@@ -7,6 +7,7 @@ const RANDOM_TOPIC_OPTION = "__random_topic__";
 
 type DialogLength = "standard" | "short_three";
 type RequiredWordsLanguage = "source" | "target";
+type ProficiencyLevel = "A1" | "A2" | "B1" | "B2";
 
 function CollapsibleSection({
   title,
@@ -53,6 +54,7 @@ export default function ContentCreateFormCard({
   requiredWords,
   requiredWordsLanguage,
   dialogLength,
+  proficiencyLevel,
   previousTopics,
   previousContexts,
   loading,
@@ -66,6 +68,7 @@ export default function ContentCreateFormCard({
   onRequiredWordsChange,
   onRequiredWordsLanguageChange,
   onDialogLengthChange,
+  onProficiencyLevelChange,
   onGeneratePreview,
 }: {
   selectedTopic: string;
@@ -76,6 +79,7 @@ export default function ContentCreateFormCard({
   requiredWords: string;
   requiredWordsLanguage: RequiredWordsLanguage;
   dialogLength: DialogLength;
+  proficiencyLevel: ProficiencyLevel;
   previousTopics: string[];
   previousContexts: string[];
   loading: boolean;
@@ -89,6 +93,7 @@ export default function ContentCreateFormCard({
   onRequiredWordsChange: (value: string) => void;
   onRequiredWordsLanguageChange: (value: RequiredWordsLanguage) => void;
   onDialogLengthChange: (value: DialogLength) => void;
+  onProficiencyLevelChange: (value: ProficiencyLevel) => void;
   onGeneratePreview: () => void;
 }): JSX.Element {
   const { t } = useI18n();
@@ -179,6 +184,27 @@ export default function ContentCreateFormCard({
         subtitle={t("content.section.optionsSubtitle")}
       >
         <>
+          <div className="content-form-section content-setting-block">
+            <div className="content-setting-block-copy">
+              <p className="content-form-section-title">{t("content.level.label")}</p>
+              <p className="hint">{t("content.level.description")}</p>
+            </div>
+            <div className="content-radio-options" role="radiogroup" aria-label={t("content.level.label")}>
+              {(["A1", "A2", "B1", "B2"] as ProficiencyLevel[]).map((level) => (
+                <label key={level} className={`content-radio-option${proficiencyLevel === level ? " content-radio-option-selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="content-proficiency-level"
+                    value={level}
+                    checked={proficiencyLevel === level}
+                    onChange={() => onProficiencyLevelChange(level)}
+                    disabled={loading || saving}
+                  />
+                  {level}
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="content-form-section content-setting-block">
             <div className="content-setting-block-copy">
               <p className="content-form-section-title">{t("content.length.label")}</p>
