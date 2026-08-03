@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   fetchContentDialogDetail,
-  fetchContentDialogs,
   fetchContentItemDetail,
-  fetchContentTopicContexts,
-  fetchContentTopics,
   generateContentDialogTurnAudio,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
@@ -20,6 +17,8 @@ import DialogActionIcon from "./DialogActionIcon";
 import DialogTurnsList from "./DialogTurnsList";
 import NewItem from "./NewItem";
 import useDialogPlaybackFocus from "./useDialogPlaybackFocus";
+import DialogsFilterBar from "./dialogs/DialogsFilterBar";
+import useDialogsCatalog, { mergeDialogRecord } from "./dialogs/useDialogsCatalog";
 
 type WordActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 type PendingWordAdd = {
@@ -40,40 +39,29 @@ type PlayingTurn = {
   turnIndex: number;
 };
 
-const DIALOGS_PAGE_SIZE = 20;
-const ALL_TOPICS_OPTION = "";
-const ALL_CONTEXTS_OPTION = "";
-
-function mergeDialogRecord(existing: ContentDialogRecord | null, incoming: ContentDialogRecord): ContentDialogRecord {
-  if (!existing) {
-    return incoming;
-  }
-  return {
-    ...existing,
-    ...incoming,
-    turns: incoming.turns?.length ? incoming.turns : existing.turns,
-    turn_count: incoming.turn_count ?? existing.turn_count,
-  };
-}
-
-function mergeDialogList(current: ContentDialogRecord[], incoming: ContentDialogRecord[]): ContentDialogRecord[] {
-  const existingById = new Map(current.map((dialog) => [dialog.dialog_id, dialog]));
-  return incoming.map((dialog) => mergeDialogRecord(existingById.get(dialog.dialog_id) || null, dialog));
-}
-
 export default function DialogsPage(): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode, showMobileActionLabels } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const [dialogs, setDialogs] = useState<ContentDialogRecord[]>([]);
-  const [availableTopics, setAvailableTopics] = useState<string[]>([]);
-  const [availableContexts, setAvailableContexts] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [page, setPage] = useState<number>(1);
-  const [hasMore, setHasMore] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [topicFilter, setTopicFilter] = useState<string>("");
-  const [contextFilter, setContextFilter] = useState<string>("");
+  const {
+    dialogs,
+    setDialogs,
+    topics,
+    contexts,
+    search,
+    topic,
+    context,
+    page,
+    hasMore,
+    loading,
+    error,
+    setError,
+    setSearch,
+    setTopic,
+    setContext,
+    setPage,
+    fetchAllFilteredDialogs,
+  } = useDialogsCatalog(sourceLanguage, targetLanguage);
   const [showDialogText, setShowDialogText] = useState<boolean>(targetPromptMode === "text");
   const [selectedDialogId, setSelectedDialogId] = useState<number | null>(null);
   const [playingAll, setPlayingAll] = useState<boolean>(false);
@@ -103,95 +91,6 @@ export default function DialogsPage(): JSX.Element {
   useEffect(() => {
     setShowDialogText(targetPromptMode === "text");
   }, [targetPromptMode]);
-
-  useEffect(() => {
-    let active = true;
-    const loadTopics = async (): Promise<void> => {
-      try {
-        const payload = await fetchContentTopics(sourceLanguage, targetLanguage);
-        if (!active) {
-          return;
-        }
-        setAvailableTopics(payload.topics || []);
-      } catch {
-        if (!active) {
-          return;
-        }
-        setAvailableTopics([]);
-      }
-    };
-    void loadTopics();
-    return () => {
-      active = false;
-    };
-  }, [sourceLanguage, targetLanguage]);
-
-  useEffect(() => {
-    let active = true;
-    const loadContexts = async (): Promise<void> => {
-      if (!topicFilter) {
-        setAvailableContexts([]);
-        setContextFilter(ALL_CONTEXTS_OPTION);
-        return;
-      }
-      try {
-        const payload = await fetchContentTopicContexts(topicFilter, sourceLanguage, targetLanguage);
-        if (!active) {
-          return;
-        }
-        setAvailableContexts(payload.contexts || []);
-      } catch {
-        if (!active) {
-          return;
-        }
-        setAvailableContexts([]);
-      }
-    };
-    void loadContexts();
-    return () => {
-      active = false;
-    };
-  }, [topicFilter, sourceLanguage, targetLanguage]);
-
-  const fetchDialogsPage = async (pageNumber: number): Promise<void> => {
-    const payload = await fetchContentDialogs(
-      sourceLanguage,
-      targetLanguage,
-      pageNumber,
-      DIALOGS_PAGE_SIZE,
-      topicFilter,
-      contextFilter,
-    );
-    const nextDialogs = payload.dialogs || [];
-    setDialogs((current) => mergeDialogList(current, nextDialogs));
-    setSelectedDialogId((current) => {
-      if (current !== null && nextDialogs.some((dialog) => dialog.dialog_id === current)) {
-        return current;
-      }
-      return nextDialogs[0]?.dialog_id ?? null;
-    });
-    setHasMore(Boolean(payload.has_more));
-  };
-
-  const fetchAllFilteredDialogs = async (): Promise<ContentDialogRecord[]> => {
-    const allDialogs: ContentDialogRecord[] = [];
-    let currentPage = 1;
-    let hasMorePages = true;
-    while (hasMorePages) {
-      const payload = await fetchContentDialogs(
-        sourceLanguage,
-        targetLanguage,
-        currentPage,
-        DIALOGS_PAGE_SIZE,
-        topicFilter,
-        contextFilter,
-      );
-      allDialogs.push(...(payload.dialogs || []));
-      hasMorePages = Boolean(payload.has_more);
-      currentPage = payload.next_page || (currentPage + 1);
-    }
-    return allDialogs;
-  };
 
   const upsertVisibleDialog = (dialog: ContentDialogRecord): void => {
     setDialogs((current) => {
@@ -288,39 +187,23 @@ export default function DialogsPage(): JSX.Element {
   };
 
   useEffect(() => {
-    let active = true;
-    const load = async (): Promise<void> => {
-      setLoading(true);
-      setError("");
-      setExpandedDialogId(null);
-      setWordActionStatus({});
-      setPhraseActionStatus({});
-      setPhraseActionError({});
-      setPendingWordAdd(null);
-      stopCurrentPlayback();
-      try {
-        await fetchDialogsPage(page);
-        if (!active) {
-          return;
-        }
-      } catch {
-        if (active) {
-          setDialogs([]);
-          setHasMore(false);
-          setError(t("dialogs.error.load"));
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-    void load();
-    return () => {
-      active = false;
-      stopCurrentPlayback();
-    };
-  }, [sourceLanguage, targetLanguage, topicFilter, contextFilter, page]);
+    setSelectedDialogId((current) => (
+      current !== null && dialogs.some((dialog) => dialog.dialog_id === current)
+        ? current
+        : dialogs[0]?.dialog_id ?? null
+    ));
+  }, [dialogs]);
+
+  useEffect(() => {
+    setExpandedDialogId(null);
+    setWordActionStatus({});
+    setPhraseActionStatus({});
+    setPhraseActionError({});
+    setPendingWordAdd(null);
+    stopCurrentPlayback();
+  }, [search, topic, context, page]);
+
+  useEffect(() => () => stopCurrentPlayback(), []);
 
   const requestAddWordFromDialogToken = async (
     key: string,
@@ -713,39 +596,17 @@ export default function DialogsPage(): JSX.Element {
       <h1>{t("dialogs.title")}</h1>
       <p>{t("dialogs.description")}</p>
       <section className="card">
-        <label className="form-field">
-          <span>{t("dialogs.topicFilter")}</span>
-          <select
-            value={topicFilter}
-            onChange={(event) => {
-              setTopicFilter(event.target.value);
-              setContextFilter(ALL_CONTEXTS_OPTION);
-              setPage(1);
-            }}
-            disabled={loading}
-          >
-            <option value={ALL_TOPICS_OPTION}>{t("dialogs.topicFilterPlaceholder")}</option>
-            {availableTopics.map((topic) => (
-              <option key={topic} value={topic}>{topic}</option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>{t("dialogs.contextFilter")}</span>
-          <select
-            value={contextFilter}
-            onChange={(event) => {
-              setContextFilter(event.target.value);
-              setPage(1);
-            }}
-            disabled={loading || !topicFilter}
-          >
-            <option value={ALL_CONTEXTS_OPTION}>{t("dialogs.contextFilterPlaceholder")}</option>
-            {availableContexts.map((context) => (
-              <option key={context} value={context}>{context}</option>
-            ))}
-          </select>
-        </label>
+        <DialogsFilterBar
+          search={search}
+          topic={topic}
+          context={context}
+          topics={topics}
+          contexts={contexts}
+          loading={loading}
+          onSearchChange={setSearch}
+          onTopicChange={setTopic}
+          onContextChange={setContext}
+        />
         <div className="actions">
           {!playingAll ? (
             <button type="button" onClick={() => void playAllDialogs()} disabled={loading || !hasPlayableDialogs}>

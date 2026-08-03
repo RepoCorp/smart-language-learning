@@ -15,6 +15,7 @@ from .management import (
     get_request_user,
     status,
 )
+from .exercise_persistence import merge_item_exercise_phrases
 
 
 def _clean_text(value: object, *, limit: int = 400) -> str:
@@ -132,12 +133,13 @@ class ContentItemDecodeView(APIView):
         if linguistic is None and memory is None and not related:
             return Response({"detail": "Failed to generate decode analysis"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        exercise_phrases = _merge_decode_analysis(
-            exercise_phrases=item.exercise_phrases or {},
-            linguistic=linguistic,
-            memory=memory,
-            related=related,
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_decode_analysis(
+                exercise_phrases=existing_payload,
+                linguistic=linguistic,
+                memory=memory,
+                related=related,
+            ),
         )
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
         return Response({"exercise_phrases": exercise_phrases})

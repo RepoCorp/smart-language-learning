@@ -2453,11 +2453,26 @@ textarea {
   font-size: 11px;
 }
 
+.conversation-last-turn-help {
+  margin: 0 0 10px;
+}
+
+
 .conversation-goal-banner-text {
   margin: 0;
   color: var(--color-text);
   font-size: 14px;
   line-height: 1.35;
+}
+
+.conversation-setup-goal {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
 }
 
 .conversation-controls-card {
@@ -3026,6 +3041,23 @@ textarea {
   padding: 8px 10px;
   margin-bottom: 6px;
   outline: none;
+}
+
+.dialogs-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.dialogs-filter-bar .form-field {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .dialogs-filter-bar {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dialog-list-card:focus {
@@ -3691,6 +3723,16 @@ textarea {
   padding: 12px 14px;
 }
 
+.walk-strategy-challenge {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.walk-strategy-challenge p {
+  margin: 4px 0 0;
+}
+
 .act-strategy-actions-title {
   margin: 0 0 8px 0;
 }
@@ -3925,6 +3967,13 @@ textarea {
   min-width: 0;
   justify-self: start;
   text-align: left;
+}
+
+.exercise-phrase-target-highlight {
+  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
+  border-radius: 3px;
+  color: inherit;
+  padding: 0 2px;
 }
 
 .exercise-phrase-row small {

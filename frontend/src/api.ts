@@ -322,6 +322,7 @@ export async function fetchContentDialogs(
   pageSize = 20,
   topic = "",
   context = "",
+  search = "",
 ): Promise<ContentDialogsResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
@@ -334,6 +335,9 @@ export async function fetchContentDialogs(
   }
   if (context.trim()) {
     params.set("context", context.trim());
+  }
+  if (search.trim()) {
+    params.set("search", search.trim());
   }
   const response = await apiFetch(`${API_BASE}/content/dialogs?${params.toString()}`);
   if (!response.ok) {
@@ -695,6 +699,7 @@ export async function startTopicConversation(
   notes: string,
   roleText: string,
   goalDifficulty: "easy" | "medium" | "hard",
+  goalText: string,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<TopicConversationStartResponse> {
@@ -705,7 +710,7 @@ export async function startTopicConversation(
   const response = await apiFetch(`${API_BASE}/content/conversation/start?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, notes, role_text: roleText, goal_difficulty: goalDifficulty }),
+    body: JSON.stringify({ topic, notes, role_text: roleText, goal_difficulty: goalDifficulty, goal_text: goalText }),
   });
   if (!response.ok) {
     let detail = "Failed to start conversation";

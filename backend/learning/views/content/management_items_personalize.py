@@ -14,6 +14,7 @@ from .management import (
     get_request_user,
     status,
 )
+from .exercise_persistence import merge_item_exercise_phrases
 
 
 def _merge_personalize_phrase(*, exercise_phrases: dict, source_text: str, target_text: str) -> dict:
@@ -94,13 +95,14 @@ class ContentItemPersonalizeView(APIView):
         if not target_text:
             return Response({"detail": "Failed to personalize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        exercise_phrases = _merge_personalize_phrase(
-            exercise_phrases=item.exercise_phrases or {},
-            source_text=final_source_text[:400],
-            target_text=target_text[:400],
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_personalize_phrase(
+                exercise_phrases=existing_payload,
+                source_text=final_source_text[:400],
+                target_text=target_text[:400],
+            ),
         )
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
 
         return Response(
             {

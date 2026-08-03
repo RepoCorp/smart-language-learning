@@ -24,6 +24,7 @@ from .management import (
     status,
 )
 from .management_items_listing import _generate_openai_image, _save_exercise_image
+from .exercise_persistence import merge_item_exercise_phrases
 from .word_friends import build_word_friend_prompt_notes
 
 logger = logging.getLogger(__name__)
@@ -186,13 +187,14 @@ class ContentItemVisualizeView(APIView):
             if not source_text or not target_text:
                 return Response({"detail": "Failed to generate visualize phrase"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-            exercise_phrases = _merge_visualize_phrase(
-                exercise_phrases=item.exercise_phrases or {},
-                source_text=source_text,
-                target_text=target_text,
+            exercise_phrases = merge_item_exercise_phrases(
+                item,
+                lambda existing_payload: _merge_visualize_phrase(
+                    exercise_phrases=existing_payload,
+                    source_text=source_text,
+                    target_text=target_text,
+                ),
             )
-            item.exercise_phrases = exercise_phrases
-            item.save(update_fields=["exercise_phrases", "updated_at"])
             if generation_stage == "phrase_only":
                 logger.info(
                     "content.visualize.request_finished item_id=%s stage=%s elapsed_ms=%d",
@@ -266,15 +268,16 @@ class ContentItemVisualizeView(APIView):
         if not image_url:
             return Response({"detail": "Failed to save visualize image"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        exercise_phrases = _merge_visualize_phrase(
-            exercise_phrases=item.exercise_phrases or {},
-            source_text=source_text,
-            target_text=target_text,
-            image_prompt=image_prompt,
-            image_url=image_url,
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_visualize_phrase(
+                exercise_phrases=existing_payload,
+                source_text=source_text,
+                target_text=target_text,
+                image_prompt=image_prompt,
+                image_url=image_url,
+            ),
         )
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
         logger.info(
             "content.visualize.request_finished item_id=%s stage=%s elapsed_ms=%d",
             item.id,

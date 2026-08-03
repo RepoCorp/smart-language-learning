@@ -4,7 +4,6 @@ import {
   fetchContentItemDetail,
   fetchTopicConversationUserCorrection,
   fetchTopicConversationUserLiteralTranslation,
-  fetchContentTopics,
   generateTopicConversationReview,
   regenerateTopicConversationGoal,
   quickAddPhraseFromConversation,
@@ -35,6 +34,7 @@ import ConversationTurns from "./ConversationTurns";
 import { useConversationGoalEvaluation } from "./useConversationGoalEvaluation";
 import { useConversationReviewPreparation } from "./useConversationReviewPreparation";
 import { useConversationScroll } from "./useConversationScroll";
+import { useConversationSetup } from "./useConversationSetup";
 import {
   type ConversationPhase,
   type ConversationResponseLevel,
@@ -59,16 +59,30 @@ export default function ConversationPage(): JSX.Element {
   const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
 
-  const [previousTopics, setPreviousTopics] = useState<string[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<string>(RANDOM_TOPIC_OPTION);
-  const [customTopic, setCustomTopic] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
-  const [role, setRole] = useState<string>("");
-  const [goalDifficulty, setGoalDifficulty] = useState<GoalDifficulty>("medium");
-  const [selectedConversationMode, setSelectedConversationMode] = useState<ConversationTransport>("realtime");
   const [speechSpeed, setSpeechSpeed] = useState<ConversationSpeechSpeed>(getInitialConversationSpeechSpeed);
   const [responseLevel, setResponseLevel] = useState<ConversationResponseLevel>(getInitialConversationResponseLevel);
-  const [loadingTopics, setLoadingTopics] = useState<boolean>(false);
+  const conversationSetup = useConversationSetup({ sourceLanguage, targetLanguage });
+  const {
+    previousTopics,
+    selectedTopic,
+    customTopic,
+    notes,
+    role,
+    goalDifficulty,
+    selectedConversationMode,
+    loadingTopics,
+    goal: setupGoal,
+    goalGenerating,
+    goalError,
+    resolvedTopic,
+    setSelectedTopic,
+    setCustomTopic,
+    setNotes,
+    setRole,
+    setGoalDifficulty,
+    setSelectedConversationMode,
+    generateGoal,
+  } = conversationSetup;
 
   const [started, setStarted] = useState<boolean>(false);
   const [activeTopic, setActiveTopic] = useState<string>("");
@@ -90,6 +104,7 @@ export default function ConversationPage(): JSX.Element {
 
   const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([]);
   const [conversationLoading, setConversationLoading] = useState<boolean>(false);
+  const [autoStartListening, setAutoStartListening] = useState<boolean>(false);
   const [conversationError, setConversationError] = useState<string>("");
   const [conversationPendingAssistantText, setConversationPendingAssistantText] = useState<string>("");
   const [conversationPendingUserTurn, setConversationPendingUserTurn] = useState<boolean>(false);
@@ -179,37 +194,6 @@ export default function ConversationPage(): JSX.Element {
       setConversationPhase("closing");
     },
   });
-
-  useEffect(() => {
-    let active = true;
-    const loadTopics = async (): Promise<void> => {
-      setLoadingTopics(true);
-      try {
-        const response = await fetchContentTopics(sourceLanguage, targetLanguage);
-        if (!active) {
-          return;
-        }
-        setPreviousTopics(response.topics || []);
-        setSelectedTopic(RANDOM_TOPIC_OPTION);
-        setCustomTopic("");
-      } catch {
-        if (active) {
-          setPreviousTopics([]);
-          setSelectedTopic(RANDOM_TOPIC_OPTION);
-          setCustomTopic("");
-        }
-      } finally {
-        if (active) {
-          setLoadingTopics(false);
-        }
-      }
-    };
-
-    void loadTopics();
-    return () => {
-      active = false;
-    };
-  }, [sourceLanguage, targetLanguage]);
 
   const toggleOpeningTranslation = (): void => {
     const nextVisible = !showOpeningTranslation;
@@ -380,9 +364,6 @@ export default function ConversationPage(): JSX.Element {
   const finishedTranscript = buildFinishedConversationTranscript(activeTopic, conversationTurns);
   const generatedReviewOriginalUserTexts = buildGeneratedReviewOriginalUserTexts(conversationTurns);
 
-  const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
-
-  const resolvedTopic = (shouldCreateNewTopic ? customTopic : selectedTopic).trim();
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
   const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
 
@@ -400,6 +381,7 @@ export default function ConversationPage(): JSX.Element {
     conversationRecordingSeconds,
     conversationTransport,
     conversationRealtimeConnecting,
+    conversationRealtimeReady,
     closeRealtimeSession,
     setPaused,
     setupRealtimeConversation,
@@ -427,6 +409,26 @@ export default function ConversationPage(): JSX.Element {
     speechSpeed,
     responseLevel,
   });
+
+  useEffect(() => {
+    if (
+      !autoStartListening
+      || !started
+      || conversationLoading
+      || (conversationTransport === "realtime" && !conversationRealtimeReady)
+    ) {
+      return;
+    }
+    setAutoStartListening(false);
+    void startRecording(false);
+  }, [
+    autoStartListening,
+    conversationLoading,
+    conversationRealtimeReady,
+    conversationTransport,
+    startRecording,
+    started,
+  ]);
   const {
     helpModalRef,
     historyRef,
@@ -628,6 +630,10 @@ export default function ConversationPage(): JSX.Element {
   const startConversation = async (): Promise<void> => {
     const startStartedAt = performance.now();
     setConversationError("");
+    if (!setupGoal) {
+      setConversationError(t("conversation.goalRequired"));
+      return;
+    }
     if (!resolvedTopic) {
       setConversationError(previousTopics.length ? t("content.error.selectOrEnterTopic") : t("content.error.enterTopic"));
       return;
@@ -649,6 +655,7 @@ export default function ConversationPage(): JSX.Element {
         trimmedNotes,
         trimmedRole,
         goalDifficulty,
+        setupGoal.text,
         sourceLanguage,
         targetLanguage,
       );
@@ -669,7 +676,7 @@ export default function ConversationPage(): JSX.Element {
           notes: payload.notes || trimmedNotes,
           roleText: payload.role_text || trimmedRole,
           goalDifficulty: payload.goal_difficulty || goalDifficulty,
-          goalText: payload.goal_text || "",
+          goalText: setupGoal.text,
         }).catch((error) => {
           warnRealtime("live-setup-failed", {
             reason: error instanceof Error ? error.message : String(error),
@@ -704,6 +711,7 @@ export default function ConversationPage(): JSX.Element {
           goalDifficulty,
           selectedTopic === RANDOM_TOPIC_OPTION,
         );
+        setAutoStartListening(true);
         logRealtime("start-finished", {
           elapsedMs: Math.round(performance.now() - startStartedAt),
           mode: "realtime",
@@ -720,6 +728,7 @@ export default function ConversationPage(): JSX.Element {
         goalDifficulty,
         selectedTopic === RANDOM_TOPIC_OPTION,
       );
+      setAutoStartListening(true);
       logRealtime("start-timing-summary", {
         totalElapsedMs: Math.round(performance.now() - startStartedAt),
         startRequestMs,
@@ -777,6 +786,7 @@ export default function ConversationPage(): JSX.Element {
     setConversationTransport("http");
     setConversationPendingUserTurn(false);
     setConversationFinished(false);
+    setAutoStartListening(false);
     setConversationEnded(false);
     setConversationReviewDialog(null);
     setAssistantSpeaking(false);
@@ -1065,6 +1075,9 @@ export default function ConversationPage(): JSX.Element {
           goalDifficulty={goalDifficulty}
           selectedConversationMode={selectedConversationMode}
           loadingTopics={loadingTopics}
+          goal={setupGoal}
+          goalGenerating={goalGenerating}
+          goalError={goalError}
           conversationLoading={conversationLoading}
           started={started}
           resolvedTopic={resolvedTopic}
@@ -1074,6 +1087,9 @@ export default function ConversationPage(): JSX.Element {
           onRoleChange={setRole}
           onGoalDifficultyChange={setGoalDifficulty}
           onConversationModeChange={setSelectedConversationMode}
+          onGenerateGoal={() => {
+            void generateGoal();
+          }}
           onStart={() => {
             void startConversation();
           }}
@@ -1110,18 +1126,6 @@ export default function ConversationPage(): JSX.Element {
             >
               <ConversationTurns
                 historyRef={historyRef}
-                opening={{
-                  text: openingText,
-                  translation: openingTranslation,
-                  audioUrl: openingAudioUrl,
-                  showTranslation: showOpeningTranslation,
-                }}
-                display={{
-                  hideSourceText,
-                  sourceLanguageLabel,
-                  pendingUserTurn: conversationPendingUserTurn,
-                  pendingAssistantText: conversationPendingAssistantText,
-                }}
                 visibility={{
                   topic: activeTopic,
                   topicWasRandom: activeTopicWasRandom,
@@ -1131,22 +1135,11 @@ export default function ConversationPage(): JSX.Element {
                   assistantRevealUsed: assistantRevealUsedByTurn,
                   assistantSpeaking,
                   translationVisible: conversationTranslationVisible,
-                  correctionVisible: conversationCorrectionVisible,
-                  userTranslationVisible: conversationUserTranslationVisible,
-                  userTranslationLoading: conversationUserTranslationLoading,
-                  userCorrectionLoading: conversationUserCorrectionLoading,
-                  sentenceActionStatus,
                 }}
                 actions={{
                   renderTargetLineWithWordLinks,
-                  hasTurnCorrection,
-                  toggleOpeningTranslation,
-                  playAudioUrl,
-                  toggleUserTurnTranslation,
-                  toggleUserTurnCorrection,
                   showAssistantTurnHint,
                   regenerateGoal: regenerateConversationGoal,
-                  requestAddSentenceFromConversation,
                 }}
                 conversationTurns={conversationTurns}
               />

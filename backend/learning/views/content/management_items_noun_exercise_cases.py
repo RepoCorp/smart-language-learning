@@ -4,6 +4,7 @@ from .management import APIView, Request, Response, _normalized_pair, apply_user
 from .management_items_listing import _target_contexts_for_word_exercises
 from .management_items_word_refresh import scan_all_dialogs_for_word
 from .exercise_payloads import sanitize_exercise_payload
+from .exercise_persistence import merge_item_exercise_phrases, replace_forms_exercise_payload
 from .generation import WORD_EXERCISE_MODEL, call_openai_json
 from .generation_words import _clean_exercise_section, _exercise_generation_input
 from .generation_word_noun_exercises import (
@@ -41,12 +42,15 @@ def _merge_german_noun_case_payload(*, existing_payload, new_section: dict, sour
             source_language=source_language,
         ))
 
-    merged = {
+    forms_payload = {
         "sections": ordered_sections,
         "phrases": [phrase for section in ordered_sections for phrase in section.get("phrases", [])],
         "generation_mode": GERMAN_NOUN_GENERATION_MODE,
     }
-    return sanitize_exercise_payload(merged)
+    return replace_forms_exercise_payload(
+        existing_payload=existing_payload,
+        forms_payload=sanitize_exercise_payload(forms_payload),
+    )
 
 
 class ContentItemNounExerciseCaseView(APIView):
@@ -96,11 +100,12 @@ class ContentItemNounExerciseCaseView(APIView):
         if not new_section.get("phrases"):
             return Response({"detail": "Exercise generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        merged_payload = _merge_german_noun_case_payload(
-            existing_payload=item.exercise_phrases or {},
-            new_section=new_section,
-            source_language=source_language,
+        merged_payload = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_german_noun_case_payload(
+                existing_payload=existing_payload,
+                new_section=new_section,
+                source_language=source_language,
+            ),
         )
-        item.exercise_phrases = merged_payload
-        item.save(update_fields=["exercise_phrases", "updated_at"])
         return Response({"exercise_phrases": merged_payload})

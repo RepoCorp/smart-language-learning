@@ -60,7 +60,7 @@ export function useRealtimeConversationTransport({
 
   const buildPhaseInstruction = (phase: ConversationPhase): string => {
     if (phase === "closing") {
-      return "The learner has already achieved the conversation goal. Gently guide the conversation toward a natural ending over the next 1 or 2 turns. Be warm and brief. Do not introduce new subtopics. If appropriate, invite a simple goodbye or give a short natural goodbye.";
+      return "The learner has already achieved the conversation goal. Let the exchange settle naturally over the next 1 or 2 turns. Reply warmly and briefly to the learner's actual message, in a way that fits the topic. Do not introduce a new subtopic or ask a new question. Do not mention the goal, ending the conversation, or what the learner should say next. Only say goodbye after the learner clearly says goodbye.";
     }
     return "Keep the conversation going naturally. Unless the learner is clearly ending the conversation, do not start wrapping up, do not say goodbye, and do not steer toward closing yet.";
   };
@@ -92,7 +92,9 @@ export function useRealtimeConversationTransport({
     const levelInstruction = buildLevelInstruction(level);
     return [
       baseInstructions,
-      conversationGoal ? `The current learner goal below replaces any earlier goal.\nCurrent learner goal: ${conversationGoal}` : "",
+      conversationGoal
+        ? `The current learner goal below replaces any earlier goal. It is private guidance only. Do not mention, quote, or explain it. Do not give goal-specific information, hints, or leading questions intended to make the learner complete it. Respond naturally to what the learner actually says and let them choose the direction within the topic.\nCurrent learner goal: ${conversationGoal}`
+        : "",
       phaseInstruction,
       levelInstruction,
       speedInstruction,

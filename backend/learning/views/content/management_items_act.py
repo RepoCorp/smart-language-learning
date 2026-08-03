@@ -15,6 +15,7 @@ from .management import (
     get_request_user,
     status,
 )
+from .exercise_persistence import merge_item_exercise_phrases
 
 
 def _merge_act_exercise(*, exercise_phrases: dict, source_text: str, target_text: str, actions: list[str]) -> dict:
@@ -83,12 +84,13 @@ class ContentItemActView(APIView):
         if not actions:
             return Response({"detail": "Failed to generate act exercise"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        exercise_phrases = _merge_act_exercise(
-            exercise_phrases=item.exercise_phrases or {},
-            source_text=source_text,
-            target_text=target_text,
-            actions=actions,
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_act_exercise(
+                exercise_phrases=existing_payload,
+                source_text=source_text,
+                target_text=target_text,
+                actions=actions,
+            ),
         )
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
         return Response({"exercise_phrases": exercise_phrases})

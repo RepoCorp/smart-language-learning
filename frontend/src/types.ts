@@ -34,7 +34,9 @@ export interface ItemExercisePhrases {
     target_text: string;
     actions?: string[];
   };
-  walk_sentences?: ExercisePhrase[];
+  walk_challenge?: ExercisePhrase & {
+    instruction: string;
+  };
   decode_analysis?: {
     linguistic?: {
       prefix?: string;
@@ -441,6 +443,7 @@ export interface TopicConversationGoalEvaluationResponse {
 }
 
 export interface TopicConversationGoalRegenerateResponse {
+  topic: string;
   goal_text: string;
   goal_difficulty?: "easy" | "medium" | "hard";
 }

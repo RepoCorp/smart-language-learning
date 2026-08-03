@@ -15,6 +15,7 @@ from .management import (
     get_request_user,
     status,
 )
+from .exercise_persistence import merge_item_exercise_phrases
 
 
 def _merge_compare_strategy(*, exercise_phrases: dict, comparisons: list[dict]) -> dict:
@@ -119,10 +120,11 @@ class ContentItemCompareStrategyView(APIView):
         if len(comparisons) < 3:
             return Response({"detail": "Failed to generate comparisons"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        exercise_phrases = _merge_compare_strategy(
-            exercise_phrases=item.exercise_phrases or {},
-            comparisons=comparisons,
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_compare_strategy(
+                exercise_phrases=existing_payload,
+                comparisons=comparisons,
+            ),
         )
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
         return Response({"exercise_phrases": exercise_phrases})

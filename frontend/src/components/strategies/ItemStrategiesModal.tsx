@@ -434,6 +434,8 @@ export default function ItemStrategiesModal({
         onRegenerateContent={onRegenerateContent}
         body={(
           <WalkStrategyPanel
+            challenge={walkStrategy.entries[0]?.label || ""}
+            targetWord={targetText}
             entries={walkStrategy.entries}
             selectedKeys={walkStrategy.selectedKeys}
             onToggleEntry={walkStrategy.toggleEntry}

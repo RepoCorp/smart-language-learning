@@ -15,6 +15,7 @@ from .management import (
     get_request_user,
     status,
 )
+from .exercise_persistence import merge_item_exercise_phrases
 
 
 def _merge_practice_phrases(*, exercise_phrases: dict, phrases: list[dict]) -> dict:
@@ -83,13 +84,14 @@ class ContentItemPracticeView(APIView):
         if not isinstance(phrases, list):
             return Response({"detail": "Failed to generate practice phrases"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        exercise_phrases = _merge_practice_phrases(
-            exercise_phrases=item.exercise_phrases or {},
-            phrases=phrases,
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_practice_phrases(
+                exercise_phrases=existing_payload,
+                phrases=phrases,
+            ),
         )
         if not exercise_phrases.get("practice_phrases"):
             return Response({"detail": "Failed to generate practice phrases"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
         return Response({"exercise_phrases": exercise_phrases})

@@ -26,6 +26,7 @@ from .management import (
 )
 from .dialog_item_context import related_dialogs_by_item_ids
 from .exercise_payloads import MAX_EXERCISE_PHRASES, sanitize_exercise_payload
+from .exercise_persistence import merge_item_exercise_phrases, replace_forms_exercise_payload
 from .item_questions import item_question_history
 from ...item_states import filter_new_items, is_new_item
 from ...models import DialogTurn, Item, ItemDialogOccurrence
@@ -693,17 +694,14 @@ class ContentItemExercisesView(APIView):
         if not cleaned["phrases"]:
             return Response({"detail": "Exercise generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        existing_funny_image_phrase = {}
-        if isinstance(item.exercise_phrases, dict):
-            funny_image_phrase = item.exercise_phrases.get("funny_image_phrase")
-            if isinstance(funny_image_phrase, dict):
-                existing_funny_image_phrase = funny_image_phrase
-        if existing_funny_image_phrase:
-            cleaned["funny_image_phrase"] = existing_funny_image_phrase
-
-        item.exercise_phrases = cleaned
-        item.save(update_fields=["exercise_phrases", "updated_at"])
-        return Response({"exercise_phrases": cleaned})
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: replace_forms_exercise_payload(
+                existing_payload=existing_payload,
+                forms_payload=cleaned,
+            ),
+        )
+        return Response({"exercise_phrases": exercise_phrases})
 
 
 class ContentItemFunnyImageExerciseView(APIView):
@@ -724,28 +722,6 @@ class ContentItemFunnyImageExerciseView(APIView):
         exercise_phrases = dict(item.exercise_phrases or {})
         phrase = _funny_image_source_phrase(exercise_phrases, word_type=item.word_type or "")
         phrase_lookup_started_at = time.perf_counter()
-        if not phrase:
-            scan_all_dialogs_for_word(
-                user=user,
-                item=item,
-                source_language=source_language,
-                target_language=target_language,
-            )
-            generated = generate_word_exercise_phrases_with_chatgpt(
-                item.spanish_text,
-                item.german_text,
-                notes=item.notes or "",
-                word_type=item.word_type or "",
-                source_language=source_language,
-                target_language=target_language,
-                target_contexts=_target_contexts_for_word_exercises(user=user, item=item),
-            )
-            cleaned = sanitize_exercise_payload(generated)
-            if cleaned.get("phrases"):
-                exercise_phrases = cleaned
-                item.exercise_phrases = cleaned
-                item.save(update_fields=["exercise_phrases", "updated_at"])
-                phrase = _funny_image_source_phrase(cleaned, word_type=item.word_type or "")
         logger.info(
             "content.exercises.funny_image_phrase_finished item_id=%s elapsed_ms=%d success=%s",
             item.id,
@@ -753,7 +729,7 @@ class ContentItemFunnyImageExerciseView(APIView):
             bool(phrase),
         )
         if not phrase:
-            return Response({"detail": "Funny image phrase lookup failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response({"detail": "Generate Forms before creating an image"}, status=status.HTTP_400_BAD_REQUEST)
 
         target_text = str(phrase.get("target_text", "")).strip()
         final_image_prompt = (
@@ -789,9 +765,13 @@ class ContentItemFunnyImageExerciseView(APIView):
             "image_url": image_url,
             "image_prompt": final_image_prompt,
         }
-        exercise_phrases["funny_image_phrase"] = funny_image_phrase
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: {
+                **existing_payload,
+                "funny_image_phrase": funny_image_phrase,
+            },
+        )
         logger.info(
             "content.exercises.funny_image_request_finished item_id=%s elapsed_ms=%d",
             item.id,

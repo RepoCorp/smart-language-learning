@@ -20,8 +20,8 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
+Uno escribir su propio goal
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
-No guardó las frases de practice
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?
 Quitar la selección de frase para imagen y cuando esta abierta decir solo la frase al presionar reproducir

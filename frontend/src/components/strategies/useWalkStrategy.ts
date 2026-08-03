@@ -14,19 +14,23 @@ function walkEntryKey(entry: WalkEntry): string {
   return `${entry.label || ""}|||${entry.source}|||${entry.target}`;
 }
 
-function sanitizeWalkEntries(exercisePhrases: ItemExercisePhrases | undefined): WalkEntry[] {
-  const entries = exercisePhrases?.walk_sentences;
-  if (!Array.isArray(entries)) {
-    return [];
+function sanitizeWalkChallenge(exercisePhrases: ItemExercisePhrases | undefined): { instruction: string; entry: WalkEntry } | null {
+  const challenge = exercisePhrases?.walk_challenge;
+  const instruction = String(challenge?.instruction || "").trim();
+  const source = String(challenge?.source_text || "").trim();
+  const target = String(challenge?.target_text || "").trim();
+  if (!instruction || !source || !target) {
+    return null;
   }
-  return entries
-    .map((entry) => ({
-      label: String(entry?.label || "").trim() || "walk",
-      source: String(entry?.source_text || "").trim(),
-      target: String(entry?.target_text || "").trim(),
-    }))
-    .filter((entry) => entry.source && entry.target)
-    .slice(0, 5);
+  return {
+    instruction,
+    entry: {
+      label: instruction,
+      source,
+      target,
+      key: "",
+    },
+  };
 }
 
 export function useWalkStrategy({
@@ -53,10 +57,11 @@ export function useWalkStrategy({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const attemptedGenerationRef = useRef<string>("");
 
-  const entries = useMemo(
-    () => sanitizeWalkEntries(exercisePhrases),
+  const challenge = useMemo(
+    () => sanitizeWalkChallenge(exercisePhrases),
     [exercisePhrases],
   );
+  const entries = useMemo(() => (challenge ? [challenge.entry] : []), [challenge]);
 
   const generate = async (): Promise<void> => {
     if (itemType !== "word" || itemId <= 0 || isLoading) {

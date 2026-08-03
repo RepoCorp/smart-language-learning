@@ -11,17 +11,12 @@ from django.conf import settings
 
 from ...auth import get_request_user
 from ...languages import language_display_name
-from .audio import create_audio_data_url, select_dialog_speaker_voice_ids
-from .core import create_audio_file
 from .management import APIView, Request, Response, status
 from .management_topic_conversation_shared import (
-    conversation_audio_enabled,
-    conversation_inline_audio_enabled,
     conversation_realtime_enabled,
     validate_conversation_start_fields,
     validate_conversation_start_payload,
 )
-from .management_topic_conversation_goal_generation import generate_conversation_goal
 from .topic_pool import resolve_topic_choice
 
 logger = logging.getLogger(__name__)
@@ -46,7 +41,10 @@ def build_realtime_conversation_instructions(
         f"Conversation topic: {topic}\n"
         f"The other person's role: {role_line}\n"
         f"Temporary notes: {notes_line}\n"
-        f"Learner's conversation goal: {goal_text}\n"
+        f"Learner's conversation goal (private guidance): {goal_text}\n"
+        "Use the goal only as subtle background guidance. Do not mention, quote, or explain it.\n"
+        "Do not give goal-specific information, hints, or leading questions intended to make the learner complete it.\n"
+        "Keep the exchange natural: respond to what the learner actually says and let them choose the direction within the topic.\n"
         f"Always reply in natural {target_name}.\n"
         "Use simple vocabulary and simple grammar.\n"
         "Prefer common everyday words.\n"
@@ -71,10 +69,11 @@ def build_realtime_phase_instruction(conversation_phase: str) -> str:
     if normalized_phase == "closing":
         return (
             "The learner has already achieved the conversation goal.\n"
-            "Gently guide the conversation toward a natural ending over the next 1 or 2 turns.\n"
-            "Be warm and brief.\n"
-            "Do not introduce new subtopics.\n"
-            "If appropriate, invite a simple goodbye or give a short natural goodbye.\n"
+            "Let the exchange settle naturally over the next 1 or 2 turns.\n"
+            "Reply warmly and briefly to the learner's actual message, in a way that fits the topic.\n"
+            "Do not introduce a new subtopic or ask a new question.\n"
+            "Do not mention the goal, ending the conversation, or what the learner should say next.\n"
+            "Only say goodbye after the learner clearly says goodbye.\n"
         )
     return (
         "Keep the conversation going naturally.\n"
@@ -192,74 +191,26 @@ class ContentTopicConversationStartView(APIView):
         if validation_error is not None:
             return validation_error
 
-        goal_started_at = time.perf_counter()
-        try:
-            goal_text, selected_goal_difficulty = generate_conversation_goal(
-                topic=topic,
-                notes=notes,
-                role_text=role_text,
-                goal_difficulty=goal_difficulty,
-                source_language=source_language,
-                target_language=target_language,
-            )
-        except RuntimeError as exc:
-            logger.warning(
-                "content.topic_conversation.start_failed stage=goal_generation topic=%s error=%s",
-                topic,
-                str(exc),
-            )
-            return Response(
-                {"detail": "Could not create a conversation goal. Please try again."},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-        goal_elapsed_ms = int((time.perf_counter() - goal_started_at) * 1000)
+        goal_text = str(request.data.get("goal_text", "")).strip()
+        if not goal_text:
+            return Response({"detail": "goal_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(goal_text) > 1000:
+            return Response({"detail": "goal_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
         goals = [goal_text]
-        opening_text = ""
-        opening_translation_text = ""
-        logger.info(
-            "content.topic_conversation.start_stage stage=goal_generation elapsed_ms=%s topic=%s goal_difficulty=%s",
-            goal_elapsed_ms,
-            topic,
-            goal_difficulty,
-        )
-        opening_audio_url = ""
-        opening_audio_elapsed_ms = 0
-        if opening_text and conversation_audio_enabled():
-            opening_audio_started_at = time.perf_counter()
-            if conversation_inline_audio_enabled():
-                opening_audio_url = create_audio_data_url(opening_text, "conversation", target_language=target_language)
-            else:
-                opening_audio_url = create_audio_file(opening_text, "conversation", target_language=target_language)
-            opening_audio_elapsed_ms = int((time.perf_counter() - opening_audio_started_at) * 1000)
-            logger.info(
-                "content.topic_conversation.start_stage stage=opening_audio elapsed_ms=%s has_audio=%s",
-                opening_audio_elapsed_ms,
-                bool(opening_audio_url),
-            )
-        elif opening_text:
-            logger.info("content.topic_conversation.start_stage stage=opening_audio skipped=true")
 
         total_elapsed_ms = int((time.perf_counter() - request_started_at) * 1000)
         logger.info(
-            "content.topic_conversation.start_finished total_elapsed_ms=%s goal_generation_ms=%s opening_audio_ms=%s topic=%s goal_length=%s has_opening_text=%s has_opening_audio=%s",
+            "content.topic_conversation.start_finished total_elapsed_ms=%s topic=%s goal_length=%s",
             total_elapsed_ms,
-            goal_elapsed_ms,
-            opening_audio_elapsed_ms,
             topic,
             len(goal_text),
-            bool(opening_text),
-            bool(opening_audio_url),
         )
         logger.info(
-            "content.topic_conversation.start_timing_summary total_elapsed_ms=%s goal_generation_ms=%s opening_audio_ms=%s topic=%s goal_difficulty=%s goal_length=%s has_opening_text=%s has_opening_audio=%s",
+            "content.topic_conversation.start_timing_summary total_elapsed_ms=%s topic=%s goal_difficulty=%s goal_length=%s",
             total_elapsed_ms,
-            goal_elapsed_ms,
-            opening_audio_elapsed_ms,
             topic,
-            selected_goal_difficulty,
+            goal_difficulty,
             len(goal_text),
-            bool(opening_text),
-            bool(opening_audio_url),
         )
 
         return Response(
@@ -267,12 +218,12 @@ class ContentTopicConversationStartView(APIView):
                 "topic": topic,
                 "notes": notes,
                 "role_text": role_text,
-                "goal_difficulty": selected_goal_difficulty,
+                "goal_difficulty": goal_difficulty,
                 "goals": goals,
                 "goal_text": goal_text,
-                "opening_text": opening_text,
-                "opening_translation_text": opening_translation_text,
-                "opening_audio_url": opening_audio_url,
+                "opening_text": "",
+                "opening_translation_text": "",
+                "opening_audio_url": "",
             }
         )
 

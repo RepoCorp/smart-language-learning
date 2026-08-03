@@ -1,32 +1,48 @@
 from __future__ import annotations
 
-from ...languages import language_display_name
 from ...models import Item
-from ...prompts import STRATEGY_WALK_SENTENCES_PROMPT
-from .generation import WORD_EXERCISE_MODEL
-from .management import (
-    APIView,
-    Request,
-    Response,
-    _call_openai_json_logged,
-    _normalized_pair,
-    _render_prompt,
-    apply_user_scope,
-    get_request_user,
-    status,
-)
+from .exercise_persistence import merge_item_exercise_phrases
+from .management import APIView, Request, Response, _normalized_pair, apply_user_scope, get_request_user, status
+from .walk_challenges import generate_walk_challenge
 
 
-def _merge_walk_sentences(*, exercise_phrases: dict, sentences: list[dict[str, str]]) -> dict:
+def _walk_sentence(exercise_phrases: dict) -> dict[str, str] | None:
+    entries = exercise_phrases.get("phrases") if isinstance(exercise_phrases, dict) else []
+    if not isinstance(entries, list):
+        return None
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        source_text = str(entry.get("source_text", "")).strip()
+        target_text = str(entry.get("target_text", "")).strip()
+        if source_text and target_text:
+            return {"source_text": source_text[:400], "target_text": target_text[:400]}
+    return None
+
+
+def _valid_walk_challenge(exercise_phrases: dict) -> dict[str, str] | None:
+    challenge = exercise_phrases.get("walk_challenge") if isinstance(exercise_phrases, dict) else None
+    if not isinstance(challenge, dict):
+        return None
+    instruction = str(challenge.get("instruction", "")).strip()
+    source_text = str(challenge.get("source_text", "")).strip()
+    target_text = str(challenge.get("target_text", "")).strip()
+    if not (instruction and source_text and target_text):
+        return None
+    return {"instruction": instruction[:500], "source_text": source_text[:400], "target_text": target_text[:400]}
+
+
+def _merge_walk_challenge(*, exercise_phrases: dict, instruction: str, regenerate: bool) -> dict:
     payload = dict(exercise_phrases or {})
-    payload["walk_sentences"] = [
-        {
-            "label": f"walk-{index + 1}",
-            "source_text": sentence["source_text"][:400],
-            "target_text": sentence["target_text"][:400],
-        }
-        for index, sentence in enumerate(sentences[:5])
-    ]
+    existing = _valid_walk_challenge(payload)
+    if existing and not regenerate:
+        return payload
+
+    sentence = _walk_sentence(payload)
+    if not sentence:
+        return payload
+    payload["walk_challenge"] = {"label": "walk", "instruction": instruction, **sentence}
+    payload.pop("walk_sentences", None)
     return payload
 
 
@@ -43,54 +59,21 @@ class ContentItemWalkView(APIView):
         if not item:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        source_name = language_display_name(source_language)
-        target_name = language_display_name(target_language)
-        parsed = _call_openai_json_logged(
-            label="content_item_walk",
-            system_prompt=_render_prompt(
-                STRATEGY_WALK_SENTENCES_PROMPT,
-                source_name=source_name,
-                target_name=target_name,
-                source_text=item.spanish_text,
-                target_text=item.german_text,
-                word_type=item.word_type or "",
-                notes=item.notes or "",
+        existing = _valid_walk_challenge(item.exercise_phrases or {})
+        if not _walk_sentence(item.exercise_phrases or {}):
+            return Response({"detail": "Generate Forms before creating a Walk challenge"}, status=status.HTTP_400_BAD_REQUEST)
+
+        instruction = generate_walk_challenge()
+        if not instruction:
+            return Response({"detail": "Walk challenges are not configured"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_walk_challenge(
+                exercise_phrases=existing_payload,
+                instruction=instruction,
+                regenerate=bool(existing),
             ),
-            user_input=(
-                f"Item source text: {item.spanish_text}\n"
-                f"Item target text: {item.german_text}\n"
-                f"Item word type: {item.word_type or ''}\n"
-                f"Item notes: {item.notes or ''}\n"
-            ),
-            timeout_seconds=12,
-            model=WORD_EXERCISE_MODEL,
-            temperature=1.0,
-            top_p=1.0,
-            presence_penalty=0.0,
         )
-        if not isinstance(parsed, dict):
-            return Response({"detail": "Failed to generate walk exercise"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        sentences_value = parsed.get("sentences")
-        if not isinstance(sentences_value, list):
-            return Response({"detail": "Failed to generate walk exercise"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        sentences: list[dict[str, str]] = []
-        for sentence in sentences_value[:5]:
-            if not isinstance(sentence, dict):
-                continue
-            target_text = str(sentence.get("target", "")).strip()
-            source_text = str(sentence.get("source", "")).strip()
-            if not target_text or not source_text:
-                continue
-            sentences.append({"target_text": target_text, "source_text": source_text})
-        if len(sentences) != 5:
-            return Response({"detail": "Failed to generate walk exercise"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        exercise_phrases = _merge_walk_sentences(
-            exercise_phrases=item.exercise_phrases or {},
-            sentences=sentences,
-        )
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
+        if not _valid_walk_challenge(exercise_phrases):
+            return Response({"detail": "Generate Forms before creating a Walk challenge"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"exercise_phrases": exercise_phrases})

@@ -2,6 +2,8 @@ import { useI18n } from "../../i18n";
 import PhraseSelectionList, { type PhraseSelectionEntry } from "./PhraseSelectionList";
 
 export default function WalkStrategyPanel({
+  challenge,
+  targetWord,
   entries,
   selectedKeys,
   onToggleEntry,
@@ -9,6 +11,8 @@ export default function WalkStrategyPanel({
   isLoading,
   error,
 }: {
+  challenge: string;
+  targetWord: string;
   entries: PhraseSelectionEntry[];
   selectedKeys: string[];
   onToggleEntry: (entry: PhraseSelectionEntry) => void;
@@ -23,6 +27,12 @@ export default function WalkStrategyPanel({
       <p className="hint exercise-modal-description">{t("newItem.walkDescription")}</p>
       {isLoading && <p className="hint">{t("newItem.walkGenerating")}</p>}
       {error && <p className="error">{error}</p>}
+      {!!challenge && (
+        <div className="walk-strategy-challenge">
+          <strong>{t("newItem.walkChallengeTitle")}</strong>
+          <p>{challenge}</p>
+        </div>
+      )}
       {!isLoading && !error && entries.length === 0 && (
         <p className="hint">{t("newItem.walkEmpty")}</p>
       )}
@@ -32,6 +42,7 @@ export default function WalkStrategyPanel({
           selectedKeys={selectedKeys}
           onToggleEntry={onToggleEntry}
           disabled={exerciseRunning}
+          highlightTargetText={targetWord}
         />
       )}
     </div>

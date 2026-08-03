@@ -15,6 +15,7 @@ from .management import (
     get_request_user,
     status,
 )
+from .exercise_persistence import merge_item_exercise_phrases
 
 
 def _clean_connect_group(entries: object, *, limit: int) -> list[dict]:
@@ -98,11 +99,12 @@ class ContentItemConnectView(APIView):
         if not same_family and not related_or_confusing:
             return Response({"detail": "Failed to generate connected words"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        exercise_phrases = _merge_connect_groups(
-            exercise_phrases=item.exercise_phrases or {},
-            same_family=same_family,
-            related_or_confusing=related_or_confusing,
+        exercise_phrases = merge_item_exercise_phrases(
+            item,
+            lambda existing_payload: _merge_connect_groups(
+                exercise_phrases=existing_payload,
+                same_family=same_family,
+                related_or_confusing=related_or_confusing,
+            ),
         )
-        item.exercise_phrases = exercise_phrases
-        item.save(update_fields=["exercise_phrases", "updated_at"])
         return Response({"exercise_phrases": exercise_phrases})

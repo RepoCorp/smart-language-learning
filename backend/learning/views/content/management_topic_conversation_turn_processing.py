@@ -63,9 +63,11 @@ def _conversation_phase_instruction(phase: str) -> str:
     if normalized_phase == "closing":
         return (
             "The learner has already achieved the conversation goal. "
-            "Gently guide the conversation toward a natural ending over the next 1 or 2 turns. "
-            "Be warm and brief. Do not introduce new subtopics. "
-            "If appropriate, invite a simple goodbye or give a short natural goodbye."
+            "Let the exchange settle naturally over the next 1 or 2 turns. "
+            "Reply warmly and briefly to the learner's actual message, in a way that fits the topic. "
+            "Do not introduce a new subtopic or ask a new question. "
+            "Do not mention the goal, ending the conversation, or what the learner should say next. "
+            "Only say goodbye after the learner clearly says goodbye."
         )
     return (
         "Keep the conversation going naturally. Unless the learner is clearly ending the conversation, "
@@ -77,7 +79,13 @@ def _effective_notes(*, notes: str, goal_text: str, response_level: str, speech_
     return "\n".join(
         part for part in [
             notes.strip(),
-            f"Learner's conversation goal: {goal_text.strip()}" if goal_text.strip() else "",
+            (
+                f"Learner's conversation goal (private guidance): {goal_text.strip()}\n"
+                "Use it only as subtle background guidance. Do not mention, quote, or explain it.\n"
+                "Do not give goal-specific information, hints, or leading questions intended to make the learner complete it.\n"
+                "Respond naturally to what the learner actually says and let them choose the direction within the topic."
+                if goal_text.strip() else ""
+            ),
             _conversation_phase_instruction(conversation_phase),
             _response_level_instruction(response_level),
             _speech_speed_instruction(speech_speed),

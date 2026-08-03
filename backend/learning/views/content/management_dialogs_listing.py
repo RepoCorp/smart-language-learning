@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.db.models import Q
+
 from .audio import select_dialog_speaker_voice_ids
 from .core import create_audio_file
 from .management import (
@@ -45,6 +47,7 @@ class ContentDialogsView(APIView):
         offset = (page - 1) * page_size
         topic_query = (request.query_params.get("topic", "") or "").strip()
         context_query = (request.query_params.get("context", "") or "").strip()
+        search_query = (request.query_params.get("search", "") or "").strip()
         queryset = apply_user_scope(SavedDialog.objects, user).filter(
             source_language=source_language,
             target_language=target_language,
@@ -53,6 +56,13 @@ class ContentDialogsView(APIView):
             queryset = queryset.filter(topic__icontains=topic_query)
         if context_query:
             queryset = queryset.filter(context__icontains=context_query)
+        if search_query:
+            queryset = queryset.filter(
+                Q(topic__icontains=search_query)
+                | Q(context__icontains=search_query)
+                | Q(dialog_turns__source_text__icontains=search_query)
+                | Q(dialog_turns__target_text__icontains=search_query)
+            ).distinct()
         rows = list(
             queryset
             .prefetch_related("dialog_turns")
@@ -81,6 +91,7 @@ class ContentDialogsView(APIView):
                 "next_page": page + 1 if has_more else None,
                 "topic": topic_query,
                 "context": context_query,
+                "search": search_query,
             }
         )
 

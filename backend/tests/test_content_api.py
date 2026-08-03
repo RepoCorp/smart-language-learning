@@ -8,6 +8,110 @@ from rest_framework.test import APIClient
 from learning.models import DialogTurn, DisabledElevenLabsVoice, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic, UserAuthToken
 
 
+def test_forms_payload_replacement_preserves_other_strategy_results():
+    from learning.views.content.exercise_persistence import replace_forms_exercise_payload
+
+    payload = replace_forms_exercise_payload(
+        existing_payload={
+            "phrases": [{"label": "old", "source_text": "viejo", "target_text": "alt"}],
+            "practice_phrases": [{"label": "practice-1", "source_text": "uso", "target_text": "Ich benutze es."}],
+            "visualize_phrase": {"source_text": "Veo un gato.", "target_text": "Ich sehe eine Katze."},
+        },
+        forms_payload={
+            "phrases": [{"label": "new", "source_text": "nuevo", "target_text": "neu"}],
+            "generation_mode": "noun_cases_german_v1",
+        },
+    )
+
+    assert payload["phrases"][0]["label"] == "new"
+    assert payload["generation_mode"] == "noun_cases_german_v1"
+    assert "practice_phrases" in payload
+    assert "visualize_phrase" in payload
+
+
+def test_walk_challenge_uses_one_movement_and_one_voice_or_imagination():
+    from learning.views.content.walk_challenges import generate_walk_challenge
+
+    selected = iter(["Move.", "voice", "Speak."])
+    challenge = generate_walk_challenge(
+        choice=lambda options: next(selected),
+        movements=("Move.",),
+        voices=("Speak.",),
+        imaginations=("Imagine.",),
+    )
+
+    assert challenge == "Move. Speak."
+
+
+def test_walk_challenge_never_combines_voice_and_imagination():
+    from learning.views.content.walk_challenges import generate_walk_challenge
+
+    selected = iter(["Move.", "imagination", "Imagine."])
+    challenge = generate_walk_challenge(
+        choice=lambda options: next(selected),
+        movements=("Move.",),
+        voices=("Speak.",),
+        imaginations=("Imagine.",),
+    )
+
+    assert challenge == "Move. Imagine."
+    assert "Speak." not in challenge
+
+
+def test_walk_challenge_handles_empty_configuration():
+    from learning.views.content.walk_challenges import generate_walk_challenge
+
+    assert generate_walk_challenge(movements=(), voices=("Speak.",), imaginations=("Imagine.",)) is None
+    assert generate_walk_challenge(movements=("Move.",), voices=(), imaginations=()) is None
+
+
+def test_walk_payload_reuses_a_challenge_until_manually_regenerated():
+    from learning.views.content.management_items_walk import _merge_walk_challenge
+
+    forms_payload = {
+        "phrases": [{"source_text": "Yo camino.", "target_text": "Ich gehe."}],
+    }
+    first_payload = _merge_walk_challenge(
+        exercise_phrases=forms_payload,
+        instruction="Walk like a penguin. Whisper the sentence.",
+        regenerate=False,
+    )
+    reused_payload = _merge_walk_challenge(
+        exercise_phrases=first_payload,
+        instruction="Hop on one foot. Pretend you're on the Moon.",
+        regenerate=False,
+    )
+    regenerated_payload = _merge_walk_challenge(
+        exercise_phrases=reused_payload,
+        instruction="Hop on one foot. Pretend you're on the Moon.",
+        regenerate=True,
+    )
+
+    assert reused_payload["walk_challenge"]["instruction"] == "Walk like a penguin. Whisper the sentence."
+    assert regenerated_payload["walk_challenge"]["instruction"] == "Hop on one foot. Pretend you're on the Moon."
+    assert regenerated_payload["walk_challenge"]["target_text"] == "Ich gehe."
+
+
+@pytest.mark.django_db
+def test_strategy_payload_updates_merge_with_the_latest_saved_payload():
+    from learning.views.content.exercise_persistence import merge_item_exercise_phrases
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="usar",
+        german_text="benutzen",
+        exercise_phrases={"practice_phrases": [{"label": "practice-1"}]},
+    )
+
+    merge_item_exercise_phrases(item, lambda payload: {**payload, "connect_groups": {"same_family": []}})
+    merge_item_exercise_phrases(item, lambda payload: {**payload, "walk_sentences": [{"label": "walk-1"}]})
+
+    item.refresh_from_db()
+    assert "practice_phrases" in item.exercise_phrases
+    assert "connect_groups" in item.exercise_phrases
+    assert "walk_sentences" in item.exercise_phrases
+
+
 def _patch_dialog_click_call(monkeypatch, fake_call_openai_json) -> None:
     from learning.views.content import dialog_click_resolution
 
@@ -3279,6 +3383,40 @@ def test_content_dialogs_endpoint_paginates_and_filters_by_topic():
     assert payload["has_more"] is False
     assert payload["next_page"] is None
     assert payload["dialogs"][0]["topic"].startswith("travel")
+
+
+@pytest.mark.django_db
+def test_content_dialogs_endpoint_searches_topic_context_and_turn_text():
+    topic_match = SavedDialog.objects.create(
+        topic="job interview",
+        context="office",
+        source_language="spanish",
+        target_language="german",
+    )
+    turn_match = SavedDialog.objects.create(
+        topic="daily plans",
+        context="home",
+        source_language="spanish",
+        target_language="german",
+    )
+    DialogTurn.objects.create(dialog=turn_match, turn_index=0, source_text="¿Dónde está la estación?", target_text="Wo ist der Bahnhof?")
+    SavedDialog.objects.create(
+        topic="cooking",
+        context="kitchen",
+        source_language="spanish",
+        target_language="german",
+    )
+
+    client = APIClient()
+    response = client.get("/api/content/dialogs?source_language=spanish&target_language=german&search=interview")
+
+    assert response.status_code == 200
+    assert [dialog["dialog_id"] for dialog in response.json()["dialogs"]] == [topic_match.id]
+
+    response = client.get("/api/content/dialogs?source_language=spanish&target_language=german&search=Bahnhof")
+
+    assert response.status_code == 200
+    assert [dialog["dialog_id"] for dialog in response.json()["dialogs"]] == [turn_match.id]
 
 
 @pytest.mark.django_db

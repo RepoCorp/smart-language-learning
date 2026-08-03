@@ -199,7 +199,14 @@ PY
 deploy_backend_step() {
   local backend_image_ref="${BACKEND_IMAGE_NAME}:${BACKEND_IMAGE_TAG}"
   local lightsail_image_ref=":${LIGHTSAIL_SERVICE_NAME}.${LIGHTSAIL_IMAGE_LABEL}.latest"
+  local health_check_healthy_threshold="${LIGHTSAIL_HEALTH_CHECK_HEALTHY_THRESHOLD:-2}"
+  local health_check_unhealthy_threshold="${LIGHTSAIL_HEALTH_CHECK_UNHEALTHY_THRESHOLD:-6}"
+  local health_check_timeout_seconds="${LIGHTSAIL_HEALTH_CHECK_TIMEOUT_SECONDS:-5}"
+  local health_check_interval_seconds="${LIGHTSAIL_HEALTH_CHECK_INTERVAL_SECONDS:-10}"
   local deployment_json
+  local deployment_version
+  local deployment_state
+  local service_url
 
   echo "Building backend container image ${backend_image_ref}..."
   (
@@ -217,12 +224,22 @@ deploy_backend_step() {
     --region "${AWS_REGION}" \
     >/tmp/lightsail-push.txt
 
-  deployment_json="$(python3 - "${BACKEND_ENV_FILE_ABS}" "${LIGHTSAIL_CONTAINER_NAME}" "${lightsail_image_ref}" "${LIGHTSAIL_CONTAINER_PORT}" "${LIGHTSAIL_HEALTH_CHECK_PATH}" <<'PY'
+  deployment_json="$(python3 - "${BACKEND_ENV_FILE_ABS}" "${LIGHTSAIL_CONTAINER_NAME}" "${lightsail_image_ref}" "${LIGHTSAIL_CONTAINER_PORT}" "${LIGHTSAIL_HEALTH_CHECK_PATH}" "${health_check_healthy_threshold}" "${health_check_unhealthy_threshold}" "${health_check_timeout_seconds}" "${health_check_interval_seconds}" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-env_path, container_name, image_ref, port, health_path = sys.argv[1:]
+(
+    env_path,
+    container_name,
+    image_ref,
+    port,
+    health_path,
+    healthy_threshold,
+    unhealthy_threshold,
+    timeout_seconds,
+    interval_seconds,
+) = sys.argv[1:]
 env = {}
 for raw_line in Path(env_path).read_text().splitlines():
     line = raw_line.strip()
@@ -248,7 +265,11 @@ payload = {
         "containerPort": int(port),
         "healthCheck": {
             "path": health_path,
-            "successCodes": "200-399"
+            "successCodes": "200-399",
+            "healthyThreshold": int(healthy_threshold),
+            "unhealthyThreshold": int(unhealthy_threshold),
+            "timeoutSeconds": int(timeout_seconds),
+            "intervalSeconds": int(interval_seconds),
         }
     }
 }
@@ -263,30 +284,47 @@ PY
     --region "${AWS_REGION}" \
     >/tmp/lightsail-deployment.json
 
-  echo "Waiting for Lightsail deployment to become active..."
+  deployment_version="$(
+    python3 - <<'PY'
+import json
+from pathlib import Path
+
+payload = json.loads(Path("/tmp/lightsail-deployment.json").read_text())
+service = payload.get("containerService", {})
+deployment = service.get("nextDeployment") or service.get("currentDeployment") or {}
+print(deployment.get("version", ""))
+PY
+  )"
+
+  if [[ -z "${deployment_version}" ]]; then
+    echo "Could not determine the Lightsail deployment version." >&2
+    exit 1
+  fi
+
+  echo "Waiting for Lightsail deployment ${deployment_version} to finish..."
   for _ in $(seq 1 60); do
-    current_state="$(aws lightsail get-container-services \
+    deployment_state="$(aws lightsail get-container-service-deployments \
       --service-name "${LIGHTSAIL_SERVICE_NAME}" \
       --region "${AWS_REGION}" \
-      --query 'containerServices[0].currentDeployment.state' \
-      --output text)"
-    service_url="$(aws lightsail get-container-services \
-      --service-name "${LIGHTSAIL_SERVICE_NAME}" \
-      --region "${AWS_REGION}" \
-      --query 'containerServices[0].url' \
+      --query "deployments[?version==\`${deployment_version}\`].state | [0]" \
       --output text)"
 
-    case "${current_state}" in
+    case "${deployment_state}" in
       ACTIVE)
+        service_url="$(aws lightsail get-container-services \
+          --service-name "${LIGHTSAIL_SERVICE_NAME}" \
+          --region "${AWS_REGION}" \
+          --query 'containerServices[0].url' \
+          --output text)"
         echo "Lightsail deployment active at ${service_url}"
         return
         ;;
       FAILED)
-        echo "Lightsail deployment failed. Check container logs in the Lightsail console." >&2
+        echo "Lightsail deployment ${deployment_version} failed. Check its container logs in the Lightsail console." >&2
         exit 1
         ;;
       *)
-        echo "Lightsail deployment state: ${current_state}"
+        echo "Lightsail deployment ${deployment_version} state: ${deployment_state}"
         sleep 10
         ;;
     esac
