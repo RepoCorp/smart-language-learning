@@ -4,6 +4,7 @@ import logging
 import time
 
 from .audio import create_audio_data_url, select_dialog_speaker_voice_ids
+from .conversation_turn_guidance import effective_notes as build_effective_notes
 from .core import create_audio_file
 from .management import (
     APIView,
@@ -29,7 +30,6 @@ from .topic_conversation_models import (
 
 logger = logging.getLogger(__name__)
 
-
 def _conversation_assistant_voice_id(*, topic: str, notes: str, role_text: str, target_language: str) -> str:
     speaker_voice_ids = select_dialog_speaker_voice_ids(
         target_language,
@@ -38,59 +38,6 @@ def _conversation_assistant_voice_id(*, topic: str, notes: str, role_text: str, 
     if not speaker_voice_ids:
         return ""
     return speaker_voice_ids[1]
-
-
-def _response_level_instruction(level: str) -> str:
-    normalized_level = str(level).strip().upper() or "A2"
-    if normalized_level == "A1":
-        return "Use an A1 level. Use very simple words, very short sentences, and very basic grammar."
-    if normalized_level == "B1":
-        return "Use a B1 level. You can use somewhat more natural and varied vocabulary, but keep it learner-friendly."
-    return "Use an A2 level. Use simple vocabulary and simple grammar."
-
-
-def _speech_speed_instruction(speed: str) -> str:
-    normalized_speed = str(speed).strip().lower() or "normal"
-    if normalized_speed == "super_slow":
-        return "Speak extremely slowly, with very short sentences and very clear wording that stays slow from beginning to end."
-    if normalized_speed == "slow":
-        return "Speak slowly and clearly, using short sentences and easy wording."
-    return ""
-
-
-def _conversation_phase_instruction(phase: str) -> str:
-    normalized_phase = str(phase).strip().lower() or "active"
-    if normalized_phase == "closing":
-        return (
-            "The learner has already achieved the conversation goal. "
-            "Let the exchange settle naturally over the next 1 or 2 turns. "
-            "Reply warmly and briefly to the learner's actual message, in a way that fits the topic. "
-            "Do not introduce a new subtopic or ask a new question. "
-            "Do not mention the goal, ending the conversation, or what the learner should say next. "
-            "Only say goodbye after the learner clearly says goodbye."
-        )
-    return (
-        "Keep the conversation going naturally. Unless the learner is clearly ending the conversation, "
-        "do not start wrapping up, do not say goodbye, and do not steer toward closing yet."
-    )
-
-
-def _effective_notes(*, notes: str, goal_text: str, response_level: str, speech_speed: str, conversation_phase: str) -> str:
-    return "\n".join(
-        part for part in [
-            notes.strip(),
-            (
-                f"Learner's conversation goal (private guidance): {goal_text.strip()}\n"
-                "Use it only as subtle background guidance. Do not mention, quote, or explain it.\n"
-                "Do not give goal-specific information, hints, or leading questions intended to make the learner complete it.\n"
-                "Respond naturally to what the learner actually says and let them choose the direction within the topic."
-                if goal_text.strip() else ""
-            ),
-            _conversation_phase_instruction(conversation_phase),
-            _response_level_instruction(response_level),
-            _speech_speed_instruction(speech_speed),
-        ] if part
-    )
 
 
 class ContentTopicConversationTurnView(APIView):
@@ -110,7 +57,7 @@ class ContentTopicConversationTurnView(APIView):
         skip_goal_evaluation = str(request.data.get("skip_goal_evaluation", "")).strip().lower() in {"1", "true", "yes", "on"}
         response_level = str(request.data.get("response_level", "A2")).strip().upper() or "A2"
         speech_speed = str(request.data.get("speech_speed", "normal")).strip().lower() or "normal"
-        effective_notes = _effective_notes(
+        effective_notes = build_effective_notes(
             notes=notes,
             goal_text=goal_text,
             response_level=response_level,

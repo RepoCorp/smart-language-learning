@@ -10,75 +10,17 @@ from urllib.request import Request as UrlRequest, urlopen
 from django.conf import settings
 
 from ...auth import get_request_user
-from ...languages import language_display_name
 from .management import APIView, Request, Response, status
+from .conversation_goal_phase import conversation_phase_instruction as build_realtime_phase_instruction
 from .management_topic_conversation_shared import (
     conversation_realtime_enabled,
     validate_conversation_start_fields,
     validate_conversation_start_payload,
 )
+from .realtime_conversation_instructions import build_realtime_conversation_instructions
 from .topic_pool import resolve_topic_choice
 
 logger = logging.getLogger(__name__)
-
-
-def build_realtime_conversation_instructions(
-    *,
-    topic: str,
-    notes: str,
-    role_text: str,
-    goal_text: str,
-    source_language: str,
-    target_language: str,
-) -> str:
-    source_name = language_display_name(source_language)
-    target_name = language_display_name(target_language)
-    role_line = role_text or "No specific learner role"
-    notes_line = notes or "No temporary notes"
-    return (
-        "You are another person in a live spoken conversation.\n"
-        f"The other person speaks {source_name} and is practicing {target_name}.\n"
-        f"Conversation topic: {topic}\n"
-        f"The other person's role: {role_line}\n"
-        f"Temporary notes: {notes_line}\n"
-        f"Learner's conversation goal (private guidance): {goal_text}\n"
-        "Use the goal only as subtle background guidance. Do not mention, quote, or explain it.\n"
-        "Do not give goal-specific information, hints, or leading questions intended to make the learner complete it.\n"
-        "Keep the exchange natural: respond to what the learner actually says and let them choose the direction within the topic.\n"
-        f"Always reply in natural {target_name}.\n"
-        "Use simple vocabulary and simple grammar.\n"
-        "Prefer common everyday words.\n"
-        "Avoid long explanations, idioms, slang, and advanced words.\n"
-        f"Keep replies very short, conversational, and appropriate for a learner of {target_name}.\n"
-        "Use 1 or 2 short sentences maximum.\n"
-        f"Do not switch to {source_name} unless the learner explicitly asks for it.\n"
-        "Do not explain grammar unless asked.\n"
-        "Do not correct the other person's mistakes unless they explicitly ask for correction or help with the sentence.\n"
-        "Do not repeat their sentence in corrected form as your reply.\n"
-        "If they make mistakes, keep the conversation moving naturally instead of correcting them.\n"
-        "Ask at most one short follow-up question when it helps keep the conversation moving.\n"
-        f"If the learner is clearly saying goodbye or ending the conversation, reply with a short natural goodbye in {target_name}.\n"
-        "In that goodbye case, do not force another question and do not try to continue the conversation.\n"
-        "Do not end or close the session on your own.\n"
-        "If the audio is unclear or empty, briefly ask the learner to repeat it.\n"
-    )
-
-
-def build_realtime_phase_instruction(conversation_phase: str) -> str:
-    normalized_phase = str(conversation_phase).strip().lower() or "active"
-    if normalized_phase == "closing":
-        return (
-            "The learner has already achieved the conversation goal.\n"
-            "Let the exchange settle naturally over the next 1 or 2 turns.\n"
-            "Reply warmly and briefly to the learner's actual message, in a way that fits the topic.\n"
-            "Do not introduce a new subtopic or ask a new question.\n"
-            "Do not mention the goal, ending the conversation, or what the learner should say next.\n"
-            "Only say goodbye after the learner clearly says goodbye.\n"
-        )
-    return (
-        "Keep the conversation going naturally.\n"
-        "Unless the learner is clearly ending the conversation, do not start wrapping up, do not say goodbye, and do not steer toward closing yet.\n"
-    )
 
 
 def build_realtime_safety_identifier(request: Request) -> str:
