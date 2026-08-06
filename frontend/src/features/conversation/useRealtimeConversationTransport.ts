@@ -5,6 +5,7 @@ import {
   CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS,
   CONVERSATION_MAX_RECORDING_MS,
 } from "./conversationConstants";
+import { buildRealtimeInstructions } from "./conversationRealtimeInstructions";
 import type {
   BaseConversationTransportArgs,
   ConversationPhase,
@@ -58,49 +59,6 @@ export function useRealtimeConversationTransport({
   const timedOutSubmissionRef = useRef<boolean>(false);
   const consecutiveTimeoutCountRef = useRef<number>(0);
 
-  const buildPhaseInstruction = (phase: ConversationPhase): string => {
-    if (phase === "closing") {
-      return "The learner has already achieved the conversation goal. Let the exchange settle naturally over the next 1 or 2 turns. Reply warmly and briefly to the learner's actual message, in a way that fits the topic. Do not introduce a new subtopic or ask a new question. Do not mention the goal, ending the conversation, or what the learner should say next. Only say goodbye after the learner clearly says goodbye.";
-    }
-    return "Keep the conversation going naturally. Unless the learner is clearly ending the conversation, do not start wrapping up, do not say goodbye, and do not steer toward closing yet.";
-  };
-
-  const buildSpeedInstruction = (speed: ConversationSpeechSpeed): string => {
-    if (speed === "super_slow") {
-      return "Speak extremely slowly, like you are talking to a beginner who is just starting to learn the language. Keep that very slow pace for the entire response from beginning to end. Do not speed up at the end of the sentence. Use very short phrases, pause often, separate ideas clearly, and articulate each word carefully.";
-    }
-    if (speed === "slow") {
-      return "Speak slowly and clearly for the entire response. Keep the same slow pace from beginning to end and do not speed up at the end.";
-    }
-    return "Speak at a normal pace for an A2 learner.";
-  };
-
-  const buildLevelInstruction = (level: ConversationResponseLevel): string => {
-    if (level === "A1") {
-      return "Use an A1 level. Use very simple words, very short sentences, and very basic grammar.";
-    }
-    if (level === "B1") {
-      return "Use a B1 level. You can use somewhat more natural and varied vocabulary, but keep it learner-friendly.";
-    }
-    return "Use an A2 level. Use simple vocabulary and simple grammar.";
-  };
-
-  const buildRealtimeInstructions = (speed: ConversationSpeechSpeed, level: ConversationResponseLevel, phase: ConversationPhase): string => {
-    const baseInstructions = baseInstructionsRef.current.trim();
-    const phaseInstruction = buildPhaseInstruction(phase);
-    const speedInstruction = buildSpeedInstruction(speed);
-    const levelInstruction = buildLevelInstruction(level);
-    return [
-      baseInstructions,
-      conversationGoal
-        ? `The current learner goal below replaces any earlier goal. It is private guidance only. Do not mention, quote, or explain it. Do not give goal-specific information, hints, or leading questions intended to make the learner complete it. Respond naturally to what the learner actually says and let them choose the direction within the topic.\nCurrent learner goal: ${conversationGoal}`
-        : "",
-      phaseInstruction,
-      levelInstruction,
-      speedInstruction,
-    ].filter(Boolean).join("\n");
-  };
-
   const sendRealtimeSessionUpdate = (
     speed: ConversationSpeechSpeed,
     level: ConversationResponseLevel,
@@ -115,7 +73,13 @@ export function useRealtimeConversationTransport({
       type: "session.update",
       session: {
         type: "realtime",
-        instructions: buildRealtimeInstructions(speed, level, phase),
+        instructions: buildRealtimeInstructions({
+          baseInstructions: baseInstructionsRef.current,
+          goal: conversationGoal,
+          phase,
+          speed,
+          level,
+        }),
         output_modalities: ["audio"],
         audio: { input: { transcription: { model: transcriptionModel }, turn_detection: null } },
       },
@@ -256,7 +220,13 @@ export function useRealtimeConversationTransport({
       dataChannel.send(JSON.stringify({
         type: "response.create",
         response: {
-          instructions: buildRealtimeInstructions(speechSpeed, responseLevel, conversationPhase),
+          instructions: buildRealtimeInstructions({
+            baseInstructions: baseInstructionsRef.current,
+            goal: conversationGoal,
+            phase: conversationPhase,
+            speed: speechSpeed,
+            level: responseLevel,
+          }),
         },
       }));
       if (timedOutSubmissionRef.current) {

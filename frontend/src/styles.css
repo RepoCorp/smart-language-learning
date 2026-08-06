@@ -1323,6 +1323,17 @@ body {
   box-shadow: 0 2px 8px rgba(127, 29, 29, 0.12);
 }
 
+.conversation-send-message-button {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.conversation-send-message-button:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+}
+
 .dangerous-button-armed:not(:disabled) {
   background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
   color: #ffffff;
@@ -2162,7 +2173,6 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 16px;
 }
 
 .conversation-controls-card .actions {
@@ -2493,13 +2503,18 @@ textarea {
 
 .conversation-primary-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
 .conversation-primary-secondary-actions {
   display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.conversation-primary-secondary-actions > button {
+  width: 100%;
 }
 
 .conversation-secondary-controls {

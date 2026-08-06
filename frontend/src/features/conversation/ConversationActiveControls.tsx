@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { useI18n } from "../../i18n";
+import DialogActionIcon from "../../components/DialogActionIcon";
 import type { ConversationResponseLevel, ConversationSpeechSpeed } from "./conversationTransportTypes";
 
 type SummaryProps = {
@@ -45,6 +46,8 @@ export default function ConversationActiveControls({
   children,
 }: Props): JSX.Element {
   const { t } = useI18n();
+  const showStartRecording = !status.conversationRecording && status.conversationPaused;
+  const showPause = !status.conversationPaused;
 
   return (
     <>
@@ -60,16 +63,18 @@ export default function ConversationActiveControls({
               </p>
               <button
                 type="button"
-                className="dangerous-action-button"
+                className="conversation-send-message-button"
                 onClick={controls.onStopRecording}
                 disabled={!status.canSendResponse || status.conversationLoading || status.conversationRealtimeConnecting}
+                aria-label={t("newItem.conversationStopRecording")}
+                title={t("newItem.conversationStopRecording")}
               >
-                {t("newItem.conversationStopRecording")}
+                <DialogActionIcon name="send" />
               </button>
             </div>
           ) : null}
           <div className="actions conversation-primary-actions">
-            {!status.conversationRecording && (
+            {showStartRecording && (
               <button
                 type="button"
                 onClick={controls.onStartRecording}
@@ -79,7 +84,7 @@ export default function ConversationActiveControls({
               </button>
             )}
             <div className="conversation-primary-secondary-actions">
-              {!status.conversationPaused && (
+              {showPause && (
                 <button
                   type="button"
                   className="secondary-button"

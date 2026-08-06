@@ -20,7 +20,6 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
-Pilas con las voces en los diferentes turnos en B2
 Uno escribir su propio goal
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp

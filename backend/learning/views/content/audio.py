@@ -22,6 +22,7 @@ from ...languages import (
 )
 
 logger = logging.getLogger(__name__)
+_s3_identity_logged = False
 
 OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
 OPENAI_TTS_PHRASE_DEFAULT_SPEED = 1.25
@@ -176,6 +177,7 @@ def _build_s3_audio_url(key: str) -> str:
 
 
 def _store_audio_bytes(filename: str, payload: bytes, content_type: str) -> str:
+    global _s3_identity_logged
     storage_backend = str(getattr(settings, "AUDIO_STORAGE_BACKEND", "local")).strip().lower()
     if storage_backend == "s3":
         bucket = str(getattr(settings, "AWS_S3_AUDIO_BUCKET", "")).strip()
@@ -197,6 +199,22 @@ def _store_audio_bytes(filename: str, payload: bytes, content_type: str) -> str:
         if region:
             s3_client_kwargs["region_name"] = region
 
+        if not _s3_identity_logged:
+            try:
+                session = boto3.Session()
+                credentials = session.get_credentials()
+                identity = session.client("sts", **s3_client_kwargs).get_caller_identity()
+                logger.info(
+                    "content.audio.s3.runtime_identity account=%s arn=%s user_id=%s credential_method=%s",
+                    identity.get("Account", ""),
+                    identity.get("Arn", ""),
+                    identity.get("UserId", ""),
+                    getattr(credentials, "method", "unknown"),
+                )
+            except Exception as exc:
+                logger.warning("content.audio.s3.runtime_identity_failed error=%s", exc.__class__.__name__)
+            _s3_identity_logged = True
+
         logger.info(
             "content.audio.s3.upload_started filename=%s bucket=%s key=%s content_type=%s bytes=%d region=%s",
             filename,
@@ -214,12 +232,16 @@ def _store_audio_bytes(filename: str, payload: bytes, content_type: str) -> str:
                 ContentType=content_type,
             )
         except Exception as exc:
+            error_response = getattr(exc, "response", {})
+            error_details = error_response.get("Error", {}) if isinstance(error_response, dict) else {}
             logger.warning(
-                "content.audio.failed_s3_upload filename=%s bucket=%s key=%s error=%s",
+                "content.audio.failed_s3_upload filename=%s bucket=%s key=%s error=%s code=%s message=%s",
                 filename,
                 bucket,
                 key,
                 exc.__class__.__name__,
+                error_details.get("Code", ""),
+                error_details.get("Message", ""),
             )
             return ""
 

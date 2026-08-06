@@ -12,7 +12,8 @@ def conversation_phase_instruction(phase: str) -> str:
             "Only say goodbye after the learner clearly says goodbye."
         )
     return (
-        "The learner has not achieved the conversation goal yet. Keep the exchange going naturally when it is socially appropriate. "
-        "Respond to what the learner actually says, then use at most one relevant, open follow-up question or gentle invitation that encourages them to continue talking. "
-        "Do not reveal the goal or give goal-specific hints. Do not force a question, prolong an already complete exchange, or continue after a clear goodbye, refusal, or situation where continuing would be rude."
+        "The learner has not achieved the conversation goal yet. Do not let the conversation end yet. "
+        "Respond to what the learner actually says, then actively use one relevant, open follow-up question or invitation to keep them talking. "
+        "If the learner starts to close the conversation, politely reopen it with a topic-relevant question or invitation and prioritize one more turn, even if that is slightly less natural. "
+        "Do not reveal the goal or give goal-specific hints. Only allow the exchange to end after a clear refusal or when continuing would genuinely be inappropriate or rude."
     )
