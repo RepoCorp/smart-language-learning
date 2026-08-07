@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db.models import Q
 
-from .audio import select_dialog_speaker_voice_ids
+from .audio import create_openai_audio_file, select_dialog_speaker_voice_ids
 from .core import create_audio_file
 from .management import (
     APIView,
@@ -141,6 +141,37 @@ class ContentDialogTurnAudioView(APIView):
         audio_url = ensure_audio_for_dialog_turn(user=user, dialog_id_raw=dialog_id, turn_index_raw=turn_index)
         if not audio_url:
             return Response({"detail": "Audio generation failed"}, status=503)
+        return Response({"audio_url": audio_url})
+
+
+class ContentDialogTurnClearAudioView(APIView):
+    def post(self, request: Request, dialog_id: int, turn_index: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        dialog = apply_user_scope(SavedDialog.objects, user).filter(
+            id=dialog_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not dialog:
+            return Response({"detail": "Dialog not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        turn = DialogTurn.objects.filter(dialog=dialog, turn_index=turn_index).first()
+        if not turn:
+            return Response({"detail": "Dialog turn not found"}, status=status.HTTP_404_NOT_FOUND)
+        if turn.clear_audio_url:
+            return Response({"audio_url": turn.clear_audio_url})
+
+        audio_url = create_openai_audio_file(
+            str(turn.target_text or "").strip(),
+            "phrase",
+            target_language=dialog.target_language,
+        )
+        if not audio_url:
+            return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        turn.clear_audio_url = audio_url
+        turn.save(update_fields=["clear_audio_url"])
         return Response({"audio_url": audio_url})
 
 

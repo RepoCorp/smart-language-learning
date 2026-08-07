@@ -88,10 +88,10 @@ def create_phrase_if_missing(
         logger.info("content.create.phrase.skipped_exists topic=%s spanish=%s", topic, candidate.spanish_text)
         return None
     try:
-        audio_url = create_openai_audio_file(candidate.german_text, "phrase", target_language=target_language)
+        audio_url = audio_url_override or create_openai_audio_file(candidate.german_text, "phrase", target_language=target_language)
     except TypeError:
         # Backward compatibility for tests/mocks that still accept only (text, prefix).
-        audio_url = create_openai_audio_file(candidate.german_text, "phrase")
+        audio_url = audio_url_override or create_openai_audio_file(candidate.german_text, "phrase")
     item = Item.objects.create(
         user=user,
         item_type=Item.ItemType.PHRASE,

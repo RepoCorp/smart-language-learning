@@ -98,6 +98,7 @@ export interface DialogPhraseTurn {
   target_text: string;
   speaker?: "a" | "b";
   phrase_audio_url?: string;
+  clear_audio_url?: string;
 }
 
 export interface CompareWordRecord {
@@ -169,6 +170,7 @@ export interface SessionItem {
       target_text: string;
       speaker?: "a" | "b";
       phrase_audio_url?: string;
+      clear_audio_url?: string;
     }>;
     matched_turns: Array<{
       turn_index: number;
@@ -222,7 +224,7 @@ export interface ContentConfirmResponse {
   source_language?: StudyLanguageCode;
   target_language?: StudyLanguageCode;
   saved_dialog_id?: number;
-  saved_dialog_turns?: Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string }>;
+  saved_dialog_turns?: Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string; clear_audio_url?: string }>;
   created_sentence_count?: number;
   existing_sentence_count?: number;
 }
@@ -249,6 +251,7 @@ export interface ContentDialogRecord {
     target_text: string;
     speaker?: "a" | "b";
     phrase_audio_url?: string;
+    clear_audio_url?: string;
   }>;
 }
 

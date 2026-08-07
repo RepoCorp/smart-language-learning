@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   fetchContentDialogDetail,
   fetchContentItemDetail,
-  generateContentDialogTurnAudio,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
   regenerateContentDialogAudio,
@@ -16,9 +15,11 @@ import DangerousButton from "./DangerousButton";
 import DialogActionIcon from "./DialogActionIcon";
 import NewItem from "./NewItem";
 import DialogsCatalogList from "./dialogs/DialogsCatalogList";
+import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
 import useDialogPlaybackFocus from "./useDialogPlaybackFocus";
 import DialogsFilterBar from "./dialogs/DialogsFilterBar";
 import useDialogsCatalog, { mergeDialogRecord } from "./dialogs/useDialogsCatalog";
+import useDialogTurnPlayback, { type DialogTurnAudioMode } from "./dialogs/useDialogTurnPlayback";
 
 type WordActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 type PendingWordAdd = {
@@ -32,11 +33,6 @@ type PendingWordAdd = {
   targetLine: string;
   clickedTargetToken: string;
   note: string;
-};
-
-type PlayingTurn = {
-  dialogId: number;
-  turnIndex: number;
 };
 
 export default function DialogsPage(): JSX.Element {
@@ -65,13 +61,10 @@ export default function DialogsPage(): JSX.Element {
     fetchAllFilteredDialogs,
   } = useDialogsCatalog(sourceLanguage, targetLanguage);
   const [showDialogText, setShowDialogText] = useState<boolean>(targetPromptMode === "text");
-  const [playingAll, setPlayingAll] = useState<boolean>(false);
-  const [playingDialogId, setPlayingDialogId] = useState<number | null>(null);
-  const [playingTurn, setPlayingTurn] = useState<PlayingTurn | null>(null);
+  const [turnAudioMode, setTurnAudioMode] = useState<DialogTurnAudioMode>("natural");
   const [expandedDialogId, setExpandedDialogId] = useState<number | null>(null);
   const [loadingDialogId, setLoadingDialogId] = useState<number | null>(null);
   const [regeneratingAudioDialogId, setRegeneratingAudioDialogId] = useState<number | null>(null);
-  const [loadingTurnAudioKey, setLoadingTurnAudioKey] = useState<string>("");
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, WordActionStatus>>({});
   const [phraseActionStatus, setPhraseActionStatus] = useState<Record<string, WordActionStatus>>({});
   const [phraseActionError, setPhraseActionError] = useState<Record<string, string>>({});
@@ -79,8 +72,6 @@ export default function DialogsPage(): JSX.Element {
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
-  const playbackRunRef = useRef<number>(0);
-  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const {
     registerDialogRef,
     registerTurnRef,
@@ -129,6 +120,30 @@ export default function DialogsPage(): JSX.Element {
     }
   };
 
+  const {
+    dialogHasTurns,
+    loadingTurnAudioKey,
+    playingAll,
+    playingDialogId,
+    playingTurn,
+    playAllDialogs,
+    playSingleDialog,
+    playTurn,
+    stopCurrentPlayback,
+  } = useDialogTurnPlayback({
+    dialogs,
+    setDialogs,
+    sourceLanguage,
+    targetLanguage,
+    loadError: t("dialogs.error.load"),
+    setError,
+    ensureDialogDetail,
+    upsertVisibleDialog,
+    fetchAllFilteredDialogs,
+    focusDialogTurn,
+    setExpandedDialogId,
+  });
+
   const toggleDialogExpanded = async (dialogId: number): Promise<void> => {
     if (expandedDialogId === dialogId) {
       setExpandedDialogId(null);
@@ -139,18 +154,6 @@ export default function DialogsPage(): JSX.Element {
       return;
     }
     focusDialogTurn(dialogId, 0, setExpandedDialogId);
-  };
-
-  const stopCurrentPlayback = (): void => {
-    playbackRunRef.current += 1;
-    if (activeAudioRef.current) {
-      activeAudioRef.current.pause();
-      activeAudioRef.current.currentTime = 0;
-      activeAudioRef.current = null;
-    }
-    setPlayingAll(false);
-    setPlayingDialogId(null);
-    setPlayingTurn(null);
   };
 
   const openLinkedWordItem = async (itemId: number): Promise<void> => {
@@ -195,8 +198,6 @@ export default function DialogsPage(): JSX.Element {
     setPendingWordAdd(null);
     stopCurrentPlayback();
   }, [search, topic, context, page]);
-
-  useEffect(() => () => stopCurrentPlayback(), []);
 
   const requestAddWordFromDialogToken = async (
     key: string,
@@ -332,122 +333,6 @@ export default function DialogsPage(): JSX.Element {
     }
   };
 
-  const playAudioUrl = (audioUrl: string, runId: number): Promise<void> =>
-    new Promise((resolve) => {
-      if (!audioUrl || runId !== playbackRunRef.current) {
-        resolve();
-        return;
-      }
-
-      const audio = new Audio(audioUrl);
-      activeAudioRef.current = audio;
-      const done = (): void => {
-        audio.removeEventListener("ended", done);
-        audio.removeEventListener("error", done);
-        if (activeAudioRef.current === audio) {
-          activeAudioRef.current = null;
-        }
-        resolve();
-      };
-      audio.addEventListener("ended", done);
-      audio.addEventListener("error", done);
-      void audio.play().catch(() => done());
-    });
-
-  const updateTurnAudioUrl = (dialogId: number, turnIndex: number, audioUrl: string): void => {
-    setDialogs((current) => current.map((dialog) => {
-      if (dialog.dialog_id !== dialogId) {
-        return dialog;
-      }
-      return {
-        ...dialog,
-        turns: dialog.turns.map((turn, index) => (
-          index === turnIndex ? { ...turn, phrase_audio_url: audioUrl } : turn
-        )),
-      };
-    }));
-  };
-
-  const ensureTurnAudioUrl = async (dialogId: number, turnIndex: number, currentAudioUrl = ""): Promise<string> => {
-    if (currentAudioUrl) {
-      return currentAudioUrl;
-    }
-    const key = `${dialogId}:${turnIndex}`;
-    setLoadingTurnAudioKey(key);
-    try {
-      const audioUrl = await generateContentDialogTurnAudio(dialogId, turnIndex, sourceLanguage, targetLanguage);
-      if (audioUrl) {
-        updateTurnAudioUrl(dialogId, turnIndex, audioUrl);
-      }
-      return audioUrl;
-    } catch {
-      setError(t("dialogs.error.load"));
-      return "";
-    } finally {
-      setLoadingTurnAudioKey((current) => (current === key ? "" : current));
-    }
-  };
-
-  const playTurn = async (dialogId: number, turnIndex: number, currentAudioUrl = ""): Promise<void> => {
-    stopCurrentPlayback();
-    const audioUrl = await ensureTurnAudioUrl(dialogId, turnIndex, currentAudioUrl);
-    if (!audioUrl) {
-      return;
-    }
-    playbackRunRef.current += 1;
-    const runId = playbackRunRef.current;
-    setPlayingDialogId(dialogId);
-    setPlayingTurn({ dialogId, turnIndex });
-    await playAudioUrl(audioUrl, runId);
-    if (runId === playbackRunRef.current) {
-      setPlayingDialogId(null);
-      setPlayingTurn(null);
-    }
-  };
-
-  const dialogHasTurns = (dialog: ContentDialogRecord): boolean => Boolean(dialog.turn_count || dialog.turns?.length);
-
-  const dialogIsPlayable = (dialog: ContentDialogRecord): boolean => dialogHasTurns(dialog);
-
-  const playDialogWithFocusedTurns = async (dialog: ContentDialogRecord, runId: number): Promise<void> => {
-    upsertVisibleDialog(dialog);
-    const detailedDialog = await ensureDialogDetail(dialog.dialog_id, dialog);
-    if (!detailedDialog || runId !== playbackRunRef.current) {
-      return;
-    }
-    setPlayingDialogId(detailedDialog.dialog_id);
-    if (detailedDialog.turns?.length) {
-      for (let index = 0; index < detailedDialog.turns.length; index += 1) {
-        if (runId !== playbackRunRef.current) {
-          break;
-        }
-        setPlayingTurn({ dialogId: detailedDialog.dialog_id, turnIndex: index });
-        if (index > 0) {
-          focusDialogTurn(detailedDialog.dialog_id, index, setExpandedDialogId);
-        } else {
-          setExpandedDialogId(detailedDialog.dialog_id);
-        }
-        const audioUrl = await ensureTurnAudioUrl(detailedDialog.dialog_id, index, detailedDialog.turns[index].phrase_audio_url || "");
-        await playAudioUrl(audioUrl, runId);
-      }
-      return;
-    }
-  };
-
-  const playSingleDialog = async (dialog: ContentDialogRecord): Promise<void> => {
-    if (!dialogIsPlayable(dialog)) {
-      return;
-    }
-    stopCurrentPlayback();
-    playbackRunRef.current += 1;
-    const runId = playbackRunRef.current;
-    await playDialogWithFocusedTurns(dialog, runId);
-    if (runId === playbackRunRef.current) {
-      setPlayingDialogId(null);
-      setPlayingTurn(null);
-    }
-  };
-
   const regenerateDialogAudio = async (dialog: ContentDialogRecord): Promise<void> => {
     if (regeneratingAudioDialogId !== null) {
       return;
@@ -465,43 +350,7 @@ export default function DialogsPage(): JSX.Element {
     }
   };
 
-  const playAllDialogs = async (): Promise<void> => {
-    stopCurrentPlayback();
-    playbackRunRef.current += 1;
-    const runId = playbackRunRef.current;
-    setPlayingAll(true);
-    setError("");
-
-    try {
-      const allFilteredDialogs = await fetchAllFilteredDialogs();
-      const playableDialogs = allFilteredDialogs.filter(dialogIsPlayable);
-      if (!playableDialogs.length || runId !== playbackRunRef.current) {
-        return;
-      }
-      const shuffledDialogs = [...playableDialogs];
-      for (let index = shuffledDialogs.length - 1; index > 0; index -= 1) {
-        const swapIndex = Math.floor(Math.random() * (index + 1));
-        [shuffledDialogs[index], shuffledDialogs[swapIndex]] = [shuffledDialogs[swapIndex], shuffledDialogs[index]];
-      }
-
-      for (const dialog of shuffledDialogs) {
-        if (runId !== playbackRunRef.current) {
-          break;
-        }
-        await playDialogWithFocusedTurns(dialog, runId);
-      }
-    } catch {
-      setError(t("dialogs.error.load"));
-    } finally {
-      if (runId === playbackRunRef.current) {
-        setPlayingAll(false);
-        setPlayingDialogId(null);
-        setPlayingTurn(null);
-      }
-    }
-  };
-
-  const hasPlayableDialogs = dialogs.some(dialogIsPlayable);
+  const hasPlayableDialogs = dialogs.some(dialogHasTurns);
   const renderDialogActionButtons = (dialog: ContentDialogRecord): JSX.Element => (
     <>
       <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
@@ -538,6 +387,12 @@ export default function DialogsPage(): JSX.Element {
           >
             <DialogActionIcon name="text" />
           </button>
+        )}
+        {dialogHasTurns(dialog) && (
+          <DialogTurnAudioModeButton
+            mode={turnAudioMode}
+            onToggle={() => setTurnAudioMode((current) => current === "natural" ? "clear" : "natural")}
+          />
         )}
         <button
           type="button"
@@ -617,6 +472,7 @@ export default function DialogsPage(): JSX.Element {
             phraseActionStatus,
             sourceLanguage,
             targetLanguage,
+            turnAudioMode,
             wordActionStatus,
           }}
           actions={{
@@ -634,7 +490,7 @@ export default function DialogsPage(): JSX.Element {
               targetText,
               token,
             ),
-            playTurn: (dialogId, turnIndex, audioUrl) => void playTurn(dialogId, turnIndex, audioUrl),
+            playTurn: (dialogId, turnIndex, audioUrl, mode) => void playTurn(dialogId, turnIndex, audioUrl, mode),
             registerDialogRef,
             renderDialogActionButtons,
             wholeTurnPhraseKey,

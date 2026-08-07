@@ -13,7 +13,6 @@ from .management import (
 )
 from .dialog_click_resolution import resolve_dialog_click_word_pair as _resolve_dialog_click_word_pair
 from .dialog_item_context import (
-    ensure_audio_for_dialog_turn,
     link_item_to_dialog_turn,
 )
 from .core import (
@@ -206,11 +205,7 @@ def _whole_turn_audio_url_for_phrase(
         return ""
     if _normalized_dialog_text(turn.target_text) != _normalized_dialog_text(target_text):
         return ""
-    return turn.audio_url or ensure_audio_for_dialog_turn(
-        user=user,
-        dialog_id_raw=dialog_id,
-        turn_index_raw=turn_index,
-    )
+    return str(turn.clear_audio_url or "").strip()
 
 
 def _phrase_quick_add_response(

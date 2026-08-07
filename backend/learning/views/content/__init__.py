@@ -44,6 +44,7 @@ from .management_dialogs_listing import (
     ContentDialogDetailView,
     ContentDialogsView,
     ContentDialogTurnAudioView,
+    ContentDialogTurnClearAudioView,
 )
 from .topics import ContentTopicContextsView, ContentTopicsView, save_topic
 
@@ -70,6 +71,7 @@ __all__ = [
     "ContentDialogDetailView",
     "ContentDialogAudioRegenerateView",
     "ContentDialogTurnAudioView",
+    "ContentDialogTurnClearAudioView",
     "ContentItemMarkLearnedView",
     "ContentItemQuestionView",
     "ContentItemRegenerateView",

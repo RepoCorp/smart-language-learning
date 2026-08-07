@@ -4,6 +4,7 @@ import { useI18n } from "../../i18n";
 import type { ContentDialogRecord, StudyLanguageCode } from "../../types";
 import DialogActionIcon from "../DialogActionIcon";
 import DialogTurnsList from "../DialogTurnsList";
+import type { DialogTurnAudioMode } from "./useDialogTurnPlayback";
 
 type WordActionStatus = "idle" | "saving" | "added" | "exists" | "error";
 type PlayingTurn = { dialogId: number; turnIndex: number };
@@ -26,6 +27,7 @@ type CatalogState = {
   phraseActionStatus: Record<string, WordActionStatus>;
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
+  turnAudioMode: DialogTurnAudioMode;
   wordActionStatus: Record<string, WordActionStatus>;
 };
 
@@ -37,7 +39,7 @@ type CatalogActions = {
   onOpenItem: (itemId: number) => void;
   onPreviousPage: () => void;
   onTokenClick: (dialogId: number, statusKey: string, token: string, turnIndex: number, sourceText: string, targetText: string) => void;
-  playTurn: (dialogId: number, turnIndex: number, audioUrl: string) => void;
+  playTurn: (dialogId: number, turnIndex: number, audioUrl: string, mode: DialogTurnAudioMode) => void;
   registerDialogRef: (dialogId: number, element: HTMLLIElement | null) => void;
   renderDialogActionButtons: (dialog: ContentDialogRecord) => ReactNode;
   wholeTurnPhraseKey: (dialogId: number, turnIndex: number) => string;
@@ -118,10 +120,15 @@ export default function DialogsCatalogList({ state, actions }: Props): JSX.Eleme
                           <button
                             type="button"
                             className="secondary-button exercise-action-icon-button dialog-inline-action-button"
-                            onClick={() => actions.playTurn(dialog.dialog_id, index, turn.phrase_audio_url || "")}
-                            disabled={state.loadingTurnAudioKey === `${dialog.dialog_id}:${index}`}
-                            aria-label={state.loadingTurnAudioKey === `${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
-                            title={state.loadingTurnAudioKey === `${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
+                            onClick={() => actions.playTurn(
+                              dialog.dialog_id,
+                              index,
+                              state.turnAudioMode === "clear" ? turn.clear_audio_url || "" : turn.phrase_audio_url || "",
+                              state.turnAudioMode,
+                            )}
+                            disabled={state.loadingTurnAudioKey === `${state.turnAudioMode}:${dialog.dialog_id}:${index}`}
+                            aria-label={state.loadingTurnAudioKey === `${state.turnAudioMode}:${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
+                            title={state.loadingTurnAudioKey === `${state.turnAudioMode}:${dialog.dialog_id}:${index}` ? t("dialogs.loading") : t("newItem.playTurnAudio")}
                           >
                             <DialogActionIcon name="play" />
                           </button>

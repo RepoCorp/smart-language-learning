@@ -1,6 +1,16 @@
-type DialogActionIconName = "play" | "stop" | "refresh" | "text" | "dialog" | "next" | "collapse" | "send";
+type DialogActionIconName = "play" | "stop" | "refresh" | "text" | "dialog" | "next" | "collapse" | "send" | "speed-fast" | "speed-slow";
 
 export default function DialogActionIcon({ name }: { name: DialogActionIconName }): JSX.Element {
+  if (name === "speed-fast" || name === "speed-slow") {
+    return (
+      <svg className="item-action-icon dialog-speedometer-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 17a7 7 0 0 1 14 0" />
+        <path d={name === "speed-fast" ? "m12 17 4-6" : "m12 17-4-4"} />
+        <circle cx="12" cy="17" r="1" />
+      </svg>
+    );
+  }
+
   const commonProps = {
     className: "item-action-icon",
     viewBox: "0 0 24 24",

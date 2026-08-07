@@ -196,6 +196,7 @@ class ContentConfirmView(APIView):
                     {
                         **dialog_turns[turn.turn_index],
                         "phrase_audio_url": turn.audio_url,
+                        "clear_audio_url": turn.clear_audio_url,
                     }
                     for turn in created_turns
                     if turn.turn_index < len(dialog_turns)

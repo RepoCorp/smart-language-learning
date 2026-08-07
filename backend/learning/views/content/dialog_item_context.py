@@ -95,6 +95,7 @@ def dialog_turns_with_phrase_audio(dialog, *, user) -> list[dict]:
         normalized_turns,
         phrase_audio_by_key=phrase_audio_by_key,
         turn_audio_by_index=_turn_audio_by_index(db_turns_by_index),
+        clear_audio_by_index=_turn_clear_audio_by_index(db_turns_by_index),
     )
 
 
@@ -167,6 +168,14 @@ def _turn_audio_by_index(db_turns_by_index: dict[int, DialogTurn]) -> dict[int, 
     }
 
 
+def _turn_clear_audio_by_index(db_turns_by_index: dict[int, DialogTurn]) -> dict[int, str]:
+    return {
+        turn.turn_index: str(turn.clear_audio_url or "")
+        for turn in db_turns_by_index.values()
+        if str(turn.clear_audio_url or "").strip()
+    }
+
+
 def _phrase_audio_by_key(
     key_pairs: set[tuple[str, str]],
     *,
@@ -195,6 +204,7 @@ def _dialog_turn_audio_payloads(
     *,
     phrase_audio_by_key: dict[tuple[str, str], str],
     turn_audio_by_index: dict[int, str],
+    clear_audio_by_index: dict[int, str],
 ) -> list[dict]:
     return [
         {
@@ -205,6 +215,7 @@ def _dialog_turn_audio_payloads(
                 turn["turn_index"],
                 phrase_audio_by_key.get((turn["source_text"].lower(), turn["target_text"].lower()), ""),
             ),
+            "clear_audio_url": clear_audio_by_index.get(turn["turn_index"], ""),
         }
         for turn in normalized_turns
     ]

@@ -65,8 +65,7 @@ export default function ContentCreatePage(): JSX.Element {
   const [preview, setPreview] = useState<ContentPreviewResponse | null>(null);
   const [result, setResult] = useState<string>("");
   const [savedDialogId, setSavedDialogId] = useState<number | null>(null);
-  const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string }>>([]);
-  const [playingSavedDialog, setPlayingSavedDialog] = useState<boolean>(false);
+  const [savedDialogTurns, setSavedDialogTurns] = useState<Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string; clear_audio_url?: string }>>([]);
   const [phraseActionStatus, setPhraseActionStatus] = useState<Record<string, PhraseActionStatus>>({});
   const [phraseActionError, setPhraseActionError] = useState<Record<string, string>>({});
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
@@ -111,7 +110,6 @@ export default function ContentCreatePage(): JSX.Element {
         setResult("");
         setSavedDialogTurns([]);
         setSavedDialogId(null);
-        setPlayingSavedDialog(false);
         setPhraseActionStatus({});
         setPhraseActionError({});
         setWordActionStatus({});
@@ -134,7 +132,6 @@ export default function ContentCreatePage(): JSX.Element {
           setResult("");
           setSavedDialogTurns([]);
           setSavedDialogId(null);
-          setPlayingSavedDialog(false);
           setPhraseActionStatus({});
           setPhraseActionError({});
           setWordActionStatus({});
@@ -193,7 +190,6 @@ export default function ContentCreatePage(): JSX.Element {
     setResult("");
     setSavedDialogTurns([]);
     setSavedDialogId(null);
-    setPlayingSavedDialog(false);
     setPhraseActionStatus({});
     setPhraseActionError({});
     setWordActionStatus({});
@@ -258,41 +254,6 @@ export default function ContentCreatePage(): JSX.Element {
       setError(t("content.error.saveContent"));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const playAudioUrl = (audioUrl?: string): void => {
-    if (!audioUrl) {
-      return;
-    }
-    const audio = new Audio(audioUrl);
-    void audio.play().catch(() => undefined);
-  };
-
-  const playAudioUrlAndWait = (audioUrl?: string): Promise<void> =>
-    new Promise((resolve) => {
-      if (!audioUrl) {
-        resolve();
-        return;
-      }
-      const audio = new Audio(audioUrl);
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      void audio.play().catch(() => resolve());
-    });
-
-  const playSavedDialogTurns = async (): Promise<void> => {
-    const audioUrls = savedDialogTurns.map((turn) => turn.phrase_audio_url || "").filter(Boolean);
-    if (!audioUrls.length || playingSavedDialog) {
-      return;
-    }
-    setPlayingSavedDialog(true);
-    try {
-      for (const audioUrl of audioUrls) {
-        await playAudioUrlAndWait(audioUrl);
-      }
-    } finally {
-      setPlayingSavedDialog(false);
     }
   };
 
@@ -490,14 +451,14 @@ export default function ContentCreatePage(): JSX.Element {
           savedDialogTurns={savedDialogTurns}
           sourceLanguage={sourceLanguage}
           targetLanguage={targetLanguage}
-          playingSavedDialog={playingSavedDialog}
           wordActionStatus={wordActionStatus}
           phraseActionStatus={phraseActionStatus}
           phraseActionError={phraseActionError}
-          onPlaySavedDialog={() => {
-            void playSavedDialogTurns();
-          }}
-          onPlayTurnAudio={playAudioUrl}
+          onUpdateTurnAudio={(turnIndex, audioUrl, mode) => setSavedDialogTurns((current) => current.map((turn, index) => (
+            index === turnIndex
+              ? { ...turn, [mode === "clear" ? "clear_audio_url" : "phrase_audio_url"]: audioUrl }
+              : turn
+          )))}
           onOpenItem={openPhraseItem}
           onTokenClick={(statusKey, token, turnIndex, sourceText, targetText) => {
             void requestAddWordFromDialogToken(statusKey, token, turnIndex, sourceText, targetText);

@@ -3196,6 +3196,20 @@ textarea {
   flex: 0 0 auto;
 }
 
+.dialog-list-action-button.dialog-turn-audio-mode-selected[aria-pressed="true"] {
+  border-color: #f3b45b;
+  background: #fff4df;
+  color: #9a5a0a;
+}
+
+.dialog-speedometer-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .related-dialog-sticky-controls {
   position: sticky;
   top: 0;

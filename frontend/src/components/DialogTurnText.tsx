@@ -234,11 +234,7 @@ export default function DialogTurnText({
           </>
         </TargetPhraseText>
       </div>
-      <p className="conversation-line">
-        {hideTargetText
-          ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span>
-          : sourceText}
-      </p>
+      {!hideTargetText && <p className="conversation-line">{sourceText}</p>}
       {!hideTargetText && showPhraseSelection && (
         <>
           <div className="actions turn-action-row">

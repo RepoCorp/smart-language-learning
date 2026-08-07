@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from 
 import {
   askContentItemQuestion,
   fetchContentItemDetail,
-  generateContentDialogTurnAudio,
   generateContentItemFunnyImageExercise,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
@@ -51,6 +50,9 @@ import { usePracticeStrategy } from "./strategies/usePracticeStrategy";
 import { useVisualizeStrategy } from "./strategies/useVisualizeStrategy";
 import { useWalkStrategy } from "./strategies/useWalkStrategy";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
+import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
+import useRelatedDialogPlayback from "./dialogs/useRelatedDialogPlayback";
+import type { DialogTurnAudioMode } from "./dialogs/useDialogTurnPlayback";
 import VerbExerciseSelector, {
   buildVerbExerciseGridEntries,
   getVerbExerciseKeysForPerson,
@@ -221,9 +223,7 @@ export default function NewItem({
   const [compareWords, setCompareWords] = useState<NonNullable<SessionItem["compare_words"]>>(item.compare_words || []);
   const [compareWordsInsights, setCompareWordsInsights] = useState<string>(item.compare_words_insights || "");
   const [showCompareWordsModal, setShowCompareWordsModal] = useState<boolean>(false);
-  const [playingRelatedDialogId, setPlayingRelatedDialogId] = useState<number | null>(null);
-  const [playingRelatedDialogTurn, setPlayingRelatedDialogTurn] = useState<{ dialogId: number; turnIndex: number } | null>(null);
-  const [loadingRelatedDialogAudioKey, setLoadingRelatedDialogAudioKey] = useState<string>("");
+  const [relatedDialogTurnAudioMode, setRelatedDialogTurnAudioMode] = useState<DialogTurnAudioMode>("natural");
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
   const [askingQuestion, setAskingQuestion] = useState<boolean>(false);
   const [showDialogTargetTextById, setShowDialogTargetTextById] = useState<Record<number, boolean>>({});
@@ -232,9 +232,20 @@ export default function NewItem({
   const exerciseRunningRef = useRef<boolean>(false);
   const exerciseMutedRef = useRef<boolean>(false);
   const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
-  const relatedDialogPlaybackRunRef = useRef<number>(0);
-  const relatedDialogAudioRef = useRef<HTMLAudioElement | null>(null);
   const autoplayedAudioKeyRef = useRef<string>("");
+  const {
+    loadingAudioKey: loadingRelatedDialogAudioKey,
+    playingDialogId: playingRelatedDialogId,
+    playingTurn: playingRelatedDialogTurn,
+    playDialog: playRelatedDialog,
+    playTurn: playRelatedDialogTurn,
+    stopPlayback: stopRelatedDialogPlayback,
+  } = useRelatedDialogPlayback({
+    setDialogs: setRelatedDialogs,
+    sourceLanguage,
+    targetLanguage,
+    onError: () => setExerciseError(t("dialogs.error.load")),
+  });
   const {
     registerRelatedDialogCardRef,
     scrollToNextRelatedDialog,
@@ -428,119 +439,11 @@ export default function NewItem({
   const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
     speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
 
-  const stopRelatedDialogPlayback = (): void => {
-    relatedDialogPlaybackRunRef.current += 1;
-    if (relatedDialogAudioRef.current) {
-      relatedDialogAudioRef.current.pause();
-      relatedDialogAudioRef.current.currentTime = 0;
-      relatedDialogAudioRef.current = null;
-    }
-    setPlayingRelatedDialogId(null);
-    setPlayingRelatedDialogTurn(null);
-  };
-
-  const playRelatedDialogAudioUrl = (audioSource: string, runId: number): Promise<void> =>
-    new Promise((resolve) => {
-      if (!audioSource || runId !== relatedDialogPlaybackRunRef.current) {
-        resolve();
-        return;
-      }
-      const audio = new Audio(audioSource);
-      relatedDialogAudioRef.current = audio;
-      const finish = (): void => {
-        audio.removeEventListener("ended", finish);
-        audio.removeEventListener("error", finish);
-        if (relatedDialogAudioRef.current === audio) {
-          relatedDialogAudioRef.current = null;
-        }
-        resolve();
-      };
-      audio.addEventListener("ended", finish);
-      audio.addEventListener("error", finish);
-      void audio.play().catch(finish);
-    });
-
-  const updateRelatedDialogTurnAudioUrl = (dialogId: number, turnIndex: number, phraseAudioUrl: string): void => {
-    setRelatedDialogs((current) => current.map((dialog) => {
-      if (dialog.dialog_id !== dialogId) {
-        return dialog;
-      }
-      return {
-        ...dialog,
-        turns: dialog.turns.map((turn, index) => (
-          index === turnIndex ? { ...turn, phrase_audio_url: phraseAudioUrl } : turn
-        )),
-      };
-    }));
-  };
-
-  const ensureRelatedDialogTurnAudioUrl = async (dialogId: number, turnIndex: number, currentAudioUrl = ""): Promise<string> => {
-    if (currentAudioUrl) {
-      return currentAudioUrl;
-    }
-    const key = `${dialogId}:${turnIndex}`;
-    setLoadingRelatedDialogAudioKey(key);
-    try {
-      const generatedAudioUrl = await generateContentDialogTurnAudio(dialogId, turnIndex, sourceLanguage, targetLanguage);
-      if (generatedAudioUrl) {
-        updateRelatedDialogTurnAudioUrl(dialogId, turnIndex, generatedAudioUrl);
-      }
-      return generatedAudioUrl;
-    } catch {
-      setExerciseError(t("dialogs.error.load"));
-      return "";
-    } finally {
-      setLoadingRelatedDialogAudioKey((current) => (current === key ? "" : current));
-    }
-  };
-
-  type RelatedDialog = NonNullable<SessionItem["related_dialogs"]>[number];
-
-  const playRelatedDialog = async (dialog: RelatedDialog): Promise<void> => {
-    if (!dialog.turns.length) {
-      return;
-    }
-    stopRelatedDialogPlayback();
-    relatedDialogPlaybackRunRef.current += 1;
-    const runId = relatedDialogPlaybackRunRef.current;
-    setPlayingRelatedDialogId(dialog.dialog_id);
-
-    for (let index = 0; index < dialog.turns.length; index += 1) {
-      if (runId !== relatedDialogPlaybackRunRef.current) {
-        break;
-      }
-      setPlayingRelatedDialogTurn({ dialogId: dialog.dialog_id, turnIndex: index });
-      const audioSource = await ensureRelatedDialogTurnAudioUrl(dialog.dialog_id, index, dialog.turns[index].phrase_audio_url || "");
-      await playRelatedDialogAudioUrl(audioSource, runId);
-    }
-
-    if (runId === relatedDialogPlaybackRunRef.current) {
-      setPlayingRelatedDialogId(null);
-      setPlayingRelatedDialogTurn(null);
-    }
-  };
-
   useEffect(() => {
     if (!showDialogsModal) {
       stopRelatedDialogPlayback();
     }
   }, [showDialogsModal]);
-
-  useEffect(() => () => {
-    stopRelatedDialogPlayback();
-  }, []);
-
-  const playTurnAudio = async (phraseAudioUrl: string): Promise<void> => {
-    if (!phraseAudioUrl) {
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      const audio = new Audio(phraseAudioUrl);
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      void audio.play().catch(() => resolve());
-    });
-  };
 
   const playAudioUrl = (audioUrl?: string): void => {
     if (!audioUrl) {
@@ -1803,6 +1706,10 @@ export default function NewItem({
                                 <DialogActionIcon name="text" />
                               </button>
                             )}
+                            <DialogTurnAudioModeButton
+                              mode={relatedDialogTurnAudioMode}
+                              onToggle={() => setRelatedDialogTurnAudioMode((current) => current === "natural" ? "clear" : "natural")}
+                            />
                             <button
                               type="button"
                               className="secondary-button exercise-action-icon-button dialog-list-action-button"
@@ -1857,12 +1764,17 @@ export default function NewItem({
                           )}
                           highlightedTurnIndex={playingRelatedDialogTurn?.dialogId === dialog.dialog_id ? playingRelatedDialogTurn.turnIndex : null}
                           highlightedTurnIndexes={matchedTurnIndexes}
-                          renderLeadingAction={(turn) => (
+                          renderLeadingAction={(turn, turnIndex) => (
                             <button
                               type="button"
                               className="secondary-button exercise-action-icon-button dialog-inline-action-button"
-                              disabled={!turn.phrase_audio_url || playingRelatedDialogId !== null}
-                              onClick={() => void playTurnAudio(turn.phrase_audio_url || "")}
+                              disabled={playingRelatedDialogId !== null || loadingRelatedDialogAudioKey === `${relatedDialogTurnAudioMode}:${dialog.dialog_id}:${turnIndex}`}
+                              onClick={() => void playRelatedDialogTurn(
+                                dialog.dialog_id,
+                                turnIndex,
+                                relatedDialogTurnAudioMode === "clear" ? turn.clear_audio_url || "" : turn.phrase_audio_url || "",
+                                relatedDialogTurnAudioMode,
+                              )}
                               aria-label={t("newItem.playTurnAudio")}
                               title={t("newItem.playTurnAudio")}
                               onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.playTurnAudio"))}

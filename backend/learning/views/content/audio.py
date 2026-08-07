@@ -18,22 +18,12 @@ from django.conf import settings
 from ...languages import (
     OPENAI_TTS_ITEM_VOICE_BY_STUDY_LANGUAGE,
     TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE,
-    language_display_name,
 )
 from .tts_config import OPENAI_TTS_ITEM_DEFAULT_SPEED, OPENAI_TTS_PHRASE_DEFAULT_SPEED
+from .tts_instructions import openai_tts_language_instruction
 
 logger = logging.getLogger(__name__)
 _s3_identity_logged = False
-
-def _tts_language_instruction(target_language: str) -> str:
-    language_label = language_display_name(target_language)
-    return (
-        f"Speak only in {language_label}. "
-        f"Every word, syllable, abbreviation, article, and phrase must be pronounced with {language_label} phonetics and accent. "
-        f"If a token looks like English or another language, still pronounce it as {language_label} text. "
-        "Do not translate, switch languages, infer an English pronunciation, or reinterpret words as another language."
-    )
-
 
 def _configured_tts_provider() -> str:
     provider = str(getattr(settings, "AUDIO_TTS_PROVIDER", "openai")).strip().lower()
@@ -447,7 +437,7 @@ def create_openai_audio_file(text: str, prefix: str, target_language: str = "ger
         voice=voice,
         speed=default_speed,
         response_format="mp3",
-        instructions=_tts_language_instruction(target_language),
+        instructions=openai_tts_language_instruction(target_language),
     )
     if not audio_bytes:
         logger.warning("content.audio.openai_failed prefix=%s filename=%s target_language=%s", prefix, filename, target_language)
@@ -605,7 +595,7 @@ def _item_tts_audio_bytes(*, text: str, prefix: str, target_language: str, defau
             voice=voice,
             speed=float(getattr(settings, "OPENAI_TTS_ITEM_SPEED", default_speed)),
             response_format="mp3",
-            instructions=_tts_language_instruction(target_language),
+            instructions=openai_tts_language_instruction(target_language),
         ),
         f"openai:{voice}",
     )

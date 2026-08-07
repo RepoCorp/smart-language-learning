@@ -390,6 +390,26 @@ export async function generateContentDialogTurnAudio(
   return payload.audio_url || "";
 }
 
+export async function generateContentDialogTurnClearAudio(
+  dialogId: number,
+  turnIndex: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<string> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/dialogs/${dialogId}/turns/${turnIndex}/clear-audio?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to generate clear dialog turn audio");
+  }
+  const payload = (await response.json()) as { audio_url?: string };
+  return payload.audio_url || "";
+}
+
 export async function regenerateContentDialogAudio(
   dialogId: number,
   sourceLanguage: StudyLanguageCode = "spanish",

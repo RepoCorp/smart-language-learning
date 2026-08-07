@@ -7,11 +7,11 @@ from .management_items_listing import (
     ContentItemCompareWordsView,
     ContentItemExercisesView,
     ContentItemFunnyImageExerciseView,
-    ContentItemDetailView,
     ContentItemMarkLearnedView,
     ContentItemsView,
     ContentWordsView,
 )
+from .management_items_detail import ContentItemDetailView
 from .management_items_compare_words_insights import ContentItemCompareWordsInsightsView
 from .management_items_compare_strategy import ContentItemCompareStrategyView
 from .management_items_connect import ContentItemConnectView

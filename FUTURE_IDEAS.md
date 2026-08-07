@@ -7,6 +7,7 @@ Ningun otro arreglito que no sea vital!!!
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
   - Añadir la informacion del genero y mostrarlo de alguna manera en la UI
   - Revisar los ejercicios, que si se cubran las principales formas gramaticales y que permita abrir una ventana para cada una de ellas que de una pequeña explicacion y que muestre las equivalentes de otras palabras del mismo genero
+  - Other things that change depending on the gender of the word.
 
 
 ## COSAS QUE NO DEBERIAN ESPERAR PERO QUE VAN A TENER QUE ESPERAR:
@@ -43,11 +44,9 @@ Uno escribir su propio goal
 Como hacer que encuentre los diálogos en las distintas formas del verbo o sustantivo
 Hacer preguntas a las estrategias
 Strategies para frases
-Que se hizo el botón de reset test actual?
 Related dialogs no deja poner modo solo audio
 Que funcione en landscape
 Escribir encima de la imagen?
-Que el usuario pueda pedir que el item sea re-evaluado por un mejor modelo. estaba implementado en el regenerar palabra, pero no estaba funcionando bien. Añadi un todo con Codex para volverlo a implementar mas adelante.  
 Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
 Delay entre frases de ejercicio repeticion
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
@@ -105,19 +104,16 @@ Que pida algo de definicion del usuario para que en las conversaciones ese sea s
 Para la conversacion, en los detalles incluir quien soy yo y quien es el usuario, de pronto si guardar estas opciones en el backend
 Si helper cambia con el genero hacer tambien ejercicios de todos
 Incluir teoria de gramatica en los ejercicios
-Ensayar otros modelos
 Seguridad de S3
 Arreglar allowed hosts de Django
 En lugar de validar longitud de entradas como el rol limitar desde el input
 Remove some text in some places that I don't really need, like These notes are only used for this conversation and are not saved. 
-Usar un model mejor para las preguntas (ENVs para distintos objetivos)
 en los ejercicios no cortar el audio cuando terminan los 30 segundos, simplemente no seguir el bucle
 Usar servicio de autenticacion de Azure
 Add settings to deploy files, like updated roles permissions, env...
 escoger el modelo apropiado para cada tarea (texto, audio, imagen, etc.)
 Actualizar `aws-deploy/ecs-task-backend.json` y `aws-deploy/ecs-task-frontend.json`; ahora el script usa ARNs de task definitions porque esos archivos estan obsoletos.
 Cambiar RDS a privado y preparar acceso administrativo por bastion/Session Manager o VPN para poder inspeccionar datos sin dejar la base publica
-Que primero genere una frase y después a esa misma frase le haga las conjugaciones
 Create a script, using AWS deployment service, to create all the initial setup
 Alguna forma de preguntar conjugaciones en tests
 Upgrade to React router v7
