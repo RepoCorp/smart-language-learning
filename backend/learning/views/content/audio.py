@@ -20,13 +20,10 @@ from ...languages import (
     TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE,
     language_display_name,
 )
+from .tts_config import OPENAI_TTS_ITEM_DEFAULT_SPEED, OPENAI_TTS_PHRASE_DEFAULT_SPEED
 
 logger = logging.getLogger(__name__)
 _s3_identity_logged = False
-
-OPENAI_TTS_ITEM_DEFAULT_SPEED = 1.0
-OPENAI_TTS_PHRASE_DEFAULT_SPEED = 1.25
-
 
 def _tts_language_instruction(target_language: str) -> str:
     language_label = language_display_name(target_language)

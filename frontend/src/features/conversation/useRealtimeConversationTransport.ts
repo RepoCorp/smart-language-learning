@@ -5,7 +5,7 @@ import {
   CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS,
   CONVERSATION_MAX_RECORDING_MS,
 } from "./conversationConstants";
-import { buildRealtimeInstructions } from "./conversationRealtimeInstructions";
+import { buildRealtimeInstructions, buildRealtimeSessionUpdate } from "./conversationRealtimeInstructions";
 import type {
   BaseConversationTransportArgs,
   ConversationPhase,
@@ -69,21 +69,14 @@ export function useRealtimeConversationTransport({
     if (!dataChannel || dataChannel.readyState !== "open") {
       return;
     }
-    dataChannel.send(JSON.stringify({
-      type: "session.update",
-      session: {
-        type: "realtime",
-        instructions: buildRealtimeInstructions({
-          baseInstructions: baseInstructionsRef.current,
-          goal: conversationGoal,
-          phase,
-          speed,
-          level,
-        }),
-        output_modalities: ["audio"],
-        audio: { input: { transcription: { model: transcriptionModel }, turn_detection: null } },
-      },
-    }));
+    dataChannel.send(JSON.stringify(buildRealtimeSessionUpdate({
+      baseInstructions: baseInstructionsRef.current,
+      goal: conversationGoal,
+      phase,
+      speed,
+      level,
+      transcriptionModel,
+    })));
   };
   const clearTimer = (): void => {
     if (timerRef.current !== null) {
