@@ -20,13 +20,13 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
-Uno escribir su propio goal
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?
 Quitar la selección de frase para imagen y cuando esta abierta decir solo la frase al presionar reproducir
 Algun security by obscurity, que igual deje el pin sencillo.
-En diálogos en item view y creo que diálogos también, que no scrolls back
+Añadir/limpiar las estrategias de frases
+En dialogos de palabras coje tambien palabras que significan lo mismo en español pero no son la misma en el idioma target
 
 #### PROMPTS/MODEL WORK
 En pregunta mejorar las respuestas, incluyendo quitar el que dice si esta relacionado
@@ -39,7 +39,7 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
-Buscar en diálogos
+Uno escribir su propio goal
 Como hacer que encuentre los diálogos en las distintas formas del verbo o sustantivo
 Hacer preguntas a las estrategias
 Strategies para frases

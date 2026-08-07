@@ -439,7 +439,6 @@ export default function ContentCreatePage(): JSX.Element {
   return (
     <main className="container" data-testid="content-create-page">
       <h1>{t("content.title")}</h1>
-      <p>{t("content.description")}</p>
 
       <ContentCreateFormCard
         selectedTopic={selectedTopic}

@@ -20,6 +20,15 @@ function turnRefKey(dialogId: number, turnIndex: number): string {
   return `${dialogId}:${turnIndex}`;
 }
 
+function stickyControlsOffset(): number {
+  const controls = document.querySelector<HTMLElement>(".dialog-global-controls-card");
+  if (!controls) {
+    return 16;
+  }
+  const configuredTop = Number.parseFloat(window.getComputedStyle(controls).top) || 0;
+  return configuredTop + controls.getBoundingClientRect().height + 16;
+}
+
 export default function useDialogPlaybackFocus(): UseDialogPlaybackFocusResult {
   const dialogRefs = useRef<Map<number, HTMLLIElement>>(new Map());
   const turnRefs = useRef<Map<string, HTMLLIElement>>(new Map());
@@ -67,7 +76,8 @@ export default function useDialogPlaybackFocus(): UseDialogPlaybackFocusResult {
         }
         return;
       }
-      turnElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      const top = turnElement.getBoundingClientRect().top + window.scrollY - stickyControlsOffset();
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
       turnElement.focus({ preventScroll: true });
     }, 0);
   };

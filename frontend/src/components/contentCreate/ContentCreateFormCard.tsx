@@ -100,27 +100,27 @@ export default function ContentCreateFormCard({
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
   const shouldCreateNewContext = selectedContext === CREATE_NEW_OPTION;
   const usingRandomTopic = selectedTopic === RANDOM_TOPIC_OPTION;
+  const hasRequiredWords = requiredWords.trim().length > 0;
+  const hasCustomTopicText = customTopic.trim().length > 0;
+  const needsCustomTopic = shouldCreateNewTopic && !hasCustomTopicText;
 
   return (
     <section className="card content-create-form">
       <CollapsibleSection
         title={t("content.section.topicTitle")}
-        subtitle={usingRandomTopic ? t("content.topic.random") : (resolvedTopic ? resolvedTopic : t("content.section.topicSubtitleEmpty"))}
-        accent={!resolvedTopic ? "required" : "neutral"}
+        subtitle={needsCustomTopic
+          ? t("content.topic.requiredBadge")
+          : (usingRandomTopic ? t("content.topic.random") : (resolvedTopic ? resolvedTopic : t("content.section.topicSubtitleEmpty")))}
+        accent={needsCustomTopic ? "required" : "neutral"}
       >
-        <div className={`content-form-section content-topic-section${resolvedTopic ? "" : " content-topic-section-required"}`}>
-          <label htmlFor="topic-select" className="prompt content-required-label">
-            {t("content.topic.label")}
-            <span>{t("content.topic.requiredBadge")}</span>
-          </label>
+        <div className="content-form-section content-topic-section">
           <select
             id="topic-select"
             value={selectedTopic}
             onChange={(e) => onSelectedTopicChange(e.target.value)}
             disabled={loading || saving}
-            aria-invalid={!resolvedTopic}
+            aria-label={t("content.section.topicTitle")}
           >
-            <option value="">{previousTopics.length ? t("content.topic.select") : t("content.topic.none")}</option>
             <option value={RANDOM_TOPIC_OPTION}>{t("content.topic.random")}</option>
             {previousTopics.map((savedTopic) => (
               <option key={savedTopic} value={savedTopic}>
@@ -129,7 +129,6 @@ export default function ContentCreateFormCard({
             ))}
             <option value={CREATE_NEW_OPTION}>{t("content.topic.createNew")}</option>
           </select>
-          {usingRandomTopic && <p className="hint">{t("content.topic.randomHint")}</p>}
           {shouldCreateNewTopic && (
             <>
               <label htmlFor="topic-input" className="prompt">{t("content.topic.newLabel")}</label>
@@ -139,11 +138,17 @@ export default function ContentCreateFormCard({
                 onChange={(e) => onCustomTopicChange(e.target.value)}
                 placeholder={t("content.topic.placeholder")}
                 disabled={loading || saving}
-                aria-invalid={!resolvedTopic}
+                required
+                aria-invalid={!hasCustomTopicText}
+                style={needsCustomTopic ? {
+                  border: "2px solid #b42318",
+                  background: "#fff1f0",
+                  boxShadow: "0 0 0 1px rgba(180, 35, 24, 0.16)",
+                } : undefined}
               />
+              <p className="error" hidden={hasCustomTopicText}>{t("content.topic.requiredBadge")}</p>
             </>
           )}
-          {!resolvedTopic && <p className="content-required-hint">{t("content.topic.requiredHint")}</p>}
         </div>
       </CollapsibleSection>
 
@@ -152,12 +157,12 @@ export default function ContentCreateFormCard({
         subtitle={selectedContext === CREATE_NEW_OPTION ? customContext.trim() || t("content.context.none") : selectedContext || t("content.context.none")}
       >
         <div className="content-form-section">
-          <label htmlFor="topic-context-select" className="prompt">{t("content.context.label")}</label>
           <select
             id="topic-context-select"
             value={selectedContext}
             onChange={(e) => onSelectedContextChange(e.target.value)}
             disabled={loading || saving}
+            aria-label={t("content.section.contextTitle")}
           >
             <option value="">{t("content.context.none")}</option>
             {previousContexts.map((savedContext) => (
@@ -168,26 +173,26 @@ export default function ContentCreateFormCard({
             <option value={CREATE_NEW_OPTION}>{t("content.context.createNew")}</option>
           </select>
           {shouldCreateNewContext && (
-            <input
-              id="topic-context-input"
-              value={customContext}
-              onChange={(e) => onCustomContextChange(e.target.value)}
+            <>
+              <input
+                id="topic-context-input"
+                value={customContext}
+                onChange={(e) => onCustomContextChange(e.target.value)}
               placeholder={t("content.context.placeholder")}
               disabled={loading || saving}
             />
+            </>
           )}
         </div>
       </CollapsibleSection>
 
       <CollapsibleSection
         title={t("content.section.optionsTitle")}
-        subtitle={t("content.section.optionsSubtitle")}
       >
         <>
           <div className="content-form-section content-setting-block">
             <div className="content-setting-block-copy">
               <p className="content-form-section-title">{t("content.level.label")}</p>
-              <p className="hint">{t("content.level.description")}</p>
             </div>
             <div className="content-radio-options" role="radiogroup" aria-label={t("content.level.label")}>
               {(["A1", "A2", "B1", "B2"] as ProficiencyLevel[]).map((level) => (
@@ -208,7 +213,6 @@ export default function ContentCreateFormCard({
           <div className="content-form-section content-setting-block">
             <div className="content-setting-block-copy">
               <p className="content-form-section-title">{t("content.length.label")}</p>
-              <p className="hint">{t("content.length.description")}</p>
             </div>
             <div className="content-radio-options" role="radiogroup" aria-label={t("content.length.label")}>
               {(["standard", "short_three"] as DialogLength[]).map((length) => (
@@ -232,7 +236,6 @@ export default function ContentCreateFormCard({
           <div className="content-form-section content-setting-block">
             <div className="content-setting-block-copy">
               <p className="content-form-section-title">{t("content.requiredWords.label")}</p>
-              <p className="hint">{t("content.requiredWords.description")}</p>
             </div>
             <input
               id="required-words-input"
@@ -245,21 +248,20 @@ export default function ContentCreateFormCard({
               {(["target", "source"] as RequiredWordsLanguage[]).map((language) => (
                 <label
                   key={language}
-                  className={`content-radio-option${requiredWordsLanguage === language ? " content-radio-option-selected" : ""}`}
+                  className={`content-radio-option${hasRequiredWords && requiredWordsLanguage === language ? " content-radio-option-selected" : ""}`}
                 >
                   <input
                     type="radio"
                     name="required-words-language"
                     value={language}
-                    checked={requiredWordsLanguage === language}
+                    checked={hasRequiredWords && requiredWordsLanguage === language}
                     onChange={() => onRequiredWordsLanguageChange(language)}
-                    disabled={loading || saving}
+                    disabled={loading || saving || !hasRequiredWords}
                   />
                   {language === "target" ? t("content.requiredWords.languageTarget") : t("content.requiredWords.languageSource")}
                 </label>
               ))}
             </div>
-            <p className="hint">{t("content.requiredWords.hint")}</p>
           </div>
           <div className="content-form-section content-setting-block">
             <div className="content-setting-block-copy">

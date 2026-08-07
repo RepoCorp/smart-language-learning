@@ -119,17 +119,15 @@ export default function ConversationActiveControls({
         >
           <summary className="conversation-secondary-summary">
             <span className="conversation-secondary-summary-copy">
-              <span className="conversation-secondary-summary-title">
-                <span className="conversation-secondary-summary-caret" aria-hidden="true">▾</span>
-                <span>{t("conversation.moreControls")}</span>
-              </span>
+              <span className="conversation-secondary-summary-title">{t("conversation.moreControls")}</span>
+              {summary.role ? <span className="conversation-secondary-summary-meta">{summary.role}</span> : null}
             </span>
-            {summary.role ? <span className="conversation-secondary-summary-meta">{summary.role}</span> : null}
+            <span className="conversation-secondary-summary-caret" aria-hidden="true">▾</span>
           </summary>
           <div className="actions conversation-support-actions">
             <button
               type="button"
-              className="secondary-button"
+              className="secondary-button conversation-help-button"
               onClick={controls.onOpenHelp}
               disabled={status.conversationLoading || status.conversationRealtimeConnecting || controls.helpLoading}
             >
@@ -139,7 +137,7 @@ export default function ConversationActiveControls({
           {status.showSpeechSpeedControl && (
             <div className="conversation-speed-controls">
               <label className="prompt conversation-speed-label">{t("conversation.speedLabel")}</label>
-              <div className="exercise-audio-mode">
+              <div className="exercise-audio-mode conversation-speed-options">
                 <label className={`exercise-radio-option ${status.speechSpeed === "normal" ? "exercise-radio-option-selected" : ""}`}>
                   <input
                     type="radio"

@@ -1,4 +1,4 @@
-type DialogActionIconName = "play" | "stop" | "refresh" | "text" | "dialog" | "next" | "send";
+type DialogActionIconName = "play" | "stop" | "refresh" | "text" | "dialog" | "next" | "collapse" | "send";
 
 export default function DialogActionIcon({ name }: { name: DialogActionIconName }): JSX.Element {
   const commonProps = {
@@ -45,6 +45,13 @@ export default function DialogActionIcon({ name }: { name: DialogActionIconName 
       <svg {...commonProps}>
         <path d="M8 6l6 6-6 6" />
         <path d="M14 6l6 6-6 6" />
+      </svg>
+    );
+  }
+  if (name === "collapse") {
+    return (
+      <svg {...commonProps}>
+        <path d="m6 15 6-6 6 6" />
       </svg>
     );
   }

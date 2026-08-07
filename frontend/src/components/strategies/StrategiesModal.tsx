@@ -37,7 +37,6 @@ export default function StrategiesModal({
         <p className="exercise-modal-header">
           <strong>{t("newItem.strategiesTitle")}</strong>
         </p>
-        <p className="hint exercise-modal-description">{t("newItem.strategiesDescription")}</p>
         <div className="word-strategies-body">
           <div className="word-strategies-item-card">
             <p className="word-strategies-item-kicker">
