@@ -1911,6 +1911,51 @@ def test_content_item_regenerate_audio_updates_audio_url(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_item_regenerate_keeps_a_selected_subphrase(monkeypatch):
+    from learning.views.content import management_items_regenerate as regenerate_views
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="para la estación",
+        german_text="zum Bahnhof",
+        source_language="spanish",
+        target_language="german",
+    )
+    dialog = SavedDialog.objects.create(
+        topic="travel",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Necesito ir para la estación.", "target_text": "Ich muss zum Bahnhof.", "speaker": "a"}],
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Necesito ir para la estación.",
+        target_text="Ich muss zum Bahnhof.",
+    )
+    ItemDialogOccurrence.objects.create(item=item, dialog=dialog, turn=turn, turn_index=0)
+    captured_texts: list[str] = []
+    monkeypatch.setattr(
+        regenerate_views,
+        "create_audio_file",
+        lambda text, prefix, **kwargs: captured_texts.append(text) or "http://localhost:8000/media/audio/subphrase.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/regenerate?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert captured_texts == ["zum Bahnhof"]
+    item.refresh_from_db()
+    assert item.spanish_text == "para la estación"
+    assert item.german_text == "zum Bahnhof"
+    assert item.audio_url == "http://localhost:8000/media/audio/subphrase.mp3"
+
+
+@pytest.mark.django_db
 def test_content_dialog_regenerate_audio_updates_turn_audio_urls(monkeypatch):
     from learning.views.content import management_dialogs_listing as dialog_listing_views
 

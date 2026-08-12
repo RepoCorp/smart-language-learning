@@ -62,13 +62,13 @@ class ContentItemRegenerateView(APIView):
             return Response({"detail": "Original item context not found"}, status=status.HTTP_400_BAD_REQUEST)
 
         if item.item_type == Item.ItemType.PHRASE:
-            audio_url = create_audio_file(target_context, "phrase", target_language=target_language)
+            # An occurrence points to the full dialog turn, while a saved phrase
+            # can intentionally be only a selected part of that turn.
+            audio_url = create_audio_file(item.german_text, "phrase", target_language=target_language)
             if not audio_url:
                 return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            item.spanish_text = source_context
-            item.german_text = target_context
             item.audio_url = audio_url
-            item.save(update_fields=["spanish_text", "german_text", "audio_url", "updated_at"])
+            item.save(update_fields=["audio_url", "updated_at"])
             return Response({"ok": True})
 
         source_text, target_text, word_type, note = resolve_dialog_click_word_pair(
