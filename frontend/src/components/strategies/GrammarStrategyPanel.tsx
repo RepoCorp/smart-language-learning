@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n";
 import type { GermanGrammarNounExample, StudyLanguageCode } from "../../types";
+import StaticGrammarTable, { type StaticGrammarRow } from "./StaticGrammarTable";
 
 type NounGender = "masculine" | "feminine" | "neuter";
 const GENDERS: NounGender[] = ["masculine", "feminine", "neuter"];
@@ -56,12 +57,25 @@ export default function GrammarStrategyPanel({
   const noun = wordType.trim().toLowerCase() === "noun" && targetLanguage === "german"
     ? parseGermanNoun(targetText)
     : null;
+  const isGermanVerb = wordType.trim().toLowerCase() === "verb" && targetLanguage === "german";
+  const isGermanAdjective = wordType.trim().toLowerCase() === "adjective" && targetLanguage === "german";
+  const isGermanAdverb = wordType.trim().toLowerCase() === "adverb" && targetLanguage === "german";
   const [selectedGender, setSelectedGender] = useState<NounGender>(noun?.gender || "masculine");
   useEffect(() => {
     if (noun) {
       setSelectedGender(noun.gender);
     }
   }, [noun?.gender]);
+
+  if (isGermanVerb) {
+    return <VerbGrammarTable />;
+  }
+  if (isGermanAdjective) {
+    return <AdjectiveGrammarTable />;
+  }
+  if (isGermanAdverb) {
+    return <AdverbGrammarTable />;
+  }
 
   if (!noun) {
     return (
@@ -153,6 +167,38 @@ export default function GrammarStrategyPanel({
       <p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p>
     </div>
   );
+}
+
+function VerbGrammarTable(): JSX.Element {
+  const { t } = useI18n();
+  const rows: StaticGrammarRow[] = [
+    { topic: t("strategies.grammar.verbInfinitive"), example: <>spiel<strong>en</strong></>, note: t("strategies.grammar.verbInfinitiveNote") },
+    { topic: t("strategies.grammar.verbStem"), example: <strong>spiel-</strong>, note: t("strategies.grammar.verbStemNote") },
+    { topic: t("strategies.grammar.verbPresent"), example: "spiel- + ending", note: t("strategies.grammar.verbPresentNote") },
+    { topic: t("strategies.grammar.verbPerfect"), example: <>haben + <strong>gespielt</strong></>, note: t("strategies.grammar.verbPerfectNote") },
+    { topic: t("strategies.grammar.verbSimplePast"), example: <>spiel- + <strong>te</strong></>, note: t("strategies.grammar.verbSimplePastNote") },
+    { topic: t("strategies.grammar.verbFuture"), example: <>werden + <strong>spielen</strong></>, note: t("strategies.grammar.verbFutureNote") },
+  ];
+  return <StaticGrammarTable rows={rows} />;
+}
+
+function AdjectiveGrammarTable(): JSX.Element {
+  const { t } = useI18n();
+  const rows: StaticGrammarRow[] = [
+    { topic: t("strategies.grammar.adjectiveWhatItDoes"), example: <>ein <strong>guter</strong> Hund</>, note: t("strategies.grammar.adjectiveWhatItDoesNote") },
+    { topic: t("strategies.grammar.adjectiveAfterVerb"), example: <>Der Hund ist <strong>gut</strong>.</>, note: t("strategies.grammar.adjectiveAfterVerbNote") },
+    { topic: t("strategies.grammar.adjectiveBeforeNoun"), example: <>ein <strong>guter</strong> Hund</>, note: t("strategies.grammar.adjectiveBeforeNounNote") },
+  ];
+  return <StaticGrammarTable rows={rows} />;
+}
+
+function AdverbGrammarTable(): JSX.Element {
+  const { t } = useI18n();
+  const rows: StaticGrammarRow[] = [
+    { topic: t("strategies.grammar.adverbWhatItDoes"), example: <>Er läuft <strong>schnell</strong>.</>, note: t("strategies.grammar.adverbWhatItDoesNote") },
+    { topic: t("strategies.grammar.adverbForm"), example: <strong>schnell</strong>, note: t("strategies.grammar.adverbFormNote") },
+  ];
+  return <StaticGrammarTable rows={rows} />;
 }
 
 function GenderTabs({
