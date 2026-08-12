@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+from uuid import uuid4
+
 from django.db.models import Q
 
 from .audio import create_openai_audio_file, select_dialog_speaker_voice_ids
@@ -22,6 +25,7 @@ from .dialog_item_context import (
 
 DEFAULT_DIALOGS_PAGE_SIZE = 20
 MAX_DIALOGS_PAGE_SIZE = 50
+logger = logging.getLogger(__name__)
 
 
 def _dialog_turn_count(dialog: SavedDialog) -> int:
@@ -179,6 +183,9 @@ class ContentDialogAudioRegenerateView(APIView):
     def post(self, request: Request, dialog_id: int) -> Response:
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
+        audio_mode = (request.query_params.get("audio_mode", "natural") or "natural").strip().lower()
+        if audio_mode not in {"natural", "clear"}:
+            return Response({"detail": "Unsupported audio mode"}, status=status.HTTP_400_BAD_REQUEST)
         dialog = (
             apply_user_scope(SavedDialog.objects, user)
             .filter(id=dialog_id, source_language=source_language, target_language=target_language)
@@ -188,30 +195,61 @@ class ContentDialogAudioRegenerateView(APIView):
         if not dialog:
             return Response({"detail": "Dialog not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        speaker_voice_ids = select_dialog_speaker_voice_ids(dialog.target_language, seed=f"dialog:{dialog.id}")
+        logger.info(
+            "content.dialog_audio.regeneration_started dialog_id=%s audio_mode=%s turn_count=%s",
+            dialog.id,
+            audio_mode,
+            _dialog_turn_count(dialog),
+        )
+        # Keep normal dialog playback stable, but make an explicit regeneration
+        # choose a fresh natural-voice pair.
+        speaker_voice_ids = select_dialog_speaker_voice_ids(
+            dialog.target_language,
+            seed=f"dialog:{dialog.id}:regenerate:{uuid4().hex}",
+        ) if audio_mode == "natural" else None
         turns = list(dialog.dialog_turns.all().order_by("turn_index", "id"))
         updated_turns: list[dict[str, str]] = []
         for turn in turns:
             target_text = str(turn.target_text or "").strip()
-            voice_id = speaker_voice_ids[turn.turn_index % 2] if speaker_voice_ids else ""
-            audio_url = create_audio_file(
-                target_text,
-                "phrase",
-                target_language=dialog.target_language,
-                voice_id=voice_id,
-            ) if target_text else ""
+            speaker = _speaker_for_index(dialog, turn.turn_index)
+            voice_id = speaker_voice_ids[0 if speaker == "a" else 1] if speaker_voice_ids else ""
+            if audio_mode == "clear":
+                audio_url = create_openai_audio_file(
+                    target_text,
+                    "phrase",
+                    target_language=dialog.target_language,
+                ) if target_text else ""
+            else:
+                audio_url = create_audio_file(
+                    target_text,
+                    "phrase",
+                    target_language=dialog.target_language,
+                    voice_id=voice_id,
+                ) if target_text else ""
             if not audio_url:
                 return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            turn.audio_url = audio_url
-            turn.save(update_fields=["audio_url"])
+            if audio_mode == "clear":
+                turn.clear_audio_url = audio_url
+                turn.save(update_fields=["clear_audio_url"])
+            else:
+                turn.audio_url = audio_url
+                turn.save(update_fields=["audio_url"])
             updated_turns.append(
                 {
                     "source_text": turn.source_text,
                     "target_text": turn.target_text,
-                    "speaker": _speaker_for_index(dialog, turn.turn_index),
-                    "phrase_audio_url": audio_url,
+                    "speaker": speaker,
+                    "phrase_audio_url": turn.audio_url,
+                    "clear_audio_url": turn.clear_audio_url,
                 }
             )
+
+        logger.info(
+            "content.dialog_audio.regeneration_finished dialog_id=%s audio_mode=%s turn_count=%s",
+            dialog.id,
+            audio_mode,
+            len(updated_turns),
+        )
 
         return Response(
             {

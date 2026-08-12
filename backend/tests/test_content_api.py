@@ -1967,6 +1967,131 @@ def test_content_dialog_regenerate_audio_updates_turn_audio_urls(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_content_dialog_regenerate_audio_keeps_consecutive_turns_with_one_speaker_voice(monkeypatch):
+    from learning.views.content import management_dialogs_listing as dialog_listing_views
+
+    dialog = SavedDialog.objects.create(
+        topic="travel",
+        context="station",
+        source_language="spanish",
+        target_language="german",
+        turns=[
+            {"source_text": "Hola.", "target_text": "Hallo.", "speaker": "a"},
+            {"source_text": "Escucha.", "target_text": "Hor zu.", "speaker": "a"},
+            {"source_text": "Vale.", "target_text": "Gut.", "speaker": "b"},
+        ],
+    )
+    for index, target_text in enumerate(("Hallo.", "Hor zu.", "Gut.")):
+        DialogTurn.objects.create(
+            dialog=dialog,
+            turn_index=index,
+            source_text="",
+            target_text=target_text,
+        )
+    captured_voice_ids: list[str] = []
+    monkeypatch.setattr(
+        dialog_listing_views,
+        "select_dialog_speaker_voice_ids",
+        lambda target_language, seed="": ("voice-a", "voice-b"),
+    )
+    monkeypatch.setattr(
+        dialog_listing_views,
+        "create_audio_file",
+        lambda text, prefix, **kwargs: captured_voice_ids.append(kwargs["voice_id"]) or f"audio://{text}",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/dialogs/{dialog.id}/audio?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert captured_voice_ids == ["voice-a", "voice-a", "voice-b"]
+
+
+@pytest.mark.django_db
+def test_content_dialog_regenerate_audio_uses_a_fresh_voice_selection_seed(monkeypatch):
+    from learning.views.content import management_dialogs_listing as dialog_listing_views
+
+    dialog = SavedDialog.objects.create(
+        topic="travel",
+        context="station",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Hola.", "target_text": "Hallo.", "speaker": "a"}],
+    )
+    DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Hola.",
+        target_text="Hallo.",
+    )
+    seeds: list[str] = []
+    monkeypatch.setattr(
+        dialog_listing_views,
+        "select_dialog_speaker_voice_ids",
+        lambda target_language, seed="": seeds.append(seed) or ("voice-a", "voice-b"),
+    )
+    monkeypatch.setattr(
+        dialog_listing_views,
+        "create_audio_file",
+        lambda text, prefix, **kwargs: "http://localhost:8000/media/audio/new.mp3",
+    )
+
+    client = APIClient()
+    for _ in range(2):
+        response = client.post(
+            f"/api/content/dialogs/{dialog.id}/audio?source_language=spanish&target_language=german",
+            format="json",
+        )
+        assert response.status_code == 200
+
+    assert len(seeds) == 2
+    assert seeds[0] != seeds[1]
+    assert all(seed.startswith(f"dialog:{dialog.id}:regenerate:") for seed in seeds)
+
+
+@pytest.mark.django_db
+def test_content_dialog_regenerate_clear_audio_updates_only_clear_urls(monkeypatch):
+    from learning.views.content import management_dialogs_listing as dialog_listing_views
+
+    dialog = SavedDialog.objects.create(
+        topic="travel",
+        context="station",
+        source_language="spanish",
+        target_language="german",
+        turns=[{"source_text": "Hola.", "target_text": "Hallo.", "speaker": "a"}],
+    )
+    turn = DialogTurn.objects.create(
+        dialog=dialog,
+        turn_index=0,
+        source_text="Hola.",
+        target_text="Hallo.",
+        audio_url="http://localhost:8000/media/audio/natural-old.mp3",
+        clear_audio_url="http://localhost:8000/media/audio/clear-old.mp3",
+    )
+    monkeypatch.setattr(
+        dialog_listing_views,
+        "create_openai_audio_file",
+        lambda text, prefix, **kwargs: "http://localhost:8000/media/audio/clear-new.mp3",
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/dialogs/{dialog.id}/audio?source_language=spanish&target_language=german&audio_mode=clear",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["turns"][0]["phrase_audio_url"] == "http://localhost:8000/media/audio/natural-old.mp3"
+    assert response.json()["turns"][0]["clear_audio_url"] == "http://localhost:8000/media/audio/clear-new.mp3"
+    turn.refresh_from_db()
+    assert turn.audio_url == "http://localhost:8000/media/audio/natural-old.mp3"
+    assert turn.clear_audio_url == "http://localhost:8000/media/audio/clear-new.mp3"
+
+
+@pytest.mark.django_db
 def test_content_item_question_saves_conversation(monkeypatch):
     from learning.views.content import item_questions as item_question_views
 

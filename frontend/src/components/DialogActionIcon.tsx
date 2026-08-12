@@ -1,4 +1,4 @@
-type DialogActionIconName = "play" | "stop" | "refresh" | "text" | "dialog" | "next" | "collapse" | "send" | "speed-fast" | "speed-slow";
+type DialogActionIconName = "play" | "stop" | "pause" | "refresh" | "text" | "dialog" | "next" | "collapse" | "send" | "speed-fast" | "speed-slow";
 
 export default function DialogActionIcon({ name }: { name: DialogActionIconName }): JSX.Element {
   if (name === "speed-fast" || name === "speed-slow") {
@@ -28,6 +28,14 @@ export default function DialogActionIcon({ name }: { name: DialogActionIconName 
     return (
       <svg {...commonProps}>
         <rect x="7" y="7" width="10" height="10" rx="1.5" />
+      </svg>
+    );
+  }
+  if (name === "pause") {
+    return (
+      <svg {...commonProps}>
+        <path d="M8 6v12" />
+        <path d="M16 6v12" />
       </svg>
     );
   }

@@ -11,11 +11,9 @@ import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentDialogRecord, SessionItem } from "../types";
-import DangerousButton from "./DangerousButton";
-import DialogActionIcon from "./DialogActionIcon";
 import NewItem from "./NewItem";
 import DialogsCatalogList from "./dialogs/DialogsCatalogList";
-import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
+import DialogGlobalControls from "./dialogs/DialogGlobalControls";
 import useDialogPlaybackFocus from "./useDialogPlaybackFocus";
 import DialogsFilterBar from "./dialogs/DialogsFilterBar";
 import useDialogsCatalog, { mergeDialogRecord } from "./dialogs/useDialogsCatalog";
@@ -126,10 +124,12 @@ export default function DialogsPage(): JSX.Element {
     playingAll,
     playingDialogId,
     playingTurn,
+    isPlaybackPaused,
     playAllDialogs,
     playSingleDialog,
     playTurn,
     stopCurrentPlayback,
+    togglePlaybackPause,
   } = useDialogTurnPlayback({
     dialogs,
     setDialogs,
@@ -337,10 +337,16 @@ export default function DialogsPage(): JSX.Element {
     if (regeneratingAudioDialogId !== null) {
       return;
     }
+    stopCurrentPlayback();
     setRegeneratingAudioDialogId(dialog.dialog_id);
     setError("");
     try {
-      const refreshedDialog = await regenerateContentDialogAudio(dialog.dialog_id, sourceLanguage, targetLanguage);
+      const refreshedDialog = await regenerateContentDialogAudio(
+        dialog.dialog_id,
+        sourceLanguage,
+        targetLanguage,
+        turnAudioMode,
+      );
       upsertVisibleDialog(refreshedDialog);
       setExpandedDialogId(dialog.dialog_id);
     } catch {
@@ -352,75 +358,23 @@ export default function DialogsPage(): JSX.Element {
 
   const hasPlayableDialogs = dialogs.some(dialogHasTurns);
   const renderDialogActionButtons = (dialog: ContentDialogRecord): JSX.Element => (
-    <>
-      <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
-        {dialogHasTurns(dialog) ? (
-          <button
-            type="button"
-            className="secondary-button exercise-action-icon-button dialog-list-action-button"
-            onClick={() => {
-              if (playingDialogId === dialog.dialog_id) {
-                stopCurrentPlayback();
-                return;
-              }
-              void playSingleDialog(dialog);
-            }}
-            disabled={loadingDialogId === dialog.dialog_id}
-            aria-label={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
-            title={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
-            data-mobile-label={playingDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
-          >
-            <DialogActionIcon name={playingDialogId === dialog.dialog_id ? "stop" : "play"} />
-          </button>
-        ) : (
-          <span className="manage-item-meta">{t("dialogs.noAudio")}</span>
-        )}
-        {targetPromptMode === "audio" && !!(dialog.turn_count || dialog.turns?.length) && (
-          <button
-            type="button"
-            className="secondary-button exercise-action-icon-button dialog-list-action-button"
-            onClick={() => setShowDialogText((value) => !value)}
-            aria-label={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
-            title={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
-            data-mobile-label={showDialogText ? t("prompt.hideText") : t("prompt.showText")}
-            aria-pressed={showDialogText}
-          >
-            <DialogActionIcon name="text" />
-          </button>
-        )}
-        {dialogHasTurns(dialog) && (
-          <DialogTurnAudioModeButton
-            mode={turnAudioMode}
-            onToggle={() => setTurnAudioMode((current) => current === "natural" ? "clear" : "natural")}
-          />
-        )}
-        <button
-          type="button"
-          className="secondary-button exercise-action-icon-button dialog-list-action-button"
-          onClick={() => setExpandedDialogId(null)}
-          aria-label={t("dialogs.hideDialog")}
-          title={t("dialogs.hideDialog")}
-          data-mobile-label={t("dialogs.hideDialog")}
-        >
-          <DialogActionIcon name="collapse" />
-        </button>
-      </div>
-      {!!(dialog.turn_count || dialog.turns?.length) && (
-        <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
-          <DangerousButton
-            type="button"
-            className="secondary-button exercise-action-icon-button dialog-list-action-button"
-            onConfirm={() => regenerateDialogAudio(dialog)}
-            disabled={regeneratingAudioDialogId === dialog.dialog_id}
-            aria-label={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
-            title={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
-            data-mobile-label={regeneratingAudioDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
-          >
-            <DialogActionIcon name="refresh" />
-          </DangerousButton>
-        </div>
-      )}
-    </>
+    <DialogGlobalControls
+      dialog={dialog}
+      hasTurns={dialogHasTurns(dialog)}
+      isPaused={isPlaybackPaused}
+      isPlaying={playingDialogId === dialog.dialog_id}
+      loading={loadingDialogId === dialog.dialog_id}
+      showText={showDialogText}
+      targetPromptMode={targetPromptMode}
+      turnAudioMode={turnAudioMode}
+      regenerating={regeneratingAudioDialogId === dialog.dialog_id}
+      onPlay={() => void playSingleDialog(dialog)}
+      onTogglePause={togglePlaybackPause}
+      onToggleText={() => setShowDialogText((value) => !value)}
+      onToggleTurnAudioMode={() => setTurnAudioMode((current) => current === "natural" ? "clear" : "natural")}
+      onCollapse={() => setExpandedDialogId(null)}
+      onRegenerate={() => regenerateDialogAudio(dialog)}
+    />
   );
 
   return (
@@ -447,8 +401,8 @@ export default function DialogsPage(): JSX.Element {
               {t("dialogs.playAll")}
             </button>
           ) : (
-            <button type="button" className="secondary-button" onClick={stopCurrentPlayback}>
-              {t("dialogs.stopAll")}
+            <button type="button" className="secondary-button" onClick={togglePlaybackPause}>
+              {isPlaybackPaused ? t("dialogs.resumeDialog") : t("dialogs.pauseDialog")}
             </button>
           )}
         </div>

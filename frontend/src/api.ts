@@ -416,10 +416,12 @@ export async function regenerateContentDialogAudio(
   dialogId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  audioMode: "natural" | "clear" = "natural",
 ): Promise<ContentDialogRecord> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
+    audio_mode: audioMode,
   });
   const response = await apiFetch(`${API_BASE}/content/dialogs/${dialogId}/audio?${params.toString()}`, {
     method: "POST",

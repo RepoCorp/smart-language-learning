@@ -43,6 +43,7 @@ export default function useDialogTurnPlayback({
   const [playingAll, setPlayingAll] = useState<boolean>(false);
   const [playingDialogId, setPlayingDialogId] = useState<number | null>(null);
   const [playingTurn, setPlayingTurn] = useState<PlayingTurn | null>(null);
+  const [isPlaybackPaused, setIsPlaybackPaused] = useState<boolean>(false);
   const [loadingTurnAudioKey, setLoadingTurnAudioKey] = useState<string>("");
   const playbackRunRef = useRef<number>(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -57,6 +58,21 @@ export default function useDialogTurnPlayback({
     setPlayingAll(false);
     setPlayingDialogId(null);
     setPlayingTurn(null);
+    setIsPlaybackPaused(false);
+  };
+
+  const togglePlaybackPause = (): void => {
+    const audio = activeAudioRef.current;
+    if (!audio) {
+      return;
+    }
+    if (audio.paused) {
+      void audio.play();
+      setIsPlaybackPaused(false);
+      return;
+    }
+    audio.pause();
+    setIsPlaybackPaused(true);
   };
 
   useEffect(() => () => {
@@ -147,6 +163,7 @@ export default function useDialogTurnPlayback({
     const runId = playbackRunRef.current;
     setPlayingDialogId(dialogId);
     setPlayingTurn({ dialogId, turnIndex });
+    setIsPlaybackPaused(false);
     await playAudioUrl(audioUrl, runId);
     if (runId === playbackRunRef.current) {
       setPlayingDialogId(null);
@@ -163,16 +180,13 @@ export default function useDialogTurnPlayback({
       return;
     }
     setPlayingDialogId(detailedDialog.dialog_id);
+    setIsPlaybackPaused(false);
     for (let index = 0; index < detailedDialog.turns.length; index += 1) {
       if (runId !== playbackRunRef.current) {
         break;
       }
       setPlayingTurn({ dialogId: detailedDialog.dialog_id, turnIndex: index });
-      if (index > 0) {
-        focusDialogTurn(detailedDialog.dialog_id, index, setExpandedDialogId);
-      } else {
-        setExpandedDialogId(detailedDialog.dialog_id);
-      }
+      focusDialogTurn(detailedDialog.dialog_id, index, setExpandedDialogId);
       const audioUrl = await ensureTurnAudioUrl(
         detailedDialog.dialog_id,
         index,
@@ -232,9 +246,11 @@ export default function useDialogTurnPlayback({
     playingAll,
     playingDialogId,
     playingTurn,
+    isPlaybackPaused,
     playAllDialogs,
     playSingleDialog,
     playTurn,
     stopCurrentPlayback,
+    togglePlaybackPause,
   };
 }
