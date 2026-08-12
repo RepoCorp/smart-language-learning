@@ -3,19 +3,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { generateContentItemPracticePhrases } from "../../apiStrategies";
 import type { ItemExercisePhrases, StudyLanguageCode } from "../../types";
 
-type PracticeEntry = {
+type ExamplesEntry = {
   label: string;
   source: string;
   target: string;
 };
 
-function practiceEntryKey(entry: PracticeEntry): string {
+function examplesEntryKey(entry: ExamplesEntry): string {
   return `${entry.label || ""}|||${entry.source}|||${entry.target}`;
 }
 
-function sanitizePracticeEntries(
+function sanitizeExamplesEntries(
   exercisePhrases: ItemExercisePhrases | undefined,
-): PracticeEntry[] {
+): ExamplesEntry[] {
   const entries = exercisePhrases?.practice_phrases;
   if (!Array.isArray(entries)) {
     return [];
@@ -30,7 +30,7 @@ function sanitizePracticeEntries(
     .slice(0, 8);
 }
 
-export function usePracticeStrategy({
+export function useExamplesStrategy({
   itemId,
   itemType,
   exercisePhrases,
@@ -55,7 +55,7 @@ export function usePracticeStrategy({
   const attemptedGenerationRef = useRef<string>("");
 
   const entries = useMemo(
-    () => sanitizePracticeEntries(exercisePhrases),
+    () => sanitizeExamplesEntries(exercisePhrases),
     [exercisePhrases],
   );
 
@@ -66,10 +66,18 @@ export function usePracticeStrategy({
     setIsLoading(true);
     setError("");
     try {
-      const payload = await generateContentItemPracticePhrases(itemId, sourceLanguage, targetLanguage);
+      const payload = await generateContentItemPracticePhrases(
+        itemId,
+        sourceLanguage,
+        targetLanguage,
+      );
       setExercisePhrases(payload.exercise_phrases || {});
     } catch (generationError) {
-      setError(generationError instanceof Error ? generationError.message : errorMessage);
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : errorMessage,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +91,13 @@ export function usePracticeStrategy({
   }, [itemId, entries]);
 
   useEffect(() => {
-    if (!enabled || itemType !== "word" || itemId <= 0 || entries.length > 0 || isLoading) {
+    if (
+      !enabled ||
+      itemType !== "word" ||
+      itemId <= 0 ||
+      entries.length > 0 ||
+      isLoading
+    ) {
       return;
     }
     const attemptKey = `${itemId}:${sourceLanguage}:${targetLanguage}`;
@@ -95,15 +109,25 @@ export function usePracticeStrategy({
     void (async () => {
       await generate();
     })();
-  }, [enabled, itemId, itemType, entries.length, isLoading, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage]);
+  }, [
+    enabled,
+    itemId,
+    itemType,
+    entries.length,
+    isLoading,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage,
+  ]);
 
-  const toggleEntry = (entry: PracticeEntry): void => {
-    const key = practiceEntryKey(entry);
-    setSelectedKeys((current) => (
+  const toggleEntry = (entry: ExamplesEntry): void => {
+    const key = examplesEntryKey(entry);
+    setSelectedKeys((current) =>
       current.includes(key)
         ? current.filter((selectedKey) => selectedKey !== key)
-        : [...current, key]
-    ));
+        : [...current, key],
+    );
   };
 
   const unselectAll = (): void => {
@@ -111,12 +135,12 @@ export function usePracticeStrategy({
   };
 
   const selectAll = (): void => {
-    setSelectedKeys(entries.map(practiceEntryKey));
+    setSelectedKeys(entries.map(examplesEntryKey));
   };
 
   const selectRandom = (): void => {
     if (entries.length <= 2) {
-      setSelectedKeys(entries.map(practiceEntryKey));
+      setSelectedKeys(entries.map(examplesEntryKey));
       return;
     }
     const pool = [...entries];
@@ -124,7 +148,7 @@ export function usePracticeStrategy({
     while (pool.length > 0 && selected.length < 2) {
       const index = Math.floor(Math.random() * pool.length);
       const [entry] = pool.splice(index, 1);
-      selected.push(practiceEntryKey(entry));
+      selected.push(examplesEntryKey(entry));
     }
     setSelectedKeys(selected);
   };

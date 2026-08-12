@@ -1,5 +1,7 @@
 import { useI18n } from "../../i18n";
-import PhraseSelectionList, { type PhraseSelectionEntry } from "./PhraseSelectionList";
+import PhraseSelectionList, {
+  type PhraseSelectionEntry,
+} from "./PhraseSelectionList";
 
 export default function WalkStrategyPanel({
   challenge,
@@ -23,8 +25,10 @@ export default function WalkStrategyPanel({
   const { t } = useI18n();
 
   return (
-    <div className="practice-strategy-panel">
-      <p className="hint exercise-modal-description">{t("newItem.walkDescription")}</p>
+    <div className="strategy-content-panel">
+      <p className="hint exercise-modal-description">
+        {t("newItem.walkDescription")}
+      </p>
       {isLoading && <p className="hint">{t("newItem.walkGenerating")}</p>}
       {error && <p className="error">{error}</p>}
       {!!challenge && (

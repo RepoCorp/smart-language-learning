@@ -1,4 +1,4 @@
-You are helping a student build semantic connections in a foreign language.
+You are helping a student explore useful word families in a foreign language.
 
 Source language:
 {source_name}
@@ -18,10 +18,7 @@ Word type:
 Additional notes:
 {notes}
 
-Generate:
-
-1. Up to 5 words from the same word family.
-2. Up to 5 related, contrasting, or commonly confused words.
+Generate up to 5 useful words from the same word family.
 
 Requirements:
 
@@ -34,7 +31,6 @@ Requirements:
 - Keep the sentences short and use common everyday vocabulary.
 - Do not repeat nearly identical sentences.
 - Do not include grammar explanations.
-- For each related, contrasting, or commonly confused word, add one short explanation in {source_name} saying why it is related, contrasting, or easy to confuse with the target word, and give a practical hint to distinguish it.
 
 Return valid JSON with this exact shape:
 {
@@ -44,15 +40,6 @@ Return valid JSON with this exact shape:
       "source_text": "<translation in {source_name}>",
       "example_target_text": "<short sentence in {target_name}>",
       "example_source_text": "<translation of the sentence in {source_name}>"
-    }
-  ],
-  "related_or_confusing": [
-    {
-      "target_text": "<target word>",
-      "source_text": "<translation in {source_name}>",
-      "example_target_text": "<short sentence in {target_name}>",
-      "example_source_text": "<translation of the sentence in {source_name}>",
-      "explanation_text": "<short explanation in {source_name} of why this word is related, contrasting, or confusing, plus a hint to distinguish it>"
     }
   ]
 }

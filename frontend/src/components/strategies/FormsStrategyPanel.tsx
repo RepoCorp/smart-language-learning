@@ -20,7 +20,6 @@ export default function FormsStrategyPanel({
   loadingExercises,
   exerciseError,
   exerciseRunning,
-  generatingFunnyImageExercise,
   wordExerciseEntries,
   selectedExerciseKeys,
   funnyImageExerciseSelectionEntry,
@@ -40,9 +39,7 @@ export default function FormsStrategyPanel({
   onSelectKeys,
   onGenerateCase,
   onOpenFunnyImage,
-  onGenerateFunnyImage,
   openImageIcon,
-  imageIcon,
   exerciseEntryKey,
 }: {
   itemType: SessionItem["item_type"];
@@ -52,7 +49,6 @@ export default function FormsStrategyPanel({
   loadingExercises: boolean;
   exerciseError: string;
   exerciseRunning: boolean;
-  generatingFunnyImageExercise: boolean;
   wordExerciseEntries: ExerciseEntry[];
   selectedExerciseKeys: string[];
   funnyImageExerciseSelectionEntry?: ExerciseEntry;
@@ -77,9 +73,7 @@ export default function FormsStrategyPanel({
   onSelectKeys: (keys: string[]) => void;
   onGenerateCase: (caseKey: "nominative" | "accusative" | "dative" | "genitive") => void;
   onOpenFunnyImage: () => void;
-  onGenerateFunnyImage: () => void;
   openImageIcon: JSX.Element;
-  imageIcon: JSX.Element;
   exerciseEntryKey: (entry: ExerciseEntry) => string;
 }): JSX.Element {
   const { t } = useI18n();
@@ -108,20 +102,20 @@ export default function FormsStrategyPanel({
       {exerciseError && <p className="error">{exerciseError}</p>}
       {itemType === "word" && (
         <>
-          <WordExerciseActions
-            exerciseRunning={exerciseRunning}
-            loadingExercises={loadingExercises}
-            generatingFunnyImageExercise={generatingFunnyImageExercise}
-            hasWordExercises={wordExerciseEntries.length > 0}
-            hasFunnyImage={Boolean(funnyImageExerciseSelectionEntry)}
-            hasOpenFunnyImage={Boolean(funnyImageExerciseImageUrl && funnyImageExerciseSelectionEntry)}
-            onOpenFunnyImage={onOpenFunnyImage}
-            onGenerateFunnyImage={onGenerateFunnyImage}
-            openImageIcon={openImageIcon}
-            imageIcon={imageIcon}
-          />
-          {generatingFunnyImageExercise && (
-            <p className="hint">{t("newItem.exercisesFunnyImagePending")}</p>
+          {funnyImageExerciseImageUrl && funnyImageExerciseSelectionEntry && (
+            <WordExerciseActions
+              exerciseRunning={exerciseRunning}
+              loadingExercises={loadingExercises}
+              generatingFunnyImageExercise={false}
+              hasWordExercises={wordExerciseEntries.length > 0}
+              hasFunnyImage={Boolean(funnyImageExerciseSelectionEntry)}
+              hasOpenFunnyImage
+              onOpenFunnyImage={onOpenFunnyImage}
+              onGenerateFunnyImage={() => {}}
+              openImageIcon={openImageIcon}
+              imageIcon={null}
+              showGenerateImage={false}
+            />
           )}
           {funnyImageExerciseSelectionEntry && (
             <div className="funny-image-phrase-row">

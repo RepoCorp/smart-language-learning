@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { generateContentItemConnectWords } from "../../apiStrategies";
+import { generateContentItemRelatedWords } from "../../apiStrategies";
 import type { ItemExercisePhrases, StudyLanguageCode } from "../../types";
 
-type ConnectEntry = {
+type RelatedEntry = {
   key: string;
   targetWord: string;
   sourceWord: string;
@@ -12,16 +12,22 @@ type ConnectEntry = {
   explanation?: string;
 };
 
-function connectEntryKey(group: string, targetWord: string, exampleTarget: string): string {
+function relatedEntryKey(
+  group: string,
+  targetWord: string,
+  exampleTarget: string,
+): string {
   return `${group}|||${targetWord}|||${exampleTarget}`;
 }
 
-function sanitizeConnectGroup(
+function sanitizeRelatedGroup(
   groupKey: string,
-  entries: ItemExercisePhrases["connect_groups"] extends infer T
-    ? T extends { same_family?: infer U } ? U : never
+  entries: ItemExercisePhrases["related_groups"] extends infer T
+    ? T extends { same_family?: infer U }
+      ? U
+      : never
     : never,
-): ConnectEntry[] {
+): RelatedEntry[] {
   if (!Array.isArray(entries)) {
     return [];
   }
@@ -33,7 +39,7 @@ function sanitizeConnectGroup(
       const exampleSource = String(entry?.example_source_text || "").trim();
       const explanation = String(entry?.explanation_text || "").trim();
       return {
-        key: connectEntryKey(groupKey, targetWord, exampleTarget),
+        key: relatedEntryKey(groupKey, targetWord, exampleTarget),
         targetWord,
         sourceWord,
         exampleTarget,
@@ -41,11 +47,28 @@ function sanitizeConnectGroup(
         explanation,
       };
     })
-    .filter((entry) => entry.targetWord && entry.sourceWord && entry.exampleTarget && entry.exampleSource)
+    .filter(
+      (entry) =>
+        entry.targetWord &&
+        entry.sourceWord &&
+        entry.exampleTarget &&
+        entry.exampleSource,
+    )
     .slice(0, 5);
 }
 
-export function useConnectStrategy({
+function legacyRelatedGroups(
+  exercisePhrases: ItemExercisePhrases | undefined,
+): { same_family?: unknown } | undefined {
+  // Existing saved exercises used the old storage key before this strategy was renamed.
+  const legacyPayload = exercisePhrases as Record<string, unknown> | undefined;
+  const groups = legacyPayload?.connect_groups;
+  return groups && typeof groups === "object"
+    ? (groups as { same_family?: unknown })
+    : undefined;
+}
+
+export function useRelatedStrategy({
   itemId,
   itemType,
   exercisePhrases,
@@ -70,17 +93,15 @@ export function useConnectStrategy({
   const attemptedGenerationRef = useRef<string>("");
 
   const sameFamily = useMemo(
-    () => sanitizeConnectGroup("same_family", exercisePhrases?.connect_groups?.same_family),
+    () =>
+      sanitizeRelatedGroup(
+        "same_family",
+        exercisePhrases?.related_groups?.same_family ??
+          legacyRelatedGroups(exercisePhrases)?.same_family,
+      ),
     [exercisePhrases],
   );
-  const relatedOrConfusing = useMemo(
-    () => sanitizeConnectGroup("related_or_confusing", exercisePhrases?.connect_groups?.related_or_confusing),
-    [exercisePhrases],
-  );
-  const allEntries = useMemo(
-    () => [...sameFamily, ...relatedOrConfusing],
-    [sameFamily, relatedOrConfusing],
-  );
+  const allEntries = sameFamily;
 
   const generate = async (): Promise<void> => {
     if (itemType !== "word" || itemId <= 0 || isLoading) {
@@ -89,10 +110,18 @@ export function useConnectStrategy({
     setIsLoading(true);
     setError("");
     try {
-      const payload = await generateContentItemConnectWords(itemId, sourceLanguage, targetLanguage);
+      const payload = await generateContentItemRelatedWords(
+        itemId,
+        sourceLanguage,
+        targetLanguage,
+      );
       setExercisePhrases(payload.exercise_phrases || {});
     } catch (generationError) {
-      setError(generationError instanceof Error ? generationError.message : errorMessage);
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : errorMessage,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +135,13 @@ export function useConnectStrategy({
   }, [itemId, allEntries]);
 
   useEffect(() => {
-    if (!enabled || itemType !== "word" || itemId <= 0 || allEntries.length > 0 || isLoading) {
+    if (
+      !enabled ||
+      itemType !== "word" ||
+      itemId <= 0 ||
+      allEntries.length > 0 ||
+      isLoading
+    ) {
       return;
     }
     const attemptKey = `${itemId}:${sourceLanguage}:${targetLanguage}`;
@@ -118,14 +153,24 @@ export function useConnectStrategy({
     void (async () => {
       await generate();
     })();
-  }, [enabled, itemId, itemType, allEntries.length, isLoading, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage]);
+  }, [
+    enabled,
+    itemId,
+    itemType,
+    allEntries.length,
+    isLoading,
+    sourceLanguage,
+    targetLanguage,
+    setExercisePhrases,
+    errorMessage,
+  ]);
 
-  const toggleEntry = (entry: ConnectEntry): void => {
-    setSelectedKeys((current) => (
+  const toggleEntry = (entry: RelatedEntry): void => {
+    setSelectedKeys((current) =>
       current.includes(entry.key)
         ? current.filter((selectedKey) => selectedKey !== entry.key)
-        : [...current, entry.key]
-    ));
+        : [...current, entry.key],
+    );
   };
 
   const unselectAll = (): void => {
@@ -153,7 +198,6 @@ export function useConnectStrategy({
 
   return {
     sameFamily,
-    relatedOrConfusing,
     allEntries,
     selectedKeys,
     error,

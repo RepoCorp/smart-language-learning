@@ -1,5 +1,7 @@
 import { useI18n } from "../../i18n";
-import PhraseSelectionList, { type PhraseSelectionEntry } from "./PhraseSelectionList";
+import PhraseSelectionList, {
+  type PhraseSelectionEntry,
+} from "./PhraseSelectionList";
 
 export default function VisualizeStrategyPanel({
   entry,
@@ -23,10 +25,14 @@ export default function VisualizeStrategyPanel({
   const { t } = useI18n();
 
   return (
-    <div className="practice-strategy-panel">
-      <p className="hint exercise-modal-description">{t("newItem.visualizeDescription")}</p>
+    <div className="strategy-content-panel">
+      <p className="hint exercise-modal-description">
+        {t("newItem.visualizeDescription")}
+      </p>
       {isLoading && <p className="hint">{t("newItem.visualizeGenerating")}</p>}
-      {!isLoading && isGeneratingImage && !!entry && <p className="hint">{t("newItem.visualizeGeneratingImage")}</p>}
+      {!isLoading && isGeneratingImage && !!entry && (
+        <p className="hint">{t("newItem.visualizeGeneratingImage")}</p>
+      )}
       {error && <p className="error">{error}</p>}
       {!isLoading && !error && !entry && (
         <p className="hint">{t("newItem.visualizeEmpty")}</p>
@@ -39,7 +45,11 @@ export default function VisualizeStrategyPanel({
             onClick={onPlayImageWord}
             aria-label={entry.target}
           >
-            <img src={entry.imageUrl} alt={entry.target} className="visualize-strategy-image" />
+            <img
+              src={entry.imageUrl}
+              alt={entry.target}
+              className="visualize-strategy-image"
+            />
           </button>
           <p className="visualize-strategy-word">
             <strong>{entry.target}</strong>

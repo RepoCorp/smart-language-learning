@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ...languages import language_display_name
 from ...models import Item
-from ...prompts import STRATEGY_CONNECT_WORDS_PROMPT
+from ...prompts import STRATEGY_RELATED_WORDS_PROMPT
 from .generation import WORD_EXERCISE_MODEL
 from .management import (
     APIView,
@@ -18,7 +18,7 @@ from .management import (
 from .exercise_persistence import merge_item_exercise_phrases
 
 
-def _clean_connect_group(entries: object, *, limit: int) -> list[dict]:
+def _clean_related_group(entries: object, *, limit: int) -> list[dict]:
     if not isinstance(entries, list):
         return []
     cleaned: list[dict] = []
@@ -44,16 +44,14 @@ def _clean_connect_group(entries: object, *, limit: int) -> list[dict]:
     return cleaned
 
 
-def _merge_connect_groups(*, exercise_phrases: dict, same_family: list[dict], related_or_confusing: list[dict]) -> dict:
+def _merge_related_groups(*, exercise_phrases: dict, same_family: list[dict]) -> dict:
     payload = dict(exercise_phrases or {})
-    payload["connect_groups"] = {
-        "same_family": same_family,
-        "related_or_confusing": related_or_confusing,
-    }
+    payload.pop("connect_groups", None)
+    payload["related_groups"] = {"same_family": same_family}
     return payload
 
 
-class ContentItemConnectView(APIView):
+class ContentItemRelatedView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
@@ -69,9 +67,9 @@ class ContentItemConnectView(APIView):
         source_name = language_display_name(source_language)
         target_name = language_display_name(target_language)
         parsed = _call_openai_json_logged(
-            label="content_item_connect",
+            label="content_item_related",
             system_prompt=_render_prompt(
-                STRATEGY_CONNECT_WORDS_PROMPT,
+                STRATEGY_RELATED_WORDS_PROMPT,
                 source_name=source_name,
                 target_name=target_name,
                 source_text=item.spanish_text,
@@ -92,19 +90,17 @@ class ContentItemConnectView(APIView):
             presence_penalty=0.0,
         )
         if not isinstance(parsed, dict):
-            return Response({"detail": "Failed to generate connected words"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response({"detail": "Failed to generate related words"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        same_family = _clean_connect_group(parsed.get("same_family"), limit=5)
-        related_or_confusing = _clean_connect_group(parsed.get("related_or_confusing"), limit=5)
-        if not same_family and not related_or_confusing:
-            return Response({"detail": "Failed to generate connected words"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        same_family = _clean_related_group(parsed.get("same_family"), limit=5)
+        if not same_family:
+            return Response({"detail": "Failed to generate related words"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         exercise_phrases = merge_item_exercise_phrases(
             item,
-            lambda existing_payload: _merge_connect_groups(
+            lambda existing_payload: _merge_related_groups(
                 exercise_phrases=existing_payload,
                 same_family=same_family,
-                related_or_confusing=related_or_confusing,
             ),
         )
         return Response({"exercise_phrases": exercise_phrases})

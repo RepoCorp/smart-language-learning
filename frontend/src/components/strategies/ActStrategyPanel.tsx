@@ -1,5 +1,7 @@
 import { useI18n } from "../../i18n";
-import PhraseSelectionList, { type PhraseSelectionEntry } from "./PhraseSelectionList";
+import PhraseSelectionList, {
+  type PhraseSelectionEntry,
+} from "./PhraseSelectionList";
 
 export default function ActStrategyPanel({
   entry,
@@ -19,8 +21,10 @@ export default function ActStrategyPanel({
   const { t } = useI18n();
 
   return (
-    <div className="practice-strategy-panel">
-      <p className="hint exercise-modal-description">{t("newItem.actDescription")}</p>
+    <div className="strategy-content-panel">
+      <p className="hint exercise-modal-description">
+        {t("newItem.actDescription")}
+      </p>
       {isLoading && <p className="hint">{t("newItem.actGenerating")}</p>}
       {error && <p className="error">{error}</p>}
       {!isLoading && !error && !entry && (

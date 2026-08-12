@@ -1,4 +1,10 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { studyLanguageMessages } from "./i18nStudyLanguages";
 
@@ -48,15 +54,20 @@ const messages = {
     "progress.minutes": "active minutes",
     "progress.items": "items completed",
     "progress.reviewsLeft": "reviews left",
-    "progress.poolQualified": "You completed today’s pool with five learning items.",
-    "progress.todayRequirement": "Study {minutes} more minute(s), or complete today’s review pool with at least five items.",
+    "progress.poolQualified":
+      "You completed today’s pool with five learning items.",
+    "progress.todayRequirement":
+      "Study {minutes} more minute(s), or complete today’s review pool with at least five items.",
     "progress.longestStreak": "Longest streak",
     "progress.flexDays": "Flex days available",
-    "progress.flexEarnedAfter": "Earn another flex day after {count} qualifying study day(s).",
+    "progress.flexEarnedAfter":
+      "Earn another flex day after {count} qualifying study day(s).",
     "progress.recentActivity": "Recent activity",
-    "progress.historyLegend": "Green: study day. Amber: flex day. Blue: paused day.",
+    "progress.historyLegend":
+      "Green: study day. Amber: flex day. Blue: paused day.",
     "progress.pauseTitle": "Protect an interruption",
-    "progress.pauseHint": "Pause up to seven days for travel, illness, or an unexpected interruption. A pause holds your streak but does not increase it.",
+    "progress.pauseHint":
+      "Pause up to seven days for travel, illness, or an unexpected interruption. A pause holds your streak but does not increase it.",
     "progress.pauseStart": "First paused day",
     "progress.pauseEnd": "Last paused day",
     "progress.pauseButton": "Pause streak",
@@ -65,27 +76,36 @@ const messages = {
     "progress.resumeSaving": "Resuming streak...",
     "progress.resumeError": "Failed to resume the streak.",
     "progress.pauseError": "Failed to pause the streak.",
-    "progress.pauseUnavailable": "Your next streak pause is available on {date}.",
+    "progress.pauseUnavailable":
+      "Your next streak pause is available on {date}.",
     "conversation.navLink": "Conversation",
     "conversation.title": "Conversation practice",
-    "conversation.description": "Choose a topic or let the app pick one, then practice a realistic voice conversation.",
-    "conversation.topicDescription": "Pick a saved topic, create your own, or let the app choose one from the topic pool.",
+    "conversation.description":
+      "Choose a topic or let the app pick one, then practice a realistic voice conversation.",
+    "conversation.topicDescription":
+      "Pick a saved topic, create your own, or let the app choose one from the topic pool.",
     "conversation.setupTitle": "Conversation setup",
-    "conversation.setupDescription": "Add optional context to shape the situation and your role in it.",
+    "conversation.setupDescription":
+      "Add optional context to shape the situation and your role in it.",
     "conversation.notesLabel": "Conversation notes",
-    "conversation.notesPlaceholder": "Optional details (tone, situation, role-play constraints).",
+    "conversation.notesPlaceholder":
+      "Optional details (tone, situation, role-play constraints).",
     "conversation.roleLabel": "Your role",
-    "conversation.rolePlaceholder": "e.g. customer, manager, traveler, candidate",
+    "conversation.rolePlaceholder":
+      "e.g. customer, manager, traveler, candidate",
     "conversation.goalDifficultyLabel": "Goal difficulty:",
-    "conversation.goalDifficultyDescription": "Choose how demanding the conversation goal should feel.",
+    "conversation.goalDifficultyDescription":
+      "Choose how demanding the conversation goal should feel.",
     "conversation.goalDifficultyEasy": "Easy",
     "conversation.goalDifficultyMedium": "Medium",
     "conversation.goalDifficultyHard": "Hard",
     "conversation.modeLabel": "Conversation mode:",
-    "conversation.modeDescription": "Choose between live realtime conversation and the natural voices mode.",
+    "conversation.modeDescription":
+      "Choose between live realtime conversation and the natural voices mode.",
     "conversation.modeLive": "Live",
     "conversation.modeNaturalVoices": "Natural Voices",
-    "conversation.liveUnavailable": "Live conversation is not available right now.",
+    "conversation.liveUnavailable":
+      "Live conversation is not available right now.",
     "conversation.speedLabel": "Assistant speed:",
     "conversation.speedNormal": "Normal",
     "conversation.speedSlow": "Slow",
@@ -94,7 +114,8 @@ const messages = {
     "conversation.levelA1": "A1",
     "conversation.levelA2": "A2",
     "conversation.levelB1": "B1",
-    "conversation.notesHint": "These notes are only used for this conversation and are not saved.",
+    "conversation.notesHint":
+      "These notes are only used for this conversation and are not saved.",
     "conversation.start": "Start conversation",
     "conversation.starting": "Starting...",
     "conversation.restart": "Restart conversation",
@@ -109,15 +130,18 @@ const messages = {
     "conversation.goalGenerate": "Generate goal",
     "conversation.goalRegenerate": "New goal",
     "conversation.goalRegenerating": "Creating goal...",
-    "conversation.goalRequired": "Generate a goal before starting the conversation.",
+    "conversation.goalRequired":
+      "Generate a goal before starting the conversation.",
     "conversation.goalAchievedDefault": "Great job, you achieved the goal.",
     "conversation.helpOpen": "Ask help",
     "conversation.moreControls": "More controls",
     "conversation.helpTitle": "Conversation help",
-    "conversation.helpDescription": "Ask what you want to say, and get support in your source language.",
+    "conversation.helpDescription":
+      "Ask what you want to say, and get support in your source language.",
     "conversation.helpInputPlaceholder": "Type what you want to say or ask...",
     "conversation.helpSend": "Get help",
-    "conversation.helpSayInputPlaceholder": "Type a word or phrase to say in the target language...",
+    "conversation.helpSayInputPlaceholder":
+      "Type a word or phrase to say in the target language...",
     "conversation.helpSaySend": "How to say it",
     "conversation.helpSayRequestRequired": "Write a word or phrase first.",
     "conversation.helpSayResponseLabel": "{language}:",
@@ -132,10 +156,12 @@ const messages = {
     "conversation.latestBubbleHint": "Reveal ({count} left)",
     "conversation.latestBubbleHintEmpty": "No reveals left",
     "conversation.reviewTitle": "Conversation review",
-    "conversation.reviewDescription": "You can now review the transcript, save phrases, and add words from any bubble.",
+    "conversation.reviewDescription":
+      "You can now review the transcript, save phrases, and add words from any bubble.",
     "conversation.reviewGenerating": "Preparing conversation review...",
     "conversation.finishedTitle": "Conversation finished",
-    "conversation.finishedDescription": "Here is the full transcript. Generate review if you want the corrected, saveable version.",
+    "conversation.finishedDescription":
+      "Here is the full transcript. Generate review if you want the corrected, saveable version.",
     "conversation.finishedPreparing": "Preparing corrections...",
     "conversation.generateReview": "Generate review",
     "conversation.closeAfterEnd": "Close conversation",
@@ -156,14 +182,17 @@ const messages = {
     "session.extendYes": "Extend 5 minutes",
     "session.extendNo": "End session",
     "session.completedTitle": "Session completed",
-    "session.completedMessage": "You finished all selected items before time was up.",
+    "session.completedMessage":
+      "You finished all selected items before time was up.",
     "session.startAnother": "Start another session",
     "session.newWordsCelebrationKicker": "FIVE NEW ITEMS TODAY",
     "session.newWordsCelebrationTitle": "Five new items today. That counts.",
-    "session.newWordsCelebrationMessage": "You just pushed another daily batch of 5 new items into motion. Take the tiny victory lap, then keep going.",
+    "session.newWordsCelebrationMessage":
+      "You just pushed another daily batch of 5 new items into motion. Take the tiny victory lap, then keep going.",
     "session.newWordsCelebrationContinue": "Keep going",
     "content.title": "Create content",
-    "content.description": "Enter a topic and generate a short dialog. Accept it or regenerate a different one.",
+    "content.description":
+      "Enter a topic and generate a short dialog. Accept it or regenerate a different one.",
     "content.backToSession": "Back to session",
     "content.manageLink": "Manage saved content",
     "content.topic.section": "Topic",
@@ -175,34 +204,46 @@ const messages = {
     "content.topic.newLabel": "New topic",
     "content.topic.placeholder": "e.g. travel, cooking, machine learning",
     "content.topic.requiredBadge": "Required",
-    "content.topic.requiredHint": "Choose or enter a topic to generate a dialog.",
-    "content.topic.randomHint": "We will pick one topic for you from our topic pool.",
+    "content.topic.requiredHint":
+      "Choose or enter a topic to generate a dialog.",
+    "content.topic.randomHint":
+      "We will pick one topic for you from our topic pool.",
     "content.section.topicTitle": "Topic",
-    "content.section.topicSubtitleEmpty": "Choose or create the main topic first.",
+    "content.section.topicSubtitleEmpty":
+      "Choose or create the main topic first.",
     "content.section.contextTitle": "Context",
     "content.section.optionsTitle": "Generation settings",
-    "content.section.optionsSubtitle": "Format, required words, and extra guidance",
-    "content.section.optionsHint": "These settings affect only the next generated preview.",
+    "content.section.optionsSubtitle":
+      "Format, required words, and extra guidance",
+    "content.section.optionsHint":
+      "These settings affect only the next generated preview.",
     "content.context.section": "Context",
     "content.context.label": "Context",
     "content.context.none": "No context",
     "content.context.createNew": "Create new context...",
-    "content.context.placeholder": "e.g. in a restaurant, at the airport, formal tone",
+    "content.context.placeholder":
+      "e.g. in a restaurant, at the airport, formal tone",
     "content.length.label": "Dialog format",
-    "content.length.description": "Choose how much content you want in the generated dialog.",
+    "content.length.description":
+      "Choose how much content you want in the generated dialog.",
     "content.length.standard": "Standard dialog",
     "content.length.shortThree": "Short: 3 phrases",
     "content.level.label": "Dialog level",
-    "content.level.description": "Choose the target-language level for this dialog.",
+    "content.level.description":
+      "Choose the target-language level for this dialog.",
     "content.requiredWords.label": "Words to include",
-    "content.requiredWords.description": "Force specific words or expressions into the generated dialog.",
+    "content.requiredWords.description":
+      "Force specific words or expressions into the generated dialog.",
     "content.requiredWords.languageTarget": "Words are in target language",
     "content.requiredWords.languageSource": "Words are in source language",
     "content.requiredWords.placeholder": "e.g. bezahlen, die Rechnung, schnell",
-    "content.requiredWords.hint": "Choose the language above, then separate multiple words with commas or new lines. Source-language words are translated first, then included in the target-language dialog.",
+    "content.requiredWords.hint":
+      "Choose the language above, then separate multiple words with commas or new lines. Source-language words are translated first, then included in the target-language dialog.",
     "content.details.label": "Extra guidance",
-    "content.details.description": "Add optional instructions to shape the situation, tone, or constraints.",
-    "content.details.placeholder": "Optional: role, mood, constraints, special situation...",
+    "content.details.description":
+      "Add optional instructions to shape the situation, tone, or constraints.",
+    "content.details.placeholder":
+      "Optional: role, mood, constraints, special situation...",
     "content.details.hint": "Used only for this generation. It is not saved.",
     "content.generate": "Generate preview",
     "content.generating": "Generating...",
@@ -270,7 +311,8 @@ const messages = {
     "manage.error.markLearned": "Failed to mark item as learnt",
     "manage.error.updateLearned": "Failed to update learnt state",
     "dialogs.title": "Saved dialogs",
-    "dialogs.description": "Listen to all dialogs you have saved for this language pair.",
+    "dialogs.description":
+      "Listen to all dialogs you have saved for this language pair.",
     "dialogs.playAll": "Play all dialogs",
     "dialogs.playDialog": "Play dialog",
     "dialogs.stopDialog": "Stop dialog",
@@ -298,23 +340,37 @@ const messages = {
     "dialogs.showDialog": "Show dialog",
     "dialogs.hideDialog": "Hide dialog",
     "dialogs.selectPhraseWords": "Select expression",
+    "strategies.grammar.title": "Grammar",
+    "strategies.grammar.description": "Just a tiny bit, we don't like studying grammar either ;)",
+    "strategies.grammar.footnote": "This app teaches by helping your brain discover patterns naturally.",
+    "dialogs.save": "Save",
+    "dialogs.saveWholePhrase": "Whole phrase",
+    "dialogs.savePhrasePart": "Part of phrase",
     "dialogs.cancelPhraseSelection": "Cancel selection",
     "dialogs.addSelectedPhrase": "Add expression",
-    "dialogs.selectedPhraseHint": "Select two or more adjacent words from the target line.",
-    "dialogs.phraseSelectionConfirmPrompt": "Do you want to save this expression?",
+    "dialogs.selectedPhraseHint":
+      "Select two or more adjacent words from the target line.",
+    "dialogs.phraseSelectionConfirmPrompt":
+      "Do you want to save this expression?",
     "dialogs.error.load": "Failed to load saved dialogs",
     "authLanding.kicker": "Smarter language practice",
-    "authLanding.title": "Learn with dialogs, reviews, and exercises generated from the content you actually want to study.",
-    "authLanding.description": "Smart Learn helps you generate useful content around your real interests, collect words and expressions, review them in both directions, and practice them with dialog audio, exercises, and conversation drills.",
+    "authLanding.title":
+      "Learn with dialogs, reviews, and exercises generated from the content you actually want to study.",
+    "authLanding.description":
+      "Smart Learn helps you generate useful content around your real interests, collect words and expressions, review them in both directions, and practice them with dialog audio, exercises, and conversation drills.",
     "authLanding.feature1Title": "Save what matters",
-    "authLanding.feature1Body": "Turn dialog lines and expressions into reusable study items instead of memorizing isolated vocabulary lists.",
+    "authLanding.feature1Body":
+      "Turn dialog lines and expressions into reusable study items instead of memorizing isolated vocabulary lists.",
     "authLanding.feature2Title": "Practice actively",
-    "authLanding.feature2Body": "Use listening, rewriting, phrase building, and targeted reviews to make the language stick.",
+    "authLanding.feature2Body":
+      "Use listening, rewriting, phrase building, and targeted reviews to make the language stick.",
     "authLanding.feature3Title": "Stay in context",
-    "authLanding.feature3Body": "Jump from an item back into the dialogs where it appeared so every review stays tied to a real situation.",
+    "authLanding.feature3Body":
+      "Jump from an item back into the dialogs where it appeared so every review stays tied to a real situation.",
     "authLanding.signInKicker": "Welcome back",
     "authLanding.signInTitle": "Sign in to continue",
-    "authLanding.signInDescription": "Use your username or email and PIN to open your study space.",
+    "authLanding.signInDescription":
+      "Use your username or email and PIN to open your study space.",
     "authLanding.identifierPlaceholder": "Username or email",
     "authLanding.pinPlaceholder": "PIN",
     "authLanding.newPinPlaceholder": "Choose a PIN",
@@ -325,8 +381,10 @@ const messages = {
     "authLanding.createUser": "Create user",
     "authLanding.requestAccess": "Request registration",
     "authLanding.cancelRegister": "Cancel",
-    "authLanding.registerHint": "New here? Create an account to start saving content and building your own review library.",
-    "authLanding.requestAccessHint": "New here? Send a registration request and an admin will create your account.",
+    "authLanding.registerHint":
+      "New here? Create an account to start saving content and building your own review library.",
+    "authLanding.requestAccessHint":
+      "New here? Send a registration request and an admin will create your account.",
     "authLanding.createAccount": "Create account",
     "authLanding.creating": "Creating...",
     "authLanding.submitRequest": "Send request",
@@ -337,11 +395,13 @@ const messages = {
     "content.error.saveContent": "Failed to save content",
     "content.result.phrasesCreated": "{count} phrase(s) created",
     "content.result.phrasesExisted": "all phrases already existed",
-    "content.result.savedNoWords": "Saved: no new words selected, {phraseMessage}.",
+    "content.result.savedNoWords":
+      "Saved: no new words selected, {phraseMessage}.",
     "content.result.savedWithWords": "Saved: {count} word(s), {phraseMessage}.",
     "content.result.dialogAccepted": "Dialog accepted and saved.",
     "content.result.dialogTitle": "Saved dialog",
-    "content.result.dialogWordHint": "Click words in target lines to add them as items.",
+    "content.result.dialogWordHint":
+      "Click words in target lines to add them as items.",
     "newItem.word": "New word",
     "newItem.phrase": "New phrase",
     "newItem.sourceLabel": "{language}:",
@@ -350,7 +410,8 @@ const messages = {
     "newItem.example": "Example:",
     "newItem.notes": "Notes:",
     "newItem.questionsTitle": "Ask about this item",
-    "newItem.questionsDescription": "Ask about learning this specific item. Unrelated questions are blocked.",
+    "newItem.questionsDescription":
+      "Ask about learning this specific item. Unrelated questions are blocked.",
     "newItem.openQuestions": "Ask questions",
     "newItem.questionsPlaceholder": "Type a learning question about this item",
     "newItem.questionsAskButton": "Ask",
@@ -393,7 +454,8 @@ const messages = {
     "newItem.compareWordsInsightsLoading": "Thinking...",
     "newItem.compareWordsInsightsRefresh": "Regenerate insights",
     "newItem.compareWordsInsightsRefreshing": "Regenerating...",
-    "newItem.compareWordsInsightsError": "Failed to load confusing word insights",
+    "newItem.compareWordsInsightsError":
+      "Failed to load confusing word insights",
     "newItem.actionGroupPractice": "Practice actions",
     "newItem.actionGroupExplore": "Reference actions",
     "newItem.actionGroupMaintenance": "Maintenance actions",
@@ -403,35 +465,42 @@ const messages = {
     "newItem.wordLetterPracticeTitle": "Letter practice",
     "newItem.wordPartsPracticeTitle": "Word parts",
     "newItem.strategiesTitle": "Strategies",
-    "newItem.strategiesDescription": "Choose a strategy to work with this word. We will build each one step by step.",
+    "newItem.strategiesDescription":
+      "Choose a strategy to work with this word. We will build each one step by step.",
     "newItem.strategiesSelectLabel": "Strategy",
     "newItem.testingTitle": "Testing",
     "newItem.testingDescription": "Choose how you want to test this item.",
     "newItem.testingSelectLabel": "Testing area",
     "newItem.testingOpenSelectedAction": "Open",
-    "newItem.testingDirectTestDescription": "Go straight into the regular test for this item.",
-    "newItem.testingWarmupDescription": "Do the quick warm-up before the main test.",
-    "newItem.testingLetterPracticeDescription": "Practice rebuilding the word letter by letter.",
-    "newItem.testingWordPartsDescription": "Rebuild the word from small local chunks.",
-    "newItem.testingPhraseBuilderDescription": "Rebuild the phrase before taking the test.",
+    "newItem.testingDirectTestDescription":
+      "Go straight into the regular test for this item.",
+    "newItem.testingWarmupDescription":
+      "Do the quick warm-up before the main test.",
+    "newItem.testingLetterPracticeDescription":
+      "Practice rebuilding the word letter by letter.",
+    "newItem.testingWordPartsDescription":
+      "Rebuild the word from small local chunks.",
+    "newItem.testingPhraseBuilderDescription":
+      "Rebuild the phrase before taking the test.",
     "newItem.strategiesPlaceholder": "Placeholder for {strategy}.",
-    "newItem.personalizeDescription": "Write a source-language sentence that feels personal, then turn it into a target-language phrase that keeps this word.",
-    "newItem.personalizePlaceholder": "Write your sentence here",
-    "newItem.personalizeAdd": "Add phrase",
-    "newItem.personalizeGenerating": "Generating...",
-    "newItem.personalizeEmpty": "No personalized phrases yet.",
-    "newItem.personalizeError": "Failed to personalize phrase",
-    "newItem.practiceDescription": "Practice with short target-language sentences that gradually grow a little more complex.",
-    "newItem.practiceGenerating": "Generating practice phrases...",
-    "newItem.practiceEmpty": "No practice phrases yet.",
-    "newItem.practiceError": "Failed to generate practice phrases",
-    "newItem.connectDescription": "Explore words that belong together, and words that might contrast with or confuse each other.",
-    "newItem.connectGenerating": "Generating connected words...",
-    "newItem.connectEmpty": "No connected words yet.",
-    "newItem.connectError": "Failed to generate connected words",
-    "newItem.connectSameFamilyTitle": "Same family",
-    "newItem.connectRelatedTitle": "Related or confusing",
-    "newItem.visualizeDescription": "Create one memorable phrase that will later guide the image for this word.",
+    "newItem.createDescription":
+      "Write a source-language sentence that feels personal, then turn it into a target-language phrase that keeps this word.",
+    "newItem.createPlaceholder": "Write your sentence here",
+    "newItem.createAdd": "Add phrase",
+    "newItem.createGenerating": "Generating...",
+    "newItem.createEmpty": "No created phrases yet.",
+    "newItem.createError": "Failed to create phrase",
+    "newItem.examplesDescription":
+      "Practice with short target-language sentences that gradually grow a little more complex.",
+    "newItem.examplesGenerating": "Generating examples...",
+    "newItem.examplesEmpty": "No examples yet.",
+    "newItem.examplesError": "Failed to generate examples",
+    "newItem.relatedDescription": "Explore useful words from the same family.",
+    "newItem.relatedGenerating": "Generating related words...",
+    "newItem.relatedEmpty": "No related words yet.",
+    "newItem.relatedError": "Failed to generate related words",
+    "newItem.visualizeDescription":
+      "Create one memorable phrase that will later guide the image for this word.",
     "newItem.visualizeGenerating": "Generating memorable phrase...",
     "newItem.visualizeGeneratingImage": "Generating image...",
     "newItem.visualizeEmpty": "No memorable phrase yet.",
@@ -441,25 +510,31 @@ const messages = {
     "word.partsBankLabel": "Word parts bank",
     "word.partsWrongChunk": "That part does not go there.",
     "word.partsReset": "Reset",
-    "newItem.actDescription": "Act out a tiny scene, then say one short phrase with the word.",
+    "newItem.actDescription":
+      "Act out a tiny scene, then say one short phrase with the word.",
     "newItem.actGenerating": "Generating acting exercise...",
     "newItem.actEmpty": "No acting exercise yet.",
     "newItem.actError": "Failed to generate act exercise",
     "newItem.actActionsTitle": "Actions",
-    "newItem.walkDescription": "Create one memorable movement challenge, then repeat the sentence while you do it.",
+    "newItem.walkDescription":
+      "Create one memorable movement challenge, then repeat the sentence while you do it.",
     "newItem.walkChallengeTitle": "Your challenge",
     "newItem.walkGenerating": "Preparing walking challenge...",
-    "newItem.walkEmpty": "Generate Forms first to choose a sentence for this challenge.",
+    "newItem.walkEmpty":
+      "Generate Forms first to choose a sentence for this challenge.",
     "newItem.walkError": "Failed to prepare walking challenge",
-    "newItem.decodeDescription": "Break the word into useful parts and connect it with a few related examples.",
+    "newItem.decodeDescription":
+      "Break the word into useful parts and connect it with a few related examples.",
     "newItem.decodeGenerating": "Generating word breakdown...",
     "newItem.decodeEmpty": "No word breakdown yet.",
     "newItem.decodeError": "Failed to generate decode analysis",
-    "newItem.encounterDescription": "See the most common places and situations where you are likely to meet this word in real life.",
+    "newItem.encounterDescription":
+      "See the most common places and situations where you are likely to meet this word in real life.",
     "newItem.encounterGenerating": "Generating real-world situations...",
     "newItem.encounterEmpty": "No encounter situations yet.",
     "newItem.encounterError": "Failed to generate encounter situations",
-    "newItem.compareDescription": "Compare this word with similar or confusing alternatives and see practical differences in use.",
+    "newItem.compareDescription":
+      "Compare this word with similar or confusing alternatives and see practical differences in use.",
     "newItem.compareGenerating": "Generating useful comparisons...",
     "newItem.compareEmpty": "No comparisons yet.",
     "newItem.compareError": "Failed to generate comparisons",
@@ -475,13 +550,15 @@ const messages = {
     "newItem.itemRegenerationError": "Failed to regenerate item",
     "newItem.openConversation": "Practice conversation",
     "newItem.conversationTitle": "Item conversation practice",
-    "newItem.conversationDescription": "Speak in the target language. The tutor replies with audio focused on this item.",
+    "newItem.conversationDescription":
+      "Speak in the target language. The tutor replies with audio focused on this item.",
     "newItem.conversationStartRecording": "Start speaking",
     "newItem.conversationStopRecording": "Send message",
     "newItem.conversationListening": "Listening... {seconds}s",
     "newItem.conversationProcessing": "Processing audio...",
     "newItem.conversationEmpty": "No turns yet. Record your first message.",
-    "newItem.conversationMicUnsupported": "This browser does not support microphone recording.",
+    "newItem.conversationMicUnsupported":
+      "This browser does not support microphone recording.",
     "newItem.conversationMicDenied": "Microphone access was denied.",
     "newItem.conversationLabelYou": "You:",
     "newItem.conversationLabelTutor": "Tutor:",
@@ -496,10 +573,12 @@ const messages = {
     "newItem.conversationShowTranslation": "Show translation",
     "newItem.conversationHideTranslation": "Hide translation",
     "newItem.exercisesTitle": "Repetition Practice",
-    "newItem.exercisesDescription": "Select lines and run a 30-second repetition loop.",
+    "newItem.exercisesDescription":
+      "Select lines and run a 30-second repetition loop.",
     "newItem.exercisesGenerating": "Generating exercises...",
     "newItem.exercisesGenerationError": "Failed to generate exercises",
-    "newItem.exercisesUnavailable": "Exercises are not available for this word yet.",
+    "newItem.exercisesUnavailable":
+      "Exercises are not available for this word yet.",
     "newItem.exercisesPhraseTitle": "Phrase repetition",
     "newItem.compareExerciseTitle": "Compare linked words",
     "newItem.compareExerciseItemCount": "{count} exercise item(s)",
@@ -511,7 +590,8 @@ const messages = {
     "newItem.exercisesRegenerating": "Regenerating phrases",
     "newItem.exercisesFunnyImageGenerate": "Generate image phrase",
     "newItem.exercisesFunnyImageGenerating": "Generating image...",
-    "newItem.exercisesFunnyImagePending": "The image phrase is being generated. You can keep using the exercises.",
+    "newItem.exercisesFunnyImagePending":
+      "The image phrase is being generated. You can keep using the exercises.",
     "newItem.exercisesFunnyImageError": "Failed to generate the image phrase",
     "newItem.exercisesFunnyImagePlayWord": "Play word audio",
     "newItem.exercisesFunnyImageShow": "Image",
@@ -522,7 +602,8 @@ const messages = {
     "newItem.exercisesUnmute": "Unmute audio",
     "newItem.wordRefresh": "Rescan dialogs",
     "newItem.wordRefreshRunning": "Rescanning...",
-    "newItem.wordRefreshComplete": "Dialogs rescanned. Added {count} dialog match(es).",
+    "newItem.wordRefreshComplete":
+      "Dialogs rescanned. Added {count} dialog match(es).",
     "newItem.wordRefreshError": "Failed to rescan dialogs",
     "newItem.closeRelatedDialogs": "Close",
     "newItem.showMoreDialogs": "Show more dialogs",
@@ -563,7 +644,8 @@ const messages = {
     "phrase.promptInstruction": "What is the correct {language} translation?",
     "phrase.feedback.correct": "Correct",
     "phrase.feedback.incorrect": "Incorrect. Answer: {answer}",
-    "phrase.feedback.markedWrong": "Marked as incorrect by choice. Answer: {answer}",
+    "phrase.feedback.markedWrong":
+      "Marked as incorrect by choice. Answer: {answer}",
     "phrase.markFailed": "I recognized it but mark failed",
     "phrase.builderPrompt": "Build the {language} phrase for:",
     "phrase.builderAnswerLabel": "Phrase in progress",
@@ -571,15 +653,18 @@ const messages = {
     "phrase.builderComplete": "Great, the phrase is in the right order.",
     "phrase.builderEnableAudio": "Enable block audio",
     "phrase.builderAudioEnabling": "Enabling audio...",
-    "phrase.builderEnableAudioHint": "iPhone Safari needs one tap before block audio can play.",
-    "phrase.situationPrompt": "Select the line that does not fit this target-language dialog.",
+    "phrase.builderEnableAudioHint":
+      "iPhone Safari needs one tap before block audio can play.",
+    "phrase.situationPrompt":
+      "Select the line that does not fit this target-language dialog.",
     "phrase.situationChoice": "{text}",
     "phrase.situationPick": "Pick",
     "phrase.situationCorrect": "Correct. That was the odd line out.",
     "phrase.situationWrong": "That line still fits. Keep looking.",
     "phrase.situationSceneLabel": "Scene:",
     "phrase.situationPlayScene": "Play scene",
-    "phrase.situationUnavailable": "This exercise needs enough other target-language dialog lines.",
+    "phrase.situationUnavailable":
+      "This exercise needs enough other target-language dialog lines.",
     "review.revealAnswer": "Reveal answer",
     "review.answerLabel": "Answer:",
     "review.phraseLabel": "Phrase:",
@@ -595,22 +680,27 @@ const messages = {
     "word.promptInstruction": "Write in {language}:",
     "word.feedback.empty": "Please enter an answer.",
     "word.feedback.correct": "Correct",
-    "word.feedback.tooManyHints": "Correct answer entered, but more than two hints or wrong letters were used. It will be treated as incorrect: {answer}",
+    "word.feedback.tooManyHints":
+      "Correct answer entered, but more than two hints or wrong letters were used. It will be treated as incorrect: {answer}",
     "word.feedback.incorrect": "Incorrect. Answer: {answer}",
-    "word.feedback.markedWrong": "Marked as incorrect by choice. Answer: {answer}",
+    "word.feedback.markedWrong":
+      "Marked as incorrect by choice. Answer: {answer}",
     "word.feedback.wrongLetter": "Wrong letter: {letter}",
     "word.feedback.rewritePrompt": "Write the word again.",
     "word.feedback.cleanRewriteRequired": "Write it again with no mistakes.",
     "word.letterSuggestions": "Letter suggestions",
     "word.clozePrompt": "Complete the phrase with: {word}",
     "word.clozePromptInstruction": "Complete the phrase with:",
-    "word.clozeMissingPhrase": "No exercise phrase is available for this retry.",
+    "word.clozeMissingPhrase":
+      "No exercise phrase is available for this retry.",
     "word.letterBuildLabel": "Built word",
     "word.warmupPromptInstruction": "Warm up the word:",
     "word.warmupRevealButton": "Show next letter",
-    "word.warmupAllLettersShown": "All letters are shown now. The answer is: {answer}",
+    "word.warmupAllLettersShown":
+      "All letters are shown now. The answer is: {answer}",
     "word.warmupPerfect": "Perfect. You got it with no revealed letters.",
-    "word.warmupAlmostPerfect": "Nice. You got it with almost no revealed letters.",
+    "word.warmupAlmostPerfect":
+      "Nice. You got it with almost no revealed letters.",
     "word.warmupTranslationLabel": "Sentence translation:",
     "word.completionWordLabel": "Word:",
     "word.completionPhraseLabel": "Phrase:",
@@ -642,10 +732,13 @@ const messages = {
     "config.browserVoice": "Browser voice",
     "config.browserVoicePreview": "Preview",
     "config.browserVoicePreviewing": "Playing...",
-    "config.browserVoiceUnavailable": "No browser voices are available right now.",
-    "config.browserVoiceHint": "Choose which browser voice to use for {language} speech.",
+    "config.browserVoiceUnavailable":
+      "No browser voices are available right now.",
+    "config.browserVoiceHint":
+      "Choose which browser voice to use for {language} speech.",
     "config.elevenLabsTitle": "ElevenLabs voices",
-    "config.elevenLabsSubtitle": "Preview and disable ElevenLabs voices for {language} audio generation.",
+    "config.elevenLabsSubtitle":
+      "Preview and disable ElevenLabs voices for {language} audio generation.",
     "config.elevenLabsPreviewText": "Preview text",
     "config.elevenLabsLoading": "Loading ElevenLabs voices...",
     "config.elevenLabsEmpty": "No ElevenLabs voices are available right now.",
@@ -659,11 +752,13 @@ const messages = {
     "config.mobileActionLabels": "Mobile action labels",
     "config.mobileActionLabelsOn": "Shown",
     "config.mobileActionLabelsOff": "Hidden",
-    "config.mobileActionLabelsHint": "Shows text labels under icon buttons on mobile.",
+    "config.mobileActionLabelsHint":
+      "Shows text labels under icon buttons on mobile.",
     "config.debugTools": "Debug tools",
     "config.debugToolsOn": "Enabled",
     "config.debugToolsOff": "Disabled",
-    "config.debugToolsHint": "Shows a floating debug log that can collect diagnostics from any page.",
+    "config.debugToolsHint":
+      "Shows a floating debug log that can collect diagnostics from any page.",
     "config.accountTitle": "Account and stats",
     "config.currentUser": "Current user",
     "config.noCurrentUser": "No active user",
@@ -671,7 +766,8 @@ const messages = {
     "config.loggingOut": "Logging out...",
     "config.resetDefaults": "Reset defaults",
     "config.createUserTitle": "Create user",
-    "config.createUserSubtitle": "Create a new account without affecting your current session.",
+    "config.createUserSubtitle":
+      "Create a new account without affecting your current session.",
     "config.username": "Username",
     "config.email": "Email",
     "config.pin": "PIN",
@@ -680,7 +776,8 @@ const messages = {
     "config.userCreated": "User created: {username}",
     "config.createUserFailed": "Failed to create user",
     "config.resetPinTitle": "Reset user PIN",
-    "config.resetPinSubtitle": "Set a new PIN for an existing user by username or email.",
+    "config.resetPinSubtitle":
+      "Set a new PIN for an existing user by username or email.",
     "config.userIdentifier": "Username or email",
     "config.newPin": "New PIN",
     "config.resetPin": "Reset PIN",
@@ -693,7 +790,8 @@ const messages = {
     "config.registeredUsersLoadFailed": "Failed to load registered users",
     "config.registeredUsersAdmin": "Admin",
     "config.registrationRequestsTitle": "Registration requests",
-    "config.registrationRequestsSubtitle": "Pending requests submitted from the landing page.",
+    "config.registrationRequestsSubtitle":
+      "Pending requests submitted from the landing page.",
     "config.registrationRequestsLoading": "Loading requests...",
     "config.registrationRequestsEmpty": "No pending registration requests.",
     "config.registrationRequestsUse": "Use request",
@@ -739,15 +837,20 @@ const messages = {
     "progress.minutes": "minutos activos",
     "progress.items": "elementos completados",
     "progress.reviewsLeft": "repasos pendientes",
-    "progress.poolQualified": "Completaste el grupo de hoy con cinco elementos de aprendizaje.",
-    "progress.todayRequirement": "Estudia {minutes} minuto(s) más o completa los repasos de hoy con al menos cinco elementos.",
+    "progress.poolQualified":
+      "Completaste el grupo de hoy con cinco elementos de aprendizaje.",
+    "progress.todayRequirement":
+      "Estudia {minutes} minuto(s) más o completa los repasos de hoy con al menos cinco elementos.",
     "progress.longestStreak": "Racha más larga",
     "progress.flexDays": "Días flexibles disponibles",
-    "progress.flexEarnedAfter": "Ganas otro día flexible después de {count} día(s) de estudio que cumplan el objetivo.",
+    "progress.flexEarnedAfter":
+      "Ganas otro día flexible después de {count} día(s) de estudio que cumplan el objetivo.",
     "progress.recentActivity": "Actividad reciente",
-    "progress.historyLegend": "Verde: día de estudio. Ámbar: día flexible. Azul: día en pausa.",
+    "progress.historyLegend":
+      "Verde: día de estudio. Ámbar: día flexible. Azul: día en pausa.",
     "progress.pauseTitle": "Proteger una interrupción",
-    "progress.pauseHint": "Pausa hasta siete días por viaje, enfermedad o una interrupción inesperada. La pausa conserva tu racha, pero no la aumenta.",
+    "progress.pauseHint":
+      "Pausa hasta siete días por viaje, enfermedad o una interrupción inesperada. La pausa conserva tu racha, pero no la aumenta.",
     "progress.pauseStart": "Primer día en pausa",
     "progress.pauseEnd": "Último día en pausa",
     "progress.pauseButton": "Pausar racha",
@@ -756,27 +859,36 @@ const messages = {
     "progress.resumeSaving": "Reanudando racha...",
     "progress.resumeError": "No se pudo reanudar la racha.",
     "progress.pauseError": "No se pudo pausar la racha.",
-    "progress.pauseUnavailable": "Tu próxima pausa de racha estará disponible el {date}.",
+    "progress.pauseUnavailable":
+      "Tu próxima pausa de racha estará disponible el {date}.",
     "conversation.navLink": "Conversación",
     "conversation.title": "Práctica de conversación",
-    "conversation.description": "Elige un tema o deja que la app escoja uno, y luego practica una conversación de voz realista.",
-    "conversation.topicDescription": "Elige un tema guardado, crea uno propio o deja que la app escoja uno del banco de temas.",
+    "conversation.description":
+      "Elige un tema o deja que la app escoja uno, y luego practica una conversación de voz realista.",
+    "conversation.topicDescription":
+      "Elige un tema guardado, crea uno propio o deja que la app escoja uno del banco de temas.",
     "conversation.setupTitle": "Preparación de la conversación",
-    "conversation.setupDescription": "Agrega contexto opcional para orientar la situación y tu papel en ella.",
+    "conversation.setupDescription":
+      "Agrega contexto opcional para orientar la situación y tu papel en ella.",
     "conversation.notesLabel": "Notas de la conversación",
-    "conversation.notesPlaceholder": "Detalles opcionales (tono, situación, reglas del role-play).",
+    "conversation.notesPlaceholder":
+      "Detalles opcionales (tono, situación, reglas del role-play).",
     "conversation.roleLabel": "Tu rol",
-    "conversation.rolePlaceholder": "p. ej. cliente, gerente, viajero, candidato",
+    "conversation.rolePlaceholder":
+      "p. ej. cliente, gerente, viajero, candidato",
     "conversation.goalDifficultyLabel": "Dificultad del objetivo:",
-    "conversation.goalDifficultyDescription": "Elige qué tan exigente debe sentirse el objetivo de la conversación.",
+    "conversation.goalDifficultyDescription":
+      "Elige qué tan exigente debe sentirse el objetivo de la conversación.",
     "conversation.goalDifficultyEasy": "Fácil",
     "conversation.goalDifficultyMedium": "Media",
     "conversation.goalDifficultyHard": "Difícil",
     "conversation.modeLabel": "Modo de conversación:",
-    "conversation.modeDescription": "Elige entre conversación en vivo en tiempo real y el modo de voces naturales.",
+    "conversation.modeDescription":
+      "Elige entre conversación en vivo en tiempo real y el modo de voces naturales.",
     "conversation.modeLive": "Live",
     "conversation.modeNaturalVoices": "Natural Voices",
-    "conversation.liveUnavailable": "La conversación Live no está disponible ahora mismo.",
+    "conversation.liveUnavailable":
+      "La conversación Live no está disponible ahora mismo.",
     "conversation.speedLabel": "Velocidad de la asistente:",
     "conversation.speedNormal": "Normal",
     "conversation.speedSlow": "Lenta",
@@ -785,7 +897,8 @@ const messages = {
     "conversation.levelA1": "A1",
     "conversation.levelA2": "A2",
     "conversation.levelB1": "B1",
-    "conversation.notesHint": "Estas notas solo se usan en esta conversación y no se guardan.",
+    "conversation.notesHint":
+      "Estas notas solo se usan en esta conversación y no se guardan.",
     "conversation.start": "Iniciar conversación",
     "conversation.starting": "Iniciando...",
     "conversation.restart": "Reiniciar conversación",
@@ -800,19 +913,25 @@ const messages = {
     "conversation.goalGenerate": "Generar objetivo",
     "conversation.goalRegenerate": "Nuevo objetivo",
     "conversation.goalRegenerating": "Creando objetivo...",
-    "conversation.goalRequired": "Genera un objetivo antes de iniciar la conversación.",
+    "conversation.goalRequired":
+      "Genera un objetivo antes de iniciar la conversación.",
     "conversation.goalAchievedDefault": "Excelente, ya cumpliste el objetivo.",
     "conversation.helpOpen": "Pedir ayuda",
     "conversation.moreControls": "Más controles",
     "conversation.helpTitle": "Ayuda para conversar",
-    "conversation.helpDescription": "Di lo que quieres comunicar y recibe ayuda en tu idioma de origen.",
-    "conversation.helpInputPlaceholder": "Escribe lo que quieres decir o preguntar...",
+    "conversation.helpDescription":
+      "Di lo que quieres comunicar y recibe ayuda en tu idioma de origen.",
+    "conversation.helpInputPlaceholder":
+      "Escribe lo que quieres decir o preguntar...",
     "conversation.helpSend": "Recibir ayuda",
-    "conversation.helpSayInputPlaceholder": "Escribe una palabra o frase para decirla en el idioma objetivo...",
+    "conversation.helpSayInputPlaceholder":
+      "Escribe una palabra o frase para decirla en el idioma objetivo...",
     "conversation.helpSaySend": "Cómo decirlo",
-    "conversation.helpSayRequestRequired": "Escribe primero una palabra o frase.",
+    "conversation.helpSayRequestRequired":
+      "Escribe primero una palabra o frase.",
     "conversation.helpSayResponseLabel": "{language}:",
-    "conversation.helpRequestRequired": "Escribe primero una solicitud de ayuda.",
+    "conversation.helpRequestRequired":
+      "Escribe primero una solicitud de ayuda.",
     "conversation.helpYouSaid": "Dijiste:",
     "conversation.correctedLabel": "Corregido:",
     "conversation.helpResponseLabel": "Ayuda:",
@@ -823,10 +942,13 @@ const messages = {
     "conversation.latestBubbleHint": "Revelar ({count} restantes)",
     "conversation.latestBubbleHintEmpty": "No quedan revelaciones",
     "conversation.reviewTitle": "Revisar conversación",
-    "conversation.reviewDescription": "Ahora puedes revisar la transcripción, guardar frases y agregar palabras desde cualquier burbuja.",
-    "conversation.reviewGenerating": "Preparando la revisión de la conversación...",
+    "conversation.reviewDescription":
+      "Ahora puedes revisar la transcripción, guardar frases y agregar palabras desde cualquier burbuja.",
+    "conversation.reviewGenerating":
+      "Preparando la revisión de la conversación...",
     "conversation.finishedTitle": "Conversación terminada",
-    "conversation.finishedDescription": "Aquí está la transcripción completa. Genera la revisión si quieres la versión corregida y guardable.",
+    "conversation.finishedDescription":
+      "Aquí está la transcripción completa. Genera la revisión si quieres la versión corregida y guardable.",
     "conversation.finishedPreparing": "Preparando correcciones...",
     "conversation.generateReview": "Generar revisión",
     "conversation.closeAfterEnd": "Cerrar conversación",
@@ -837,7 +959,8 @@ const messages = {
     "session.restart": "Reiniciar sesión",
     "session.nextItem": "Siguiente",
     "session.resetCurrentResult": "Restablecer resultado actual",
-    "session.resetCurrentResultFailed": "No se pudo restablecer el resultado actual",
+    "session.resetCurrentResultFailed":
+      "No se pudo restablecer el resultado actual",
     "session.timeRemaining": "Tiempo restante: {time}",
     "session.timeAlmostUp": "La sesión está por terminar.",
     "session.timeUpTitle": "Sesión finalizada",
@@ -847,14 +970,18 @@ const messages = {
     "session.extendYes": "Extender 5 minutos",
     "session.extendNo": "Finalizar sesión",
     "session.completedTitle": "Sesión completada",
-    "session.completedMessage": "Terminaste todos los elementos seleccionados antes de que se acabara el tiempo.",
+    "session.completedMessage":
+      "Terminaste todos los elementos seleccionados antes de que se acabara el tiempo.",
     "session.startAnother": "Iniciar otra sesión",
     "session.newWordsCelebrationKicker": "CINCO ELEMENTOS NUEVOS HOY",
-    "session.newWordsCelebrationTitle": "Cinco elementos nuevos hoy. Eso cuenta.",
-    "session.newWordsCelebrationMessage": "Acabas de poner en marcha otro bloque diario de 5 elementos nuevos. Mini vuelta de victoria y seguimos.",
+    "session.newWordsCelebrationTitle":
+      "Cinco elementos nuevos hoy. Eso cuenta.",
+    "session.newWordsCelebrationMessage":
+      "Acabas de poner en marcha otro bloque diario de 5 elementos nuevos. Mini vuelta de victoria y seguimos.",
     "session.newWordsCelebrationContinue": "Seguir",
     "content.title": "Crear contenido",
-    "content.description": "Ingresa un tema y genera un diálogo corto. Acéptalo o genera otro diferente.",
+    "content.description":
+      "Ingresa un tema y genera un diálogo corto. Acéptalo o genera otro diferente.",
     "content.backToSession": "Volver a la sesión",
     "content.manageLink": "Gestionar contenido guardado",
     "content.topic.section": "Tema",
@@ -864,36 +991,52 @@ const messages = {
     "content.topic.random": "Tema aleatorio",
     "content.topic.createNew": "Crear tema nuevo...",
     "content.topic.newLabel": "Tema nuevo",
-    "content.topic.placeholder": "p. ej. viajes, cocina, aprendizaje automático",
+    "content.topic.placeholder":
+      "p. ej. viajes, cocina, aprendizaje automático",
     "content.topic.requiredBadge": "Obligatorio",
-    "content.topic.requiredHint": "Elige o ingresa un tema para generar un diálogo.",
-    "content.topic.randomHint": "Elegiremos un tema por ti de nuestro banco de temas.",
+    "content.topic.requiredHint":
+      "Elige o ingresa un tema para generar un diálogo.",
+    "content.topic.randomHint":
+      "Elegiremos un tema por ti de nuestro banco de temas.",
     "content.section.topicTitle": "Tema",
-    "content.section.topicSubtitleEmpty": "Elige o crea primero el tema principal.",
+    "content.section.topicSubtitleEmpty":
+      "Elige o crea primero el tema principal.",
     "content.section.contextTitle": "Contexto",
     "content.section.optionsTitle": "Ajustes de generación",
-    "content.section.optionsSubtitle": "Formato, palabras obligatorias y guía extra",
-    "content.section.optionsHint": "Estos ajustes afectan solo la próxima vista previa generada.",
+    "content.section.optionsSubtitle":
+      "Formato, palabras obligatorias y guía extra",
+    "content.section.optionsHint":
+      "Estos ajustes afectan solo la próxima vista previa generada.",
     "content.context.section": "Contexto",
     "content.context.label": "Contexto",
     "content.context.none": "Sin contexto",
     "content.context.createNew": "Crear contexto nuevo...",
-    "content.context.placeholder": "p. ej. en un restaurante, en el aeropuerto, tono formal",
+    "content.context.placeholder":
+      "p. ej. en un restaurante, en el aeropuerto, tono formal",
     "content.length.label": "Formato del diálogo",
-    "content.length.description": "Elige cuánto contenido quieres en el diálogo generado.",
+    "content.length.description":
+      "Elige cuánto contenido quieres en el diálogo generado.",
     "content.length.standard": "Diálogo estándar",
     "content.length.shortThree": "Corto: 3 frases",
     "content.level.label": "Nivel del diálogo",
-    "content.level.description": "Elige el nivel del idioma objetivo para este diálogo.",
+    "content.level.description":
+      "Elige el nivel del idioma objetivo para este diálogo.",
     "content.requiredWords.label": "Palabras a incluir",
-    "content.requiredWords.description": "Fuerza palabras o expresiones específicas dentro del diálogo generado.",
-    "content.requiredWords.languageTarget": "Las palabras están en el idioma objetivo",
-    "content.requiredWords.languageSource": "Las palabras están en el idioma fuente",
-    "content.requiredWords.placeholder": "p. ej. bezahlen, die Rechnung, schnell",
-    "content.requiredWords.hint": "Elige el idioma arriba y separa varias palabras con comas o saltos de línea. Las palabras del idioma fuente se traducen primero y luego se incluyen en el diálogo del idioma objetivo.",
+    "content.requiredWords.description":
+      "Fuerza palabras o expresiones específicas dentro del diálogo generado.",
+    "content.requiredWords.languageTarget":
+      "Las palabras están en el idioma objetivo",
+    "content.requiredWords.languageSource":
+      "Las palabras están en el idioma fuente",
+    "content.requiredWords.placeholder":
+      "p. ej. bezahlen, die Rechnung, schnell",
+    "content.requiredWords.hint":
+      "Elige el idioma arriba y separa varias palabras con comas o saltos de línea. Las palabras del idioma fuente se traducen primero y luego se incluyen en el diálogo del idioma objetivo.",
     "content.details.label": "Guía extra",
-    "content.details.description": "Agrega instrucciones opcionales para orientar la situación, el tono o las restricciones.",
-    "content.details.placeholder": "Opcional: rol, tono, restricciones, situación especial...",
+    "content.details.description":
+      "Agrega instrucciones opcionales para orientar la situación, el tono o las restricciones.",
+    "content.details.placeholder":
+      "Opcional: rol, tono, restricciones, situación especial...",
     "content.details.hint": "Se usa solo para esta generación. No se guarda.",
     "content.generate": "Generar vista previa",
     "content.generating": "Generando...",
@@ -959,9 +1102,11 @@ const messages = {
     "manage.error.deleteItem": "No se pudo eliminar el elemento",
     "manage.error.regenerateAudio": "No se pudo regenerar el audio",
     "manage.error.markLearned": "No se pudo marcar como aprendido",
-    "manage.error.updateLearned": "No se pudo actualizar el estado de aprendido",
+    "manage.error.updateLearned":
+      "No se pudo actualizar el estado de aprendido",
     "dialogs.title": "Diálogos guardados",
-    "dialogs.description": "Escucha todos los diálogos guardados para este par de idiomas.",
+    "dialogs.description":
+      "Escucha todos los diálogos guardados para este par de idiomas.",
     "dialogs.playAll": "Reproducir todos los diálogos",
     "dialogs.playDialog": "Reproducir diálogo",
     "dialogs.stopDialog": "Detener diálogo",
@@ -989,23 +1134,36 @@ const messages = {
     "dialogs.showDialog": "Mostrar diálogo",
     "dialogs.hideDialog": "Ocultar diálogo",
     "dialogs.selectPhraseWords": "Seleccionar expresión",
+    "strategies.grammar.title": "Gramática",
+    "strategies.grammar.description": "Solo un poquito, tampoco nos gusta estudiar gramática ;)",
+    "strategies.grammar.footnote": "Esta aplicación enseña ayudando a tu cerebro a descubrir patrones de forma natural.",
+    "dialogs.save": "Guardar",
+    "dialogs.saveWholePhrase": "Frase completa",
+    "dialogs.savePhrasePart": "Parte de la frase",
     "dialogs.cancelPhraseSelection": "Cancelar selección",
     "dialogs.addSelectedPhrase": "Agregar expresión",
-    "dialogs.selectedPhraseHint": "Selecciona dos o más palabras adyacentes de la línea del idioma objetivo.",
+    "dialogs.selectedPhraseHint":
+      "Selecciona dos o más palabras adyacentes de la línea del idioma objetivo.",
     "dialogs.phraseSelectionConfirmPrompt": "¿Deseas guardar esta expresión?",
     "dialogs.error.load": "No se pudieron cargar los diálogos guardados",
     "authLanding.kicker": "Práctica de idiomas más inteligente",
-    "authLanding.title": "Aprende con diálogos, repasos y ejercicios generados a partir del contenido que realmente quieres estudiar.",
-    "authLanding.description": "Smart Learn te ayuda a generar contenido útil alrededor de tus intereses reales, guardar palabras y expresiones, repasarlas en ambas direcciones y practicarlas con audio de diálogos, ejercicios y conversaciones.",
+    "authLanding.title":
+      "Aprende con diálogos, repasos y ejercicios generados a partir del contenido que realmente quieres estudiar.",
+    "authLanding.description":
+      "Smart Learn te ayuda a generar contenido útil alrededor de tus intereses reales, guardar palabras y expresiones, repasarlas en ambas direcciones y practicarlas con audio de diálogos, ejercicios y conversaciones.",
     "authLanding.feature1Title": "Guarda lo importante",
-    "authLanding.feature1Body": "Convierte líneas de diálogo y expresiones en elementos de estudio reutilizables en lugar de memorizar listas aisladas.",
+    "authLanding.feature1Body":
+      "Convierte líneas de diálogo y expresiones en elementos de estudio reutilizables en lugar de memorizar listas aisladas.",
     "authLanding.feature2Title": "Practica activamente",
-    "authLanding.feature2Body": "Usa escucha, reescritura, construcción de frases y repasos dirigidos para fijar el idioma.",
+    "authLanding.feature2Body":
+      "Usa escucha, reescritura, construcción de frases y repasos dirigidos para fijar el idioma.",
     "authLanding.feature3Title": "Mantén el contexto",
-    "authLanding.feature3Body": "Salta de un elemento a los diálogos donde apareció para que cada repaso siga conectado a una situación real.",
+    "authLanding.feature3Body":
+      "Salta de un elemento a los diálogos donde apareció para que cada repaso siga conectado a una situación real.",
     "authLanding.signInKicker": "Bienvenida de nuevo",
     "authLanding.signInTitle": "Inicia sesión para continuar",
-    "authLanding.signInDescription": "Usa tu nombre de usuario o correo y tu PIN para abrir tu espacio de estudio.",
+    "authLanding.signInDescription":
+      "Usa tu nombre de usuario o correo y tu PIN para abrir tu espacio de estudio.",
     "authLanding.identifierPlaceholder": "Nombre de usuario o correo",
     "authLanding.pinPlaceholder": "PIN",
     "authLanding.newPinPlaceholder": "Elige un PIN",
@@ -1016,8 +1174,10 @@ const messages = {
     "authLanding.createUser": "Crear usuario",
     "authLanding.requestAccess": "Solicitar registro",
     "authLanding.cancelRegister": "Cancelar",
-    "authLanding.registerHint": "¿Eres nueva? Crea una cuenta para empezar a guardar contenido y construir tu propia biblioteca de repaso.",
-    "authLanding.requestAccessHint": "¿Eres nueva? Envía una solicitud de registro y un admin creará tu cuenta.",
+    "authLanding.registerHint":
+      "¿Eres nueva? Crea una cuenta para empezar a guardar contenido y construir tu propia biblioteca de repaso.",
+    "authLanding.requestAccessHint":
+      "¿Eres nueva? Envía una solicitud de registro y un admin creará tu cuenta.",
     "authLanding.createAccount": "Crear cuenta",
     "authLanding.creating": "Creando...",
     "authLanding.submitRequest": "Enviar solicitud",
@@ -1028,11 +1188,14 @@ const messages = {
     "content.error.saveContent": "No se pudo guardar el contenido",
     "content.result.phrasesCreated": "{count} frase(s) creada(s)",
     "content.result.phrasesExisted": "todas las frases ya existían",
-    "content.result.savedNoWords": "Guardado: no se seleccionaron palabras nuevas, {phraseMessage}.",
-    "content.result.savedWithWords": "Guardado: {count} palabra(s), {phraseMessage}.",
+    "content.result.savedNoWords":
+      "Guardado: no se seleccionaron palabras nuevas, {phraseMessage}.",
+    "content.result.savedWithWords":
+      "Guardado: {count} palabra(s), {phraseMessage}.",
     "content.result.dialogAccepted": "Diálogo aceptado y guardado.",
     "content.result.dialogTitle": "Diálogo guardado",
-    "content.result.dialogWordHint": "Haz clic en palabras del idioma objetivo para agregarlas como elementos.",
+    "content.result.dialogWordHint":
+      "Haz clic en palabras del idioma objetivo para agregarlas como elementos.",
     "newItem.word": "Palabra nueva",
     "newItem.phrase": "Frase nueva",
     "newItem.sourceLabel": "{language}:",
@@ -1041,9 +1204,11 @@ const messages = {
     "newItem.example": "Ejemplo:",
     "newItem.notes": "Notas:",
     "newItem.questionsTitle": "Preguntar sobre este elemento",
-    "newItem.questionsDescription": "Pregunta sobre aprender este elemento especifico. Se bloquean preguntas no relacionadas.",
+    "newItem.questionsDescription":
+      "Pregunta sobre aprender este elemento especifico. Se bloquean preguntas no relacionadas.",
     "newItem.openQuestions": "Hacer preguntas",
-    "newItem.questionsPlaceholder": "Escribe una pregunta de aprendizaje sobre este elemento",
+    "newItem.questionsPlaceholder":
+      "Escribe una pregunta de aprendizaje sobre este elemento",
     "newItem.questionsAskButton": "Preguntar",
     "newItem.questionsQuickMeaning": "¿Qué significa exactamente aquí?",
     "newItem.questionsQuickDeconstruct": "Descompón esta palabra para mí.",
@@ -1075,16 +1240,20 @@ const messages = {
     "newItem.compareWordsRemove": "Quitar",
     "newItem.compareWordsModalTitle": "Selecciona palabras para comparar",
     "newItem.compareWordsSearchPlaceholder": "Buscar palabras guardadas...",
-    "newItem.compareWordsSearchEmpty": "No se encontraron palabras disponibles.",
+    "newItem.compareWordsSearchEmpty":
+      "No se encontraron palabras disponibles.",
     "newItem.compareWordsConfirm": "Agregar seleccionadas",
-    "newItem.compareWordsLoadError": "No se pudieron cargar las palabras para comparar",
-    "newItem.compareWordsSaveError": "No se pudieron guardar las palabras para comparar",
+    "newItem.compareWordsLoadError":
+      "No se pudieron cargar las palabras para comparar",
+    "newItem.compareWordsSaveError":
+      "No se pudieron guardar las palabras para comparar",
     "newItem.compareWordsRemoveError": "No se pudo quitar la palabra vinculada",
     "newItem.compareWordsInsightsAsk": "Pedir insight",
     "newItem.compareWordsInsightsLoading": "Pensando...",
     "newItem.compareWordsInsightsRefresh": "Regenerar insights",
     "newItem.compareWordsInsightsRefreshing": "Regenerando...",
-    "newItem.compareWordsInsightsError": "No se pudieron cargar los insights de palabras confusas",
+    "newItem.compareWordsInsightsError":
+      "No se pudieron cargar los insights de palabras confusas",
     "newItem.actionGroupPractice": "Acciones de práctica",
     "newItem.actionGroupExplore": "Acciones de referencia",
     "newItem.actionGroupMaintenance": "Acciones de mantenimiento",
@@ -1094,63 +1263,79 @@ const messages = {
     "newItem.wordLetterPracticeTitle": "Práctica de letras",
     "newItem.wordPartsPracticeTitle": "Partes de la palabra",
     "newItem.strategiesTitle": "Estrategias",
-    "newItem.strategiesDescription": "Elige una estrategia para trabajar esta palabra. Iremos construyendo cada una paso a paso.",
+    "newItem.strategiesDescription":
+      "Elige una estrategia para trabajar esta palabra. Iremos construyendo cada una paso a paso.",
     "newItem.strategiesSelectLabel": "Estrategia",
     "newItem.testingTitle": "Pruebas",
     "newItem.testingDescription": "Elige cómo quieres probar este elemento.",
     "newItem.testingSelectLabel": "Área de pruebas",
     "newItem.testingOpenSelectedAction": "Abrir",
-    "newItem.testingDirectTestDescription": "Ve directamente a la prueba normal de este elemento.",
-    "newItem.testingWarmupDescription": "Haz el calentamiento rápido antes de la prueba principal.",
-    "newItem.testingLetterPracticeDescription": "Practica reconstruyendo la palabra letra por letra.",
-    "newItem.testingWordPartsDescription": "Reconstruye la palabra a partir de pequeños fragmentos locales.",
-    "newItem.testingPhraseBuilderDescription": "Reconstruye la frase antes de hacer la prueba.",
+    "newItem.testingDirectTestDescription":
+      "Ve directamente a la prueba normal de este elemento.",
+    "newItem.testingWarmupDescription":
+      "Haz el calentamiento rápido antes de la prueba principal.",
+    "newItem.testingLetterPracticeDescription":
+      "Practica reconstruyendo la palabra letra por letra.",
+    "newItem.testingWordPartsDescription":
+      "Reconstruye la palabra a partir de pequeños fragmentos locales.",
+    "newItem.testingPhraseBuilderDescription":
+      "Reconstruye la frase antes de hacer la prueba.",
     "newItem.strategiesPlaceholder": "Placeholder para {strategy}.",
-    "newItem.personalizeDescription": "Escribe una frase en el idioma de origen que te resuene y conviértela en una frase del idioma objetivo que conserve esta palabra.",
-    "newItem.personalizePlaceholder": "Escribe tu frase aquí",
-    "newItem.personalizeAdd": "Agregar frase",
-    "newItem.personalizeGenerating": "Generando...",
-    "newItem.personalizeEmpty": "Todavía no hay frases personalizadas.",
-    "newItem.personalizeError": "No se pudo personalizar la frase",
-    "newItem.practiceDescription": "Practica con frases cortas en el idioma objetivo que poco a poco se vuelven un poco más complejas.",
-    "newItem.practiceGenerating": "Generando frases de práctica...",
-    "newItem.practiceEmpty": "Todavía no hay frases de práctica.",
-    "newItem.practiceError": "No se pudieron generar las frases de práctica",
-    "newItem.connectDescription": "Explora palabras que van juntas y palabras que pueden contrastar o confundirse entre sí.",
-    "newItem.connectGenerating": "Generando palabras conectadas...",
-    "newItem.connectEmpty": "Todavía no hay palabras conectadas.",
-    "newItem.connectError": "No se pudieron generar las palabras conectadas",
-    "newItem.connectSameFamilyTitle": "Misma familia",
-    "newItem.connectRelatedTitle": "Relacionadas o confusas",
-    "newItem.visualizeDescription": "Crea una frase memorable que más adelante guiará la imagen de esta palabra.",
+    "newItem.createDescription":
+      "Escribe una frase en el idioma de origen que te resuene y conviértela en una frase del idioma objetivo que conserve esta palabra.",
+    "newItem.createPlaceholder": "Escribe tu frase aquí",
+    "newItem.createAdd": "Agregar frase",
+    "newItem.createGenerating": "Generando...",
+    "newItem.createEmpty": "Todavía no hay frases creadas.",
+    "newItem.createError": "No se pudo crear la frase",
+    "newItem.examplesDescription":
+      "Practica con frases cortas en el idioma objetivo que poco a poco se vuelven un poco más complejas.",
+    "newItem.examplesGenerating": "Generando ejemplos...",
+    "newItem.examplesEmpty": "Todavía no hay ejemplos.",
+    "newItem.examplesError": "No se pudieron generar los ejemplos",
+    "newItem.relatedDescription":
+      "Explora palabras útiles de la misma familia.",
+    "newItem.relatedGenerating": "Generando palabras relacionadas...",
+    "newItem.relatedEmpty": "Todavía no hay palabras relacionadas.",
+    "newItem.relatedError": "No se pudieron generar las palabras relacionadas",
+    "newItem.visualizeDescription":
+      "Crea una frase memorable que más adelante guiará la imagen de esta palabra.",
     "newItem.visualizeGenerating": "Generando frase memorable...",
     "newItem.visualizeGeneratingImage": "Generando imagen...",
     "newItem.visualizeEmpty": "Todavía no hay una frase memorable.",
     "newItem.visualizeError": "No se pudo generar la frase para visualizar",
-    "word.partsPromptInstruction": "Construye la palabra a partir de sus partes.",
+    "word.partsPromptInstruction":
+      "Construye la palabra a partir de sus partes.",
     "word.partsSlotsLabel": "Zona objetivo de partes de palabra",
     "word.partsBankLabel": "Banco de partes de palabra",
     "word.partsWrongChunk": "Esa parte no va ahí.",
     "word.partsReset": "Reiniciar",
-    "newItem.actDescription": "Representa una mini escena y luego di una frase corta con la palabra.",
+    "newItem.actDescription":
+      "Representa una mini escena y luego di una frase corta con la palabra.",
     "newItem.actGenerating": "Generando ejercicio de actuación...",
     "newItem.actEmpty": "Todavía no hay ejercicio de actuación.",
     "newItem.actError": "No se pudo generar el ejercicio de actuación",
     "newItem.actActionsTitle": "Acciones",
-    "newItem.walkDescription": "Crea un reto de movimiento memorable y repite la frase mientras lo haces.",
+    "newItem.walkDescription":
+      "Crea un reto de movimiento memorable y repite la frase mientras lo haces.",
     "newItem.walkChallengeTitle": "Tu reto",
     "newItem.walkGenerating": "Preparando reto para caminar...",
-    "newItem.walkEmpty": "Primero genera Formas para elegir una frase para este reto.",
+    "newItem.walkEmpty":
+      "Primero genera Formas para elegir una frase para este reto.",
     "newItem.walkError": "No se pudo preparar el reto para caminar",
-    "newItem.decodeDescription": "Divide la palabra en partes útiles y relaciónala con algunos ejemplos relacionados.",
+    "newItem.decodeDescription":
+      "Divide la palabra en partes útiles y relaciónala con algunos ejemplos relacionados.",
     "newItem.decodeGenerating": "Generando desglose de la palabra...",
     "newItem.decodeEmpty": "Todavía no hay desglose de la palabra.",
     "newItem.decodeError": "No se pudo generar el análisis de la palabra",
-    "newItem.encounterDescription": "Mira los lugares y situaciones más comunes donde es probable que te encuentres esta palabra en la vida real.",
+    "newItem.encounterDescription":
+      "Mira los lugares y situaciones más comunes donde es probable que te encuentres esta palabra en la vida real.",
     "newItem.encounterGenerating": "Generando situaciones reales...",
     "newItem.encounterEmpty": "Todavía no hay situaciones de encuentro.",
-    "newItem.encounterError": "No se pudieron generar las situaciones de encuentro",
-    "newItem.compareDescription": "Compara esta palabra con alternativas parecidas o confusas y mira diferencias prácticas de uso.",
+    "newItem.encounterError":
+      "No se pudieron generar las situaciones de encuentro",
+    "newItem.compareDescription":
+      "Compara esta palabra con alternativas parecidas o confusas y mira diferencias prácticas de uso.",
     "newItem.compareGenerating": "Generando comparaciones útiles...",
     "newItem.compareEmpty": "Todavía no hay comparaciones.",
     "newItem.compareError": "No se pudieron generar las comparaciones",
@@ -1166,13 +1351,15 @@ const messages = {
     "newItem.itemRegenerationError": "No se pudo regenerar el elemento",
     "newItem.openConversation": "Practicar conversación",
     "newItem.conversationTitle": "Práctica de conversación del elemento",
-    "newItem.conversationDescription": "Habla en el idioma objetivo. El tutor responde con audio centrado en este elemento.",
+    "newItem.conversationDescription":
+      "Habla en el idioma objetivo. El tutor responde con audio centrado en este elemento.",
     "newItem.conversationStartRecording": "Empezar a hablar",
     "newItem.conversationStopRecording": "Enviar mensaje",
     "newItem.conversationListening": "Escuchando... {seconds}s",
     "newItem.conversationProcessing": "Procesando audio...",
     "newItem.conversationEmpty": "Aún no hay turnos. Graba tu primer mensaje.",
-    "newItem.conversationMicUnsupported": "Este navegador no soporta grabación con micrófono.",
+    "newItem.conversationMicUnsupported":
+      "Este navegador no soporta grabación con micrófono.",
     "newItem.conversationMicDenied": "Se denegó el acceso al micrófono.",
     "newItem.conversationLabelYou": "Tú:",
     "newItem.conversationLabelTutor": "Tutor:",
@@ -1187,10 +1374,12 @@ const messages = {
     "newItem.conversationShowTranslation": "Mostrar traducción",
     "newItem.conversationHideTranslation": "Ocultar traducción",
     "newItem.exercisesTitle": "Práctica de repetición",
-    "newItem.exercisesDescription": "Selecciona líneas e inicia un bucle de repetición de 30 segundos.",
+    "newItem.exercisesDescription":
+      "Selecciona líneas e inicia un bucle de repetición de 30 segundos.",
     "newItem.exercisesGenerating": "Generando ejercicios...",
     "newItem.exercisesGenerationError": "No se pudieron generar los ejercicios",
-    "newItem.exercisesUnavailable": "Los ejercicios todavía no están disponibles para esta palabra.",
+    "newItem.exercisesUnavailable":
+      "Los ejercicios todavía no están disponibles para esta palabra.",
     "newItem.exercisesPhraseTitle": "Repetición de frase",
     "newItem.compareExerciseTitle": "Comparar palabras vinculadas",
     "newItem.compareExerciseItemCount": "{count} elemento(s) de ejercicio",
@@ -1202,8 +1391,10 @@ const messages = {
     "newItem.exercisesRegenerating": "Regenerando frases",
     "newItem.exercisesFunnyImageGenerate": "Generar frase con imagen",
     "newItem.exercisesFunnyImageGenerating": "Generando imagen...",
-    "newItem.exercisesFunnyImagePending": "La frase con imagen se está generando. Puedes seguir usando los ejercicios.",
-    "newItem.exercisesFunnyImageError": "No se pudo generar la frase con imagen",
+    "newItem.exercisesFunnyImagePending":
+      "La frase con imagen se está generando. Puedes seguir usando los ejercicios.",
+    "newItem.exercisesFunnyImageError":
+      "No se pudo generar la frase con imagen",
     "newItem.exercisesFunnyImagePlayWord": "Reproducir audio de la palabra",
     "newItem.exercisesFunnyImageShow": "Imagen",
     "newItem.exercisesTimeLeft": "Tiempo restante: {seconds}s",
@@ -1213,7 +1404,8 @@ const messages = {
     "newItem.exercisesUnmute": "Activar audio",
     "newItem.wordRefresh": "Reescanear diálogos",
     "newItem.wordRefreshRunning": "Reescaneando...",
-    "newItem.wordRefreshComplete": "Diálogos reescaneados. Se agregaron {count} coincidencia(s) de diálogo.",
+    "newItem.wordRefreshComplete":
+      "Diálogos reescaneados. Se agregaron {count} coincidencia(s) de diálogo.",
     "newItem.wordRefreshError": "No se pudieron reescanear los diálogos",
     "newItem.closeRelatedDialogs": "Cerrar",
     "newItem.showMoreDialogs": "Mostrar más diálogos",
@@ -1251,10 +1443,12 @@ const messages = {
     "newItem.gotIt": "Entendido",
     "newItem.saving": "Guardando...",
     "phrase.prompt": "¿Cuál es la traducción correcta en {language}? {text}",
-    "phrase.promptInstruction": "¿Cuál es la traducción correcta en {language}?",
+    "phrase.promptInstruction":
+      "¿Cuál es la traducción correcta en {language}?",
     "phrase.feedback.correct": "Correcto",
     "phrase.feedback.incorrect": "Incorrecto. Respuesta: {answer}",
-    "phrase.feedback.markedWrong": "Marcado como incorrecto por elección. Respuesta: {answer}",
+    "phrase.feedback.markedWrong":
+      "Marcado como incorrecto por elección. Respuesta: {answer}",
     "phrase.markFailed": "La reconocí, pero marcar como fallida",
     "phrase.builderPrompt": "Construye la frase en {language} para:",
     "phrase.builderAnswerLabel": "Frase en progreso",
@@ -1262,15 +1456,18 @@ const messages = {
     "phrase.builderComplete": "Muy bien, la frase está en el orden correcto.",
     "phrase.builderEnableAudio": "Activar audio de bloques",
     "phrase.builderAudioEnabling": "Activando audio...",
-    "phrase.builderEnableAudioHint": "Safari en iPhone necesita un toque antes de reproducir audio de bloques.",
-    "phrase.situationPrompt": "Selecciona la línea que no encaja en este diálogo del idioma objetivo.",
+    "phrase.builderEnableAudioHint":
+      "Safari en iPhone necesita un toque antes de reproducir audio de bloques.",
+    "phrase.situationPrompt":
+      "Selecciona la línea que no encaja en este diálogo del idioma objetivo.",
     "phrase.situationChoice": "{text}",
     "phrase.situationPick": "Elegir",
     "phrase.situationCorrect": "Correcto. Esa era la línea fuera de lugar.",
     "phrase.situationWrong": "Esa línea todavía encaja. Sigue buscando.",
     "phrase.situationSceneLabel": "Escena:",
     "phrase.situationPlayScene": "Reproducir escena",
-    "phrase.situationUnavailable": "Este ejercicio necesita suficientes líneas de otros diálogos en el idioma objetivo.",
+    "phrase.situationUnavailable":
+      "Este ejercicio necesita suficientes líneas de otros diálogos en el idioma objetivo.",
     "review.revealAnswer": "Mostrar respuesta",
     "review.answerLabel": "Respuesta:",
     "review.phraseLabel": "Frase:",
@@ -1286,22 +1483,27 @@ const messages = {
     "word.promptInstruction": "Escribe en {language}:",
     "word.feedback.empty": "Ingresa una respuesta.",
     "word.feedback.correct": "Correcto",
-    "word.feedback.tooManyHints": "Ingresaste la respuesta correcta, pero usaste más de dos pistas o letras incorrectas. Se tomará como incorrecta: {answer}",
+    "word.feedback.tooManyHints":
+      "Ingresaste la respuesta correcta, pero usaste más de dos pistas o letras incorrectas. Se tomará como incorrecta: {answer}",
     "word.feedback.incorrect": "Incorrecto. Respuesta: {answer}",
-    "word.feedback.markedWrong": "Marcado como incorrecto por elección. Respuesta: {answer}",
+    "word.feedback.markedWrong":
+      "Marcado como incorrecto por elección. Respuesta: {answer}",
     "word.feedback.wrongLetter": "Letra incorrecta: {letter}",
     "word.feedback.rewritePrompt": "Escribe la palabra otra vez.",
     "word.feedback.cleanRewriteRequired": "Escríbela otra vez sin errores.",
     "word.letterSuggestions": "Sugerencias de letras",
     "word.clozePrompt": "Completa la frase con: {word}",
     "word.clozePromptInstruction": "Completa la frase con:",
-    "word.clozeMissingPhrase": "No hay una frase de ejercicio disponible para este reintento.",
+    "word.clozeMissingPhrase":
+      "No hay una frase de ejercicio disponible para este reintento.",
     "word.letterBuildLabel": "Palabra formada",
     "word.warmupPromptInstruction": "Calienta la palabra:",
     "word.warmupRevealButton": "Mostrar siguiente letra",
-    "word.warmupAllLettersShown": "Ya se mostraron todas las letras. La respuesta es: {answer}",
+    "word.warmupAllLettersShown":
+      "Ya se mostraron todas las letras. La respuesta es: {answer}",
     "word.warmupPerfect": "Perfecto. La acertaste sin revelar letras.",
-    "word.warmupAlmostPerfect": "Muy bien. La acertaste con casi ninguna letra revelada.",
+    "word.warmupAlmostPerfect":
+      "Muy bien. La acertaste con casi ninguna letra revelada.",
     "word.warmupTranslationLabel": "Traducción de la frase:",
     "word.completionWordLabel": "Palabra:",
     "word.completionPhraseLabel": "Frase:",
@@ -1313,7 +1515,8 @@ const messages = {
     "word.acceptButton": "Aceptar",
     "word.markFailed": "La reconocí, pero marcar como fallida",
     "words.title": "Biblioteca de palabras",
-    "words.description": "Busca y abre palabras guardadas para este par de estudio.",
+    "words.description":
+      "Busca y abre palabras guardadas para este par de estudio.",
     "words.searchLabel": "Buscar palabras",
     "words.searchPlaceholder": "Escribe en idioma origen o destino",
     "words.loading": "Cargando palabras...",
@@ -1323,7 +1526,8 @@ const messages = {
     "words.itemTitle": "Detalle de palabra",
     "words.close": "Cerrar",
     "config.title": "Configuraciones",
-    "config.subtitle": "Administra el idioma de la app y el par de estudio predeterminado.",
+    "config.subtitle":
+      "Administra el idioma de la app y el par de estudio predeterminado.",
     "config.appLanguage": "Idioma de la app",
     "config.studySourceLanguage": "Idioma de origen de estudio",
     "config.studyTargetLanguage": "Idioma de destino de estudio",
@@ -1333,28 +1537,35 @@ const messages = {
     "config.browserVoice": "Voz del navegador",
     "config.browserVoicePreview": "Probar",
     "config.browserVoicePreviewing": "Reproduciendo...",
-    "config.browserVoiceUnavailable": "No hay voces del navegador disponibles ahora mismo.",
-    "config.browserVoiceHint": "Elige qué voz del navegador usar para el audio en {language}.",
+    "config.browserVoiceUnavailable":
+      "No hay voces del navegador disponibles ahora mismo.",
+    "config.browserVoiceHint":
+      "Elige qué voz del navegador usar para el audio en {language}.",
     "config.elevenLabsTitle": "Voces de ElevenLabs",
-    "config.elevenLabsSubtitle": "Prueba y desactiva voces de ElevenLabs para la generacion de audio en {language}.",
+    "config.elevenLabsSubtitle":
+      "Prueba y desactiva voces de ElevenLabs para la generacion de audio en {language}.",
     "config.elevenLabsPreviewText": "Texto de prueba",
     "config.elevenLabsLoading": "Cargando voces de ElevenLabs...",
-    "config.elevenLabsEmpty": "No hay voces de ElevenLabs disponibles ahora mismo.",
+    "config.elevenLabsEmpty":
+      "No hay voces de ElevenLabs disponibles ahora mismo.",
     "config.elevenLabsPreview": "Probar",
     "config.elevenLabsPreviewing": "Reproduciendo...",
     "config.elevenLabsDisable": "Desactivar",
     "config.elevenLabsEnable": "Activar",
     "config.elevenLabsSaving": "Guardando...",
     "config.elevenLabsPreviewError": "No se pudo probar la voz de ElevenLabs",
-    "config.elevenLabsUpdateError": "No se pudo actualizar la voz de ElevenLabs",
+    "config.elevenLabsUpdateError":
+      "No se pudo actualizar la voz de ElevenLabs",
     "config.mobileActionLabels": "Etiquetas móviles de acciones",
     "config.mobileActionLabelsOn": "Visibles",
     "config.mobileActionLabelsOff": "Ocultas",
-    "config.mobileActionLabelsHint": "Muestra etiquetas de texto debajo de los botones con icono en móvil.",
+    "config.mobileActionLabelsHint":
+      "Muestra etiquetas de texto debajo de los botones con icono en móvil.",
     "config.debugTools": "Herramientas de depuración",
     "config.debugToolsOn": "Activadas",
     "config.debugToolsOff": "Desactivadas",
-    "config.debugToolsHint": "Muestra un registro flotante de depuración que puede recopilar diagnósticos desde cualquier página.",
+    "config.debugToolsHint":
+      "Muestra un registro flotante de depuración que puede recopilar diagnósticos desde cualquier página.",
     "config.accountTitle": "Cuenta y estadísticas",
     "config.currentUser": "Usuario actual",
     "config.noCurrentUser": "Sin usuario activo",
@@ -1362,7 +1573,8 @@ const messages = {
     "config.loggingOut": "Cerrando sesión...",
     "config.resetDefaults": "Restablecer valores predeterminados",
     "config.createUserTitle": "Crear usuario",
-    "config.createUserSubtitle": "Crea una cuenta nueva sin afectar tu sesión actual.",
+    "config.createUserSubtitle":
+      "Crea una cuenta nueva sin afectar tu sesión actual.",
     "config.username": "Nombre de usuario",
     "config.email": "Correo electrónico",
     "config.pin": "PIN",
@@ -1371,7 +1583,8 @@ const messages = {
     "config.userCreated": "Usuario creado: {username}",
     "config.createUserFailed": "No se pudo crear el usuario",
     "config.resetPinTitle": "Restablecer PIN de usuario",
-    "config.resetPinSubtitle": "Establece un PIN nuevo para un usuario existente usando nombre de usuario o correo.",
+    "config.resetPinSubtitle":
+      "Establece un PIN nuevo para un usuario existente usando nombre de usuario o correo.",
     "config.userIdentifier": "Nombre de usuario o correo",
     "config.newPin": "Nuevo PIN",
     "config.resetPin": "Restablecer PIN",
@@ -1381,12 +1594,15 @@ const messages = {
     "config.registeredUsersTitle": "Usuarios registrados",
     "config.registeredUsersSubtitle": "Cuentas actuales del sistema.",
     "config.registeredUsersLoading": "Cargando usuarios...",
-    "config.registeredUsersLoadFailed": "No se pudieron cargar los usuarios registrados",
+    "config.registeredUsersLoadFailed":
+      "No se pudieron cargar los usuarios registrados",
     "config.registeredUsersAdmin": "Admin",
     "config.registrationRequestsTitle": "Solicitudes de registro",
-    "config.registrationRequestsSubtitle": "Solicitudes pendientes enviadas desde la página de entrada.",
+    "config.registrationRequestsSubtitle":
+      "Solicitudes pendientes enviadas desde la página de entrada.",
     "config.registrationRequestsLoading": "Cargando solicitudes...",
-    "config.registrationRequestsEmpty": "No hay solicitudes de registro pendientes.",
+    "config.registrationRequestsEmpty":
+      "No hay solicitudes de registro pendientes.",
     "config.registrationRequestsUse": "Usar solicitud",
   },
 } as const;
@@ -1399,9 +1615,14 @@ interface I18nContextValue {
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
 }
 
-function formatMessage(template: string, vars: Record<string, string | number> = {}): string {
+function formatMessage(
+  template: string,
+  vars: Record<string, string | number> = {},
+): string {
   return template.replace(/\{(\w+)\}/g, (_, name: string) => {
-    return Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : `{${name}}`;
+    return Object.prototype.hasOwnProperty.call(vars, name)
+      ? String(vars[name])
+      : `{${name}}`;
   });
 }
 
@@ -1421,8 +1642,13 @@ const defaultContext: I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue>(defaultContext);
 
-export function I18nProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [language, setLanguageState] = useState<AppLanguage>(getInitialLanguage);
+export function I18nProvider({
+  children,
+}: {
+  children: ReactNode;
+}): JSX.Element {
+  const [language, setLanguageState] =
+    useState<AppLanguage>(getInitialLanguage);
 
   const setLanguage = (value: AppLanguage): void => {
     setLanguageState(value);

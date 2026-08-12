@@ -1,7 +1,9 @@
 import { useI18n } from "../../i18n";
-import PhraseSelectionList, { type PhraseSelectionEntry } from "./PhraseSelectionList";
+import PhraseSelectionList, {
+  type PhraseSelectionEntry,
+} from "./PhraseSelectionList";
 
-export default function PracticeStrategyPanel({
+export default function ExamplesStrategyPanel({
   entries,
   selectedKeys,
   onToggleEntry,
@@ -19,12 +21,14 @@ export default function PracticeStrategyPanel({
   const { t } = useI18n();
 
   return (
-    <div className="practice-strategy-panel">
-      <p className="hint exercise-modal-description">{t("newItem.practiceDescription")}</p>
-      {isLoading && <p className="hint">{t("newItem.practiceGenerating")}</p>}
+    <div className="examples-strategy-panel">
+      <p className="hint exercise-modal-description">
+        {t("newItem.examplesDescription")}
+      </p>
+      {isLoading && <p className="hint">{t("newItem.examplesGenerating")}</p>}
       {error && <p className="error">{error}</p>}
       {!isLoading && !error && entries.length === 0 && (
-        <p className="hint">{t("newItem.practiceEmpty")}</p>
+        <p className="hint">{t("newItem.examplesEmpty")}</p>
       )}
       {!!entries.length && (
         <PhraseSelectionList

@@ -1,9 +1,17 @@
-The target noun must express possession or association.
+The target noun must be in the genitive case.
 
-Generate the shortest natural sentence in which the target noun naturally appears in the genitive.
+Prefer a short, natural sentence in which the target noun expresses possession, belonging, or a close relationship to another noun.
 
-Choose a head noun that is strongly associated with the target noun whenever possible.
+The German question should naturally identify the target noun using **Wessen?**
 
-The generated question should ask whose.
+Choose a relationship that is strongly and naturally associated with the target noun.
 
-The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.
+Examples:
+
+* Das Spielzeug des Kindes ist neu. → Wessen Spielzeug ist neu?
+* Die Farbe des Autos gefällt mir. → Wessen Farbe gefällt mir?
+* Die Tür des Hauses ist offen. → Wessen Tür ist offen?
+
+If a **Wessen?** construction would produce an unnatural or contrived sentence, use another common and natural construction that requires the genitive case. Never force the **Wessen?** pattern at the expense of natural German.
+
+When a fallback construction is used, generate the natural German question for that construction rather than forcing **Wessen?**.

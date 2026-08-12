@@ -1,7 +1,14 @@
 export type ItemType = "word" | "phrase";
 export type SessionMode = "new" | "review";
 export type ReviewDirection = "es_to_de" | "de_to_es";
-export type StudyLanguageCode = "spanish" | "english" | "german" | "french" | "italian" | "portuguese" | "dutch";
+export type StudyLanguageCode =
+  | "spanish"
+  | "english"
+  | "german"
+  | "french"
+  | "italian"
+  | "portuguese"
+  | "dutch";
 
 export interface ExercisePhrase {
   label?: string;
@@ -75,15 +82,8 @@ export interface ItemExercisePhrases {
     comparison_example_text: string;
     comparison_translation_text: string;
   }>;
-  connect_groups?: {
+  related_groups?: {
     same_family?: Array<{
-      target_text: string;
-      source_text: string;
-      example_target_text: string;
-      example_source_text: string;
-      explanation_text?: string;
-    }>;
-    related_or_confusing?: Array<{
       target_text: string;
       source_text: string;
       example_target_text: string;
@@ -186,7 +186,11 @@ export interface SessionItem {
   session_restore_state?: SessionRestoreState;
 }
 
-export type ItemQuestionType = "grammar_explanation" | "more_examples" | "common_mistakes" | "custom_related";
+export type ItemQuestionType =
+  | "grammar_explanation"
+  | "more_examples"
+  | "common_mistakes"
+  | "custom_related";
 
 export interface ItemQuestionExchange {
   id: number;
@@ -216,7 +220,11 @@ export interface ContentPreviewResponse {
   source_language?: StudyLanguageCode;
   target_language?: StudyLanguageCode;
   proficiency_level?: "A1" | "A2" | "B1" | "B2";
-  dialog_turns: Array<{ source_text: string; target_text: string; speaker?: "a" | "b" }>;
+  dialog_turns: Array<{
+    source_text: string;
+    target_text: string;
+    speaker?: "a" | "b";
+  }>;
 }
 
 export interface ContentConfirmResponse {
@@ -224,7 +232,13 @@ export interface ContentConfirmResponse {
   source_language?: StudyLanguageCode;
   target_language?: StudyLanguageCode;
   saved_dialog_id?: number;
-  saved_dialog_turns?: Array<{ source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string; clear_audio_url?: string }>;
+  saved_dialog_turns?: Array<{
+    source_text: string;
+    target_text: string;
+    speaker?: "a" | "b";
+    phrase_audio_url?: string;
+    clear_audio_url?: string;
+  }>;
   created_sentence_count?: number;
   existing_sentence_count?: number;
 }
@@ -335,7 +349,7 @@ export interface ContentItemPracticeResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 
-export interface ContentItemConnectResponse {
+export interface ContentItemRelatedResponse {
   exercise_phrases?: ItemExercisePhrases;
 }
 

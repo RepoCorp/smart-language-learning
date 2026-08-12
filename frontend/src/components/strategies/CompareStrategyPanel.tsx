@@ -26,22 +26,28 @@ function CompareCard({
   return (
     <button
       type="button"
-      className={`connect-strategy-card ${selected ? "connect-strategy-card-selected" : ""}`}
+      className={`strategy-content-card ${selected ? "strategy-content-card-selected" : ""}`}
       onClick={() => onToggle(entry)}
       disabled={disabled}
     >
-      <p className="connect-strategy-word">
+      <p className="strategy-content-word">
         <strong>{entry.targetWord}</strong>
       </p>
-      <p className="connect-strategy-translation">{entry.sourceWord}</p>
-      <p className="connect-strategy-explanation">{entry.difference}</p>
-      <p className="connect-strategy-explanation">
+      <p className="strategy-content-translation">{entry.sourceWord}</p>
+      <p className="strategy-content-explanation">{entry.difference}</p>
+      <p className="strategy-content-explanation">
         <strong>{entry.mistake}</strong>
       </p>
-      <p className="connect-strategy-example-target">{entry.targetExample}</p>
-      <p className="connect-strategy-example-source">{entry.targetTranslation}</p>
-      <p className="connect-strategy-example-target">{entry.comparisonExample}</p>
-      <p className="connect-strategy-example-source">{entry.comparisonTranslation}</p>
+      <p className="strategy-content-example-target">{entry.targetExample}</p>
+      <p className="strategy-content-example-source">
+        {entry.targetTranslation}
+      </p>
+      <p className="strategy-content-example-target">
+        {entry.comparisonExample}
+      </p>
+      <p className="strategy-content-example-source">
+        {entry.comparisonTranslation}
+      </p>
     </button>
   );
 }
@@ -64,15 +70,17 @@ export default function CompareStrategyPanel({
   const { t } = useI18n();
 
   return (
-    <div className="connect-strategy-panel">
-      <p className="hint exercise-modal-description">{t("newItem.compareDescription")}</p>
+    <div className="strategy-content-panel">
+      <p className="hint exercise-modal-description">
+        {t("newItem.compareDescription")}
+      </p>
       {isLoading && <p className="hint">{t("newItem.compareGenerating")}</p>}
       {error && <p className="error">{error}</p>}
       {!isLoading && !error && entries.length === 0 && (
         <p className="hint">{t("newItem.compareEmpty")}</p>
       )}
       {!!entries.length && (
-        <div className="connect-strategy-grid">
+        <div className="strategy-content-grid">
           {entries.map((entry) => (
             <CompareCard
               key={entry.key}

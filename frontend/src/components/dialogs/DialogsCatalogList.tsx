@@ -133,23 +133,13 @@ export default function DialogsCatalogList({ state, actions }: Props): JSX.Eleme
                             <DialogActionIcon name="play" />
                           </button>
                         )}
-                        renderTurnActions={(turn, index) => {
+                        getWholePhraseSaveAction={(turn, index) => {
                           const phraseKey = actions.wholeTurnPhraseKey(dialog.dialog_id, index);
-                          return (
-                            <>
-                              <button
-                                type="button"
-                                className="secondary-button"
-                                onClick={() => actions.addWholeTurnPhrase(dialog.dialog_id, turn, index)}
-                                disabled={state.phraseActionStatus[phraseKey] === "saving"}
-                              >
-                                {state.phraseActionStatus[phraseKey] === "saving" ? t("newItem.sentenceAddSaving") : t("content.preview.savePhrase")}
-                              </button>
-                              {state.phraseActionStatus[phraseKey] === "added" && <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>}
-                              {state.phraseActionStatus[phraseKey] === "exists" && <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>}
-                              {state.phraseActionStatus[phraseKey] === "error" && <span className="turn-token-status">{state.phraseActionError[phraseKey] || t("newItem.sentenceAddError")}</span>}
-                            </>
-                          );
+                          return {
+                            onSave: () => actions.addWholeTurnPhrase(dialog.dialog_id, turn, index),
+                            status: state.phraseActionStatus[phraseKey] || "idle",
+                            error: state.phraseActionError[phraseKey] || "",
+                          };
                         }}
                       />
                       <div className="actions">

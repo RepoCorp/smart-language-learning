@@ -139,33 +139,14 @@ export default function SavedDialogCard({
                 <DialogActionIcon name="play" />
               </button>
             )}
-            renderTurnActions={(turn, index) => {
+            getWholePhraseSaveAction={(turn, index) => {
               const phraseKey = wholeTurnPhraseKey(index);
-              return (
-                <>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => void onSavePhrase(turn, index)}
-                    disabled={!savedDialogId || phraseActionStatus[phraseKey] === "saving"}
-                  >
-                    {phraseActionStatus[phraseKey] === "saving"
-                      ? t("newItem.sentenceAddSaving")
-                      : t("content.preview.savePhrase")}
-                  </button>
-                  {phraseActionStatus[phraseKey] === "added" && (
-                    <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
-                  )}
-                  {phraseActionStatus[phraseKey] === "exists" && (
-                    <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
-                  )}
-                  {phraseActionStatus[phraseKey] === "error" && (
-                    <span className="turn-token-status">
-                      {phraseActionError[phraseKey] || t("newItem.sentenceAddError")}
-                    </span>
-                  )}
-                </>
-              );
+              return {
+                onSave: () => onSavePhrase(turn, index),
+                disabled: !savedDialogId,
+                status: phraseActionStatus[phraseKey] || "idle",
+                error: phraseActionError[phraseKey] || "",
+              };
             }}
           />
         </div>

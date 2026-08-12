@@ -84,6 +84,7 @@ export default function StrategyLoopPanel({
   canRegenerateContent,
   regeneratingContent,
   onRegenerateContent,
+  additionalDangerAction,
 }: {
   body: ReactNode;
   secondsLeft: number;
@@ -101,6 +102,7 @@ export default function StrategyLoopPanel({
   canRegenerateContent?: boolean;
   regeneratingContent?: boolean;
   onRegenerateContent?: () => void;
+  additionalDangerAction?: ReactNode;
 }): JSX.Element {
   const { t } = useI18n();
 
@@ -152,17 +154,20 @@ export default function StrategyLoopPanel({
               )}
             </div>
           )}
-          {onRegenerateContent && (
+          {(additionalDangerAction || onRegenerateContent) && (
             <div className="strategy-loop-danger-actions">
-              <DangerousButton
-                className="secondary-button dangerous-action-button exercise-action-icon-button"
-                onConfirm={onRegenerateContent}
-                disabled={!canRegenerateContent || Boolean(regeneratingContent)}
-                aria-label={regeneratingContent ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
-                title={regeneratingContent ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
-              >
-                <LoopActionIcon name="refresh" />
-              </DangerousButton>
+              {additionalDangerAction}
+              {onRegenerateContent && (
+                <DangerousButton
+                  className="secondary-button dangerous-action-button exercise-action-icon-button"
+                  onConfirm={onRegenerateContent}
+                  disabled={!canRegenerateContent || Boolean(regeneratingContent)}
+                  aria-label={regeneratingContent ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
+                  title={regeneratingContent ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
+                >
+                  <LoopActionIcon name="refresh" />
+                </DangerousButton>
+              )}
             </div>
           )}
         </div>

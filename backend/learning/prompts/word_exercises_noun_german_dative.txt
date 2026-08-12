@@ -1,11 +1,20 @@
-The target noun must be the indirect object of the sentence.
+The target noun must be in the dative case.
 
-Generate the shortest natural sentence in which another subject directs an action toward, gives something to, helps, thanks, follows, or otherwise relates to the target noun through a verb that naturally requires the dative.
+Prefer a short, natural sentence in which the target noun is the dative object of the verb.
 
-Do not use the verb "helfen".
+Choose a verb that naturally requires the dative and is strongly associated with the target noun.
 
-The generated question must ask only "for whom", not "to whom".
+The German question should naturally identify the target noun using **Wem?**
 
-Only use sentence patterns for which the natural answer question starts with "For whom ...?".
+When the target noun is a dative object, the question MUST use Wem? and must preserve the same grammatical construction as the generated sentences. Do not paraphrase it using a preposition such as für wen, mit wem, or zu wem.
 
-The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.
+Examples:
+
+* Ich helfe dem Hund. → Wem helfe ich?
+* Anna dankt dem Lehrer. → Wem dankt Anna?
+* Ich vertraue meinem Freund. → Wem vertraue ich?
+
+If using the target noun as a dative object would produce an unnatural or contrived sentence, use another common and natural construction that requires the dative case, such as a dative preposition or an appropriate two-way preposition. Never force the **Wem?** pattern at the expense of natural German.
+
+When the fallback construction is used, generate the natural German question for that construction rather than forcing **Wem?**.
+

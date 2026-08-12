@@ -6,7 +6,14 @@ import { useI18n } from "../i18n";
 import type { StudyLanguageCode } from "../types";
 import TargetPhraseText from "./TargetPhraseText";
 
-type ActionStatus = "idle" | "saving" | "added" | "exists" | "error";
+export type ActionStatus = "idle" | "saving" | "added" | "exists" | "error";
+
+export type WholePhraseSaveAction = {
+  onSave: () => void | Promise<void>;
+  status?: ActionStatus;
+  error?: string;
+  disabled?: boolean;
+};
 
 type PendingPhraseAdd = {
   sourceText: string;
@@ -25,11 +32,11 @@ interface DialogTurnTextProps {
   highlightWord?: string;
   hideTargetText?: boolean;
   onTokenClick?: (statusKey: string, token: string, tokenIndex: number) => void;
-  onOpenItem?: (itemId: number) => Promise<void>;
+  onOpenItem?: (itemId: number) => void | Promise<void>;
   wordMatches?: (token: string, word: string) => boolean;
   showPhraseSelection?: boolean;
   leadingAction?: ReactNode;
-  extraActions?: ReactNode;
+  wholePhraseSaveAction?: WholePhraseSaveAction;
 }
 
 const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
@@ -51,7 +58,7 @@ export default function DialogTurnText({
   wordMatches,
   showPhraseSelection = true,
   leadingAction,
-  extraActions,
+  wholePhraseSaveAction,
 }: DialogTurnTextProps): JSX.Element {
   const { t } = useI18n();
   const [selectingPhrase, setSelectingPhrase] = useState<boolean>(false);
@@ -59,6 +66,7 @@ export default function DialogTurnText({
   const [phraseStatus, setPhraseStatus] = useState<ActionStatus>("idle");
   const [phraseError, setPhraseError] = useState<string>("");
   const [pendingPhraseAdd, setPendingPhraseAdd] = useState<PendingPhraseAdd | null>(null);
+  const [showSaveChoices, setShowSaveChoices] = useState<boolean>(false);
   const prefix = statusKeyPrefix || `${dialogId}-${turnIndex}-target`;
   const tokens = lineTokens(targetText);
 
@@ -114,6 +122,16 @@ export default function DialogTurnText({
     setSelectedTokenIndexes([]);
     setPhraseError("");
     setPendingPhraseAdd(null);
+  };
+
+  const chooseWholePhrase = (): void => {
+    setShowSaveChoices(false);
+    void wholePhraseSaveAction?.onSave();
+  };
+
+  const choosePhrasePart = (): void => {
+    setShowSaveChoices(false);
+    startPhraseSelection();
   };
 
   const cancelPhraseSelection = (): void => {
@@ -235,7 +253,7 @@ export default function DialogTurnText({
         </TargetPhraseText>
       </div>
       {!hideTargetText && <p className="conversation-line">{sourceText}</p>}
-      {!hideTargetText && showPhraseSelection && (
+      {(wholePhraseSaveAction || (!hideTargetText && showPhraseSelection)) && (
         <>
           <div className="actions turn-action-row">
             {selectingPhrase ? (
@@ -251,12 +269,53 @@ export default function DialogTurnText({
                   {phraseStatus === "saving" ? t("newItem.sentenceAddSaving") : t("dialogs.addSelectedPhrase")}
                 </button>
               </>
-            ) : (
+            ) : wholePhraseSaveAction && !hideTargetText && showPhraseSelection ? (
+              <div className="turn-save-chooser">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setShowSaveChoices((current) => !current)}
+                  disabled={wholePhraseSaveAction.disabled || wholePhraseSaveAction.status === "saving"}
+                  aria-expanded={showSaveChoices}
+                >
+                  {t("dialogs.save")}
+                </button>
+                {showSaveChoices && (
+                  <div className="turn-save-options">
+                    <button
+                      type="button"
+                      onClick={chooseWholePhrase}
+                      disabled={wholePhraseSaveAction.disabled || wholePhraseSaveAction.status === "saving"}
+                    >
+                      {wholePhraseSaveAction.status === "saving"
+                        ? t("newItem.sentenceAddSaving")
+                        : t("dialogs.saveWholePhrase")}
+                    </button>
+                    <button type="button" className="secondary-button" onClick={choosePhrasePart}>
+                      {t("dialogs.savePhrasePart")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : wholePhraseSaveAction ? (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={chooseWholePhrase}
+                disabled={wholePhraseSaveAction.disabled || wholePhraseSaveAction.status === "saving"}
+              >
+                {wholePhraseSaveAction.status === "saving"
+                  ? t("newItem.sentenceAddSaving")
+                  : t("dialogs.saveWholePhrase")}
+              </button>
+            ) : !hideTargetText && showPhraseSelection ? (
               <button type="button" className="secondary-button" onClick={startPhraseSelection} disabled={phraseStatus === "saving"}>
                 {t("dialogs.selectPhraseWords")}
               </button>
-            )}
-            {extraActions}
+            ) : null}
+            {wholePhraseSaveAction?.status === "added" && <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>}
+            {wholePhraseSaveAction?.status === "exists" && <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>}
+            {wholePhraseSaveAction?.status === "error" && <span className="turn-token-status">{wholePhraseSaveAction.error || t("newItem.sentenceAddError")}</span>}
             {phraseStatus === "added" && <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>}
             {phraseStatus === "exists" && <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>}
             {phraseStatus === "error" && <span className="turn-token-status">{phraseError || t("newItem.sentenceAddError")}</span>}
@@ -264,11 +323,6 @@ export default function DialogTurnText({
           {selectingPhrase && <p className="hint">{t("dialogs.selectedPhraseHint")}</p>}
         </>
       )}
-      {(hideTargetText || !showPhraseSelection) && extraActions ? (
-        <div className="actions turn-action-row">
-          {extraActions}
-        </div>
-      ) : null}
       {pendingPhraseAdd && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal add-word-modal">

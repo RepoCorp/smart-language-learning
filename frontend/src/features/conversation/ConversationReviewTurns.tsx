@@ -1,6 +1,6 @@
 import { useI18n } from "../../i18n";
 import type { ContentDialogRecord, StudyLanguageCode } from "../../types";
-import DialogTurnText from "../../components/DialogTurnText";
+import DialogTurnText, { type ActionStatus } from "../../components/DialogTurnText";
 
 export type SentenceActionStatus = "idle" | "saving" | "added" | "exists" | "error" | "missing_source";
 
@@ -44,6 +44,7 @@ export default function ConversationReviewTurns({
         const speaker = turn.speaker === "b" ? "assistant" : "user";
         const phraseKey = `conversation-review-phrase-${dialog.dialog_id}-${index}`;
         const phraseStatus = sentenceActionStatus[phraseKey] || "idle";
+        const wholePhraseStatus: ActionStatus = phraseStatus === "missing_source" ? "error" : phraseStatus;
         return (
           <div
             key={`${dialog.dialog_id}-${index}`}
@@ -76,16 +77,17 @@ export default function ConversationReviewTurns({
                   );
                 }}
                 showPhraseSelection={!readOnly}
-                extraActions={!readOnly ? (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => void requestAddSentenceFromConversation(phraseKey, turn.source_text, turn.target_text, dialog.dialog_id, index)}
-                    disabled={phraseStatus === "saving"}
-                  >
-                    {t("newItem.sentenceAddButton")}
-                  </button>
-                ) : undefined}
+                wholePhraseSaveAction={!readOnly ? {
+                  onSave: () => requestAddSentenceFromConversation(
+                    phraseKey,
+                    turn.source_text,
+                    turn.target_text,
+                    dialog.dialog_id,
+                    index,
+                  ),
+                  status: wholePhraseStatus,
+                  error: phraseStatus === "missing_source" ? t("newItem.sentenceAddMissingSource") : "",
+                } : undefined}
               />
             </div>
             {speaker === "user" && originalUserTexts[index] && originalUserTexts[index].trim() !== turn.target_text.trim() && (
@@ -97,23 +99,6 @@ export default function ConversationReviewTurns({
               <p className="conversation-review-corrected">
                 <strong>{t("conversation.correctedLabel")}</strong> {correctedUserTexts[index]}
               </p>
-            )}
-            {!readOnly && (
-              <div className="actions turn-action-row">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => void requestAddSentenceFromConversation(phraseKey, turn.source_text, turn.target_text, dialog.dialog_id, index)}
-                  disabled={phraseStatus === "saving"}
-                >
-                  {t("newItem.sentenceAddButton")}
-                </button>
-                {phraseStatus === "saving" && <span className="turn-token-status">{t("newItem.sentenceAddSaving")}</span>}
-                {phraseStatus === "added" && <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>}
-                {phraseStatus === "exists" && <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>}
-                {phraseStatus === "missing_source" && <span className="turn-token-status">{t("newItem.sentenceAddMissingSource")}</span>}
-                {phraseStatus === "error" && <span className="turn-token-status">{t("newItem.sentenceAddError")}</span>}
-              </div>
             )}
           </div>
         );

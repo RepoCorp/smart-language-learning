@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { useI18n } from "../i18n";
 import type { ContentDialogRecord, StudyLanguageCode } from "../types";
-import DialogTurnText from "./DialogTurnText";
+import DialogTurnText, { type WholePhraseSaveAction } from "./DialogTurnText";
 
 type DialogTurnRecord = ContentDialogRecord["turns"][number];
 type WordActionStatus = "idle" | "saving" | "added" | "exists" | "error";
@@ -15,7 +15,7 @@ interface DialogTurnsListProps {
   hideTargetText?: boolean;
   tokenStatus?: Record<string, WordActionStatus>;
   statusKeyPrefixBase?: string;
-  onOpenItem?: (itemId: number) => Promise<void>;
+  onOpenItem?: (itemId: number) => void | Promise<void>;
   onTokenClick?: (
     statusKey: string,
     token: string,
@@ -24,7 +24,7 @@ interface DialogTurnsListProps {
     targetText: string,
   ) => void;
   renderLeadingAction?: (turn: DialogTurnRecord, turnIndex: number) => ReactNode;
-  renderTurnActions?: (turn: DialogTurnRecord, turnIndex: number) => ReactNode;
+  getWholePhraseSaveAction?: (turn: DialogTurnRecord, turnIndex: number) => WholePhraseSaveAction | undefined;
   getTurnRef?: (turnIndex: number, element: HTMLLIElement | null) => void;
   highlightedTurnIndex?: number | null;
   highlightedTurnIndexes?: Iterable<number>;
@@ -44,7 +44,7 @@ export default function DialogTurnsList({
   onOpenItem,
   onTokenClick,
   renderLeadingAction,
-  renderTurnActions,
+  getWholePhraseSaveAction,
   getTurnRef,
   highlightedTurnIndex = null,
   highlightedTurnIndexes,
@@ -82,7 +82,7 @@ export default function DialogTurnsList({
                 onOpenItem={onOpenItem}
                 onTokenClick={(statusKey, token) => onTokenClick?.(statusKey, token, index, turn.source_text, turn.target_text)}
                 leadingAction={renderLeadingAction?.(turn, index)}
-                extraActions={renderTurnActions?.(turn, index)}
+                wholePhraseSaveAction={getWholePhraseSaveAction?.(turn, index)}
               />
             </div>
           </li>

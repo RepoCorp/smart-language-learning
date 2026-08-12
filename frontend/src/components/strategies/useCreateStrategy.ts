@@ -3,19 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import { personalizeContentItemPhrase } from "../../apiStrategies";
 import type { ItemExercisePhrases, StudyLanguageCode } from "../../types";
 
-type PersonalizeEntry = {
+type CreateEntry = {
   label: string;
   source: string;
   target: string;
 };
 
-function personalizeEntryKey(entry: PersonalizeEntry): string {
+function createEntryKey(entry: CreateEntry): string {
   return `${entry.label || ""}|||${entry.source}|||${entry.target}`;
 }
 
-function sanitizePersonalizeEntries(
+function sanitizeCreateEntries(
   exercisePhrases: ItemExercisePhrases | undefined,
-): PersonalizeEntry[] {
+): CreateEntry[] {
   const entries = exercisePhrases?.personalize_phrases;
   if (!Array.isArray(entries)) {
     return [];
@@ -30,7 +30,7 @@ function sanitizePersonalizeEntries(
     .slice(-30);
 }
 
-export function usePersonalizeStrategy({
+export function useCreateStrategy({
   itemId,
   itemType,
   exercisePhrases,
@@ -53,7 +53,7 @@ export function usePersonalizeStrategy({
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   const entries = useMemo(
-    () => sanitizePersonalizeEntries(exercisePhrases),
+    () => sanitizeCreateEntries(exercisePhrases),
     [exercisePhrases],
   );
 
@@ -64,13 +64,13 @@ export function usePersonalizeStrategy({
     setIsGenerating(false);
   }, [itemId, entries]);
 
-  const toggleEntry = (entry: PersonalizeEntry): void => {
-    const key = personalizeEntryKey(entry);
-    setSelectedKeys((current) => (
+  const toggleEntry = (entry: CreateEntry): void => {
+    const key = createEntryKey(entry);
+    setSelectedKeys((current) =>
       current.includes(key)
         ? current.filter((selectedKey) => selectedKey !== key)
-        : [...current, key]
-    ));
+        : [...current, key],
+    );
   };
 
   const unselectAll = (): void => {
@@ -78,12 +78,12 @@ export function usePersonalizeStrategy({
   };
 
   const selectAll = (): void => {
-    setSelectedKeys(entries.map(personalizeEntryKey));
+    setSelectedKeys(entries.map(createEntryKey));
   };
 
   const selectRandom = (): void => {
     if (entries.length <= 2) {
-      setSelectedKeys(entries.map(personalizeEntryKey));
+      setSelectedKeys(entries.map(createEntryKey));
       return;
     }
     const pool = [...entries];
@@ -91,7 +91,7 @@ export function usePersonalizeStrategy({
     while (pool.length > 0 && selected.length < 2) {
       const index = Math.floor(Math.random() * pool.length);
       const [entry] = pool.splice(index, 1);
-      selected.push(personalizeEntryKey(entry));
+      selected.push(createEntryKey(entry));
     }
     setSelectedKeys(selected);
   };
@@ -107,11 +107,20 @@ export function usePersonalizeStrategy({
     setIsGenerating(true);
     setError("");
     try {
-      const payload = await personalizeContentItemPhrase(itemId, sourceText, sourceLanguage, targetLanguage);
+      const payload = await personalizeContentItemPhrase(
+        itemId,
+        sourceText,
+        sourceLanguage,
+        targetLanguage,
+      );
       setExercisePhrases(payload.exercise_phrases || {});
       setInputValue("");
     } catch (generationError) {
-      setError(generationError instanceof Error ? generationError.message : errorMessage);
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : errorMessage,
+      );
     } finally {
       setIsGenerating(false);
     }

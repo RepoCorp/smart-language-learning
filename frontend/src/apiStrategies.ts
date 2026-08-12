@@ -1,7 +1,7 @@
 import { API_BASE, apiFetch } from "./apiCore";
 import type {
   ContentItemActResponse,
-  ContentItemConnectResponse,
+  ContentItemRelatedResponse,
   ContentItemCompareResponse,
   ContentItemPersonalizeResponse,
   ContentItemPracticeResponse,
@@ -21,9 +21,12 @@ export async function generateContentItemActExercise(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/act?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/act?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to generate act exercise";
     try {
@@ -49,11 +52,14 @@ export async function personalizeContentItemPhrase(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/personalize?${params.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source_text: sourceText }),
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/personalize?${params.toString()}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source_text: sourceText }),
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to personalize phrase";
     try {
@@ -78,9 +84,12 @@ export async function generateContentItemPracticePhrases(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/practice?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/practice?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to generate practice phrases";
     try {
@@ -96,20 +105,23 @@ export async function generateContentItemPracticePhrases(
   return (await response.json()) as ContentItemPracticeResponse;
 }
 
-export async function generateContentItemConnectWords(
+export async function generateContentItemRelatedWords(
   itemId: number,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
-): Promise<ContentItemConnectResponse> {
+): Promise<ContentItemRelatedResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/connect?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/related?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
-    let detail = "Failed to generate connected words";
+    let detail = "Failed to generate related words";
     try {
       const payload = (await response.json()) as { detail?: string };
       if (payload.detail) {
@@ -120,7 +132,7 @@ export async function generateContentItemConnectWords(
     }
     throw new Error(detail);
   }
-  return (await response.json()) as ContentItemConnectResponse;
+  return (await response.json()) as ContentItemRelatedResponse;
 }
 
 export async function generateContentItemCompareWords(
@@ -132,9 +144,12 @@ export async function generateContentItemCompareWords(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/compare?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/compare?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to generate comparisons";
     try {
@@ -161,9 +176,12 @@ export async function generateContentItemVisualizePhrase(
     target_language: targetLanguage,
     stage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/visualize?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/visualize?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to generate visualize phrase";
     try {
@@ -188,9 +206,12 @@ export async function generateContentItemWalkSentences(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/walk?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/walk?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to generate walk exercise";
     try {
@@ -215,9 +236,12 @@ export async function generateContentItemDecodeAnalysis(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/decode?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/decode?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to generate decode analysis";
     try {
@@ -242,9 +266,12 @@ export async function generateContentItemEncounterSituations(
     source_language: sourceLanguage,
     target_language: targetLanguage,
   });
-  const response = await apiFetch(`${API_BASE}/content/items/${itemId}/strategies/encounter?${params.toString()}`, {
-    method: "POST",
-  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/encounter?${params.toString()}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
     let detail = "Failed to generate encounter situations";
     try {

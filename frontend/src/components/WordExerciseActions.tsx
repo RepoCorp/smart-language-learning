@@ -14,6 +14,8 @@ interface WordExerciseActionsProps {
   onGenerateFunnyImage: () => void;
   openImageIcon: ReactNode;
   imageIcon: ReactNode;
+  showOpenImage?: boolean;
+  showGenerateImage?: boolean;
 }
 
 export default function WordExerciseActions({
@@ -27,12 +29,14 @@ export default function WordExerciseActions({
   onGenerateFunnyImage,
   openImageIcon,
   imageIcon,
+  showOpenImage = true,
+  showGenerateImage = true,
 }: WordExerciseActionsProps): JSX.Element {
   const { t } = useI18n();
 
   return (
     <div className="exercise-selection-actions">
-      {hasOpenFunnyImage && (
+      {showOpenImage && hasOpenFunnyImage && (
         <button
           type="button"
           className="secondary-button exercise-action-icon-button"
@@ -43,7 +47,7 @@ export default function WordExerciseActions({
           {openImageIcon}
         </button>
       )}
-      <div className="exercise-image-actions">
+      {showGenerateImage && <div className="exercise-image-actions">
         {hasFunnyImage ? (
           <DangerousButton
             className="secondary-button dangerous-action-button exercise-action-icon-button"
@@ -66,7 +70,7 @@ export default function WordExerciseActions({
             {imageIcon}
           </button>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

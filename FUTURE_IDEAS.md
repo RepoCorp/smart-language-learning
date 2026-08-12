@@ -6,6 +6,7 @@ Ningun otro arreglito que no sea vital!!!
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
   - Other things that change depending on the gender of the word.
+- 
 
 ## New functionalities 
 De las conversaciones saca errores. Darle al modelo la lista de errores que tenemos incluidas y el dice si/cuales de esos están y sugiere repasarlo. Que sea bien empatico 😂

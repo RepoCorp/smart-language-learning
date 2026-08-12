@@ -1,13 +1,12 @@
 import { useMemo, type ReactNode } from "react";
 
 import { useI18n } from "../../i18n";
-import { PHRASE_STRATEGIES, WORD_STRATEGIES } from "./strategyConstants";
+import { PHRASE_STRATEGIES, STRATEGY_LABELS, WORD_STRATEGIES } from "./strategyConstants";
 
 export default function StrategiesModal({
   itemType,
   sourceText,
   targetText,
-  pluralText,
   selectedStrategy,
   onSelectedStrategyChange,
   onClose,
@@ -16,7 +15,6 @@ export default function StrategiesModal({
   itemType: "word" | "phrase";
   sourceText: string;
   targetText: string;
-  pluralText?: string;
   selectedStrategy: string;
   onSelectedStrategyChange: (strategy: string) => void;
   onClose: () => void;
@@ -34,22 +32,15 @@ export default function StrategiesModal({
         <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={onClose}>
           ×
         </button>
-        <p className="exercise-modal-header">
+        <p className="exercise-modal-header word-strategies-modal-title">
           <strong>{t("newItem.strategiesTitle")}</strong>
         </p>
         <div className="word-strategies-body">
           <div className="word-strategies-item-card">
-            <p className="word-strategies-item-kicker">
-              <strong>{itemType === "word" ? t("newItem.word") : t("newItem.phrase")}</strong>
-            </p>
             <p className="word-strategies-item-target">{targetText || sourceText}</p>
-            {!!pluralText?.trim() && itemType === "word" && (
-              <p className="word-strategies-item-plural">{pluralText.trim()}</p>
-            )}
             <p className="word-strategies-item-source">{sourceText}</p>
           </div>
           <label className="word-strategies-select-group" htmlFor="word-strategy-select">
-            <span className="word-strategies-select-label">{t("newItem.strategiesSelectLabel")}</span>
             <select
               id="word-strategy-select"
               className="word-strategies-select"
@@ -58,7 +49,7 @@ export default function StrategiesModal({
             >
               {strategies.map((strategy, index) => (
                 <option key={strategy} value={strategy}>
-                  {index + 1}. {strategy}
+                  {index + 1}. {STRATEGY_LABELS[strategy] || strategy}
                 </option>
               ))}
             </select>

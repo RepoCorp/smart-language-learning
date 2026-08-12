@@ -19,17 +19,17 @@ interface PromptPreferencesContextValue {
 
 function getInitialTargetPromptMode(): TargetPromptMode {
   if (typeof window === "undefined") {
-    return "text";
+    return "audio";
   }
   const stored = window.localStorage.getItem(TARGET_PROMPT_MODE_STORAGE_KEY);
-  return stored === "audio" ? "audio" : "text";
+  return stored === "text" ? "text" : "audio";
 }
 
 function getInitialShowMobileActionLabels(): boolean {
   if (typeof window === "undefined") {
-    return false;
+    return true;
   }
-  return window.localStorage.getItem(MOBILE_ACTION_LABELS_STORAGE_KEY) === "true";
+  return window.localStorage.getItem(MOBILE_ACTION_LABELS_STORAGE_KEY) !== "false";
 }
 
 function getInitialPreferredBrowserVoiceURIByLanguage(): Partial<Record<StudyLanguageCode, string>> {
@@ -49,9 +49,9 @@ function getInitialPreferredBrowserVoiceURIByLanguage(): Partial<Record<StudyLan
 }
 
 const defaultContext: PromptPreferencesContextValue = {
-  targetPromptMode: "text",
+  targetPromptMode: "audio",
   setTargetPromptMode: () => {},
-  showMobileActionLabels: false,
+  showMobileActionLabels: true,
   setShowMobileActionLabels: () => {},
   preferredBrowserVoiceURIByLanguage: {},
   setPreferredBrowserVoiceURI: () => {},

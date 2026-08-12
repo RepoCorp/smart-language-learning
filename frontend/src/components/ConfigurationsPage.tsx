@@ -119,8 +119,8 @@ export default function ConfigurationsPage({
     setLanguage("en");
     setSourceLanguage("spanish");
     setTargetLanguage("german");
-    setTargetPromptMode("text");
-    setShowMobileActionLabels(false);
+    setTargetPromptMode("audio");
+    setShowMobileActionLabels(true);
     clearPreferredBrowserVoiceURIs();
     setDebugToolsEnabled(false);
   };
@@ -216,30 +216,32 @@ export default function ConfigurationsPage({
             </div>
           </div>
 
-          <div className="settings-field">
-            {t("config.debugTools")}
-            <div className="settings-choice-group" role="radiogroup" aria-label={t("config.debugTools")}>
-              <button
-                type="button"
-                className={`settings-choice-button ${debugToolsEnabled ? "settings-choice-button-selected" : ""}`}
-                onClick={() => setDebugToolsEnabled(true)}
-                role="radio"
-                aria-checked={debugToolsEnabled}
-              >
-                {t("config.debugToolsOn")}
-              </button>
-              <button
-                type="button"
-                className={`settings-choice-button ${!debugToolsEnabled ? "settings-choice-button-selected" : ""}`}
-                onClick={() => setDebugToolsEnabled(false)}
-                role="radio"
-                aria-checked={!debugToolsEnabled}
-              >
-                {t("config.debugToolsOff")}
-              </button>
+          {canCreateUsers && (
+            <div className="settings-field">
+              {t("config.debugTools")}
+              <div className="settings-choice-group" role="radiogroup" aria-label={t("config.debugTools")}>
+                <button
+                  type="button"
+                  className={`settings-choice-button ${debugToolsEnabled ? "settings-choice-button-selected" : ""}`}
+                  onClick={() => setDebugToolsEnabled(true)}
+                  role="radio"
+                  aria-checked={debugToolsEnabled}
+                >
+                  {t("config.debugToolsOn")}
+                </button>
+                <button
+                  type="button"
+                  className={`settings-choice-button ${!debugToolsEnabled ? "settings-choice-button-selected" : ""}`}
+                  onClick={() => setDebugToolsEnabled(false)}
+                  role="radio"
+                  aria-checked={!debugToolsEnabled}
+                >
+                  {t("config.debugToolsOff")}
+                </button>
+              </div>
+              <span className="hint">{t("config.debugToolsHint")}</span>
             </div>
-            <span className="hint">{t("config.debugToolsHint")}</span>
-          </div>
+          )}
 
           <div className="settings-field">
             {t("config.mobileActionLabels")}

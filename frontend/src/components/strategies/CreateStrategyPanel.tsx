@@ -1,13 +1,13 @@
 import { useI18n } from "../../i18n";
 import PhraseSelectionList from "./PhraseSelectionList";
 
-interface PersonalizeEntry {
+interface CreateEntry {
   key: string;
   source: string;
   target: string;
 }
 
-export default function PersonalizeStrategyPanel({
+export default function CreateStrategyPanel({
   inputValue,
   onInputChange,
   onGenerate,
@@ -23,31 +23,39 @@ export default function PersonalizeStrategyPanel({
   onGenerate: () => void;
   isGenerating: boolean;
   error: string;
-  entries: PersonalizeEntry[];
+  entries: CreateEntry[];
   selectedKeys: string[];
-  onToggleEntry: (entry: PersonalizeEntry) => void;
+  onToggleEntry: (entry: CreateEntry) => void;
   exerciseRunning: boolean;
 }): JSX.Element {
   const { t } = useI18n();
 
   return (
-    <div className="personalize-strategy-panel">
-      <p className="hint exercise-modal-description">{t("newItem.personalizeDescription")}</p>
-      <div className="personalize-strategy-form">
+    <div className="create-strategy-panel">
+      <p className="hint exercise-modal-description">
+        {t("newItem.createDescription")}
+      </p>
+      <div className="create-strategy-form">
         <textarea
-          className="personalize-strategy-input"
+          className="create-strategy-input"
           value={inputValue}
           onChange={(event) => onInputChange(event.target.value)}
-          placeholder={t("newItem.personalizePlaceholder")}
+          placeholder={t("newItem.createPlaceholder")}
           rows={3}
         />
-        <button type="button" onClick={onGenerate} disabled={isGenerating || !inputValue.trim()}>
-          {isGenerating ? t("newItem.personalizeGenerating") : t("newItem.personalizeAdd")}
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={isGenerating || !inputValue.trim()}
+        >
+          {isGenerating
+            ? t("newItem.createGenerating")
+            : t("newItem.createAdd")}
         </button>
       </div>
       {error && <p className="error">{error}</p>}
       {entries.length === 0 && !isGenerating && (
-        <p className="hint">{t("newItem.personalizeEmpty")}</p>
+        <p className="hint">{t("newItem.createEmpty")}</p>
       )}
       <PhraseSelectionList
         entries={entries}

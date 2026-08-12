@@ -1,11 +1,17 @@
-The target noun must be the direct object of the sentence.
+The target noun must be in the accusative case.
 
-Generate the shortest natural sentence in which another subject performs a characteristic action on the target noun.
+Prefer a short, natural sentence in which the target noun is the direct object of the verb.
 
-Choose a verb that is strongly associated with the noun whenever possible.
+Choose a verb whose action is strongly and naturally associated with the target noun.
 
-The generated question must ask only "what", not "whom".
+The German question should naturally identify the target noun using **Wen?** for a person or **Was?** for a thing.
 
-Only use sentence patterns for which the natural answer question starts with "What ...?".
+Examples:
 
-The requested determiner must appear immediately before the target noun and must modify the target noun. Do not apply the requested determiner to the subject or to any other noun in the sentence.
+* Ich sehe den Hund. → Wen sehe ich?
+* Ich öffne die Tür. → Was öffne ich?
+* Ich höre die Musik. → Was höre ich?
+
+If using the target noun as a direct object would produce an unnatural or contrived sentence, use another common and natural construction that requires the accusative case. Never force the direct-object pattern at the expense of natural German.
+
+Do not apply the requested determiner to the subject or to any other noun in the sentence.

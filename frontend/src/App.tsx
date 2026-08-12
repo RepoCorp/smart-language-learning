@@ -62,10 +62,10 @@ export default function App(): JSX.Element {
 
   const pageOptions = [
     { path: "/session", label: "Session" },
-    { path: "/content/create", label: "Create content" },
-    { path: "/content/manage", label: "Manage content" },
     { path: "/dialogs", label: "Dialogs" },
     { path: "/conversation", label: "Conversation" },
+    { path: "/content/manage", label: "Manage content" },
+    { path: "/content/create", label: "Create content" },
   ];
   const configPath = "/configurations";
   const selectedPagePath = pageOptions.some((option) => option.path === location.pathname) ? location.pathname : "/session";
@@ -156,7 +156,7 @@ export default function App(): JSX.Element {
             />
             <Route path="*" element={<Navigate to="/session" replace />} />
           </Routes>
-          <DebugToolsPanel />
+          {authUser.is_superuser && <DebugToolsPanel />}
         </>
       ) : null}
     </>

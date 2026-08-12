@@ -1,5 +1,13 @@
-The target noun must be the grammatical subject of the sentence.
+The target noun must be in the nominative case and be the grammatical subject of the sentence.
 
-Generate the shortest natural sentence in which the target noun performs the action or exists in a characteristic state.
+Generate the shortest natural sentence in which the target noun performs a characteristic action or is in a characteristic state.
 
-The generated question should ask who or what performs the action or is in that state.
+Prefer an action or state that strongly evokes the meaning of the noun.
+
+The German question must naturally identify the subject using **Wer?** for a person or **Was?** for a thing.
+
+Examples:
+
+* Der Hund bellt. → Wer bellt?
+* Die Erfahrung zählt. → Was zählt?
+* Das Feuer brennt. → Was brennt?

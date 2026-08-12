@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type PointerEvent,
+} from "react";
 
 import {
   askContentItemQuestion,
@@ -11,7 +17,10 @@ import {
   refreshContentItemWord,
   submitReview,
 } from "../api";
-import { generateContentItemExercises, generateContentItemNounExerciseCase } from "../apiNounExercises";
+import {
+  generateContentItemExercises,
+  generateContentItemNounExerciseCase,
+} from "../apiNounExercises";
 import { deterministicIndex, deterministicTake } from "../deterministic";
 import {
   BROWSER_EXERCISE_PHRASE_PAUSE_MS,
@@ -21,36 +30,39 @@ import {
 } from "../exerciseBrowserSpeech";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
-import {
-  STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE,
-} from "../studyLanguageMetadata";
+import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../studyLanguageMetadata";
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import CompareWordsModal from "./CompareWordsModal";
 import DialogActionIcon from "./DialogActionIcon";
-import DialogTurnsList from "./DialogTurnsList";
 import ItemActionToolbar from "./ItemActionToolbar";
 import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
+import WordExerciseActions from "./WordExerciseActions";
 import WordPartsReview from "./WordPartsReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
 import ItemTestingModal from "./testing/ItemTestingModal";
 import { buildGermanPluralExerciseEntry } from "./wordExercisePrimaryEntry";
-import { ACT_STRATEGY, COMPARE_STRATEGY, CONNECT_STRATEGY, DECODE_STRATEGY, DEFAULT_STRATEGY, ENCOUNTER_STRATEGY, PERSONALIZE_STRATEGY, PRACTICE_STRATEGY, VISUALIZE_STRATEGY, WALK_STRATEGY } from "./strategies/strategyConstants";
-import { useActStrategy } from "./strategies/useActStrategy";
-import { useCompareStrategy } from "./strategies/useCompareStrategy";
-import { useConnectStrategy } from "./strategies/useConnectStrategy";
-import { useDecodeStrategy } from "./strategies/useDecodeStrategy";
-import { useEncounterStrategy } from "./strategies/useEncounterStrategy";
+import {
+  ACT_STRATEGY,
+  COMPARE_STRATEGY,
+  DECODE_STRATEGY,
+  DEFAULT_STRATEGY,
+  ENCOUNTER_STRATEGY,
+  CREATE_STRATEGY,
+  EXAMPLES_STRATEGY,
+  RELATED_STRATEGY,
+  VISUALIZE_STRATEGY,
+  WALK_STRATEGY,
+  firstStrategyForItemType,
+} from "./strategies/strategyConstants";
 import { useNounExerciseModal } from "./useNounExerciseModal";
-import { usePersonalizeStrategy } from "./strategies/usePersonalizeStrategy";
-import { usePracticeStrategy } from "./strategies/usePracticeStrategy";
-import { useVisualizeStrategy } from "./strategies/useVisualizeStrategy";
-import { useWalkStrategy } from "./strategies/useWalkStrategy";
+import { useItemStrategies } from "./strategies/useItemStrategies";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
 import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
+import RelatedDialogTurns from "./dialogs/RelatedDialogTurns";
 import useRelatedDialogPlayback from "./dialogs/useRelatedDialogPlayback";
 import type { DialogTurnAudioMode } from "./dialogs/useDialogTurnPlayback";
 import VerbExerciseSelector, {
@@ -76,7 +88,9 @@ interface NewItemProps {
 
 const MAX_EXERCISE_ENTRIES = 30;
 
-function ItemActionIcon({ name }: {
+function ItemActionIcon({
+  name,
+}: {
   name: "selectAll" | "clearAll" | "random" | "image" | "openImage" | "refresh";
 }): JSX.Element {
   const commonProps = {
@@ -151,44 +165,85 @@ export default function NewItem({
   onClose,
 }: NewItemProps): JSX.Element {
   const { t } = useI18n();
-  const { targetPromptMode, showMobileActionLabels, preferredBrowserVoiceURIByLanguage } = usePromptPreferences();
+  const {
+    targetPromptMode,
+    showMobileActionLabels,
+    preferredBrowserVoiceURIByLanguage,
+  } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const sourceLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
-  const targetLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage]);
-  const preferredBrowserVoiceURI = preferredBrowserVoiceURIByLanguage[targetLanguage] || "";
+  const sourceLanguageLabel = t(
+    STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage],
+  );
+  const targetLanguageLabel = t(
+    STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage],
+  );
+  const preferredBrowserVoiceURI =
+    preferredBrowserVoiceURIByLanguage[targetLanguage] || "";
   const [saving, setSaving] = useState<boolean>(false);
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
   const [showTestingModal, setShowTestingModal] = useState<boolean>(false);
-  const [showDirectTestModal, setShowDirectTestModal] = useState<boolean>(false);
-  const [directTestReviewComplete, setDirectTestReviewComplete] = useState<boolean>(false);
-  const [directTestCorrect, setDirectTestCorrect] = useState<boolean | null>(null);
-  const [directTestResetVersion, setDirectTestResetVersion] = useState<number>(0);
-  const [showWordIntroPracticeModal, setShowWordIntroPracticeModal] = useState<boolean>(false);
-  const [showWordLetterPracticeModal, setShowWordLetterPracticeModal] = useState<boolean>(false);
-  const [showPhraseBuilderModal, setShowPhraseBuilderModal] = useState<boolean>(false);
-  const [showFunnyImageModal, setShowFunnyImageModal] = useState<boolean>(false);
-  const [itemActionTooltip, setItemActionTooltip] = useState<{ label: string; left: number; top: number } | null>(null);
+  const [showDirectTestModal, setShowDirectTestModal] =
+    useState<boolean>(false);
+  const [directTestReviewComplete, setDirectTestReviewComplete] =
+    useState<boolean>(false);
+  const [directTestCorrect, setDirectTestCorrect] = useState<boolean | null>(
+    null,
+  );
+  const [directTestResetVersion, setDirectTestResetVersion] =
+    useState<number>(0);
+  const [showWordIntroPracticeModal, setShowWordIntroPracticeModal] =
+    useState<boolean>(false);
+  const [showWordLetterPracticeModal, setShowWordLetterPracticeModal] =
+    useState<boolean>(false);
+  const [showPhraseBuilderModal, setShowPhraseBuilderModal] =
+    useState<boolean>(false);
+  const [showFunnyImageModal, setShowFunnyImageModal] =
+    useState<boolean>(false);
+  const [itemActionTooltip, setItemActionTooltip] = useState<{
+    label: string;
+    left: number;
+    top: number;
+  } | null>(null);
   const [loadingExercises, setLoadingExercises] = useState<boolean>(false);
-  const [suppressInitialStrategyAutogeneration, setSuppressInitialStrategyAutogeneration] = useState<boolean>(false);
-  const [initialModalStrategy, setInitialModalStrategy] = useState<string>(DEFAULT_STRATEGY);
-  const [generatingNounCaseKey, setGeneratingNounCaseKey] = useState<"" | "nominative" | "accusative" | "dative" | "genitive">("");
+  const [
+    suppressInitialStrategyAutogeneration,
+    setSuppressInitialStrategyAutogeneration,
+  ] = useState<boolean>(false);
+  const [initialModalStrategy, setInitialModalStrategy] = useState<string>(() =>
+    firstStrategyForItemType(item.item_type),
+  );
+  const [generatingNounCaseKey, setGeneratingNounCaseKey] = useState<
+    "" | "nominative" | "accusative" | "dative" | "genitive"
+  >("");
   const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
   const [regeneratingAudio, setRegeneratingAudio] = useState<boolean>(false);
-  const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] = useState<boolean>(false);
+  const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] =
+    useState<boolean>(false);
   const [exerciseError, setExerciseError] = useState<string>("");
-  const [selectedStrategy, setSelectedStrategy] = useState<string>(DEFAULT_STRATEGY);
-  const [selectedTestingAction, setSelectedTestingAction] = useState<string>("test");
+  const [selectedStrategy, setSelectedStrategy] = useState<string>(() =>
+    firstStrategyForItemType(item.item_type),
+  );
+  const [selectedTestingAction, setSelectedTestingAction] =
+    useState<string>("test");
   const [wordRefreshMessage, setWordRefreshMessage] = useState<string>("");
   const [showQuestionsModal, setShowQuestionsModal] = useState<boolean>(false);
-  const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>([]);
+  const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>(
+    [],
+  );
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
   const [exerciseRunning, setExerciseRunning] = useState<boolean>(false);
   const [exerciseMuted, setExerciseMuted] = useState<boolean>(false);
-  const [wordActionStatus, setWordActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
-  const [phraseActionStatus, setPhraseActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error">>({});
-  const [phraseActionError, setPhraseActionError] = useState<Record<string, string>>({});
+  const [wordActionStatus, setWordActionStatus] = useState<
+    Record<string, "idle" | "saving" | "added" | "exists" | "error">
+  >({});
+  const [phraseActionStatus, setPhraseActionStatus] = useState<
+    Record<string, "idle" | "saving" | "added" | "exists" | "error">
+  >({});
+  const [phraseActionError, setPhraseActionError] = useState<
+    Record<string, string>
+  >({});
   const [pendingWordAdd, setPendingWordAdd] = useState<{
     key: string;
     source: string;
@@ -202,31 +257,62 @@ export default function NewItem({
     note: string;
   } | null>(null);
   const [addingWord, setAddingWord] = useState<boolean>(false);
-  const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
+  const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(
+    null,
+  );
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
-  const [regeneratingRelatedDialogId, setRegeneratingRelatedDialogId] = useState<number | null>(null);
-  const [itemQuestions, setItemQuestions] = useState<NonNullable<SessionItem["item_questions"]>>(item.item_questions || []);
-  const [exercisePhrases, setExercisePhrases] = useState(item.exercise_phrases || {});
+  const [regeneratingRelatedDialogId, setRegeneratingRelatedDialogId] =
+    useState<number | null>(null);
+  const [itemQuestions, setItemQuestions] = useState<
+    NonNullable<SessionItem["item_questions"]>
+  >(item.item_questions || []);
+  const [exercisePhrases, setExercisePhrases] = useState(
+    item.exercise_phrases || {},
+  );
   const [sourceText, setSourceText] = useState<string>(item.spanish_text || "");
   const [targetText, setTargetText] = useState<string>(item.german_text || "");
   const [notes, setNotes] = useState<string>(item.notes || "");
-  const [pluralGerman, setPluralGerman] = useState<string>(item.plural_german || "");
+  const [pluralGerman, setPluralGerman] = useState<string>(
+    item.plural_german || "",
+  );
   const [audioUrl, setAudioUrl] = useState<string>(item.audio_url || "");
   const [wordType, setWordType] = useState<string>(item.word_type || "");
-  const [dialogPhraseAnswer, setDialogPhraseAnswer] = useState<string>(item.dialog_phrase_answer || "");
-  const [dialogPhraseScene, setDialogPhraseScene] = useState<string>(item.dialog_phrase_scene || "");
-  const [dialogPhraseSceneAudioUrls, setDialogPhraseSceneAudioUrls] = useState<string[]>(item.dialog_phrase_scene_audio_urls || []);
-  const [dialogPhraseOptions, setDialogPhraseOptions] = useState<string[]>(item.dialog_phrase_options || []);
-  const [dialogPhraseTurns, setDialogPhraseTurns] = useState<NonNullable<SessionItem["dialog_phrase_turns"]>>(item.dialog_phrase_turns || []);
-  const [dialogPhraseOddIndex, setDialogPhraseOddIndex] = useState<number | null>(item.dialog_phrase_odd_index ?? null);
-  const [relatedDialogs, setRelatedDialogs] = useState<NonNullable<SessionItem["related_dialogs"]>>(item.related_dialogs || []);
-  const [compareWords, setCompareWords] = useState<NonNullable<SessionItem["compare_words"]>>(item.compare_words || []);
-  const [compareWordsInsights, setCompareWordsInsights] = useState<string>(item.compare_words_insights || "");
-  const [showCompareWordsModal, setShowCompareWordsModal] = useState<boolean>(false);
-  const [relatedDialogTurnAudioMode, setRelatedDialogTurnAudioMode] = useState<DialogTurnAudioMode>("natural");
+  const [dialogPhraseAnswer, setDialogPhraseAnswer] = useState<string>(
+    item.dialog_phrase_answer || "",
+  );
+  const [dialogPhraseScene, setDialogPhraseScene] = useState<string>(
+    item.dialog_phrase_scene || "",
+  );
+  const [dialogPhraseSceneAudioUrls, setDialogPhraseSceneAudioUrls] = useState<
+    string[]
+  >(item.dialog_phrase_scene_audio_urls || []);
+  const [dialogPhraseOptions, setDialogPhraseOptions] = useState<string[]>(
+    item.dialog_phrase_options || [],
+  );
+  const [dialogPhraseTurns, setDialogPhraseTurns] = useState<
+    NonNullable<SessionItem["dialog_phrase_turns"]>
+  >(item.dialog_phrase_turns || []);
+  const [dialogPhraseOddIndex, setDialogPhraseOddIndex] = useState<
+    number | null
+  >(item.dialog_phrase_odd_index ?? null);
+  const [relatedDialogs, setRelatedDialogs] = useState<
+    NonNullable<SessionItem["related_dialogs"]>
+  >(item.related_dialogs || []);
+  const [compareWords, setCompareWords] = useState<
+    NonNullable<SessionItem["compare_words"]>
+  >(item.compare_words || []);
+  const [compareWordsInsights, setCompareWordsInsights] = useState<string>(
+    item.compare_words_insights || "",
+  );
+  const [showCompareWordsModal, setShowCompareWordsModal] =
+    useState<boolean>(false);
+  const [relatedDialogTurnAudioMode, setRelatedDialogTurnAudioMode] =
+    useState<DialogTurnAudioMode>("natural");
   const [itemQuestionError, setItemQuestionError] = useState<string>("");
   const [askingQuestion, setAskingQuestion] = useState<boolean>(false);
-  const [showDialogTargetTextById, setShowDialogTargetTextById] = useState<Record<number, boolean>>({});
+  const [showDialogTargetTextById, setShowDialogTargetTextById] = useState<
+    Record<number, boolean>
+  >({});
   const exerciseTimerRef = useRef<number | null>(null);
   const exerciseRunRef = useRef<number>(0);
   const exerciseRunningRef = useRef<boolean>(false);
@@ -246,21 +332,19 @@ export default function NewItem({
     targetLanguage,
     onError: () => setExerciseError(t("dialogs.error.load")),
   });
-  const {
-    registerRelatedDialogCardRef,
-    scrollToNextRelatedDialog,
-  } = useRelatedDialogsFocus({
-    showDialogsModal,
-    relatedDialogs,
-    showAllDialogs,
-    playingRelatedDialogId,
-    playingRelatedDialogTurn,
-  });
+  const { registerRelatedDialogCardRef, scrollToNextRelatedDialog } =
+    useRelatedDialogsFocus({
+      showDialogsModal,
+      relatedDialogs,
+      showAllDialogs,
+      playingRelatedDialogId,
+      playingRelatedDialogTurn,
+    });
 
   useEffect(() => {
     setExercisePhrases(item.exercise_phrases || {});
     setExerciseError("");
-    setSelectedStrategy(DEFAULT_STRATEGY);
+    setSelectedStrategy(firstStrategyForItemType(item.item_type));
     setWordRefreshMessage("");
     setSourceText(item.spanish_text || "");
     setTargetText(item.german_text || "");
@@ -277,7 +361,25 @@ export default function NewItem({
     setRelatedDialogs(item.related_dialogs || []);
     setCompareWords(item.compare_words || []);
     setCompareWordsInsights(item.compare_words_insights || "");
-  }, [item.id, item.spanish_text, item.german_text, item.notes, item.plural_german, item.audio_url, item.exercise_phrases, item.word_type, item.dialog_phrase_answer, item.dialog_phrase_scene, item.dialog_phrase_scene_audio_urls, item.dialog_phrase_options, item.dialog_phrase_turns, item.dialog_phrase_odd_index, item.related_dialogs, item.compare_words, item.compare_words_insights]);
+  }, [
+    item.id,
+    item.spanish_text,
+    item.german_text,
+    item.notes,
+    item.plural_german,
+    item.audio_url,
+    item.exercise_phrases,
+    item.word_type,
+    item.dialog_phrase_answer,
+    item.dialog_phrase_scene,
+    item.dialog_phrase_scene_audio_urls,
+    item.dialog_phrase_options,
+    item.dialog_phrase_turns,
+    item.dialog_phrase_odd_index,
+    item.related_dialogs,
+    item.compare_words,
+    item.compare_words_insights,
+  ]);
 
   useEffect(() => {
     if (!autoplayAudioOnMount || !audioUrl) {
@@ -309,15 +411,15 @@ export default function NewItem({
     }
     const onKeyDown = (event: KeyboardEvent): void => {
       if (
-        showQuestionsModal
-        || showDialogsModal
-        || showCompareWordsModal
-        || showExerciseModal
-        || showTestingModal
-        || showDirectTestModal
-        || showWordIntroPracticeModal
-        || showWordLetterPracticeModal
-        || showPhraseBuilderModal
+        showQuestionsModal ||
+        showDialogsModal ||
+        showCompareWordsModal ||
+        showExerciseModal ||
+        showTestingModal ||
+        showDirectTestModal ||
+        showWordIntroPracticeModal ||
+        showWordLetterPracticeModal ||
+        showPhraseBuilderModal
       ) {
         return;
       }
@@ -332,7 +434,20 @@ export default function NewItem({
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [saving, onContinue, readOnly, showQuestionsModal, showDialogsModal, showCompareWordsModal, showExerciseModal, showTestingModal, showDirectTestModal, showWordIntroPracticeModal, showWordLetterPracticeModal, showPhraseBuilderModal]);
+  }, [
+    saving,
+    onContinue,
+    readOnly,
+    showQuestionsModal,
+    showDialogsModal,
+    showCompareWordsModal,
+    showExerciseModal,
+    showTestingModal,
+    showDirectTestModal,
+    showWordIntroPracticeModal,
+    showWordLetterPracticeModal,
+    showPhraseBuilderModal,
+  ]);
 
   useEffect(() => {
     exerciseRunningRef.current = exerciseRunning;
@@ -352,21 +467,24 @@ export default function NewItem({
     }
   }, [exerciseMuted]);
 
-  useEffect(() => () => {
-    exerciseRunRef.current += 1;
-    if (exerciseTimerRef.current !== null) {
-      window.clearInterval(exerciseTimerRef.current);
-      exerciseTimerRef.current = null;
-    }
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-    if (exerciseAudioRef.current) {
-      exerciseAudioRef.current.pause();
-      exerciseAudioRef.current.currentTime = 0;
-      exerciseAudioRef.current = null;
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      exerciseRunRef.current += 1;
+      if (exerciseTimerRef.current !== null) {
+        window.clearInterval(exerciseTimerRef.current);
+        exerciseTimerRef.current = null;
+      }
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (exerciseAudioRef.current) {
+        exerciseAudioRef.current.pause();
+        exerciseAudioRef.current.currentTime = 0;
+        exerciseAudioRef.current = null;
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     setItemQuestions(item.item_questions || []);
@@ -390,7 +508,11 @@ export default function NewItem({
     let cancelled = false;
     const loadLatestItemHistory = async (): Promise<void> => {
       try {
-        const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
+        const detail = await fetchContentItemDetail(
+          item.id,
+          sourceLanguage,
+          targetLanguage,
+        );
         if (cancelled) {
           return;
         }
@@ -403,7 +525,13 @@ export default function NewItem({
     return () => {
       cancelled = true;
     };
-  }, [showDialogsModal, showQuestionsModal, item.id, sourceLanguage, targetLanguage]);
+  }, [
+    showDialogsModal,
+    showQuestionsModal,
+    item.id,
+    sourceLanguage,
+    targetLanguage,
+  ]);
 
   useEffect(() => {
     setShowDialogTargetTextById({});
@@ -416,13 +544,19 @@ export default function NewItem({
     }
     const candidates = [normalized];
     const withoutArticle = normalized.replace(/^(der|die|das)\s+/i, "").trim();
-    if (withoutArticle && withoutArticle.toLowerCase() !== normalized.toLowerCase()) {
+    if (
+      withoutArticle &&
+      withoutArticle.toLowerCase() !== normalized.toLowerCase()
+    ) {
       candidates.push(withoutArticle);
     }
     return candidates.sort((a, b) => b.length - a.length);
   };
 
-  const containsWordInTurn = (turnTargetText: string, word: string): boolean => {
+  const containsWordInTurn = (
+    turnTargetText: string,
+    word: string,
+  ): boolean => {
     const text = turnTargetText.trim();
     if (!text) {
       return false;
@@ -436,8 +570,11 @@ export default function NewItem({
     }
     return false;
   };
-  const speakerForTurn = (speaker: string | undefined, index: number): "a" | "b" =>
-    speaker === "a" || speaker === "b" ? speaker : (index % 2 === 0 ? "a" : "b");
+  const speakerForTurn = (
+    speaker: string | undefined,
+    index: number,
+  ): "a" | "b" =>
+    speaker === "a" || speaker === "b" ? speaker : index % 2 === 0 ? "a" : "b";
 
   useEffect(() => {
     if (!showDialogsModal) {
@@ -453,7 +590,8 @@ export default function NewItem({
     void audio.play().catch(() => undefined);
   };
 
-  const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
+  const cleanToken = (value: string): string =>
+    value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
 
   const requestAddWordFromDialogToken = async (
     key: string,
@@ -488,7 +626,11 @@ export default function NewItem({
         setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
         setLoadingLinkedWord(true);
         try {
-          const detail = await fetchContentItemDetail(check.id, sourceLanguage, targetLanguage);
+          const detail = await fetchContentItemDetail(
+            check.id,
+            sourceLanguage,
+            targetLanguage,
+          );
           setOpenedLinkedWord({
             id: detail.id,
             item_type: detail.item_type,
@@ -505,7 +647,8 @@ export default function NewItem({
             options: [],
             dialog_phrase_answer: detail.dialog_phrase_answer || "",
             dialog_phrase_scene: detail.dialog_phrase_scene || "",
-            dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+            dialog_phrase_scene_audio_urls:
+              detail.dialog_phrase_scene_audio_urls || [],
             dialog_phrase_options: detail.dialog_phrase_options || [],
             dialog_phrase_turns: detail.dialog_phrase_turns || [],
             dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
@@ -545,7 +688,11 @@ export default function NewItem({
   const openLinkedDialogItem = async (itemId: number): Promise<void> => {
     setLoadingLinkedWord(true);
     try {
-      const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
+      const detail = await fetchContentItemDetail(
+        itemId,
+        sourceLanguage,
+        targetLanguage,
+      );
       setOpenedLinkedWord({
         id: detail.id,
         item_type: detail.item_type,
@@ -562,7 +709,8 @@ export default function NewItem({
         options: [],
         dialog_phrase_answer: detail.dialog_phrase_answer || "",
         dialog_phrase_scene: detail.dialog_phrase_scene || "",
-        dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+        dialog_phrase_scene_audio_urls:
+          detail.dialog_phrase_scene_audio_urls || [],
         dialog_phrase_options: detail.dialog_phrase_options || [],
         dialog_phrase_turns: detail.dialog_phrase_turns || [],
         dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
@@ -576,11 +724,17 @@ export default function NewItem({
     }
   };
 
-  const wholeTurnPhraseKey = (dialogId: number, turnIndex: number): string => `related-${dialogId}-turn-${turnIndex}-whole-phrase`;
+  const wholeTurnPhraseKey = (dialogId: number, turnIndex: number): string =>
+    `related-${dialogId}-turn-${turnIndex}-whole-phrase`;
 
   const addWholeTurnPhraseFromRelatedDialog = async (
     dialogId: number,
-    turn: { source_text: string; target_text: string; speaker?: "a" | "b"; phrase_audio_url?: string },
+    turn: {
+      source_text: string;
+      target_text: string;
+      speaker?: "a" | "b";
+      phrase_audio_url?: string;
+    },
     turnIndex: number,
   ): Promise<void> => {
     if (!turn.source_text.trim() || !turn.target_text.trim()) {
@@ -604,37 +758,54 @@ export default function NewItem({
       if (resultPayload.id) {
         await openLinkedDialogItem(resultPayload.id);
       }
-      setPhraseActionStatus((current) => ({ ...current, [statusKey]: resultPayload.created ? "added" : "exists" }));
+      setPhraseActionStatus((current) => ({
+        ...current,
+        [statusKey]: resultPayload.created ? "added" : "exists",
+      }));
     } catch (error) {
-      setPhraseActionStatus((current) => ({ ...current, [statusKey]: "error" }));
+      setPhraseActionStatus((current) => ({
+        ...current,
+        [statusKey]: "error",
+      }));
       setPhraseActionError((current) => ({
         ...current,
-        [statusKey]: error instanceof Error && error.message ? error.message : t("newItem.sentenceAddError"),
+        [statusKey]:
+          error instanceof Error && error.message
+            ? error.message
+            : t("newItem.sentenceAddError"),
       }));
     }
   };
 
-  const regenerateRelatedDialogAudio = async (dialogId: number): Promise<void> => {
+  const regenerateRelatedDialogAudio = async (
+    dialogId: number,
+  ): Promise<void> => {
     if (regeneratingRelatedDialogId !== null) {
       return;
     }
     setRegeneratingRelatedDialogId(dialogId);
     setExerciseError("");
     try {
-      const refreshedDialog = await regenerateContentDialogAudio(dialogId, sourceLanguage, targetLanguage);
-      setRelatedDialogs((current) => current.map((dialog) => (
-        dialog.dialog_id === dialogId
-          ? {
-              ...dialog,
-              topic: refreshedDialog.topic,
-              context: refreshedDialog.context,
-              audio_url: refreshedDialog.audio_url,
-              created_at: refreshedDialog.created_at,
-              turn_count: refreshedDialog.turn_count,
-              turns: refreshedDialog.turns,
-            }
-          : dialog
-      )));
+      const refreshedDialog = await regenerateContentDialogAudio(
+        dialogId,
+        sourceLanguage,
+        targetLanguage,
+      );
+      setRelatedDialogs((current) =>
+        current.map((dialog) =>
+          dialog.dialog_id === dialogId
+            ? {
+                ...dialog,
+                topic: refreshedDialog.topic,
+                context: refreshedDialog.context,
+                audio_url: refreshedDialog.audio_url,
+                created_at: refreshedDialog.created_at,
+                turn_count: refreshedDialog.turn_count,
+                turns: refreshedDialog.turns,
+              }
+            : dialog,
+        ),
+      );
     } catch {
       setExerciseError(t("manage.error.regenerateAudio"));
     } finally {
@@ -653,7 +824,13 @@ export default function NewItem({
     setAskingQuestion(true);
     setItemQuestionError("");
     try {
-      const response = await askContentItemQuestion(item.id, questionText, itemQuestions, sourceLanguage, targetLanguage);
+      const response = await askContentItemQuestion(
+        item.id,
+        questionText,
+        itemQuestions,
+        sourceLanguage,
+        targetLanguage,
+      );
       setItemQuestions(response.conversation || []);
     } catch (error) {
       if (error instanceof Error && error.message) {
@@ -671,7 +848,16 @@ export default function NewItem({
       return;
     }
 
-    const { key, source, target, dialogId, turnIndex, sourceLine, targetLine, clickedTargetToken } = pendingWordAdd;
+    const {
+      key,
+      source,
+      target,
+      dialogId,
+      turnIndex,
+      sourceLine,
+      targetLine,
+      clickedTargetToken,
+    } = pendingWordAdd;
     setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
     setAddingWord(true);
     try {
@@ -687,11 +873,18 @@ export default function NewItem({
         targetLine,
         clickedTargetToken,
       );
-      setWordActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+      setWordActionStatus((current) => ({
+        ...current,
+        [key]: result.created ? "added" : "exists",
+      }));
       if (result.id) {
         setLoadingLinkedWord(true);
         try {
-          const detail = await fetchContentItemDetail(result.id, sourceLanguage, targetLanguage);
+          const detail = await fetchContentItemDetail(
+            result.id,
+            sourceLanguage,
+            targetLanguage,
+          );
           setOpenedLinkedWord({
             id: detail.id,
             item_type: detail.item_type,
@@ -708,7 +901,8 @@ export default function NewItem({
             options: [],
             dialog_phrase_answer: detail.dialog_phrase_answer || "",
             dialog_phrase_scene: detail.dialog_phrase_scene || "",
-            dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
+            dialog_phrase_scene_audio_urls:
+              detail.dialog_phrase_scene_audio_urls || [],
             dialog_phrase_options: detail.dialog_phrase_options || [],
             dialog_phrase_turns: detail.dialog_phrase_turns || [],
             dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
@@ -729,7 +923,13 @@ export default function NewItem({
     }
   };
 
-  const sanitizeExerciseEntries = (entries?: Array<{ label?: string; source_text?: string; target_text?: string }>): Array<{ label: string; source: string; target: string }> => {
+  const sanitizeExerciseEntries = (
+    entries?: Array<{
+      label?: string;
+      source_text?: string;
+      target_text?: string;
+    }>,
+  ): Array<{ label: string; source: string; target: string }> => {
     if (!entries || !entries.length) {
       return [];
     }
@@ -743,150 +943,111 @@ export default function NewItem({
       .slice(0, MAX_EXERCISE_ENTRIES);
   };
 
-  const exerciseEntryKey = (entry: { label?: string; source: string; target: string }): string => `${entry.label || ""}|||${entry.source}|||${entry.target}`;
-  const personalizeStrategy = usePersonalizeStrategy({
+  const exerciseEntryKey = (entry: {
+    label?: string;
+    source: string;
+    target: string;
+  }): string => `${entry.label || ""}|||${entry.source}|||${entry.target}`;
+  const {
+    createStrategy,
+    examplesStrategy,
+    relatedStrategy,
+    visualizeStrategy,
+    actStrategy,
+    walkStrategy,
+    decodeStrategy,
+    encounterStrategy,
+    compareStrategy,
+  } = useItemStrategies({
     itemId: item.id,
     itemType: item.item_type,
     exercisePhrases,
     sourceLanguage,
     targetLanguage,
     setExercisePhrases,
-    errorMessage: t("newItem.personalizeError"),
+    modalOpen: showExerciseModal,
+    selectedStrategy,
+    initialStrategy: initialModalStrategy,
+    suppressInitialAutogeneration: suppressInitialStrategyAutogeneration,
+    errors: {
+      create: t("newItem.createError"),
+      examples: t("newItem.examplesError"),
+      related: t("newItem.relatedError"),
+      visualize: t("newItem.visualizeError"),
+      act: t("newItem.actError"),
+      walk: t("newItem.walkError"),
+      decode: t("newItem.decodeError"),
+      encounter: t("newItem.encounterError"),
+      compare: t("newItem.compareError"),
+    },
   });
-  const practiceStrategy = usePracticeStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.practiceError"),
-    enabled: showExerciseModal && selectedStrategy === PRACTICE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const connectStrategy = useConnectStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.connectError"),
-    enabled: showExerciseModal && selectedStrategy === CONNECT_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const visualizeStrategy = useVisualizeStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.visualizeError"),
-    enabled: showExerciseModal && selectedStrategy === VISUALIZE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const actStrategy = useActStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.actError"),
-    enabled: showExerciseModal && selectedStrategy === ACT_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const walkStrategy = useWalkStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.walkError"),
-    enabled: showExerciseModal && selectedStrategy === WALK_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const decodeStrategy = useDecodeStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.decodeError"),
-    enabled: showExerciseModal && selectedStrategy === DECODE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const encounterStrategy = useEncounterStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.encounterError"),
-    enabled: showExerciseModal && selectedStrategy === ENCOUNTER_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const compareStrategy = useCompareStrategy({
-    itemId: item.id,
-    itemType: item.item_type,
-    exercisePhrases,
-    sourceLanguage,
-    targetLanguage,
-    setExercisePhrases,
-    errorMessage: t("newItem.compareError"),
-    enabled: showExerciseModal && selectedStrategy === COMPARE_STRATEGY && !(suppressInitialStrategyAutogeneration && selectedStrategy === initialModalStrategy),
-  });
-  const savedExerciseEntries = sanitizeExerciseEntries(exercisePhrases?.phrases);
+  const savedExerciseEntries = sanitizeExerciseEntries(
+    exercisePhrases?.phrases,
+  );
   const legacyExerciseEntries = [
     ...sanitizeExerciseEntries(exercisePhrases?.first_section),
     ...sanitizeExerciseEntries(exercisePhrases?.second_section),
   ];
-  const generatedWordExerciseEntries = savedExerciseEntries.length ? savedExerciseEntries : legacyExerciseEntries;
+  const generatedWordExerciseEntries = savedExerciseEntries.length
+    ? savedExerciseEntries
+    : legacyExerciseEntries;
   const funnyImageExerciseEntry = exercisePhrases?.funny_image_phrase;
-  const funnyImageExerciseSelectionEntry = funnyImageExerciseEntry?.source_text && funnyImageExerciseEntry?.target_text
-    ? {
-        label: funnyImageExerciseEntry.label || "funny image",
-        source: funnyImageExerciseEntry.source_text,
-        target: funnyImageExerciseEntry.target_text,
-      }
-    : undefined;
-  const regularWordExerciseEntries = item.item_type === "word"
-    ? [
-        {
-          label: "word",
-          source: sourceText,
-          target: targetText,
-        },
-        ...generatedWordExerciseEntries,
-      ]
-    : generatedWordExerciseEntries;
-  const wordExerciseEntries = item.item_type === "word"
-    ? [
-        ...regularWordExerciseEntries,
-        ...(funnyImageExerciseSelectionEntry ? [funnyImageExerciseSelectionEntry] : []),
-      ]
-    : regularWordExerciseEntries;
-  const isVerbWord = item.item_type === "word" && String(wordType || "").trim().toLowerCase() === "verb";
-  const {
-    nounExerciseSections,
-    isNounSectionedExercise,
-  } = useNounExerciseModal({
-    itemType: item.item_type,
-    wordType,
-    exercisePhrases,
-  });
-  const verbExerciseGridEntries = buildVerbExerciseGridEntries(generatedWordExerciseEntries);
+  const funnyImageExerciseSelectionEntry =
+    funnyImageExerciseEntry?.source_text && funnyImageExerciseEntry?.target_text
+      ? {
+          label: funnyImageExerciseEntry.label || "funny image",
+          source: funnyImageExerciseEntry.source_text,
+          target: funnyImageExerciseEntry.target_text,
+        }
+      : undefined;
+  const regularWordExerciseEntries =
+    item.item_type === "word"
+      ? [
+          {
+            label: "word",
+            source: sourceText,
+            target: targetText,
+          },
+          ...generatedWordExerciseEntries,
+        ]
+      : generatedWordExerciseEntries;
+  const wordExerciseEntries =
+    item.item_type === "word"
+      ? [
+          ...regularWordExerciseEntries,
+          ...(funnyImageExerciseSelectionEntry
+            ? [funnyImageExerciseSelectionEntry]
+            : []),
+        ]
+      : regularWordExerciseEntries;
+  const isVerbWord =
+    item.item_type === "word" &&
+    String(wordType || "")
+      .trim()
+      .toLowerCase() === "verb";
+  const { nounExerciseSections, isNounSectionedExercise } =
+    useNounExerciseModal({
+      itemType: item.item_type,
+      wordType,
+      exercisePhrases,
+    });
+  const verbExerciseGridEntries = buildVerbExerciseGridEntries(
+    generatedWordExerciseEntries,
+  );
   const hasVerbExerciseGridEntries = verbExerciseGridEntries.length > 0;
-  const hasCurrentVerbExerciseGeneration = exercisePhrases?.generation_mode === VERB_BY_TENSE_GENERATION_MODE;
-  const isVerbExerciseGrid = item.item_type === "word"
-    && (isVerbWord || hasVerbExerciseGridEntries);
-  const wordOnlyExerciseEntry = item.item_type === "word"
-    ? wordExerciseEntries.find((entry) => entry.label === "word")
-    : undefined;
+  const hasCurrentVerbExerciseGeneration =
+    exercisePhrases?.generation_mode === VERB_BY_TENSE_GENERATION_MODE;
+  const isVerbExerciseGrid =
+    item.item_type === "word" && (isVerbWord || hasVerbExerciseGridEntries);
+  const wordOnlyExerciseEntry =
+    item.item_type === "word"
+      ? wordExerciseEntries.find((entry) => entry.label === "word")
+      : undefined;
   const nounPluralExerciseEntry = isNounSectionedExercise
     ? buildGermanPluralExerciseEntry(wordOnlyExerciseEntry, pluralGerman, notes)
     : undefined;
 
-  const compareExerciseWords = item.item_type === "word"
-    ? compareWords
-    : [];
+  const compareExerciseWords = item.item_type === "word" ? compareWords : [];
   const compareWordExerciseEntries = (
     word: NonNullable<SessionItem["compare_words"]>[number],
     exercisePhrasePayload?: SessionItem["exercise_phrases"],
@@ -897,55 +1058,85 @@ export default function NewItem({
       source: word.spanish_text,
       target: word.german_text,
     };
-    const compareSavedEntries = sanitizeExerciseEntries(exercisePhrasePayload?.phrases);
+    const compareSavedEntries = sanitizeExerciseEntries(
+      exercisePhrasePayload?.phrases,
+    );
     const compareLegacyEntries = [
       ...sanitizeExerciseEntries(exercisePhrasePayload?.first_section),
       ...sanitizeExerciseEntries(exercisePhrasePayload?.second_section),
     ];
-    const compareGeneratedEntries = compareSavedEntries.length ? compareSavedEntries : compareLegacyEntries;
+    const compareGeneratedEntries = compareSavedEntries.length
+      ? compareSavedEntries
+      : compareLegacyEntries;
     const compareFunnyImageEntry = exercisePhrasePayload?.funny_image_phrase;
-    const compareFunnyImageSelectionEntry = compareFunnyImageEntry?.source_text && compareFunnyImageEntry?.target_text
-      ? [{
-          label: wordLabel ? `${wordLabel} - ${compareFunnyImageEntry.label || "funny image"}` : (compareFunnyImageEntry.label || "funny image"),
-          source: compareFunnyImageEntry.source_text,
-          target: compareFunnyImageEntry.target_text,
-        }]
-      : [];
+    const compareFunnyImageSelectionEntry =
+      compareFunnyImageEntry?.source_text && compareFunnyImageEntry?.target_text
+        ? [
+            {
+              label: wordLabel
+                ? `${wordLabel} - ${compareFunnyImageEntry.label || "funny image"}`
+                : compareFunnyImageEntry.label || "funny image",
+              source: compareFunnyImageEntry.source_text,
+              target: compareFunnyImageEntry.target_text,
+            },
+          ]
+        : [];
     const labeledGeneratedEntries = compareGeneratedEntries.map((entry) => ({
       ...entry,
       label: wordLabel ? `${wordLabel} - ${entry.label}` : entry.label,
     }));
-    return [compareWordEntry, ...labeledGeneratedEntries, ...compareFunnyImageSelectionEntry];
+    return [
+      compareWordEntry,
+      ...labeledGeneratedEntries,
+      ...compareFunnyImageSelectionEntry,
+    ];
   };
-  const compareExerciseEntries = item.item_type === "word"
-    ? compareExerciseWords.flatMap((word) => compareWordExerciseEntries(word, word.exercise_phrases))
-    : [];
-  const allWordExerciseEntries = item.item_type === "word"
-    ? [
-        ...wordExerciseEntries,
-        ...(nounPluralExerciseEntry ? [nounPluralExerciseEntry] : []),
-        ...compareExerciseEntries,
-      ]
-    : wordExerciseEntries;
-  const selectedRepeatExerciseEntries = item.item_type === "phrase"
-    ? [{ source: sourceText, target: targetText }]
-    : allWordExerciseEntries.filter((entry) => selectedExerciseKeys.includes(exerciseEntryKey(entry)));
-  const selectedPersonalizeEntries = personalizeStrategy.entries.filter((entry) => personalizeStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
-  const selectedPracticeEntries = practiceStrategy.entries.filter((entry) => practiceStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
-  const selectedConnectEntries = connectStrategy.allEntries
-    .filter((entry) => connectStrategy.selectedKeys.includes(entry.key))
+  const compareExerciseEntries =
+    item.item_type === "word"
+      ? compareExerciseWords.flatMap((word) =>
+          compareWordExerciseEntries(word, word.exercise_phrases),
+        )
+      : [];
+  const allWordExerciseEntries =
+    item.item_type === "word"
+      ? [
+          ...wordExerciseEntries,
+          ...(nounPluralExerciseEntry ? [nounPluralExerciseEntry] : []),
+          ...compareExerciseEntries,
+        ]
+      : wordExerciseEntries;
+  const selectedRepeatExerciseEntries =
+    item.item_type === "phrase"
+      ? [{ source: sourceText, target: targetText }]
+      : allWordExerciseEntries.filter((entry) =>
+          selectedExerciseKeys.includes(exerciseEntryKey(entry)),
+        );
+  const selectedCreateEntries = createStrategy.entries.filter((entry) =>
+    createStrategy.selectedKeys.includes(exerciseEntryKey(entry)),
+  );
+  const selectedExamplesEntries = examplesStrategy.entries.filter((entry) =>
+    examplesStrategy.selectedKeys.includes(exerciseEntryKey(entry)),
+  );
+  const selectedRelatedEntries = relatedStrategy.allEntries
+    .filter((entry) => relatedStrategy.selectedKeys.includes(entry.key))
     .map((entry) => ({
-      label: "connect",
+      label: "related",
       source: entry.exampleSource,
       target: entry.exampleTarget,
     }));
-  const selectedVisualizeEntries = visualizeStrategy.entry && visualizeStrategy.selectedKeys.includes(visualizeStrategy.entry.key)
-    ? [visualizeStrategy.entry]
-    : [];
-  const selectedActEntries = actStrategy.entry && actStrategy.selectedKeys.includes(actStrategy.entry.key)
-    ? [actStrategy.entry]
-    : [];
-  const selectedWalkEntries = walkStrategy.entries.filter((entry) => walkStrategy.selectedKeys.includes(exerciseEntryKey(entry)));
+  const selectedVisualizeEntries =
+    visualizeStrategy.entry &&
+    visualizeStrategy.selectedKeys.includes(visualizeStrategy.entry.key)
+      ? [visualizeStrategy.entry]
+      : [];
+  const selectedActEntries =
+    actStrategy.entry &&
+    actStrategy.selectedKeys.includes(actStrategy.entry.key)
+      ? [actStrategy.entry]
+      : [];
+  const selectedWalkEntries = walkStrategy.entries.filter((entry) =>
+    walkStrategy.selectedKeys.includes(exerciseEntryKey(entry)),
+  );
   const selectedDecodeEntries = decodeStrategy.analysis.related
     .filter((entry) => decodeStrategy.selectedKeys.includes(entry.key))
     .map((entry) => ({
@@ -953,10 +1144,12 @@ export default function NewItem({
       source: entry.exampleSource,
       target: entry.exampleTarget,
     }));
-  const selectedEncounterEntries = encounterStrategy.entries.filter((entry) => encounterStrategy.selectedKeys.includes(entry.key));
+  const selectedEncounterEntries = encounterStrategy.entries.filter((entry) =>
+    encounterStrategy.selectedKeys.includes(entry.key),
+  );
   const selectedCompareEntries = compareStrategy.entries
     .filter((entry) => compareStrategy.selectedKeys.includes(entry.key))
-    .flatMap((entry) => ([
+    .flatMap((entry) => [
       {
         label: `${entry.targetWord} - target`,
         source: entry.targetTranslation,
@@ -967,26 +1160,27 @@ export default function NewItem({
         source: entry.comparisonTranslation,
         target: entry.comparisonExample,
       },
-    ]));
-  const selectedStrategyEntries = selectedStrategy === PERSONALIZE_STRATEGY
-    ? selectedPersonalizeEntries
-    : selectedStrategy === PRACTICE_STRATEGY
-      ? selectedPracticeEntries
-      : selectedStrategy === CONNECT_STRATEGY
-        ? selectedConnectEntries
-        : selectedStrategy === VISUALIZE_STRATEGY
-          ? selectedVisualizeEntries
-          : selectedStrategy === ACT_STRATEGY
-            ? selectedActEntries
-            : selectedStrategy === WALK_STRATEGY
-              ? selectedWalkEntries
-              : selectedStrategy === DECODE_STRATEGY
-                ? selectedDecodeEntries
-                : selectedStrategy === ENCOUNTER_STRATEGY
-                  ? selectedEncounterEntries
-                  : selectedStrategy === COMPARE_STRATEGY
-                    ? selectedCompareEntries
-          : selectedRepeatExerciseEntries;
+    ]);
+  const selectedStrategyEntries =
+    selectedStrategy === CREATE_STRATEGY
+      ? selectedCreateEntries
+      : selectedStrategy === EXAMPLES_STRATEGY
+        ? selectedExamplesEntries
+        : selectedStrategy === RELATED_STRATEGY
+          ? selectedRelatedEntries
+          : selectedStrategy === VISUALIZE_STRATEGY
+            ? selectedVisualizeEntries
+            : selectedStrategy === ACT_STRATEGY
+              ? selectedActEntries
+              : selectedStrategy === WALK_STRATEGY
+                ? selectedWalkEntries
+                : selectedStrategy === DECODE_STRATEGY
+                  ? selectedDecodeEntries
+                  : selectedStrategy === ENCOUNTER_STRATEGY
+                    ? selectedEncounterEntries
+                    : selectedStrategy === COMPARE_STRATEGY
+                      ? selectedCompareEntries
+                      : selectedRepeatExerciseEntries;
   const selectedExerciseEntries = selectedStrategyEntries;
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
   const wordPracticeItemBase: SessionItem = {
@@ -1054,20 +1248,27 @@ export default function NewItem({
     if (keys.length <= count) {
       return keys;
     }
-    return deterministicTake(keys, count, `${itemDeterministicKey}:exercise-keys:${count}`, (key) => key);
+    return deterministicTake(
+      keys,
+      count,
+      `${itemDeterministicKey}:exercise-keys:${count}`,
+      (key) => key,
+    );
   };
 
-  const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] => getVerbExerciseKeysForPerson(
-    verbExerciseGridEntries,
-    exerciseEntryKey,
-    person,
-  );
+  const verbExerciseKeysForPerson = (person: VerbPersonKey): string[] =>
+    getVerbExerciseKeysForPerson(
+      verbExerciseGridEntries,
+      exerciseEntryKey,
+      person,
+    );
 
-  const verbExerciseKeysForTense = (tense: VerbTenseKey): string[] => getVerbExerciseKeysForTense(
-    verbExerciseGridEntries,
-    exerciseEntryKey,
-    tense,
-  );
+  const verbExerciseKeysForTense = (tense: VerbTenseKey): string[] =>
+    getVerbExerciseKeysForTense(
+      verbExerciseGridEntries,
+      exerciseEntryKey,
+      tense,
+    );
 
   const selectVerbExercisePerson = (person: VerbPersonKey): void => {
     if ((person as string) === "__clear__") {
@@ -1091,16 +1292,23 @@ export default function NewItem({
       return;
     }
     setSelectedExerciseKeys([]);
-  }, [showExerciseModal, item.id, item.item_type, isVerbExerciseGrid, itemDeterministicKey, compareWords]);
+  }, [
+    showExerciseModal,
+    item.id,
+    item.item_type,
+    isVerbExerciseGrid,
+    itemDeterministicKey,
+    compareWords,
+  ]);
 
   useEffect(() => {
     if (!showExerciseModal) {
-      setSelectedStrategy(DEFAULT_STRATEGY);
+      setSelectedStrategy(firstStrategyForItemType(item.item_type));
       setSuppressInitialStrategyAutogeneration(false);
       return;
     }
-    if (item.item_type !== "word" && selectedStrategy === PERSONALIZE_STRATEGY) {
-      setSelectedStrategy(DEFAULT_STRATEGY);
+    if (item.item_type !== "word" && selectedStrategy === CREATE_STRATEGY) {
+      setSelectedStrategy(firstStrategyForItemType(item.item_type));
     }
   }, [showExerciseModal, item.item_type, selectedStrategy]);
 
@@ -1111,15 +1319,24 @@ export default function NewItem({
     if (selectedStrategy !== initialModalStrategy) {
       setSuppressInitialStrategyAutogeneration(false);
     }
-  }, [showExerciseModal, suppressInitialStrategyAutogeneration, selectedStrategy, initialModalStrategy]);
+  }, [
+    showExerciseModal,
+    suppressInitialStrategyAutogeneration,
+    selectedStrategy,
+    initialModalStrategy,
+  ]);
 
-  const toggleExerciseEntry = (entry: { label?: string; source: string; target: string }): void => {
+  const toggleExerciseEntry = (entry: {
+    label?: string;
+    source: string;
+    target: string;
+  }): void => {
     const key = exerciseEntryKey(entry);
-    setSelectedExerciseKeys((current) => (
+    setSelectedExerciseKeys((current) =>
       current.includes(key)
         ? current.filter((selectedKey) => selectedKey !== key)
-        : [...current, key]
-    ));
+        : [...current, key],
+    );
   };
 
   const selectAllExerciseEntries = (): void => {
@@ -1145,7 +1362,9 @@ export default function NewItem({
     setSelectedExerciseKeys([]);
   };
 
-  const compareWordNeedsExerciseGeneration = (word: NonNullable<SessionItem["compare_words"]>[number]): boolean => {
+  const compareWordNeedsExerciseGeneration = (
+    word: NonNullable<SessionItem["compare_words"]>[number],
+  ): boolean => {
     return compareWordExerciseEntries(word, word.exercise_phrases).length <= 1;
   };
 
@@ -1157,20 +1376,31 @@ export default function NewItem({
     setLoadingExercises(true);
     setExerciseError("");
     try {
-      const shouldGenerateCurrentWordExercises = item.id > 0
-        && (
-          generatedWordExerciseEntries.length === 0
-          || (isVerbWord && (!hasVerbExerciseGridEntries || !hasCurrentVerbExerciseGeneration))
-        );
-      const missingCompareWords = nextCompareWords.filter((word) => word.id > 0 && compareWordNeedsExerciseGeneration(word));
+      const shouldGenerateCurrentWordExercises =
+        item.id > 0 &&
+        (generatedWordExerciseEntries.length === 0 ||
+          (isVerbWord &&
+            (!hasVerbExerciseGridEntries ||
+              !hasCurrentVerbExerciseGeneration)));
+      const missingCompareWords = nextCompareWords.filter(
+        (word) => word.id > 0 && compareWordNeedsExerciseGeneration(word),
+      );
       if (shouldGenerateCurrentWordExercises) {
-        const payload = await generateContentItemExercises(item.id, sourceLanguage, targetLanguage);
+        const payload = await generateContentItemExercises(
+          item.id,
+          sourceLanguage,
+          targetLanguage,
+        );
         setExercisePhrases(payload.exercise_phrases || {});
       }
       if (missingCompareWords.length > 0) {
         const generatedCompareWords = await Promise.all(
           missingCompareWords.map(async (word) => {
-            const payload = await generateContentItemExercises(word.id, sourceLanguage, targetLanguage);
+            const payload = await generateContentItemExercises(
+              word.id,
+              sourceLanguage,
+              targetLanguage,
+            );
             return {
               id: word.id,
               exercise_phrases: payload.exercise_phrases || {},
@@ -1180,11 +1410,16 @@ export default function NewItem({
         const generatedCompareWordMap = new Map(
           generatedCompareWords.map((word) => [word.id, word.exercise_phrases]),
         );
-        setCompareWords((current) => current.map((word) => (
-          generatedCompareWordMap.has(word.id)
-            ? { ...word, exercise_phrases: generatedCompareWordMap.get(word.id) || {} }
-            : word
-        )));
+        setCompareWords((current) =>
+          current.map((word) =>
+            generatedCompareWordMap.has(word.id)
+              ? {
+                  ...word,
+                  exercise_phrases: generatedCompareWordMap.get(word.id) || {},
+                }
+              : word,
+          ),
+        );
       }
     } catch {
       setExerciseError(t("newItem.exercisesGenerationError"));
@@ -1200,24 +1435,30 @@ export default function NewItem({
     setExerciseError("");
     if (item.item_type === "word" && item.id > 0) {
       try {
-        const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
+        const detail = await fetchContentItemDetail(
+          item.id,
+          sourceLanguage,
+          targetLanguage,
+        );
         setCompareWords(detail.compare_words || []);
         setCompareWordsInsights(detail.compare_words_insights || "");
       } catch {
         setExerciseError(t("manage.error.load"));
       }
     }
-    setInitialModalStrategy(selectedStrategy);
+    const firstStrategy = firstStrategyForItemType(item.item_type);
+    setSelectedStrategy(firstStrategy);
+    setInitialModalStrategy(firstStrategy);
     setSuppressInitialStrategyAutogeneration(true);
     setShowExerciseModal(true);
   };
 
   useEffect(() => {
     if (
-      !showExerciseModal
-      || item.item_type !== "word"
-      || selectedStrategy !== DEFAULT_STRATEGY
-      || suppressInitialStrategyAutogeneration
+      !showExerciseModal ||
+      item.item_type !== "word" ||
+      selectedStrategy !== DEFAULT_STRATEGY ||
+      suppressInitialStrategyAutogeneration
     ) {
       return;
     }
@@ -1237,17 +1478,26 @@ export default function NewItem({
     hasCurrentVerbExerciseGeneration,
   ]);
 
-  const generateNounExerciseCase = async (caseKey: "nominative" | "accusative" | "dative" | "genitive"): Promise<void> => {
+  const generateNounExerciseCase = async (
+    caseKey: "nominative" | "accusative" | "dative" | "genitive",
+  ): Promise<void> => {
     if (generatingNounCaseKey || item.id <= 0) {
       return;
     }
     setExerciseError("");
     setGeneratingNounCaseKey(caseKey);
     try {
-      const payload = await generateContentItemNounExerciseCase(item.id, caseKey, sourceLanguage, targetLanguage);
+      const payload = await generateContentItemNounExerciseCase(
+        item.id,
+        caseKey,
+        sourceLanguage,
+        targetLanguage,
+      );
       setExercisePhrases(payload.exercise_phrases || {});
     } catch (error) {
-      setExerciseError(error instanceof Error ? error.message : t("newItem.wordRefreshError"));
+      setExerciseError(
+        error instanceof Error ? error.message : t("newItem.wordRefreshError"),
+      );
     } finally {
       setGeneratingNounCaseKey("");
     }
@@ -1261,11 +1511,21 @@ export default function NewItem({
     setExerciseError("");
     setWordRefreshMessage("");
     try {
-      const payload = await refreshContentItemWord(item.id, sourceLanguage, targetLanguage);
+      const payload = await refreshContentItemWord(
+        item.id,
+        sourceLanguage,
+        targetLanguage,
+      );
       setRelatedDialogs(payload.related_dialogs || []);
-      setWordRefreshMessage(t("newItem.wordRefreshComplete", { count: payload.dialog_occurrences_created || 0 }));
+      setWordRefreshMessage(
+        t("newItem.wordRefreshComplete", {
+          count: payload.dialog_occurrences_created || 0,
+        }),
+      );
     } catch (error) {
-      setExerciseError(error instanceof Error ? error.message : t("newItem.wordRefreshError"));
+      setExerciseError(
+        error instanceof Error ? error.message : t("newItem.wordRefreshError"),
+      );
     } finally {
       setRefreshingWord(false);
     }
@@ -1280,7 +1540,11 @@ export default function NewItem({
     setWordRefreshMessage("");
     try {
       await regenerateContentItem(item.id, sourceLanguage, targetLanguage);
-      const detail = await fetchContentItemDetail(item.id, sourceLanguage, targetLanguage);
+      const detail = await fetchContentItemDetail(
+        item.id,
+        sourceLanguage,
+        targetLanguage,
+      );
       setSourceText(detail.spanish_text || "");
       setTargetText(detail.german_text || "");
       setNotes(detail.notes || "");
@@ -1290,7 +1554,9 @@ export default function NewItem({
       setExercisePhrases(detail.exercise_phrases || {});
       setDialogPhraseAnswer(detail.dialog_phrase_answer || "");
       setDialogPhraseScene(detail.dialog_phrase_scene || "");
-      setDialogPhraseSceneAudioUrls(detail.dialog_phrase_scene_audio_urls || []);
+      setDialogPhraseSceneAudioUrls(
+        detail.dialog_phrase_scene_audio_urls || [],
+      );
       setDialogPhraseOptions(detail.dialog_phrase_options || []);
       setDialogPhraseTurns(detail.dialog_phrase_turns || []);
       setDialogPhraseOddIndex(detail.dialog_phrase_odd_index ?? null);
@@ -1300,20 +1566,32 @@ export default function NewItem({
       setItemQuestions(detail.item_questions || []);
       setSelectedExerciseKeys([]);
     } catch (error) {
-      setExerciseError(error instanceof Error ? error.message : t("newItem.itemRegenerationError"));
+      setExerciseError(
+        error instanceof Error
+          ? error.message
+          : t("newItem.itemRegenerationError"),
+      );
     } finally {
       setRegeneratingAudio(false);
     }
   };
 
   const generateFunnyImageExercise = async (): Promise<void> => {
-    if (generatingFunnyImageExercise || item.item_type !== "word" || item.id <= 0) {
+    if (
+      generatingFunnyImageExercise ||
+      item.item_type !== "word" ||
+      item.id <= 0
+    ) {
       return;
     }
     setExerciseError("");
     setGeneratingFunnyImageExercise(true);
     try {
-      const payload = await generateContentItemFunnyImageExercise(item.id, sourceLanguage, targetLanguage);
+      const payload = await generateContentItemFunnyImageExercise(
+        item.id,
+        sourceLanguage,
+        targetLanguage,
+      );
       setExercisePhrases(payload.exercise_phrases || {});
     } catch {
       setExerciseError(t("newItem.exercisesFunnyImageError"));
@@ -1329,7 +1607,11 @@ export default function NewItem({
     setLoadingExercises(true);
     setExerciseError("");
     try {
-      const payload = await generateContentItemExercises(item.id, sourceLanguage, targetLanguage);
+      const payload = await generateContentItemExercises(
+        item.id,
+        sourceLanguage,
+        targetLanguage,
+      );
       setExercisePhrases(payload.exercise_phrases || {});
       setSelectedExerciseKeys([]);
     } catch {
@@ -1343,7 +1625,10 @@ export default function NewItem({
     if (typeof window === "undefined") {
       return;
     }
-    const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
     if (!AudioContextClass) {
       return;
     }
@@ -1386,19 +1671,29 @@ export default function NewItem({
   };
 
   const pauseBetweenExercisePhrases = async (runId: number): Promise<void> => {
-    await pauseBrowserExercisePhrases(runId, () => (
-      exerciseRunRef.current === runId && exerciseRunningRef.current
-    ));
+    await pauseBrowserExercisePhrases(
+      runId,
+      () => exerciseRunRef.current === runId && exerciseRunningRef.current,
+    );
   };
 
-  const playAudioSourcesOnce = async (sources: string[], runId: number): Promise<void> => {
+  const playAudioSourcesOnce = async (
+    sources: string[],
+    runId: number,
+  ): Promise<void> => {
     for (let index = 0; index < sources.length; index += 1) {
       const source = sources[index];
-      if (!source || exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
+      if (
+        !source ||
+        exerciseRunRef.current !== runId ||
+        !exerciseRunningRef.current
+      ) {
         continue;
       }
       if (exerciseMutedRef.current) {
-        await new Promise<void>((resolve) => window.setTimeout(resolve, BROWSER_EXERCISE_PHRASE_PAUSE_MS));
+        await new Promise<void>((resolve) =>
+          window.setTimeout(resolve, BROWSER_EXERCISE_PHRASE_PAUSE_MS),
+        );
         continue;
       }
       await new Promise<void>((resolve) => {
@@ -1420,14 +1715,22 @@ export default function NewItem({
     if (exerciseRunningRef.current) {
       stopExercise(false);
     }
-    playBrowserExerciseWord(targetText, targetLanguage, preferredBrowserVoiceURI);
+    playBrowserExerciseWord(
+      targetText,
+      targetLanguage,
+      preferredBrowserVoiceURI,
+    );
   };
 
-  const speakLinesOnce = async (lines: string[], runId: number): Promise<void> => {
+  const speakLinesOnce = async (
+    lines: string[],
+    runId: number,
+  ): Promise<void> => {
     await speakBrowserExerciseLinesOnce({
       lines,
       runId,
-      isRunning: () => exerciseRunRef.current === runId && exerciseRunningRef.current,
+      isRunning: () =>
+        exerciseRunRef.current === runId && exerciseRunningRef.current,
       isMuted: () => exerciseMutedRef.current,
       targetLanguage,
       preferredBrowserVoiceURI,
@@ -1453,8 +1756,10 @@ export default function NewItem({
       });
     }, 1000);
 
-    const phraseExerciseAudioSources = item.item_type === "phrase" && audioUrl ? [audioUrl] : [];
-    const linesToPlay = overrideLines && overrideLines.length > 0 ? overrideLines : exerciseLines;
+    const phraseExerciseAudioSources =
+      item.item_type === "phrase" && audioUrl ? [audioUrl] : [];
+    const linesToPlay =
+      overrideLines && overrideLines.length > 0 ? overrideLines : exerciseLines;
     const usesBrowserSpeechLoop = phraseExerciseAudioSources.length === 0;
     const playOnce = phraseExerciseAudioSources.length
       ? () => playAudioSourcesOnce(phraseExerciseAudioSources, runId)
@@ -1482,7 +1787,9 @@ export default function NewItem({
     if (!funnyImageExerciseSelectionEntry) {
       return;
     }
-    setSelectedExerciseKeys([exerciseEntryKey(funnyImageExerciseSelectionEntry)]);
+    setSelectedExerciseKeys([
+      exerciseEntryKey(funnyImageExerciseSelectionEntry),
+    ]);
     startExercise([funnyImageExerciseSelectionEntry.target]);
   };
 
@@ -1559,12 +1866,19 @@ export default function NewItem({
   return (
     <div className="item-view-shell">
       {readOnly && onClose && (
-        <button type="button" className="modal-corner-close" aria-label={t("words.close")} onClick={onClose}>
+        <button
+          type="button"
+          className="modal-corner-close"
+          aria-label={t("words.close")}
+          onClick={onClose}
+        >
           ×
         </button>
       )}
       <section className="item-view-header-card">
-        <p className="item-view-kicker">{item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}</p>
+        <p className="item-view-kicker">
+          {item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}
+        </p>
         <div className="item-view-title-row">
           <div className="item-view-title-block">
             <h2 className="item-view-title">{targetText || sourceText}</h2>
@@ -1574,13 +1888,19 @@ export default function NewItem({
         <div className="item-view-meta-grid">
           {item.item_type === "word" && (
             <div className="item-view-meta-card">
-              <span className="item-view-meta-label">{t("newItem.wordTypeLabel")}</span>
-              <strong className="item-view-meta-value">{wordType || t("newItem.wordAddTypeUnknown")}</strong>
+              <span className="item-view-meta-label">
+                {t("newItem.wordTypeLabel")}
+              </span>
+              <strong className="item-view-meta-value">
+                {wordType || t("newItem.wordAddTypeUnknown")}
+              </strong>
             </div>
           )}
           <div className="item-view-meta-card">
             <span className="item-view-meta-label">{t("newItem.notes")}</span>
-            <strong className="item-view-meta-value item-view-meta-value-notes">{item.notes || "-"}</strong>
+            <strong className="item-view-meta-value item-view-meta-value-notes">
+              {item.notes || "-"}
+            </strong>
           </div>
         </div>
       </section>
@@ -1599,7 +1919,9 @@ export default function NewItem({
           refreshingWord={refreshingWord}
           showMobileActionLabels={showMobileActionLabels}
           hasQuestions={itemQuestions.length > 0}
-          hasCompareWordsContent={compareWords.length > 0 || Boolean(compareWordsInsights.trim())}
+          hasCompareWordsContent={
+            compareWords.length > 0 || Boolean(compareWordsInsights.trim())
+          }
           onOpenExercises={() => {
             void openExerciseModal();
           }}
@@ -1626,215 +1948,352 @@ export default function NewItem({
         </div>
       )}
       {wordRefreshMessage && <p className="hint">{wordRefreshMessage}</p>}
-      {exerciseError && !showExerciseModal && <p className="error">{exerciseError}</p>}
+      {exerciseError && !showExerciseModal && (
+        <p className="error">{exerciseError}</p>
+      )}
       {!readOnly && (
         <div className="actions">
-          <button type="button" className="item-got-it-button" onClick={markAsSeen} disabled={saving}>
-            {saving ? t("newItem.saving") : (continueLabel || t("newItem.gotIt"))}
+          <button
+            type="button"
+            className="item-got-it-button"
+            onClick={markAsSeen}
+            disabled={saving}
+          >
+            {saving ? t("newItem.saving") : continueLabel || t("newItem.gotIt")}
           </button>
         </div>
       )}
-      {showDialogsModal && (item.item_type === "word" || item.item_type === "phrase") && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal related-dialogs-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={() => setShowDialogsModal(false)}>
-              ×
-            </button>
-            <p>
-              <strong>{t("newItem.relatedDialogs", { count: relatedDialogs.length })}</strong>
-            </p>
-            {!relatedDialogs.length && <p>{t("newItem.noRelatedDialogs")}</p>}
-            {!!relatedDialogs.length && (
-              <div className="related-dialogs-scroll">
-                {(showAllDialogs ? relatedDialogs : relatedDialogs.slice(0, 2)).map((dialog) => {
-                const showDialogTargetText = targetPromptMode === "text" || Boolean(showDialogTargetTextById[dialog.dialog_id]);
-                const hideDialogTargetText = targetPromptMode === "audio" && !showDialogTargetText;
-                const matchedTurnIndexes = new Set(dialog.matched_turns.map((turn) => turn.turn_index));
-                return (
-                  <div
-                    key={dialog.dialog_id}
-                    ref={(element) => registerRelatedDialogCardRef(dialog.dialog_id, element)}
-                    className="related-dialog-card"
-                  >
-                    <p>
-                      <strong>{dialog.topic}</strong>
-                    </p>
-                    <p>
-                      <strong>{t("newItem.dialogContext")}:</strong> {dialog.context || t("newItem.dialogNoContext")}
-                    </p>
-                    {!!dialog.turns.length && (
-                      <>
-                        <p><strong>{t("newItem.dialogTurns")}:</strong></p>
-                        <div className="dialog-list-controls related-dialog-sticky-controls">
-                          <div className="item-action-group" aria-label={t("newItem.actionGroupExplore")}>
-                            <button
-                              type="button"
-                              className="secondary-button exercise-action-icon-button dialog-list-action-button"
-                              onClick={() => {
-                                if (playingRelatedDialogId === dialog.dialog_id) {
-                                  stopRelatedDialogPlayback();
-                                  return;
-                                }
-                                void playRelatedDialog(dialog);
-                              }}
-                              disabled={Boolean(loadingRelatedDialogAudioKey)}
-                              aria-label={playingRelatedDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
-                              title={playingRelatedDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog")}
-                              onPointerEnter={(event) => showItemActionTooltip(event, playingRelatedDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog"))}
-                              onPointerLeave={hideItemActionTooltip}
-                              onFocus={(event) => showItemActionTooltip(event, playingRelatedDialogId === dialog.dialog_id ? t("dialogs.stopDialog") : t("dialogs.playDialog"))}
-                              onBlur={hideItemActionTooltip}
-                            >
-                              <DialogActionIcon name={playingRelatedDialogId === dialog.dialog_id ? "stop" : "play"} />
-                            </button>
-                            {targetPromptMode === "audio" && (
-                              <button
-                                type="button"
-                                className="secondary-button exercise-action-icon-button dialog-list-action-button"
-                                onClick={() => setShowDialogTargetTextById((current) => ({
-                                  ...current,
-                                  [dialog.dialog_id]: !current[dialog.dialog_id],
-                                }))}
-                                aria-label={showDialogTargetText ? t("prompt.hideText") : t("prompt.showText")}
-                                title={showDialogTargetText ? t("prompt.hideText") : t("prompt.showText")}
-                                aria-pressed={showDialogTargetText}
-                                onPointerEnter={(event) => showItemActionTooltip(event, showDialogTargetText ? t("prompt.hideText") : t("prompt.showText"))}
-                                onPointerLeave={hideItemActionTooltip}
-                                onFocus={(event) => showItemActionTooltip(event, showDialogTargetText ? t("prompt.hideText") : t("prompt.showText"))}
-                                onBlur={hideItemActionTooltip}
-                              >
-                                <DialogActionIcon name="text" />
-                              </button>
-                            )}
-                            <DialogTurnAudioModeButton
-                              mode={relatedDialogTurnAudioMode}
-                              onToggle={() => setRelatedDialogTurnAudioMode((current) => current === "natural" ? "clear" : "natural")}
-                            />
-                            <button
-                              type="button"
-                              className="secondary-button exercise-action-icon-button dialog-list-action-button"
-                              onClick={() => scrollToNextRelatedDialog(
-                                (showAllDialogs ? relatedDialogs : relatedDialogs.slice(0, 2)).map((entry) => entry.dialog_id),
-                                dialog.dialog_id,
-                              )}
-                              aria-label={t("newItem.nextDialog")}
-                              title={t("newItem.nextDialog")}
-                              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.nextDialog"))}
-                              onPointerLeave={hideItemActionTooltip}
-                              onFocus={(event) => showItemActionTooltip(event, t("newItem.nextDialog"))}
-                              onBlur={hideItemActionTooltip}
-                            >
-                              <DialogActionIcon name="next" />
-                            </button>
-                          </div>
-                          <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
-                            <DangerousButton
-                              type="button"
-                              className="secondary-button exercise-action-icon-button dialog-list-action-button"
-                              onConfirm={() => regenerateRelatedDialogAudio(dialog.dialog_id)}
-                              disabled={regeneratingRelatedDialogId === dialog.dialog_id}
-                              aria-label={regeneratingRelatedDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
-                              title={regeneratingRelatedDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio")}
-                              onPointerEnter={(event) => showItemActionTooltip(event, regeneratingRelatedDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio"))}
-                              onPointerLeave={hideItemActionTooltip}
-                              onFocus={(event) => showItemActionTooltip(event, regeneratingRelatedDialogId === dialog.dialog_id ? t("dialogs.loading") : t("manage.regenerateAudio"))}
-                              onBlur={hideItemActionTooltip}
-                            >
-                              <DialogActionIcon name="refresh" />
-                            </DangerousButton>
-                          </div>
-                        </div>
-                        <DialogTurnsList
-                          dialogId={dialog.dialog_id}
-                          turns={dialog.turns}
-                          sourceLanguage={sourceLanguage}
-                          targetLanguage={targetLanguage}
-                          hideTargetText={hideDialogTargetText}
-                          tokenStatus={wordActionStatus}
-                          statusKeyPrefixBase="related"
-                          onOpenItem={openLinkedDialogItem}
-                          onTokenClick={(statusKey, token, turnIndex, sourceText, targetTextLine) => void requestAddWordFromDialogToken(
-                            statusKey,
-                            token,
-                            token,
+      {showDialogsModal &&
+        (item.item_type === "word" || item.item_type === "phrase") && (
+          <div
+            className="blocking-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="blocking-modal related-dialogs-modal">
+              <button
+                type="button"
+                className="modal-corner-close"
+                aria-label={t("newItem.closeRelatedDialogs")}
+                onClick={() => setShowDialogsModal(false)}
+              >
+                ×
+              </button>
+              <p>
+                <strong>
+                  {t("newItem.relatedDialogs", {
+                    count: relatedDialogs.length,
+                  })}
+                </strong>
+              </p>
+              {!relatedDialogs.length && <p>{t("newItem.noRelatedDialogs")}</p>}
+              {!!relatedDialogs.length && (
+                <div className="related-dialogs-scroll">
+                  {(showAllDialogs
+                    ? relatedDialogs
+                    : relatedDialogs.slice(0, 2)
+                  ).map((dialog) => {
+                    const showDialogTargetText =
+                      targetPromptMode === "text" ||
+                      Boolean(showDialogTargetTextById[dialog.dialog_id]);
+                    const hideDialogTargetText =
+                      targetPromptMode === "audio" && !showDialogTargetText;
+                    const matchedTurnIndexes = new Set(
+                      dialog.matched_turns.map((turn) => turn.turn_index),
+                    );
+                    return (
+                      <div
+                        key={dialog.dialog_id}
+                        ref={(element) =>
+                          registerRelatedDialogCardRef(
                             dialog.dialog_id,
-                            turnIndex,
-                            sourceText,
-                            targetTextLine,
-                          )}
-                          highlightedTurnIndex={playingRelatedDialogTurn?.dialogId === dialog.dialog_id ? playingRelatedDialogTurn.turnIndex : null}
-                          highlightedTurnIndexes={matchedTurnIndexes}
-                          renderLeadingAction={(turn, turnIndex) => (
-                            <button
-                              type="button"
-                              className="secondary-button exercise-action-icon-button dialog-inline-action-button"
-                              disabled={playingRelatedDialogId !== null || loadingRelatedDialogAudioKey === `${relatedDialogTurnAudioMode}:${dialog.dialog_id}:${turnIndex}`}
-                              onClick={() => void playRelatedDialogTurn(
-                                dialog.dialog_id,
-                                turnIndex,
-                                relatedDialogTurnAudioMode === "clear" ? turn.clear_audio_url || "" : turn.phrase_audio_url || "",
-                                relatedDialogTurnAudioMode,
-                              )}
-                              aria-label={t("newItem.playTurnAudio")}
-                              title={t("newItem.playTurnAudio")}
-                              onPointerEnter={(event) => showItemActionTooltip(event, t("newItem.playTurnAudio"))}
-                              onPointerLeave={hideItemActionTooltip}
-                              onFocus={(event) => showItemActionTooltip(event, t("newItem.playTurnAudio"))}
-                              onBlur={hideItemActionTooltip}
-                            >
-                              <DialogActionIcon name="play" />
-                            </button>
-                          )}
-                          renderTurnActions={(turn, index) => {
-                            const phraseKey = wholeTurnPhraseKey(dialog.dialog_id, index);
-                            return (
-                              <>
+                            element,
+                          )
+                        }
+                        className="related-dialog-card"
+                      >
+                        <p>
+                          <strong>{dialog.topic}</strong>
+                        </p>
+                        <p>
+                          <strong>{t("newItem.dialogContext")}:</strong>{" "}
+                          {dialog.context || t("newItem.dialogNoContext")}
+                        </p>
+                        {!!dialog.turns.length && (
+                          <>
+                            <p>
+                              <strong>{t("newItem.dialogTurns")}:</strong>
+                            </p>
+                            <div className="dialog-list-controls related-dialog-sticky-controls">
+                              <div
+                                className="item-action-group"
+                                aria-label={t("newItem.actionGroupExplore")}
+                              >
                                 <button
                                   type="button"
-                                  className="secondary-button"
-                                  onClick={() => void addWholeTurnPhraseFromRelatedDialog(dialog.dialog_id, turn, index)}
-                                  disabled={phraseActionStatus[phraseKey] === "saving"}
+                                  className="secondary-button exercise-action-icon-button dialog-list-action-button"
+                                  onClick={() => {
+                                    if (
+                                      playingRelatedDialogId ===
+                                      dialog.dialog_id
+                                    ) {
+                                      stopRelatedDialogPlayback();
+                                      return;
+                                    }
+                                    void playRelatedDialog(dialog);
+                                  }}
+                                  disabled={Boolean(
+                                    loadingRelatedDialogAudioKey,
+                                  )}
+                                  aria-label={
+                                    playingRelatedDialogId === dialog.dialog_id
+                                      ? t("dialogs.stopDialog")
+                                      : t("dialogs.playDialog")
+                                  }
+                                  title={
+                                    playingRelatedDialogId === dialog.dialog_id
+                                      ? t("dialogs.stopDialog")
+                                      : t("dialogs.playDialog")
+                                  }
+                                  onPointerEnter={(event) =>
+                                    showItemActionTooltip(
+                                      event,
+                                      playingRelatedDialogId ===
+                                        dialog.dialog_id
+                                        ? t("dialogs.stopDialog")
+                                        : t("dialogs.playDialog"),
+                                    )
+                                  }
+                                  onPointerLeave={hideItemActionTooltip}
+                                  onFocus={(event) =>
+                                    showItemActionTooltip(
+                                      event,
+                                      playingRelatedDialogId ===
+                                        dialog.dialog_id
+                                        ? t("dialogs.stopDialog")
+                                        : t("dialogs.playDialog"),
+                                    )
+                                  }
+                                  onBlur={hideItemActionTooltip}
                                 >
-                                  {phraseActionStatus[phraseKey] === "saving"
-                                    ? t("newItem.sentenceAddSaving")
-                                    : t("content.preview.savePhrase")}
+                                  <DialogActionIcon
+                                    name={
+                                      playingRelatedDialogId ===
+                                      dialog.dialog_id
+                                        ? "stop"
+                                        : "play"
+                                    }
+                                  />
                                 </button>
-                                {phraseActionStatus[phraseKey] === "added" && (
-                                  <span className="turn-token-status">{t("newItem.sentenceAddAdded")}</span>
+                                {targetPromptMode === "audio" && (
+                                  <button
+                                    type="button"
+                                    className="secondary-button exercise-action-icon-button dialog-list-action-button"
+                                    onClick={() =>
+                                      setShowDialogTargetTextById(
+                                        (current) => ({
+                                          ...current,
+                                          [dialog.dialog_id]:
+                                            !current[dialog.dialog_id],
+                                        }),
+                                      )
+                                    }
+                                    aria-label={
+                                      showDialogTargetText
+                                        ? t("prompt.hideText")
+                                        : t("prompt.showText")
+                                    }
+                                    title={
+                                      showDialogTargetText
+                                        ? t("prompt.hideText")
+                                        : t("prompt.showText")
+                                    }
+                                    aria-pressed={showDialogTargetText}
+                                    onPointerEnter={(event) =>
+                                      showItemActionTooltip(
+                                        event,
+                                        showDialogTargetText
+                                          ? t("prompt.hideText")
+                                          : t("prompt.showText"),
+                                      )
+                                    }
+                                    onPointerLeave={hideItemActionTooltip}
+                                    onFocus={(event) =>
+                                      showItemActionTooltip(
+                                        event,
+                                        showDialogTargetText
+                                          ? t("prompt.hideText")
+                                          : t("prompt.showText"),
+                                      )
+                                    }
+                                    onBlur={hideItemActionTooltip}
+                                  >
+                                    <DialogActionIcon name="text" />
+                                  </button>
                                 )}
-                                {phraseActionStatus[phraseKey] === "exists" && (
-                                  <span className="turn-token-status">{t("newItem.sentenceAddExists")}</span>
-                                )}
-                                {phraseActionStatus[phraseKey] === "error" && (
-                                  <span className="turn-token-status">
-                                    {phraseActionError[phraseKey] || t("newItem.sentenceAddError")}
-                                  </span>
-                                )}
-                              </>
-                            );
-                          }}
-                        />
-                      </>
-                    )}
-                  </div>
-                );
-                })}
-              </div>
-            )}
-            <div className="actions">
-              {!!relatedDialogs.length && relatedDialogs.length > 2 && (
-                <button type="button" onClick={() => setShowAllDialogs((value) => !value)}>
-                  {showAllDialogs ? t("newItem.hideMoreDialogs") : t("newItem.showMoreDialogs")}
-                </button>
+                                <DialogTurnAudioModeButton
+                                  mode={relatedDialogTurnAudioMode}
+                                  onToggle={() =>
+                                    setRelatedDialogTurnAudioMode((current) =>
+                                      current === "natural"
+                                        ? "clear"
+                                        : "natural",
+                                    )
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  className="secondary-button exercise-action-icon-button dialog-list-action-button"
+                                  onClick={() =>
+                                    scrollToNextRelatedDialog(
+                                      (showAllDialogs
+                                        ? relatedDialogs
+                                        : relatedDialogs.slice(0, 2)
+                                      ).map((entry) => entry.dialog_id),
+                                      dialog.dialog_id,
+                                    )
+                                  }
+                                  aria-label={t("newItem.nextDialog")}
+                                  title={t("newItem.nextDialog")}
+                                  onPointerEnter={(event) =>
+                                    showItemActionTooltip(
+                                      event,
+                                      t("newItem.nextDialog"),
+                                    )
+                                  }
+                                  onPointerLeave={hideItemActionTooltip}
+                                  onFocus={(event) =>
+                                    showItemActionTooltip(
+                                      event,
+                                      t("newItem.nextDialog"),
+                                    )
+                                  }
+                                  onBlur={hideItemActionTooltip}
+                                >
+                                  <DialogActionIcon name="next" />
+                                </button>
+                              </div>
+                              <div
+                                className="item-action-group item-action-group-danger"
+                                aria-label={t("newItem.actionGroupDanger")}
+                              >
+                                <DangerousButton
+                                  type="button"
+                                  className="secondary-button exercise-action-icon-button dialog-list-action-button"
+                                  onConfirm={() =>
+                                    regenerateRelatedDialogAudio(
+                                      dialog.dialog_id,
+                                    )
+                                  }
+                                  disabled={
+                                    regeneratingRelatedDialogId ===
+                                    dialog.dialog_id
+                                  }
+                                  aria-label={
+                                    regeneratingRelatedDialogId ===
+                                    dialog.dialog_id
+                                      ? t("dialogs.loading")
+                                      : t("manage.regenerateAudio")
+                                  }
+                                  title={
+                                    regeneratingRelatedDialogId ===
+                                    dialog.dialog_id
+                                      ? t("dialogs.loading")
+                                      : t("manage.regenerateAudio")
+                                  }
+                                  onPointerEnter={(event) =>
+                                    showItemActionTooltip(
+                                      event,
+                                      regeneratingRelatedDialogId ===
+                                        dialog.dialog_id
+                                        ? t("dialogs.loading")
+                                        : t("manage.regenerateAudio"),
+                                    )
+                                  }
+                                  onPointerLeave={hideItemActionTooltip}
+                                  onFocus={(event) =>
+                                    showItemActionTooltip(
+                                      event,
+                                      regeneratingRelatedDialogId ===
+                                        dialog.dialog_id
+                                        ? t("dialogs.loading")
+                                        : t("manage.regenerateAudio"),
+                                    )
+                                  }
+                                  onBlur={hideItemActionTooltip}
+                                >
+                                  <DialogActionIcon name="refresh" />
+                                </DangerousButton>
+                              </div>
+                            </div>
+                            <RelatedDialogTurns
+                              dialog={dialog}
+                              sourceLanguage={sourceLanguage}
+                              targetLanguage={targetLanguage}
+                              hideTargetText={hideDialogTargetText}
+                              turnAudioMode={relatedDialogTurnAudioMode}
+                              playingDialogId={playingRelatedDialogId}
+                              playingTurn={playingRelatedDialogTurn}
+                              loadingTurnAudioKey={loadingRelatedDialogAudioKey}
+                              matchedTurnIndexes={matchedTurnIndexes}
+                              wordActionStatus={wordActionStatus}
+                              phraseActionStatus={phraseActionStatus}
+                              phraseActionError={phraseActionError}
+                              onOpenItem={openLinkedDialogItem}
+                              onTokenClick={(
+                                statusKey,
+                                token,
+                                turnIndex,
+                                sourceText,
+                                targetTextLine,
+                              ) =>
+                                void requestAddWordFromDialogToken(
+                                  statusKey,
+                                  token,
+                                  token,
+                                  dialog.dialog_id,
+                                  turnIndex,
+                                  sourceText,
+                                  targetTextLine,
+                                )
+                              }
+                              onPlayTurn={playRelatedDialogTurn}
+                              onSaveWholeTurn={addWholeTurnPhraseFromRelatedDialog}
+                              wholeTurnPhraseKey={wholeTurnPhraseKey}
+                              onShowTooltip={showItemActionTooltip}
+                              onHideTooltip={hideItemActionTooltip}
+                            />
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
+              <div className="actions">
+                {!!relatedDialogs.length && relatedDialogs.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllDialogs((value) => !value)}
+                  >
+                    {showAllDialogs
+                      ? t("newItem.hideMoreDialogs")
+                      : t("newItem.showMoreDialogs")}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       {showWordIntroPracticeModal && item.item_type === "word" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closeWordIntroPracticeModal}>
+            <button
+              type="button"
+              className="modal-corner-close"
+              aria-label={t("newItem.closeRelatedDialogs")}
+              onClick={closeWordIntroPracticeModal}
+            >
               ×
             </button>
             <p>
@@ -1848,62 +2307,67 @@ export default function NewItem({
           </div>
         </div>
       )}
-      {showTestingModal && (item.item_type === "word" || item.item_type === "phrase") && (
-        <ItemTestingModal
-          itemType={item.item_type}
-          selectedActionKey={selectedTestingAction}
-          onSelectedActionKeyChange={(value) => {
-            setSelectedTestingAction(value);
-            setDirectTestReviewComplete(false);
-            setDirectTestCorrect(null);
-            setDirectTestResetVersion((current) => current + 1);
-          }}
-          onClose={closeTestingModal}
-          testingContent={(
-            selectedTestingAction === "warmup" && item.item_type === "word" ? (
-              <WordReview
-                key={`testing-word-intro-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                item={wordIntroPracticeItem}
-                onAnswered={async () => closeTestingModal()}
-              />
-            ) : selectedTestingAction === "letters" && item.item_type === "word" ? (
-              <WordReview
-                key={`testing-word-letter-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                item={wordLetterPracticeItem}
-                onAnswered={async () => closeTestingModal()}
-              />
-            ) : selectedTestingAction === "parts" && item.item_type === "word" ? (
-              <WordPartsReview
-                key={`testing-word-parts-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                item={wordPartsPracticeItem}
-                onAnswered={async () => closeTestingModal()}
-              />
-            ) : selectedTestingAction === "builder" && item.item_type === "phrase" ? (
-              <PhraseReview
-                key={`testing-phrase-builder-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                item={phraseBuilderItem}
-                onAnswered={async () => closeTestingModal()}
-              />
-            ) : item.item_type === "word" ? (
-              <WordReview
-                key={`testing-direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${directTestResetVersion}`}
-                item={directTestItem}
-                onAnswered={registerDirectTestAnswer}
-                reviewComplete={directTestReviewComplete}
-                onNextItem={async () => closeTestingModal()}
-              />
-            ) : (
-              <PhraseReview
-                key={`testing-direct-phrase-test-${item.id}-${sourceText}-${targetText}-${directTestResetVersion}`}
-                item={directTestItem}
-                onAnswered={registerDirectTestAnswer}
-                reviewComplete={directTestReviewComplete}
-                onNextItem={async () => closeTestingModal()}
-              />
-            )
-          )}
-        />
-      )}
+      {showTestingModal &&
+        (item.item_type === "word" || item.item_type === "phrase") && (
+          <ItemTestingModal
+            itemType={item.item_type}
+            selectedActionKey={selectedTestingAction}
+            onSelectedActionKeyChange={(value) => {
+              setSelectedTestingAction(value);
+              setDirectTestReviewComplete(false);
+              setDirectTestCorrect(null);
+              setDirectTestResetVersion((current) => current + 1);
+            }}
+            onClose={closeTestingModal}
+            testingContent={
+              selectedTestingAction === "warmup" &&
+              item.item_type === "word" ? (
+                <WordReview
+                  key={`testing-word-intro-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
+                  item={wordIntroPracticeItem}
+                  onAnswered={async () => closeTestingModal()}
+                />
+              ) : selectedTestingAction === "letters" &&
+                item.item_type === "word" ? (
+                <WordReview
+                  key={`testing-word-letter-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
+                  item={wordLetterPracticeItem}
+                  onAnswered={async () => closeTestingModal()}
+                />
+              ) : selectedTestingAction === "parts" &&
+                item.item_type === "word" ? (
+                <WordPartsReview
+                  key={`testing-word-parts-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
+                  item={wordPartsPracticeItem}
+                  onAnswered={async () => closeTestingModal()}
+                />
+              ) : selectedTestingAction === "builder" &&
+                item.item_type === "phrase" ? (
+                <PhraseReview
+                  key={`testing-phrase-builder-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
+                  item={phraseBuilderItem}
+                  onAnswered={async () => closeTestingModal()}
+                />
+              ) : item.item_type === "word" ? (
+                <WordReview
+                  key={`testing-direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${directTestResetVersion}`}
+                  item={directTestItem}
+                  onAnswered={registerDirectTestAnswer}
+                  reviewComplete={directTestReviewComplete}
+                  onNextItem={async () => closeTestingModal()}
+                />
+              ) : (
+                <PhraseReview
+                  key={`testing-direct-phrase-test-${item.id}-${sourceText}-${targetText}-${directTestResetVersion}`}
+                  item={directTestItem}
+                  onAnswered={registerDirectTestAnswer}
+                  reviewComplete={directTestReviewComplete}
+                  onNextItem={async () => closeTestingModal()}
+                />
+              )
+            }
+          />
+        )}
       {showCompareWordsModal && item.item_type === "word" && (
         <CompareWordsModal
           open={showCompareWordsModal}
@@ -1918,39 +2382,54 @@ export default function NewItem({
           onOpenItem={openLinkedDialogItem}
         />
       )}
-      {showDirectTestModal && (item.item_type === "word" || item.item_type === "phrase") && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closeDirectTestModal}>
-              ×
-            </button>
-            <p>
-              <strong>{t("newItem.openItemTest")}</strong>
-            </p>
-            {item.item_type === "word" ? (
-              <WordReview
-                key={`direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${directTestResetVersion}`}
-                item={directTestItem}
-                onAnswered={registerDirectTestAnswer}
-                reviewComplete={directTestReviewComplete}
-                onNextItem={async () => closeDirectTestModal()}
-              />
-            ) : (
-              <PhraseReview
-                key={`direct-phrase-test-${item.id}-${sourceText}-${targetText}-${directTestResetVersion}`}
-                item={directTestItem}
-                onAnswered={registerDirectTestAnswer}
-                reviewComplete={directTestReviewComplete}
-                onNextItem={async () => closeDirectTestModal()}
-              />
-            )}
+      {showDirectTestModal &&
+        (item.item_type === "word" || item.item_type === "phrase") && (
+          <div
+            className="blocking-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
+              <button
+                type="button"
+                className="modal-corner-close"
+                aria-label={t("newItem.closeRelatedDialogs")}
+                onClick={closeDirectTestModal}
+              >
+                ×
+              </button>
+              <p>
+                <strong>{t("newItem.openItemTest")}</strong>
+              </p>
+              {item.item_type === "word" ? (
+                <WordReview
+                  key={`direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${directTestResetVersion}`}
+                  item={directTestItem}
+                  onAnswered={registerDirectTestAnswer}
+                  reviewComplete={directTestReviewComplete}
+                  onNextItem={async () => closeDirectTestModal()}
+                />
+              ) : (
+                <PhraseReview
+                  key={`direct-phrase-test-${item.id}-${sourceText}-${targetText}-${directTestResetVersion}`}
+                  item={directTestItem}
+                  onAnswered={registerDirectTestAnswer}
+                  reviewComplete={directTestReviewComplete}
+                  onNextItem={async () => closeDirectTestModal()}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       {showWordLetterPracticeModal && item.item_type === "word" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closeWordLetterPracticeModal}>
+            <button
+              type="button"
+              className="modal-corner-close"
+              aria-label={t("newItem.closeRelatedDialogs")}
+              onClick={closeWordLetterPracticeModal}
+            >
               ×
             </button>
             <p>
@@ -1967,7 +2446,12 @@ export default function NewItem({
       {showPhraseBuilderModal && item.item_type === "phrase" && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal related-dialogs-modal phrase-builder-modal">
-            <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={closePhraseBuilderModal}>
+            <button
+              type="button"
+              className="modal-corner-close"
+              aria-label={t("newItem.closeRelatedDialogs")}
+              onClick={closePhraseBuilderModal}
+            >
               ×
             </button>
             <p>
@@ -1981,206 +2465,242 @@ export default function NewItem({
           </div>
         </div>
       )}
-      {showExerciseModal && (item.item_type === "word" || item.item_type === "phrase") && (
-        <ItemStrategiesModal
-          itemType={item.item_type}
-          sourceText={sourceText}
-          targetText={targetText}
-          pluralText={pluralGerman}
-          selectedStrategy={selectedStrategy}
-          onSelectedStrategyChange={setSelectedStrategy}
-          onClose={closeExerciseModal}
-          exerciseSecondsLeft={exerciseSecondsLeft}
-          exerciseRunning={exerciseRunning}
-          exerciseMuted={exerciseMuted}
-          canStart={exerciseLines.length > 0}
-          onStart={startExercise}
-          onStop={stopExercise}
-          onToggleMute={() => setExerciseMuted((value) => !value)}
-          formsContent={(
-            <FormsStrategyPanel
-              itemType={item.item_type}
-              targetText={targetText}
-              sourceText={sourceText}
-              sourceLanguageLabel={sourceLanguageLabel}
-              loadingExercises={loadingExercises}
-              exerciseError={exerciseError}
-              exerciseRunning={exerciseRunning}
-              generatingFunnyImageExercise={generatingFunnyImageExercise}
-              wordExerciseEntries={wordExerciseEntries}
-              selectedExerciseKeys={selectedExerciseKeys}
-              funnyImageExerciseSelectionEntry={funnyImageExerciseSelectionEntry}
-              funnyImageExerciseImageUrl={funnyImageExerciseEntry?.image_url}
-              isVerbExerciseGrid={isVerbExerciseGrid}
-              isNounSectionedExercise={isNounSectionedExercise}
-              pluralGerman={pluralGerman}
-              notes={notes}
-              wordOnlyExerciseEntry={wordOnlyExerciseEntry}
-              verbExerciseGridEntries={verbExerciseGridEntries}
-              nounExerciseSections={nounExerciseSections}
-              generatingNounCaseKey={generatingNounCaseKey}
-              compareExerciseEntries={compareExerciseEntries}
-              onToggleEntry={toggleExerciseEntry}
-              onSelectPerson={selectVerbExercisePerson}
-              onSelectTense={selectVerbExerciseTense}
-              onSelectKeys={setSelectedExerciseKeys}
-              onGenerateCase={(caseKey) => {
-                void generateNounExerciseCase(caseKey);
-              }}
-              onOpenFunnyImage={() => setShowFunnyImageModal(true)}
-              onGenerateFunnyImage={() => {
-                void generateFunnyImageExercise();
-              }}
-              openImageIcon={<ItemActionIcon name="openImage" />}
-              imageIcon={<ItemActionIcon name="image" />}
-              exerciseEntryKey={exerciseEntryKey}
-            />
-          )}
-          canRegenerateContent={
-            item.item_type === "word"
-            && item.id > 0
-            && (
-              selectedStrategy === DEFAULT_STRATEGY
-              || selectedStrategy === PRACTICE_STRATEGY
-              || selectedStrategy === CONNECT_STRATEGY
-              || selectedStrategy === VISUALIZE_STRATEGY
-              || selectedStrategy === ACT_STRATEGY
-              || selectedStrategy === WALK_STRATEGY
-              || selectedStrategy === DECODE_STRATEGY
-              || selectedStrategy === ENCOUNTER_STRATEGY
-              || selectedStrategy === COMPARE_STRATEGY
-            )
-          }
-          regeneratingContent={
-            selectedStrategy === PRACTICE_STRATEGY
-              ? practiceStrategy.isLoading
-              : selectedStrategy === CONNECT_STRATEGY
-                ? connectStrategy.isLoading
-                : selectedStrategy === VISUALIZE_STRATEGY
-                  ? visualizeStrategy.isLoading
-                  : selectedStrategy === ACT_STRATEGY
-                    ? actStrategy.isLoading
-                    : selectedStrategy === WALK_STRATEGY
-                      ? walkStrategy.isLoading
-                      : selectedStrategy === DECODE_STRATEGY
-                        ? decodeStrategy.isLoading
-                        : selectedStrategy === ENCOUNTER_STRATEGY
-                          ? encounterStrategy.isLoading
-                          : selectedStrategy === COMPARE_STRATEGY
-                            ? compareStrategy.isLoading
-                  : loadingExercises
-          }
-          onRegenerateContent={() => {
-            if (selectedStrategy === PRACTICE_STRATEGY) {
-              void practiceStrategy.generate();
-              return;
+      {showExerciseModal &&
+        (item.item_type === "word" || item.item_type === "phrase") && (
+          <ItemStrategiesModal
+            itemType={item.item_type}
+            sourceText={sourceText}
+            targetText={targetText}
+            selectedStrategy={selectedStrategy}
+            onSelectedStrategyChange={setSelectedStrategy}
+            onClose={closeExerciseModal}
+            exerciseSecondsLeft={exerciseSecondsLeft}
+            exerciseRunning={exerciseRunning}
+            exerciseMuted={exerciseMuted}
+            canStart={exerciseLines.length > 0}
+            onStart={startExercise}
+            onStop={stopExercise}
+            onToggleMute={() => setExerciseMuted((value) => !value)}
+            formsContent={
+              <FormsStrategyPanel
+                itemType={item.item_type}
+                targetText={targetText}
+                sourceText={sourceText}
+                sourceLanguageLabel={sourceLanguageLabel}
+                loadingExercises={loadingExercises}
+                exerciseError={exerciseError}
+                exerciseRunning={exerciseRunning}
+                wordExerciseEntries={wordExerciseEntries}
+                selectedExerciseKeys={selectedExerciseKeys}
+                funnyImageExerciseSelectionEntry={
+                  funnyImageExerciseSelectionEntry
+                }
+                funnyImageExerciseImageUrl={funnyImageExerciseEntry?.image_url}
+                isVerbExerciseGrid={isVerbExerciseGrid}
+                isNounSectionedExercise={isNounSectionedExercise}
+                pluralGerman={pluralGerman}
+                notes={notes}
+                wordOnlyExerciseEntry={wordOnlyExerciseEntry}
+                verbExerciseGridEntries={verbExerciseGridEntries}
+                nounExerciseSections={nounExerciseSections}
+                generatingNounCaseKey={generatingNounCaseKey}
+                compareExerciseEntries={compareExerciseEntries}
+                onToggleEntry={toggleExerciseEntry}
+                onSelectPerson={selectVerbExercisePerson}
+                onSelectTense={selectVerbExerciseTense}
+                onSelectKeys={setSelectedExerciseKeys}
+                onGenerateCase={(caseKey) => {
+                  void generateNounExerciseCase(caseKey);
+                }}
+                onOpenFunnyImage={() => setShowFunnyImageModal(true)}
+                openImageIcon={<ItemActionIcon name="openImage" />}
+                exerciseEntryKey={exerciseEntryKey}
+              />
             }
-            if (selectedStrategy === CONNECT_STRATEGY) {
-              void connectStrategy.generate();
-              return;
+            formsFooterAction={
+              item.item_type === "word" ? (
+                <WordExerciseActions
+                  exerciseRunning={exerciseRunning}
+                  loadingExercises={loadingExercises}
+                  generatingFunnyImageExercise={generatingFunnyImageExercise}
+                  hasWordExercises={wordExerciseEntries.length > 0}
+                  hasFunnyImage={Boolean(funnyImageExerciseSelectionEntry)}
+                  hasOpenFunnyImage={false}
+                  onOpenFunnyImage={() => {}}
+                  onGenerateFunnyImage={() => {
+                    void generateFunnyImageExercise();
+                  }}
+                  openImageIcon={null}
+                  imageIcon={<ItemActionIcon name="image" />}
+                  showOpenImage={false}
+                />
+              ) : undefined
             }
-            if (selectedStrategy === VISUALIZE_STRATEGY) {
-              void visualizeStrategy.generate();
-              return;
+            canRegenerateContent={
+              item.item_type === "word" &&
+              item.id > 0 &&
+              (selectedStrategy === DEFAULT_STRATEGY ||
+                selectedStrategy === EXAMPLES_STRATEGY ||
+                selectedStrategy === RELATED_STRATEGY ||
+                selectedStrategy === VISUALIZE_STRATEGY ||
+                selectedStrategy === ACT_STRATEGY ||
+                selectedStrategy === WALK_STRATEGY ||
+                selectedStrategy === DECODE_STRATEGY ||
+                selectedStrategy === ENCOUNTER_STRATEGY ||
+                selectedStrategy === COMPARE_STRATEGY)
             }
-            if (selectedStrategy === ACT_STRATEGY) {
-              void actStrategy.generate();
-              return;
+            regeneratingContent={
+              selectedStrategy === EXAMPLES_STRATEGY
+                ? examplesStrategy.isLoading
+                : selectedStrategy === RELATED_STRATEGY
+                  ? relatedStrategy.isLoading
+                  : selectedStrategy === VISUALIZE_STRATEGY
+                    ? visualizeStrategy.isLoading
+                    : selectedStrategy === ACT_STRATEGY
+                      ? actStrategy.isLoading
+                      : selectedStrategy === WALK_STRATEGY
+                        ? walkStrategy.isLoading
+                        : selectedStrategy === DECODE_STRATEGY
+                          ? decodeStrategy.isLoading
+                          : selectedStrategy === ENCOUNTER_STRATEGY
+                            ? encounterStrategy.isLoading
+                            : selectedStrategy === COMPARE_STRATEGY
+                              ? compareStrategy.isLoading
+                              : loadingExercises
             }
-            if (selectedStrategy === WALK_STRATEGY) {
-              void walkStrategy.generate();
-              return;
-            }
-            if (selectedStrategy === DECODE_STRATEGY) {
-              void decodeStrategy.generate();
-              return;
-            }
-            if (selectedStrategy === ENCOUNTER_STRATEGY) {
-              void encounterStrategy.generate();
-              return;
-            }
-            if (selectedStrategy === COMPARE_STRATEGY) {
-              void compareStrategy.generate();
-              return;
-            }
-            void regenerateWordExercises();
-          }}
-          formsSelection={{
-            canSelectEntries: wordExerciseEntries.length > 0 || compareExerciseEntries.length > 0 || item.item_type === "phrase",
-            hasSelectedEntries: selectedExerciseKeys.length > 0 || item.item_type === "phrase",
-            unselectAll: unselectAllExerciseEntries,
-            selectAll: selectAllExerciseEntries,
-            selectRandom: selectRandomExerciseEntries,
-          }}
-          personalizeStrategy={{
-            inputValue: personalizeStrategy.inputValue,
-            setInputValue: personalizeStrategy.setInputValue,
-            generatePhrase: personalizeStrategy.generatePhrase,
-            isGenerating: personalizeStrategy.isGenerating,
-            error: personalizeStrategy.error,
-            entries: personalizeStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) })),
-            selectedKeys: personalizeStrategy.selectedKeys,
-            toggleEntry: personalizeStrategy.toggleEntry,
-            unselectAll: personalizeStrategy.unselectAll,
-            selectAll: personalizeStrategy.selectAll,
-            selectRandom: personalizeStrategy.selectRandom,
-          }}
-          practiceStrategy={{
-            entries: practiceStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) })),
-            selectedKeys: practiceStrategy.selectedKeys,
-            toggleEntry: practiceStrategy.toggleEntry,
-            isLoading: practiceStrategy.isLoading,
-            error: practiceStrategy.error,
-            unselectAll: practiceStrategy.unselectAll,
-            selectAll: practiceStrategy.selectAll,
-            selectRandom: practiceStrategy.selectRandom,
-          }}
-          connectStrategy={connectStrategy}
-          visualizeStrategy={visualizeStrategy}
-          onPlayVisualizeWord={playFunnyImageWordAudio}
-          actStrategy={actStrategy}
-          walkStrategy={{
-            entries: walkStrategy.entries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) })),
-            selectedKeys: walkStrategy.selectedKeys,
-            toggleEntry: walkStrategy.toggleEntry,
-            isLoading: walkStrategy.isLoading,
-            error: walkStrategy.error,
-            unselectAll: walkStrategy.unselectAll,
-            selectAll: walkStrategy.selectAll,
-            selectRandom: walkStrategy.selectRandom,
-          }}
-          decodeStrategy={decodeStrategy}
-          encounterStrategy={encounterStrategy}
-          compareStrategy={compareStrategy}
-        />
-      )}
-      {showFunnyImageModal && funnyImageExerciseEntry?.image_url && funnyImageExerciseSelectionEntry && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal funny-image-modal">
-            <button
-              type="button"
-              className="modal-corner-close"
-              aria-label={t("newItem.closeRelatedDialogs")}
-              onClick={() => setShowFunnyImageModal(false)}
-            >
-              ×
-            </button>
-            <button
-              type="button"
-              className="funny-image-large-button"
-              onClick={playFunnyImageWordAudio}
-              aria-label={t("newItem.exercisesFunnyImagePlayWord")}
-            >
-              <img src={funnyImageExerciseEntry.image_url} alt={funnyImageExerciseSelectionEntry.target} />
-            </button>
-            <div className="actions">
-              <button type="button" onClick={startFunnyImagePhraseExercise}>
-                {t("newItem.exercisesStart")}
+            onRegenerateContent={() => {
+              if (selectedStrategy === EXAMPLES_STRATEGY) {
+                void examplesStrategy.generate();
+                return;
+              }
+              if (selectedStrategy === RELATED_STRATEGY) {
+                void relatedStrategy.generate();
+                return;
+              }
+              if (selectedStrategy === VISUALIZE_STRATEGY) {
+                void visualizeStrategy.generate();
+                return;
+              }
+              if (selectedStrategy === ACT_STRATEGY) {
+                void actStrategy.generate();
+                return;
+              }
+              if (selectedStrategy === WALK_STRATEGY) {
+                void walkStrategy.generate();
+                return;
+              }
+              if (selectedStrategy === DECODE_STRATEGY) {
+                void decodeStrategy.generate();
+                return;
+              }
+              if (selectedStrategy === ENCOUNTER_STRATEGY) {
+                void encounterStrategy.generate();
+                return;
+              }
+              if (selectedStrategy === COMPARE_STRATEGY) {
+                void compareStrategy.generate();
+                return;
+              }
+              void regenerateWordExercises();
+            }}
+            formsSelection={{
+              canSelectEntries:
+                wordExerciseEntries.length > 0 ||
+                compareExerciseEntries.length > 0 ||
+                item.item_type === "phrase",
+              hasSelectedEntries:
+                selectedExerciseKeys.length > 0 || item.item_type === "phrase",
+              unselectAll: unselectAllExerciseEntries,
+              selectAll: selectAllExerciseEntries,
+              selectRandom: selectRandomExerciseEntries,
+            }}
+            createStrategy={{
+              inputValue: createStrategy.inputValue,
+              setInputValue: createStrategy.setInputValue,
+              generatePhrase: createStrategy.generatePhrase,
+              isGenerating: createStrategy.isGenerating,
+              error: createStrategy.error,
+              entries: createStrategy.entries.map((entry) => ({
+                ...entry,
+                key: exerciseEntryKey(entry),
+              })),
+              selectedKeys: createStrategy.selectedKeys,
+              toggleEntry: createStrategy.toggleEntry,
+              unselectAll: createStrategy.unselectAll,
+              selectAll: createStrategy.selectAll,
+              selectRandom: createStrategy.selectRandom,
+            }}
+            examplesStrategy={{
+              entries: examplesStrategy.entries.map((entry) => ({
+                ...entry,
+                key: exerciseEntryKey(entry),
+              })),
+              selectedKeys: examplesStrategy.selectedKeys,
+              toggleEntry: examplesStrategy.toggleEntry,
+              isLoading: examplesStrategy.isLoading,
+              error: examplesStrategy.error,
+              unselectAll: examplesStrategy.unselectAll,
+              selectAll: examplesStrategy.selectAll,
+              selectRandom: examplesStrategy.selectRandom,
+            }}
+            relatedStrategy={relatedStrategy}
+            visualizeStrategy={visualizeStrategy}
+            onPlayVisualizeWord={playFunnyImageWordAudio}
+            actStrategy={actStrategy}
+            walkStrategy={{
+              entries: walkStrategy.entries.map((entry) => ({
+                ...entry,
+                key: exerciseEntryKey(entry),
+              })),
+              selectedKeys: walkStrategy.selectedKeys,
+              toggleEntry: walkStrategy.toggleEntry,
+              isLoading: walkStrategy.isLoading,
+              error: walkStrategy.error,
+              unselectAll: walkStrategy.unselectAll,
+              selectAll: walkStrategy.selectAll,
+              selectRandom: walkStrategy.selectRandom,
+            }}
+            decodeStrategy={decodeStrategy}
+            encounterStrategy={encounterStrategy}
+            compareStrategy={compareStrategy}
+          />
+        )}
+      {showFunnyImageModal &&
+        funnyImageExerciseEntry?.image_url &&
+        funnyImageExerciseSelectionEntry && (
+          <div
+            className="blocking-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="blocking-modal funny-image-modal">
+              <button
+                type="button"
+                className="modal-corner-close"
+                aria-label={t("newItem.closeRelatedDialogs")}
+                onClick={() => setShowFunnyImageModal(false)}
+              >
+                ×
               </button>
+              <button
+                type="button"
+                className="funny-image-large-button"
+                onClick={playFunnyImageWordAudio}
+                aria-label={t("newItem.exercisesFunnyImagePlayWord")}
+              >
+                <img
+                  src={funnyImageExerciseEntry.image_url}
+                  alt={funnyImageExerciseSelectionEntry.target}
+                />
+              </button>
+              <div className="actions">
+                <button type="button" onClick={startFunnyImagePhraseExercise}>
+                  {t("newItem.exercisesStart")}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       {(item.item_type === "word" || item.item_type === "phrase") && (
         <ItemQuestionsModal
           open={showQuestionsModal}
@@ -2203,21 +2723,38 @@ export default function NewItem({
             </p>
             <p className="add-word-modal-word">{pendingWordAdd.target}</p>
             <p className="add-word-modal-meaning">
-              {t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}
+              {t("newItem.wordAddMeaning", {
+                translation: pendingWordAdd.source,
+              })}
             </p>
             <p className="add-word-modal-type">
-              <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
+              <strong>
+                {t("newItem.wordAddType", { type: pendingWordAdd.wordType })}
+              </strong>
             </p>
             {pendingWordAdd.note && (
-              <p className="hint">{t("newItem.wordAddNote", { note: pendingWordAdd.note })}</p>
+              <p className="hint">
+                {t("newItem.wordAddNote", { note: pendingWordAdd.note })}
+              </p>
             )}
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
-              <button type="button" className="secondary-button" onClick={() => setPendingWordAdd(null)} disabled={addingWord}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setPendingWordAdd(null)}
+                disabled={addingWord}
+              >
                 {t("newItem.wordAddCancel")}
               </button>
-              <button type="button" onClick={() => void confirmAddWordFromDialog()} disabled={addingWord}>
-                {addingWord ? t("newItem.wordAddSaving") : t("newItem.wordAddConfirmButton")}
+              <button
+                type="button"
+                onClick={() => void confirmAddWordFromDialog()}
+                disabled={addingWord}
+              >
+                {addingWord
+                  ? t("newItem.wordAddSaving")
+                  : t("newItem.wordAddConfirmButton")}
               </button>
             </div>
           </div>
@@ -2233,7 +2770,11 @@ export default function NewItem({
       {openedLinkedWord && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal words-item-modal">
-            <NewItem item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
+            <NewItem
+              item={openedLinkedWord}
+              readOnly
+              onClose={() => setOpenedLinkedWord(null)}
+            />
           </div>
         </div>
       )}
