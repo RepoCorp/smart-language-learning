@@ -1,4 +1,7 @@
 import type { JSX } from "react";
+import type { StudyLanguageCode } from "../../types";
+import type { GermanGrammarNounExample } from "../../types";
+import type { NounGender } from "./useGrammarExamples";
 
 export type StrategyEntry = { label?: string; source: string; target: string };
 export type KeyedStrategyEntry = StrategyEntry & { key: string };
@@ -28,6 +31,9 @@ export type ItemStrategiesModalProps = {
   itemType: "word" | "phrase";
   sourceText: string;
   targetText: string;
+  targetLanguage: StudyLanguageCode;
+  wordType: string;
+  pluralGerman: string;
   selectedStrategy: string;
   onSelectedStrategyChange: (strategy: string) => void;
   onClose: () => void;
@@ -119,4 +125,8 @@ export type ItemStrategiesModalProps = {
     }>;
   };
   onPlayVisualizeWord: () => void;
+  grammarStrategy: {
+    examples: Partial<Record<NounGender, GermanGrammarNounExample>>;
+    isLoading: boolean;
+  };
 };

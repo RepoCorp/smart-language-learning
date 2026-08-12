@@ -60,6 +60,22 @@ class Item(models.Model):
         return f"{self.item_type}: {self.spanish_text} -> {self.german_text}"
 
 
+class ItemGrammarFeature(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="grammar_features")
+    feature_key = models.CharField(max_length=100)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("item", "feature_key"),
+                name="learning_item_grammar_feature_uniq",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item_id}: {self.feature_key}"
+
+
 class SavedTopic(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

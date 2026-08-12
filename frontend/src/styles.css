@@ -2488,6 +2488,84 @@ textarea {
   gap: 0.45rem;
 }
 
+.grammar-strategy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.grammar-strategy-intro,
+.grammar-strategy-footnote {
+  margin: 0;
+}
+
+.grammar-strategy-table-wrap {
+  overflow-x: auto;
+}
+
+.grammar-strategy-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.grammar-strategy-tab {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.grammar-strategy-tab-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-surface);
+  color: var(--color-accent-strong);
+}
+
+.grammar-strategy-tab-active:not(.grammar-strategy-tab-origin) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-alt);
+  color: var(--color-text-soft);
+  box-shadow: inset 0 -3px 0 var(--color-border-strong);
+}
+
+.grammar-strategy-tab-origin {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-surface);
+  color: var(--color-accent-strong);
+  box-shadow: inset 0 -3px 0 var(--color-accent-strong);
+}
+
+.grammar-strategy-tab-unavailable {
+  opacity: 0.55;
+}
+
+.grammar-strategy-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.grammar-strategy-table th,
+.grammar-strategy-table td {
+  padding: 9px 10px;
+  vertical-align: top;
+  border: 1px solid var(--color-border);
+}
+
+.grammar-strategy-table thead th {
+  background: var(--color-accent-surface);
+}
+
+.grammar-strategy-table tbody th {
+  width: 21%;
+  background: var(--color-bg-alt);
+}
+
 .turn-action-row-user {
   align-self: flex-end;
 }

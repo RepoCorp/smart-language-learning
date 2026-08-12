@@ -958,12 +958,14 @@ export default function NewItem({
     decodeStrategy,
     encounterStrategy,
     compareStrategy,
+    grammarStrategy,
   } = useItemStrategies({
     itemId: item.id,
     itemType: item.item_type,
     exercisePhrases,
     sourceLanguage,
     targetLanguage,
+    wordType,
     setExercisePhrases,
     modalOpen: showExerciseModal,
     selectedStrategy,
@@ -2471,6 +2473,9 @@ export default function NewItem({
             itemType={item.item_type}
             sourceText={sourceText}
             targetText={targetText}
+            targetLanguage={targetLanguage}
+            wordType={wordType}
+            pluralGerman={pluralGerman}
             selectedStrategy={selectedStrategy}
             onSelectedStrategyChange={setSelectedStrategy}
             onClose={closeExerciseModal}
@@ -2663,6 +2668,7 @@ export default function NewItem({
             decodeStrategy={decodeStrategy}
             encounterStrategy={encounterStrategy}
             compareStrategy={compareStrategy}
+            grammarStrategy={grammarStrategy}
           />
         )}
       {showFunnyImageModal &&

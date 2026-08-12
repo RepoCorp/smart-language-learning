@@ -93,6 +93,16 @@ export interface ItemExercisePhrases {
   };
 }
 
+export type GermanGrammarNounExample = {
+  target_text: string;
+  source_text: string;
+  plural_german: string;
+};
+
+export type ContentItemGrammarExamplesResponse = {
+  examples: Partial<Record<"masculine" | "feminine" | "neuter", GermanGrammarNounExample>>;
+};
+
 export interface DialogPhraseTurn {
   source_text: string;
   target_text: string;

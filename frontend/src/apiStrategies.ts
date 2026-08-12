@@ -9,8 +9,27 @@ import type {
   ContentItemEncounterResponse,
   ContentItemVisualizeResponse,
   ContentItemWalkResponse,
+  ContentItemGrammarExamplesResponse,
   StudyLanguageCode,
 } from "./types";
+
+export async function fetchContentItemGrammarExamples(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemGrammarExamplesResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/grammar-examples?${params.toString()}`,
+  );
+  if (!response.ok) {
+    throw new Error("Failed to load grammar examples");
+  }
+  return (await response.json()) as ContentItemGrammarExamplesResponse;
+}
 
 export async function generateContentItemActExercise(
   itemId: number,

@@ -9,6 +9,7 @@ import {
   RELATED_STRATEGY,
   VISUALIZE_STRATEGY,
   WALK_STRATEGY,
+  GRAMMAR_STRATEGY,
 } from "./strategyConstants";
 import { useActStrategy } from "./useActStrategy";
 import { useCompareStrategy } from "./useCompareStrategy";
@@ -19,6 +20,7 @@ import { useExamplesStrategy } from "./useExamplesStrategy";
 import { useRelatedStrategy } from "./useRelatedStrategy";
 import { useVisualizeStrategy } from "./useVisualizeStrategy";
 import { useWalkStrategy } from "./useWalkStrategy";
+import { useGrammarExamples } from "./useGrammarExamples";
 
 type StrategyErrors = {
   create: string;
@@ -38,6 +40,7 @@ export function useItemStrategies({
   exercisePhrases,
   sourceLanguage,
   targetLanguage,
+  wordType,
   setExercisePhrases,
   modalOpen,
   selectedStrategy,
@@ -50,6 +53,7 @@ export function useItemStrategies({
   exercisePhrases: ItemExercisePhrases | undefined;
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
+  wordType: string;
   setExercisePhrases: (value: ItemExercisePhrases) => void;
   modalOpen: boolean;
   selectedStrategy: string;
@@ -114,6 +118,12 @@ export function useItemStrategies({
     errorMessage: errors.compare,
     enabled: autoGenerate(COMPARE_STRATEGY),
   });
+  const grammarStrategy = useGrammarExamples({
+    enabled: modalOpen && selectedStrategy === GRAMMAR_STRATEGY && itemType === "word" && wordType.trim().toLowerCase() === "noun",
+    itemId,
+    sourceLanguage,
+    targetLanguage,
+  });
 
   return {
     createStrategy,
@@ -125,5 +135,6 @@ export function useItemStrategies({
     decodeStrategy,
     encounterStrategy,
     compareStrategy,
+    grammarStrategy,
   };
 }

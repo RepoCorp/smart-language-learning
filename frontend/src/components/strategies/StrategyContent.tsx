@@ -56,7 +56,16 @@ export default function StrategyContent(props: Props): JSX.Element {
   });
 
   if (props.selectedStrategy === GRAMMAR_STRATEGY) {
-    return <GrammarStrategyPanel />;
+    return (
+      <GrammarStrategyPanel
+        wordType={props.wordType}
+        targetLanguage={props.targetLanguage}
+        targetText={props.targetText}
+        pluralGerman={props.pluralGerman}
+        examples={props.grammarStrategy.examples}
+        isLoadingExamples={props.grammarStrategy.isLoading}
+      />
+    );
   }
   if (props.selectedStrategy === CREATE_STRATEGY && props.itemType === "word") {
     return (
