@@ -8,6 +8,8 @@ import ContentCreatePage from "./components/ContentCreatePage";
 import ContentManagePage from "./components/ContentManagePage";
 import DialogsPage from "./components/DialogsPage";
 import OverviewStatsBar from "./components/OverviewStatsBar";
+import LearningStreakControl from "./components/LearningStreakControl";
+import ProgressPage from "./components/ProgressPage";
 import SessionPage from "./components/SessionPage";
 import { DebugToolsPanel } from "./debugTools";
 import ConversationPage from "./features/conversation/ConversationPage";
@@ -120,6 +122,7 @@ export default function App(): JSX.Element {
                       </div>
                     ) : null}
                   </div>
+                  <LearningStreakControl />
                   <button
                     type="button"
                     className={`app-top-bar-user-badge ${location.pathname === configPath ? "active" : ""}`}
@@ -139,6 +142,7 @@ export default function App(): JSX.Element {
             <Route path="/content/manage" element={<ContentManagePage />} />
             <Route path="/dialogs" element={<DialogsPage />} />
             <Route path="/conversation" element={<ConversationPage />} />
+            <Route path="/progress" element={<ProgressPage />} />
             <Route
               path="/configurations"
               element={(

@@ -27,26 +27,32 @@ GERMAN_NOUN_GENERATION_MODE = "noun_cases_german_v1"
 def _placeholder_question_source_text(case_key: str, source_language: str) -> str:
     normalized_source = (source_language or "").strip().lower()
     if normalized_source == "spanish":
+        if case_key == "nominative":
+            return "¿Quién? / ¿Qué?"
         if case_key == "accusative":
-            return "¿Qué...?"
+            return "¿A quién? / ¿Qué?"
         if case_key == "dative":
-            return "¿Para quién...?"
+            return "¿A quién? / ¿A qué?"
         if case_key == "genitive":
-            return "¿De quién...?"
+            return "¿De quién? / ¿De qué?"
+    if case_key == "nominative":
+        return "Who? / What?"
     if case_key == "accusative":
-        return "What?"
+        return "Whom? / What?"
     if case_key == "dative":
-        return "For whom?"
+        return "To whom? / To what?"
     if case_key == "genitive":
-        return "Whose?"
+        return "Whose? / Of what?"
     return ""
 
 
 def _placeholder_question_target_text(case_key: str) -> str:
+    if case_key == "nominative":
+        return "Wer? / Was?"
     if case_key == "accusative":
-        return "Was?"
+        return "Wen? / Was?"
     if case_key == "dative":
-        return "Fuer wen?"
+        return "Wem?"
     if case_key == "genitive":
         return "Wessen?"
     return ""

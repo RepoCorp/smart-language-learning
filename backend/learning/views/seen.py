@@ -7,6 +7,7 @@ from ..auth import apply_user_scope, get_request_user
 from ..models import Item
 from ..serializers import MarkSeenSerializer
 from ..srs import mark_item_seen
+from ..streaks import record_completed_item
 
 
 class MarkSeenView(APIView):
@@ -23,4 +24,5 @@ class MarkSeenView(APIView):
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
         mark_item_seen(item)
+        record_completed_item(user, item, None)
         return Response({"ok": True})

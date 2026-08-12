@@ -3683,10 +3683,11 @@ def test_word_exercise_generation_drops_bare_vocabulary_entries():
         {"label": "nominative-nominative", "source_text": "La mesa esta aqui.", "target_text": "Der Tisch ist hier."},
     ]
     assert payload["generation_mode"] == "noun_cases_german_v1"
-    assert [section["key"] for section in payload["sections"]] == ["nominative", "accusative", "dative"]
+    assert [section["key"] for section in payload["sections"]] == ["nominative", "accusative", "dative", "genitive"]
     assert payload["sections"][1]["phrases"] == []
-    assert payload["sections"][1]["question_target_text"] == "Wen oder was?"
-    assert payload["sections"][2]["question_target_text"] == "Wem oder fuer wen?"
+    assert payload["sections"][1]["question_target_text"] == "Wen? / Was?"
+    assert payload["sections"][2]["question_target_text"] == "Wem?"
+    assert payload["sections"][3]["question_target_text"] == "Wessen?"
 
 
 @pytest.mark.django_db

@@ -1,5 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 const OVERVIEW_STATS_UPDATED_EVENT = "overview-stats-updated";
+const LEARNING_PROGRESS_UPDATED_EVENT = "learning-progress-updated";
 
 function apiRequestSummary(input: string, init?: RequestInit): { method: string; url: string } {
   return {
@@ -52,9 +53,19 @@ function getOverviewStatsUpdatedEventName(): string {
   return OVERVIEW_STATS_UPDATED_EVENT;
 }
 
+function notifyLearningProgressUpdated(): void {
+  window.dispatchEvent(new CustomEvent(LEARNING_PROGRESS_UPDATED_EVENT));
+}
+
+function getLearningProgressUpdatedEventName(): string {
+  return LEARNING_PROGRESS_UPDATED_EVENT;
+}
+
 export {
   API_BASE,
   apiFetch,
+  getLearningProgressUpdatedEventName,
   getOverviewStatsUpdatedEventName,
+  notifyLearningProgressUpdated,
   notifyOverviewStatsUpdated,
 };

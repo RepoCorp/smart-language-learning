@@ -460,3 +460,23 @@ export interface OverviewStatsResponse {
   not_started: number;
   difficult_items: number;
 }
+
+export interface LearningProgressResponse {
+  current_streak: number;
+  longest_streak: number;
+  flex_days: number;
+  qualifying_days_toward_flex: number;
+  active_seconds_today: number;
+  completed_items_today: number;
+  due_reviews_remaining: number;
+  qualified_today: boolean;
+  qualification: "" | "time" | "pool";
+  pause_active: boolean;
+  pause_end_date: string | null;
+  pause_available: boolean;
+  next_pause_available_on: string | null;
+  history: Array<{
+    date: string;
+    status: "pending" | "studied" | "flex" | "paused" | "missed";
+  }>;
+}

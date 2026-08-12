@@ -309,7 +309,7 @@ def test_word_review_de_to_es_contains_multiple_choice_options():
 
 
 @pytest.mark.django_db
-def test_session_falls_back_to_next_upcoming_review_when_no_due_or_new():
+def test_session_includes_all_reviews_scheduled_for_today_in_the_due_pool():
     now = timezone.now()
 
     later = Item.objects.create(
@@ -333,7 +333,7 @@ def test_session_falls_back_to_next_upcoming_review_when_no_due_or_new():
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 1
-    assert items[0]["id"] == sooner.id
+    assert items[0]["id"] in {sooner.id, later.id}
     assert items[0]["mode"] == "review"
     assert items[0]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
 

@@ -25,7 +25,7 @@ import type {
   SessionRestoreState,
   StudyLanguageCode,
 } from "./types";
-import { API_BASE, apiFetch, getOverviewStatsUpdatedEventName, notifyOverviewStatsUpdated } from "./apiCore";
+import { API_BASE, apiFetch, getOverviewStatsUpdatedEventName, notifyLearningProgressUpdated, notifyOverviewStatsUpdated } from "./apiCore";
 
 export async function fetchElevenLabsVoices(targetLanguage: StudyLanguageCode): Promise<ElevenLabsVoicesResponse> {
   const params = new URLSearchParams({ target_language: targetLanguage });
@@ -140,6 +140,7 @@ export async function submitReview(itemId: number, correct: boolean, direction?:
     throw new Error(detail);
   }
   notifyOverviewStatsUpdated();
+  notifyLearningProgressUpdated();
 }
 
 export async function markSeen(itemId: number): Promise<void> {
@@ -162,6 +163,7 @@ export async function markSeen(itemId: number): Promise<void> {
     throw new Error(detail);
   }
   notifyOverviewStatsUpdated();
+  notifyLearningProgressUpdated();
 }
 
 export async function restoreSessionItemState(itemId: number, state: SessionRestoreState): Promise<void> {

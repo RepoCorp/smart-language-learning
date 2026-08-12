@@ -46,6 +46,7 @@ from .content import (
 )
 from .health import HealthView
 from .overview_stats import OverviewStatsView
+from .progress import LearningProgressPauseView, LearningProgressResumeView, LearningProgressStudyTimeView, LearningProgressView
 from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
@@ -111,6 +112,10 @@ __all__ = [
     "ContentWordsView",
     "HealthView",
     "OverviewStatsView",
+    "LearningProgressView",
+    "LearningProgressStudyTimeView",
+    "LearningProgressPauseView",
+    "LearningProgressResumeView",
     "SubmitReviewView",
     "MarkSeenView",
     "SessionView",

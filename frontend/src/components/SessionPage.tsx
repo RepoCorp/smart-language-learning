@@ -9,6 +9,7 @@ import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
 import WordReview from "./WordReview";
+import useSessionStudyActivity from "./useSessionStudyActivity";
 
 type StoredSessionState = {
   durationInput: string;
@@ -65,6 +66,16 @@ export default function SessionPage(): JSX.Element {
   const [resettingCurrentResult, setResettingCurrentResult] = useState<boolean>(false);
   const [currentReviewResetVersion, setCurrentReviewResetVersion] = useState<number>(0);
   const reviewResultAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useSessionStudyActivity(
+    sessionDurationMinutes !== null
+      && sessionOutcome === null
+      && !showExtendPrompt
+      && !loading
+      && items.length > 0,
+    sourceLanguage,
+    targetLanguage,
+  );
 
   const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
     setLoading(true);

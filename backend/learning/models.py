@@ -250,3 +250,62 @@ class DisabledElevenLabsVoice(models.Model):
 
     def __str__(self) -> str:
         return self.voice_name or self.voice_id
+
+
+class LearningStreakProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_streak_profile",
+    )
+    tracking_started_on = models.DateField()
+    current_streak = models.PositiveIntegerField(default=0)
+    longest_streak = models.PositiveIntegerField(default=0)
+    flex_days = models.PositiveSmallIntegerField(default=0)
+    qualifying_days_toward_flex = models.PositiveSmallIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class DailyLearningProgress(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        STUDIED = "studied", "Studied"
+        FLEX = "flex", "Flex"
+        PAUSED = "paused", "Paused"
+        MISSED = "missed", "Missed"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="daily_learning_progress",
+    )
+    date = models.DateField()
+    active_seconds = models.PositiveIntegerField(default=0)
+    active_seconds_by_language = models.JSONField(default=dict, blank=True)
+    completed_entry_keys = models.JSONField(default=list, blank=True)
+    completed_daily_pool = models.BooleanField(default=False)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "date"),
+                name="learning_dailyprogress_user_date_uniq",
+            )
+        ]
+        ordering = ("-date",)
+
+
+class LearningStreakPause(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_streak_pauses",
+    )
+    start_date = models.DateField()
+    end_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-end_date", "-id")

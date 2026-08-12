@@ -8,6 +8,7 @@ from ..auth import apply_user_scope, get_request_user
 from ..models import Item
 from ..serializers import SubmitReviewSerializer
 from ..srs import apply_review_result
+from ..streaks import record_completed_item
 
 
 class SubmitReviewView(APIView):
@@ -36,4 +37,5 @@ class SubmitReviewView(APIView):
             item.is_difficult = True
             item.difficult_marked_at = timezone.now()
             item.save(update_fields=["is_difficult", "difficult_marked_at", "updated_at"])
+        record_completed_item(user, item, direction)
         return Response({"ok": True})

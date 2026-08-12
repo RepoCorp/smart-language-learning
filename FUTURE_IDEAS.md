@@ -5,14 +5,7 @@ Ningun otro arreglito que no sea vital!!!
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
-  - Añadir la informacion del genero y mostrarlo de alguna manera en la UI
-  - Revisar los ejercicios, que si se cubran las principales formas gramaticales y que permita abrir una ventana para cada una de ellas que de una pequeña explicacion y que muestre las equivalentes de otras palabras del mismo genero
   - Other things that change depending on the gender of the word.
-
-
-## COSAS QUE NO DEBERIAN ESPERAR PERO QUE VAN A TENER QUE ESPERAR:
-- Refactor (Lo vamos a ir haciendo gradualmente)
-- Mejorar prompts
 
 ## New functionalities 
 De las conversaciones saca errores. Darle al modelo la lista de errores que tenemos incluidas y el dice si/cuales de esos están y sugiere repasarlo. Que sea bien empatico 😂

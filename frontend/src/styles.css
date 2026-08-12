@@ -204,6 +204,146 @@ body {
   color: var(--color-accent-strong);
 }
 
+.learning-streak-control {
+  min-width: 42px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.05);
+}
+
+.learning-streak-control strong {
+  color: var(--color-text);
+  font-size: 0.82rem;
+}
+
+.learning-streak-control span {
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.learning-streak-control-complete {
+  border-color: #8ddfcf;
+  background: var(--color-accent-surface);
+  color: var(--color-accent-strong);
+}
+
+.learning-streak-control-paused {
+  border-color: #9cc8e8;
+  background: #eef7ff;
+  color: #2b658d;
+}
+
+.progress-page {
+  display: grid;
+  gap: 16px;
+  padding-top: 20px;
+  padding-bottom: 32px;
+}
+
+.progress-hero-card {
+  text-align: center;
+  background: linear-gradient(135deg, #f1fbf8, #fffaf0);
+}
+
+.progress-kicker {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.progress-streak-number {
+  display: block;
+  margin: 8px 0 -2px;
+  color: var(--color-accent-strong);
+  font-size: clamp(3.4rem, 12vw, 5.5rem);
+  line-height: 1;
+}
+
+.progress-hero-card h1,
+.progress-today-card h2,
+.progress-history-card h2,
+.progress-pause-card h2 {
+  margin: 6px 0;
+}
+
+.progress-today-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.progress-today-metrics div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  background: var(--color-surface-soft);
+  text-align: center;
+}
+
+.progress-today-metrics strong {
+  font-size: 1.2rem;
+}
+
+.progress-today-metrics span,
+.progress-detail-row span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.progress-details-card {
+  display: grid;
+  gap: 10px;
+}
+
+.progress-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.progress-history-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+}
+
+.progress-history-day {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: #e5e7eb;
+}
+
+.progress-history-studied { background: var(--color-accent); }
+.progress-history-flex { background: #efb35c; }
+.progress-history-paused { background: #82b8df; }
+.progress-history-pending { background: #d9e7df; }
+
+.progress-pause-form {
+  display: grid;
+  gap: 10px;
+}
+
+.progress-pause-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .top-nav-menu {
   position: absolute;
   top: calc(100% + 8px);
