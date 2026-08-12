@@ -63,13 +63,39 @@ export function useVisualizeStrategy({
     [exercisePhrases],
   );
 
+  const generateImage = async (): Promise<void> => {
+    if (itemId <= 0 || isGeneratingImage) {
+      return;
+    }
+    const requestId = imageRequestIdRef.current + 1;
+    imageRequestIdRef.current = requestId;
+    setIsGeneratingImage(true);
+    setError("");
+    try {
+      const imagePayload = await generateContentItemVisualizePhrase(itemId, sourceLanguage, targetLanguage, "image_only");
+      if (imageRequestIdRef.current !== requestId) {
+        return;
+      }
+      setExercisePhrases(imagePayload.exercise_phrases || exercisePhrases || {});
+    } catch (generationError) {
+      if (imageRequestIdRef.current !== requestId) {
+        return;
+      }
+      setError(generationError instanceof Error ? generationError.message : errorMessage);
+    } finally {
+      if (imageRequestIdRef.current === requestId) {
+        setIsGeneratingImage(false);
+      }
+    }
+  };
+
   const generate = async (): Promise<void> => {
     if (itemType !== "word" || itemId <= 0 || isLoading) {
       return;
     }
     setIsLoading(true);
-    setIsGeneratingImage(false);
     setError("");
+    setSelectedKeys([]);
     try {
       const payload = await generateContentItemVisualizePhrase(itemId, sourceLanguage, targetLanguage, "phrase_only");
       const phrasePayload = payload.exercise_phrases || {};
@@ -81,27 +107,7 @@ export function useVisualizeStrategy({
         && String(visualizePhrase.target_text || "").trim(),
       );
       if (hasPhrase) {
-        const requestId = imageRequestIdRef.current + 1;
-        imageRequestIdRef.current = requestId;
-        setIsGeneratingImage(true);
-        void (async () => {
-          try {
-            const imagePayload = await generateContentItemVisualizePhrase(itemId, sourceLanguage, targetLanguage, "image_only");
-            if (imageRequestIdRef.current !== requestId) {
-              return;
-            }
-            setExercisePhrases(imagePayload.exercise_phrases || phrasePayload);
-          } catch (generationError) {
-            if (imageRequestIdRef.current !== requestId) {
-              return;
-            }
-            setError(generationError instanceof Error ? generationError.message : errorMessage);
-          } finally {
-            if (imageRequestIdRef.current === requestId) {
-              setIsGeneratingImage(false);
-            }
-          }
-        })();
+        void generateImage();
       }
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : errorMessage);
@@ -117,22 +123,29 @@ export function useVisualizeStrategy({
     setIsGeneratingImage(false);
     attemptedGenerationRef.current = "";
     imageRequestIdRef.current += 1;
-  }, [itemId, entry]);
+  }, [itemId]);
 
   useEffect(() => {
-    if (!enabled || itemType !== "word" || itemId <= 0 || entry || isLoading) {
+    if (!enabled || itemType !== "word" || itemId <= 0 || isLoading || isGeneratingImage) {
       return;
     }
-    const attemptKey = `${itemId}:${sourceLanguage}:${targetLanguage}`;
+    if (entry?.imageUrl) {
+      return;
+    }
+    const attemptKey = `${itemId}:${sourceLanguage}:${targetLanguage}:${entry ? "image" : "phrase"}`;
     if (attemptedGenerationRef.current === attemptKey) {
       return;
     }
     attemptedGenerationRef.current = attemptKey;
 
     void (async () => {
+      if (entry) {
+        await generateImage();
+        return;
+      }
       await generate();
     })();
-  }, [enabled, itemId, itemType, entry, isLoading, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage]);
+  }, [enabled, itemId, itemType, entry, isLoading, isGeneratingImage, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage]);
 
   const toggleEntry = (nextEntry: VisualizeEntry): void => {
     setSelectedKeys((current) => (current.includes(nextEntry.key) ? [] : [nextEntry.key]));
