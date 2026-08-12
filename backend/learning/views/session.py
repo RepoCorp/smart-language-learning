@@ -3,7 +3,6 @@ from __future__ import annotations
 import random
 import math
 import hashlib
-from datetime import datetime, time
 from dataclasses import dataclass
 from collections import defaultdict
 
@@ -19,6 +18,8 @@ from ..serializers import SessionItemSerializer
 from ..srs import build_session_restore_state
 from .dialog_phrase_match import build_dialog_phrase_match_payload
 from .content.item_compare_payloads import compare_words_payload
+from .session_review_pool import review_rows
+from ..review_schedule import local_day_bounds
 
 
 @dataclass(frozen=True)
@@ -242,18 +243,6 @@ def _safe_int(raw_value, *, default: int | None, minimum: int, maximum: int) -> 
     return max(minimum, min(maximum, parsed))
 
 
-def _start_of_local_day(now):
-    current_timezone = timezone.get_current_timezone()
-    local_date = timezone.localdate(now, timezone=current_timezone)
-    return timezone.make_aware(datetime.combine(local_date, time.min), current_timezone)
-
-
-def _exclude_item_ids(queryset, excluded_item_ids: set[int]):
-    if not excluded_item_ids:
-        return queryset
-    return queryset.exclude(id__in=excluded_item_ids)
-
-
 def build_due_entries(
     *,
     user,
@@ -264,53 +253,14 @@ def build_due_entries(
     excluded_item_ids: set[int] | None = None,
 ) -> list[SessionEntry]:
     excluded_item_ids = excluded_item_ids or set()
-    rows: list[tuple[object, int, str, Item]] = []
-
-    phrase_due_es_to_de = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.PHRASE,
-        is_learned=False,
+    rows = review_rows(
+        user=user,
+        now=now,
         source_language=source_language,
         target_language=target_language,
-        last_reviewed_at_es_to_de__isnull=False,
-        due_at_es_to_de__lte=now,
-    ), excluded_item_ids).order_by("due_at_es_to_de", "id")
-    for item in phrase_due_es_to_de:
-        rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
-
-    phrase_due_de_to_es = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.PHRASE,
-        is_learned=False,
-        source_language=source_language,
-        target_language=target_language,
-        last_reviewed_at_de_to_es__isnull=False,
-        due_at_de_to_es__lte=now,
-    ), excluded_item_ids).order_by("due_at_de_to_es", "id")
-    for item in phrase_due_de_to_es:
-        rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
-
-    word_due_es_to_de = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.WORD,
-        is_learned=False,
-        source_language=source_language,
-        target_language=target_language,
-        last_reviewed_at_es_to_de__isnull=False,
-        due_at_es_to_de__lte=now,
-    ), excluded_item_ids).order_by("due_at_es_to_de", "id")
-    for item in word_due_es_to_de:
-        rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
-
-    word_due_de_to_es = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.WORD,
-        is_learned=False,
-        source_language=source_language,
-        target_language=target_language,
-        last_reviewed_at_de_to_es__isnull=False,
-        due_at_de_to_es__lte=now,
-    ), excluded_item_ids).order_by("due_at_de_to_es", "id")
-    for item in word_due_de_to_es:
-        rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
-
-    rows.sort(key=lambda row: (row[0], row[1], row[2]))
+        excluded_item_ids=excluded_item_ids,
+        include_due_today=True,
+    )
     entries = [review_entry(item=row[3], direction=row[2], due_at=row[0]) for row in rows]
     randomize_review_order(entries)
     return entries[:limit]
@@ -326,24 +276,24 @@ def build_new_entries(
 ) -> list[SessionEntry]:
     excluded_item_ids = excluded_item_ids or set()
     new_words = list(
-        _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
+        apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.WORD,
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=True,
             last_reviewed_at_de_to_es__isnull=True,
-        ), excluded_item_ids).order_by("created_at", "id")
+        ).exclude(id__in=excluded_item_ids).order_by("created_at", "id")
     )
     new_phrases = list(
-        _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
+        apply_user_scope(Item.objects, user).filter(
             item_type=Item.ItemType.PHRASE,
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=True,
             last_reviewed_at_de_to_es__isnull=True,
-        ), excluded_item_ids).order_by("created_at", "id")
+        ).exclude(id__in=excluded_item_ids).order_by("created_at", "id")
     )
 
     combined = sorted(new_words + new_phrases, key=lambda item: (item.created_at, item.id))
@@ -361,53 +311,14 @@ def build_upcoming_entries(
     excluded_item_ids: set[int] | None = None,
 ) -> list[SessionEntry]:
     excluded_item_ids = excluded_item_ids or set()
-    rows: list[tuple[object, int, str, Item]] = []
-
-    phrase_upcoming_es_to_de = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.PHRASE,
-        is_learned=False,
+    rows = review_rows(
+        user=user,
+        now=now,
         source_language=source_language,
         target_language=target_language,
-        last_reviewed_at_es_to_de__isnull=False,
-        due_at_es_to_de__gt=now,
-    ), excluded_item_ids).order_by("due_at_es_to_de", "id")
-    for item in phrase_upcoming_es_to_de:
-        rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
-
-    phrase_upcoming_de_to_es = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.PHRASE,
-        is_learned=False,
-        source_language=source_language,
-        target_language=target_language,
-        last_reviewed_at_de_to_es__isnull=False,
-        due_at_de_to_es__gt=now,
-    ), excluded_item_ids).order_by("due_at_de_to_es", "id")
-    for item in phrase_upcoming_de_to_es:
-        rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
-
-    word_upcoming_es_to_de = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.WORD,
-        is_learned=False,
-        source_language=source_language,
-        target_language=target_language,
-        last_reviewed_at_es_to_de__isnull=False,
-        due_at_es_to_de__gt=now,
-    ), excluded_item_ids).order_by("due_at_es_to_de", "id")
-    for item in word_upcoming_es_to_de:
-        rows.append((item.due_at_es_to_de, item.id, Item.ReviewDirection.SPANISH_TO_GERMAN, item))
-
-    word_upcoming_de_to_es = _exclude_item_ids(apply_user_scope(Item.objects, user).filter(
-        item_type=Item.ItemType.WORD,
-        is_learned=False,
-        source_language=source_language,
-        target_language=target_language,
-        last_reviewed_at_de_to_es__isnull=False,
-        due_at_de_to_es__gt=now,
-    ), excluded_item_ids).order_by("due_at_de_to_es", "id")
-    for item in word_upcoming_de_to_es:
-        rows.append((item.due_at_de_to_es, item.id, Item.ReviewDirection.GERMAN_TO_SPANISH, item))
-
-    rows.sort(key=lambda row: (row[0], row[1], row[2]))
+        excluded_item_ids=excluded_item_ids,
+        include_due_today=False,
+    )
 
     entries: list[SessionEntry] = []
     for due_at, _, direction, item in rows:
@@ -429,7 +340,7 @@ def build_difficult_practice_entries(
     source_language: str,
     target_language: str,
 ) -> tuple[list[SessionEntry], set[int]]:
-    ready_cutoff = _start_of_local_day(now)
+    ready_cutoff, _ = local_day_bounds(now)
     difficult_items = list(
         apply_user_scope(Item.objects, user).filter(
             is_learned=False,

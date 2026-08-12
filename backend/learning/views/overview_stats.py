@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from ..auth import apply_user_scope, get_request_user
 from ..item_states import filter_new_items
 from ..models import Item
+from ..review_schedule import local_day_bounds
 
 
 class OverviewStatsView(APIView):
@@ -47,38 +48,40 @@ class OverviewStatsView(APIView):
 
 
 def count_ready_reviews(now, *, user, source_language: str, target_language: str) -> int:
+    _, tomorrow = local_day_bounds(now)
     return (
         apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=False,
-            due_at_es_to_de__lte=now,
+            due_at_es_to_de__lt=tomorrow,
         ).count()
         + apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_de_to_es__isnull=False,
-            due_at_de_to_es__lte=now,
+            due_at_de_to_es__lt=tomorrow,
         ).count()
     )
 
 
 def count_future_reviews(now, *, user, source_language: str, target_language: str) -> int:
+    _, tomorrow = local_day_bounds(now)
     return (
         apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=False,
-            due_at_es_to_de__gt=now,
+            due_at_es_to_de__gte=tomorrow,
         ).count()
         + apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_de_to_es__isnull=False,
-            due_at_de_to_es__gt=now,
+            due_at_de_to_es__gte=tomorrow,
         ).count()
     )

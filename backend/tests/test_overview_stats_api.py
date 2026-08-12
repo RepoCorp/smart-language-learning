@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from learning.models import Item
+from learning.review_schedule import local_day_bounds
 
 
 @pytest.mark.django_db
@@ -37,9 +38,29 @@ def test_overview_stats_returns_expected_counts():
     payload = response.json()
     assert payload["ready_to_review"] == 1
     assert payload["future_reviews"] == 1
-    assert payload["word_items"] == 2
+    assert payload["word_items"] == 1
     assert payload["not_started"] == 1
     assert payload["difficult_items"] == 0
+
+
+@pytest.mark.django_db
+def test_overview_stats_counts_reviews_scheduled_later_today_as_ready():
+    now = timezone.now()
+    _, tomorrow = local_day_bounds(now)
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="tarde",
+        german_text="spaet",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=tomorrow - timedelta(minutes=1),
+    )
+
+    response = APIClient().get("/api/overview-stats")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ready_to_review"] == 1
+    assert payload["future_reviews"] == 0
 
 
 @pytest.mark.django_db
@@ -112,7 +133,7 @@ def test_overview_stats_excludes_items_marked_as_learned():
     payload = response.json()
     assert payload["ready_to_review"] == 0
     assert payload["future_reviews"] == 0
-    assert payload["word_items"] == 2
+    assert payload["word_items"] == 1
     assert payload["not_started"] == 1
     assert payload["difficult_items"] == 0
 

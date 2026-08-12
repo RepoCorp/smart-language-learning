@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from learning.models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
+from learning.review_schedule import local_day_bounds
 
 
 @pytest.mark.django_db
@@ -34,6 +35,26 @@ def test_session_prioritizes_due_reviews_then_new_items():
     assert items[0]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
     assert items[1]["id"] == new_item.id
     assert items[1]["mode"] == "new"
+
+
+@pytest.mark.django_db
+def test_session_includes_reviews_scheduled_later_today():
+    now = timezone.now()
+    _, tomorrow = local_day_bounds(now)
+    later_today = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="tarde",
+        german_text="spaet",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=tomorrow - timedelta(minutes=1),
+    )
+
+    response = APIClient().get("/api/session", {"size": 1})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["id"] == later_today.id
+    assert item["mode"] == "review"
 
 
 @pytest.mark.django_db

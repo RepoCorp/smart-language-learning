@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from learning.models import Item
+from learning.review_schedule import local_day_bounds
 
 
 @pytest.mark.django_db
@@ -30,6 +31,26 @@ def test_submit_review_updates_item_schedule_on_correct_answer():
     assert item.due_at_es_to_de is not None
     assert item.due_at_es_to_de > timezone.now()
     assert item.repetition_count_de_to_es == 0
+
+
+@pytest.mark.django_db
+def test_submit_review_schedules_the_next_review_at_the_start_of_its_calendar_day():
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+    )
+
+    response = APIClient().post(
+        "/api/review",
+        {"item_id": item.id, "correct": True, "direction": Item.ReviewDirection.SPANISH_TO_GERMAN},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    item.refresh_from_db()
+    _, tomorrow = local_day_bounds(timezone.now())
+    assert item.due_at_es_to_de == tomorrow
 
 
 @pytest.mark.django_db
