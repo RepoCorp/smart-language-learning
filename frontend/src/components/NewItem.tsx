@@ -2616,9 +2616,9 @@ export default function NewItem({
                 item.item_type === "phrase",
               hasSelectedEntries:
                 selectedExerciseKeys.length > 0 || item.item_type === "phrase",
-              unselectAll: unselectAllExerciseEntries,
-              selectAll: selectAllExerciseEntries,
-              selectRandom: selectRandomExerciseEntries,
+              onUnselectAll: unselectAllExerciseEntries,
+              onSelectAll: selectAllExerciseEntries,
+              onSelectRandom: selectRandomExerciseEntries,
             }}
             createStrategy={{
               inputValue: createStrategy.inputValue,

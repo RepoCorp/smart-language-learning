@@ -6,7 +6,8 @@ Ningun otro arreglito que no sea vital!!!
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
   - Other things that change depending on the gender of the word.
-- 
+- Añadir mas grammar features 
+- Que detecte los errores de las features en la conversacion 
 
 ## New functionalities 
 De las conversaciones saca errores. Darle al modelo la lista de errores que tenemos incluidas y el dice si/cuales de esos están y sugiere repasarlo. Que sea bien empatico 😂
@@ -15,6 +16,7 @@ Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Dep
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
 ### Tier 1
+Que despues de la conversacion haga comentarios sobre mejores o mas naturales formas de decir algo
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?
