@@ -129,4 +129,15 @@ export type ItemStrategiesModalProps = {
     examples: Partial<Record<NounGender, GermanGrammarNounExample>>;
     isLoading: boolean;
   };
+  phraseGrammarStrategy: {
+    isOpen: boolean;
+    isLoading: boolean;
+    featurePresent: boolean | null;
+    error: string;
+    toggleVerbPosition: () => void;
+    examples: Array<{ target_text: string; source_text: string }>;
+    examplesVisible: boolean;
+    isLoadingExamples: boolean;
+    showExamples: () => void;
+  };
 };

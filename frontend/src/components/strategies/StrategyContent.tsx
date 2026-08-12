@@ -64,6 +64,8 @@ export default function StrategyContent(props: Props): JSX.Element {
         pluralGerman={props.pluralGerman}
         examples={props.grammarStrategy.examples}
         isLoadingExamples={props.grammarStrategy.isLoading}
+        itemType={props.itemType}
+        phraseGrammar={props.phraseGrammarStrategy}
       />
     );
   }

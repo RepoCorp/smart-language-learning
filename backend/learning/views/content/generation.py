@@ -290,12 +290,14 @@ def generate_content_with_chatgpt(
     return spanish_text, german_text, notes, []
 
 
-def extract_json_from_text(content: str) -> dict:
+def extract_json_from_text(content: str) -> dict | list:
     stripped = content.strip()
-    if stripped.startswith("{") and stripped.endswith("}"):
+    if (stripped.startswith("{") and stripped.endswith("}")) or (
+        stripped.startswith("[") and stripped.endswith("]")
+    ):
         return json.loads(stripped)
 
-    match = re.search(r"\{.*\}", stripped, flags=re.DOTALL)
+    match = re.search(r"(?:\{.*\}|\[.*\])", stripped, flags=re.DOTALL)
     if not match:
-        raise json.JSONDecodeError("No JSON object found", content, 0)
+        raise json.JSONDecodeError("No JSON object or array found", content, 0)
     return json.loads(match.group(0))

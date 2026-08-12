@@ -10,6 +10,8 @@ import type {
   ContentItemVisualizeResponse,
   ContentItemWalkResponse,
   ContentItemGrammarExamplesResponse,
+  ContentItemPhraseGrammarFeaturesResponse,
+  ContentItemPhraseGrammarExamplesResponse,
   StudyLanguageCode,
 } from "./types";
 
@@ -29,6 +31,43 @@ export async function fetchContentItemGrammarExamples(
     throw new Error("Failed to load grammar examples");
   }
   return (await response.json()) as ContentItemGrammarExamplesResponse;
+}
+
+export async function analyzeContentItemPhraseGrammarFeatures(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemPhraseGrammarFeaturesResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/grammar-features?${params.toString()}`,
+    { method: "POST" },
+  );
+  if (!response.ok) {
+    throw new Error("Failed to analyze phrase grammar");
+  }
+  return (await response.json()) as ContentItemPhraseGrammarFeaturesResponse;
+}
+
+export async function fetchContentItemPhraseGrammarExamples(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<ContentItemPhraseGrammarExamplesResponse> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(
+    `${API_BASE}/content/items/${itemId}/strategies/grammar-features?${params.toString()}`,
+  );
+  if (!response.ok) {
+    throw new Error("Failed to load phrase grammar examples");
+  }
+  return (await response.json()) as ContentItemPhraseGrammarExamplesResponse;
 }
 
 export async function generateContentItemActExercise(

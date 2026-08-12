@@ -37,7 +37,7 @@ def _call_openai_json_logged(
     temperature: float = 0.2,
     top_p: float = 1.0,
     presence_penalty: float = 0.0,
-) -> dict | None:
+) -> dict | list | None:
     logger.info(
         "content.management.model.request label=%s model=%s system_prompt=%s user_input=%s",
         label,

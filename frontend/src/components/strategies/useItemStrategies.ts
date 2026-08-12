@@ -21,6 +21,7 @@ import { useRelatedStrategy } from "./useRelatedStrategy";
 import { useVisualizeStrategy } from "./useVisualizeStrategy";
 import { useWalkStrategy } from "./useWalkStrategy";
 import { useGrammarExamples } from "./useGrammarExamples";
+import { usePhraseGrammarFeatures } from "./usePhraseGrammarFeatures";
 
 type StrategyErrors = {
   create: string;
@@ -124,6 +125,11 @@ export function useItemStrategies({
     sourceLanguage,
     targetLanguage,
   });
+  const phraseGrammarStrategy = usePhraseGrammarFeatures({
+    itemId,
+    sourceLanguage,
+    targetLanguage,
+  });
 
   return {
     createStrategy,
@@ -136,5 +142,6 @@ export function useItemStrategies({
     encounterStrategy,
     compareStrategy,
     grammarStrategy,
+    phraseGrammarStrategy,
   };
 }

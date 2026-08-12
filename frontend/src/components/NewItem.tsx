@@ -959,6 +959,7 @@ export default function NewItem({
     encounterStrategy,
     compareStrategy,
     grammarStrategy,
+    phraseGrammarStrategy,
   } = useItemStrategies({
     itemId: item.id,
     itemType: item.item_type,
@@ -2669,6 +2670,7 @@ export default function NewItem({
             encounterStrategy={encounterStrategy}
             compareStrategy={compareStrategy}
             grammarStrategy={grammarStrategy}
+            phraseGrammarStrategy={phraseGrammarStrategy}
           />
         )}
       {showFunnyImageModal &&

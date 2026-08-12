@@ -2499,6 +2499,33 @@ textarea {
   margin: 0;
 }
 
+.grammar-phrase-features {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.grammar-phrase-features .content-collapsible-body {
+  text-align: left;
+}
+
+.grammar-phrase-examples {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.grammar-phrase-example {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-muted);
+}
+
+.grammar-phrase-example p {
+  margin: 0;
+}
+
 .grammar-strategy-table-wrap {
   overflow-x: auto;
 }

@@ -5,7 +5,7 @@ import pytest
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from learning.models import DialogTurn, DisabledElevenLabsVoice, Item, ItemDialogOccurrence, ItemQuestionExchange, SavedDialog, SavedTopic, UserAuthToken
+from learning.models import DialogTurn, DisabledElevenLabsVoice, Item, ItemDialogOccurrence, ItemGrammarFeature, ItemQuestionExchange, SavedDialog, SavedTopic, UserAuthToken
 
 
 def test_forms_payload_replacement_preserves_other_strategy_results():
@@ -1953,6 +1953,80 @@ def test_content_item_regenerate_keeps_a_selected_subphrase(monkeypatch):
     assert item.spanish_text == "para la estación"
     assert item.german_text == "zum Bahnhof"
     assert item.audio_url == "http://localhost:8000/media/audio/subphrase.mp3"
+
+
+@pytest.mark.django_db
+def test_phrase_grammar_feature_is_persisted_only_when_detected(monkeypatch):
+    from learning.grammar_features import VERB_POSITION_MAIN_CLAUSE
+    from learning.views.content import management_items_phrase_grammar as phrase_grammar_views
+
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Vivo en Berlin.",
+        german_text="Ich wohne in Berlin.",
+        source_language="spanish",
+        target_language="german",
+    )
+    monkeypatch.setattr(
+        phrase_grammar_views,
+        "_call_openai_json_logged",
+        lambda **kwargs: [VERB_POSITION_MAIN_CLAUSE],
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{phrase.id}/strategies/grammar-features?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"feature_present": True}
+    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_MAIN_CLAUSE).exists()
+
+
+@pytest.mark.django_db
+def test_phrase_grammar_feature_does_not_store_an_absent_feature(monkeypatch):
+    from learning.grammar_features import VERB_POSITION_MAIN_CLAUSE
+    from learning.views.content import management_items_phrase_grammar as phrase_grammar_views
+
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="¡Qué bonito!",
+        german_text="Wie schön!",
+        source_language="spanish",
+        target_language="german",
+    )
+    monkeypatch.setattr(phrase_grammar_views, "_call_openai_json_logged", lambda **kwargs: [])
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{phrase.id}/strategies/grammar-features?source_language=spanish&target_language=german",
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"feature_present": False}
+    assert not phrase.grammar_features.filter(feature_key=VERB_POSITION_MAIN_CLAUSE).exists()
+
+
+@pytest.mark.django_db
+def test_phrase_grammar_examples_return_other_phrases_with_the_feature():
+    from learning.grammar_features import VERB_POSITION_MAIN_CLAUSE
+
+    current = Item.objects.create(item_type=Item.ItemType.PHRASE, spanish_text="Vivo aqui.", german_text="Ich wohne hier.", source_language="spanish", target_language="german")
+    matching = Item.objects.create(item_type=Item.ItemType.PHRASE, spanish_text="Ella trabaja hoy.", german_text="Sie arbeitet heute.", source_language="spanish", target_language="german")
+    nonmatching = Item.objects.create(item_type=Item.ItemType.PHRASE, spanish_text="¡Qué bonito!", german_text="Wie schön!", source_language="spanish", target_language="german")
+    ItemGrammarFeature.objects.create(item=current, feature_key=VERB_POSITION_MAIN_CLAUSE)
+    ItemGrammarFeature.objects.create(item=matching, feature_key=VERB_POSITION_MAIN_CLAUSE)
+
+    client = APIClient()
+    response = client.get(
+        f"/api/content/items/{current.id}/strategies/grammar-features?source_language=spanish&target_language=german",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["examples"] == [{"target_text": matching.german_text, "source_text": matching.spanish_text}]
+    assert nonmatching.german_text not in str(response.json())
 
 
 @pytest.mark.django_db

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n";
 import type { GermanGrammarNounExample, StudyLanguageCode } from "../../types";
+import TargetPhraseText from "../TargetPhraseText";
 import StaticGrammarTable, { type StaticGrammarRow } from "./StaticGrammarTable";
 
 type NounGender = "masculine" | "feminine" | "neuter";
@@ -45,6 +46,8 @@ export default function GrammarStrategyPanel({
   pluralGerman,
   examples,
   isLoadingExamples,
+  itemType,
+  phraseGrammar,
 }: {
   wordType: string;
   targetLanguage: StudyLanguageCode;
@@ -52,6 +55,18 @@ export default function GrammarStrategyPanel({
   pluralGerman: string;
   examples: Partial<Record<NounGender, GermanGrammarNounExample>>;
   isLoadingExamples: boolean;
+  itemType: "word" | "phrase";
+  phraseGrammar: {
+    isOpen: boolean;
+    isLoading: boolean;
+    featurePresent: boolean | null;
+    error: string;
+    toggleVerbPosition: () => void;
+    examples: Array<{ target_text: string; source_text: string }>;
+    examplesVisible: boolean;
+    isLoadingExamples: boolean;
+    showExamples: () => void;
+  };
 }): JSX.Element {
   const { t } = useI18n();
   const noun = wordType.trim().toLowerCase() === "noun" && targetLanguage === "german"
@@ -66,6 +81,10 @@ export default function GrammarStrategyPanel({
       setSelectedGender(noun.gender);
     }
   }, [noun?.gender]);
+
+  if (itemType === "phrase") {
+    return <PhraseGrammarPanel targetLanguage={targetLanguage} phraseGrammar={phraseGrammar} />;
+  }
 
   if (isGermanVerb) {
     return <VerbGrammarTable />;
@@ -167,6 +186,67 @@ export default function GrammarStrategyPanel({
       <p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p>
     </div>
   );
+}
+
+function PhraseGrammarPanel({
+  targetLanguage,
+  phraseGrammar,
+}: {
+  targetLanguage: StudyLanguageCode;
+  phraseGrammar: {
+    isOpen: boolean;
+    isLoading: boolean;
+    featurePresent: boolean | null;
+    error: string;
+    toggleVerbPosition: () => void;
+    examples: Array<{ target_text: string; source_text: string }>;
+    examplesVisible: boolean;
+    isLoadingExamples: boolean;
+    showExamples: () => void;
+  };
+}): JSX.Element {
+  const { t } = useI18n();
+  if (targetLanguage !== "german") {
+    return <GrammarPlaceholder />;
+  }
+  return (
+    <div className="grammar-strategy-panel">
+      <p className="grammar-strategy-intro">{t("strategies.grammar.description")}</p>
+      <div className="grammar-phrase-features">
+        <section className="content-collapsible-card">
+          <button type="button" className="content-collapsible-trigger" aria-expanded={phraseGrammar.isOpen} onClick={phraseGrammar.toggleVerbPosition}>
+            <span className="content-collapsible-trigger-copy"><strong>{t("strategies.grammar.verbPosition")}</strong></span>
+            <span className={`content-collapsible-trigger-icon${phraseGrammar.isOpen ? " content-collapsible-trigger-icon-open" : ""}`} aria-hidden="true">▾</span>
+          </button>
+          {phraseGrammar.isOpen && (
+            <div className="content-collapsible-body">
+              {phraseGrammar.isLoading && <p className="hint">{t("strategies.grammar.checking")}</p>}
+              {phraseGrammar.error && <p className="error">{phraseGrammar.error}</p>}
+              {phraseGrammar.featurePresent === true && <>
+                <p>{t("strategies.grammar.verbPositionNote")}</p>
+                {!phraseGrammar.examplesVisible && <button type="button" className="secondary-button" onClick={phraseGrammar.showExamples}>{t("strategies.grammar.showExamples")}</button>}
+                {phraseGrammar.isLoadingExamples && <p className="hint">{t("strategies.grammar.loadingExamples")}</p>}
+                {phraseGrammar.examplesVisible && !phraseGrammar.isLoadingExamples && (
+                  phraseGrammar.examples.length > 0 ? (
+                    <div className="grammar-phrase-examples">
+                      {phraseGrammar.examples.map((example) => <div key={`${example.target_text}|||${example.source_text}`} className="grammar-phrase-example"><TargetPhraseText as="p" text={example.target_text} variant="dialog" /><p className="dialog-turn-translation">{example.source_text}</p></div>)}
+                    </div>
+                  ) : <p className="hint">{t("strategies.grammar.noExamples")}</p>
+                )}
+              </>}
+              {phraseGrammar.featurePresent === false && <p className="hint">{t("strategies.grammar.verbPositionNotShown")}</p>}
+            </div>
+          )}
+        </section>
+      </div>
+      <p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p>
+    </div>
+  );
+}
+
+function GrammarPlaceholder(): JSX.Element {
+  const { t } = useI18n();
+  return <div className="word-strategies-placeholder-card grammar-strategy-panel"><p className="word-strategies-placeholder-title"><strong>{t("strategies.grammar.title")}</strong></p><p>{t("strategies.grammar.description")}</p><p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p></div>;
 }
 
 function VerbGrammarTable(): JSX.Element {

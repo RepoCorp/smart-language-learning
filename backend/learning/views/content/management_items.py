@@ -18,6 +18,7 @@ from .management_items_related import ContentItemRelatedView
 from .management_items_decode import ContentItemDecodeView
 from .management_items_encounter import ContentItemEncounterView
 from .management_items_grammar import ContentItemGrammarExamplesView
+from .management_items_phrase_grammar import ContentItemPhraseGrammarFeaturesView
 from .management_items_noun_exercise_cases import ContentItemNounExerciseCaseView
 from .management_items_personalize import ContentItemPersonalizeView
 from .management_items_practice import ContentItemPracticeView
@@ -40,6 +41,7 @@ __all__ = [
     "ContentItemDecodeView",
     "ContentItemEncounterView",
     "ContentItemGrammarExamplesView",
+    "ContentItemPhraseGrammarFeaturesView",
     "ContentItemExercisesView",
     "ContentItemNounExerciseCaseView",
     "ContentItemPersonalizeView",

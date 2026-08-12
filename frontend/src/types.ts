@@ -103,6 +103,14 @@ export type ContentItemGrammarExamplesResponse = {
   examples: Partial<Record<"masculine" | "feminine" | "neuter", GermanGrammarNounExample>>;
 };
 
+export type ContentItemPhraseGrammarFeaturesResponse = {
+  feature_present: boolean;
+};
+
+export type ContentItemPhraseGrammarExamplesResponse = {
+  examples: Array<{ target_text: string; source_text: string }>;
+};
+
 export interface DialogPhraseTurn {
   source_text: string;
   target_text: string;

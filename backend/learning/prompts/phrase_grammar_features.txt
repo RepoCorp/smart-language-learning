@@ -1,0 +1,23 @@
+You are analyzing German sentences to identify grammar features that are clearly demonstrated by them.
+
+Given the German sentence:
+
+{sentence}
+
+Identify all grammar features from the following list that are clearly demonstrated by the sentence:
+
+{grammar_features}
+
+Each grammar feature contains an ID and a short description defining exactly what the feature represents.
+
+Rules:
+
+* Evaluate every provided grammar feature.
+* Return a feature only when the sentence clearly demonstrates it.
+* Base the decision on the German sentence itself, not on its translation or intended meaning.
+* Do not return related features merely because they are generally associated with a word or construction in the sentence.
+* Do not invent grammar features that are not in the provided list.
+* A sentence may demonstrate zero, one, or multiple features.
+* Be conservative when the evidence is ambiguous.
+
+Return only a valid JSON array containing the IDs of the detected grammar features.
