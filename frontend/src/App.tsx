@@ -13,6 +13,7 @@ import ProgressPage from "./components/ProgressPage";
 import SessionPage from "./components/SessionPage";
 import { DebugToolsPanel } from "./debugTools";
 import ConversationPage from "./features/conversation/ConversationPage";
+import GlobalSessionEndPrompt from "./features/session/GlobalSessionEndPrompt";
 
 export default function App(): JSX.Element {
   const location = useLocation();
@@ -156,6 +157,7 @@ export default function App(): JSX.Element {
             />
             <Route path="*" element={<Navigate to="/session" replace />} />
           </Routes>
+          <GlobalSessionEndPrompt />
           {authUser.is_superuser && <DebugToolsPanel />}
         </>
       ) : null}

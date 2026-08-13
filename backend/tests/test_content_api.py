@@ -29,6 +29,51 @@ def test_forms_payload_replacement_preserves_other_strategy_results():
     assert "visualize_phrase" in payload
 
 
+@pytest.mark.django_db
+def test_create_strategy_phrase_persists_and_is_returned_by_item_detail(monkeypatch):
+    from learning.views.content import management_items_personalize
+
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="usar",
+        german_text="benutzen",
+        source_language="spanish",
+        target_language="german",
+        word_type="verb",
+    )
+    monkeypatch.setattr(
+        management_items_personalize,
+        "_call_openai_json_logged",
+        lambda **kwargs: {
+            "source_text": "Uso el telefono para trabajar.",
+            "target_text": "Ich benutze das Telefon zur Arbeit.",
+        },
+    )
+
+    client = APIClient()
+    response = client.post(
+        f"/api/content/items/{item.id}/strategies/personalize?source_language=spanish&target_language=german",
+        {"source_text": "Uso el telefono para trabajar."},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    item.refresh_from_db()
+    assert item.exercise_phrases["personalize_phrases"] == [
+        {
+            "label": "personalize",
+            "source_text": "Uso el telefono para trabajar.",
+            "target_text": "Ich benutze das Telefon zur Arbeit.",
+        }
+    ]
+
+    detail_response = client.get(
+        f"/api/content/items/{item.id}?source_language=spanish&target_language=german",
+    )
+    assert detail_response.status_code == 200
+    assert detail_response.json()["exercise_phrases"] == item.exercise_phrases
+
+
 def test_walk_challenge_uses_one_movement_and_one_voice_or_imagination():
     from learning.views.content.walk_challenges import generate_walk_challenge
 

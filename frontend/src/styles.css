@@ -2324,12 +2324,15 @@ textarea {
 
 .item-questions-actions {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.item-questions-actions input {
-  flex: 1 1 360px;
+.item-questions-actions textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
 }
 
 .item-questions-history {

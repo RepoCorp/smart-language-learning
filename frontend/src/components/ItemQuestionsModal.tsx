@@ -32,7 +32,7 @@ export default function ItemQuestionsModal({
   const { t } = useI18n();
   const [questionInput, setQuestionInput] = useState<string>("");
   const questionsHistoryRef = useRef<HTMLDivElement | null>(null);
-  const questionInputRef = useRef<HTMLInputElement | null>(null);
+  const questionInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const orderedItemQuestions = useMemo(
     () => [...itemQuestions].sort((left, right) => left.id - right.id),
@@ -129,12 +129,13 @@ export default function ItemQuestionsModal({
             void submitQuestion(questionInput);
           }}
         >
-          <input
+          <textarea
             ref={questionInputRef}
             value={questionInput}
             onChange={(event) => setQuestionInput(event.target.value)}
             placeholder={t("newItem.questionsPlaceholder")}
             disabled={askingQuestion}
+            rows={5}
           />
           <button type="submit" disabled={askingQuestion || !questionInput.trim()}>
             {askingQuestion ? t("newItem.questionsLoading") : t("newItem.questionsAskButton")}

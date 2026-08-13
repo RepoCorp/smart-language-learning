@@ -10,19 +10,13 @@ import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
 import WordReview from "./WordReview";
 import useSessionStudyActivity from "./useSessionStudyActivity";
-
-type StoredSessionState = {
-  durationInput: string;
-  sessionDurationMinutes: number | null;
-  sessionEndsAtMs: number | null;
-  remainingSeconds: number;
-  sessionOutcome: "time_up" | "completed" | null;
-  index: number;
-  items: SessionItem[];
-  showPostReviewItem: boolean;
-  currentReviewCorrect: boolean | null;
-  showExtendPrompt: boolean;
-};
+import {
+  ACTIVE_SESSION_CHANGED_EVENT,
+  activeSessionStorageKey,
+  readStoredSessionState,
+  writeStoredSessionState,
+  type StoredSessionState,
+} from "../features/session/sessionStorage";
 
 type DailyNewItemProgress = {
   date: string;
@@ -41,7 +35,7 @@ function todayKey(): string {
 export default function SessionPage(): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const sessionStorageKey = `active_session_${sourceLanguage}_${targetLanguage}`;
+  const sessionStorageKey = activeSessionStorageKey(sourceLanguage, targetLanguage);
   const dailyNewItemStorageKey = `daily_new_items_${sourceLanguage}_${targetLanguage}`;
   const [items, setItems] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -99,31 +93,25 @@ export default function SessionPage(): JSX.Element {
   useEffect(() => {
     setHasHydratedState(false);
     setRestoredSnapshotHasItems(false);
-    const raw = window.sessionStorage.getItem(sessionStorageKey);
-    if (!raw) {
+    const parsed = readStoredSessionState(sessionStorageKey);
+    if (!parsed) {
       setHasHydratedState(true);
       return;
     }
-    try {
-      const parsed = JSON.parse(raw) as Partial<StoredSessionState> & { showIncorrectReviewItem?: boolean };
-      setDurationInput(typeof parsed.durationInput === "string" ? parsed.durationInput : "10");
-      setSessionDurationMinutes(typeof parsed.sessionDurationMinutes === "number" ? parsed.sessionDurationMinutes : null);
-      setSessionEndsAtMs(typeof parsed.sessionEndsAtMs === "number" ? parsed.sessionEndsAtMs : null);
-      setRemainingSeconds(typeof parsed.remainingSeconds === "number" ? parsed.remainingSeconds : 0);
-      setSessionOutcome(parsed.sessionOutcome === "time_up" || parsed.sessionOutcome === "completed" ? parsed.sessionOutcome : null);
-      const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
-      setItems(parsedItems);
-      setRestoredSnapshotHasItems(parsedItems.length > 0);
-      setIndex(typeof parsed.index === "number" ? parsed.index : 0);
-      setShowExtendPrompt(Boolean(parsed.showExtendPrompt));
-      setShowPostReviewItem(Boolean(parsed.showPostReviewItem ?? parsed.showIncorrectReviewItem));
-      setCurrentReviewCorrect(typeof parsed.currentReviewCorrect === "boolean" ? parsed.currentReviewCorrect : null);
-      setResetCurrentResultError("");
-    } catch {
-      window.sessionStorage.removeItem(sessionStorageKey);
-    } finally {
-      setHasHydratedState(true);
-    }
+    setDurationInput(typeof parsed.durationInput === "string" ? parsed.durationInput : "10");
+    setSessionDurationMinutes(typeof parsed.sessionDurationMinutes === "number" ? parsed.sessionDurationMinutes : null);
+    setSessionEndsAtMs(typeof parsed.sessionEndsAtMs === "number" ? parsed.sessionEndsAtMs : null);
+    setRemainingSeconds(typeof parsed.remainingSeconds === "number" ? parsed.remainingSeconds : 0);
+    setSessionOutcome(parsed.sessionOutcome === "time_up" || parsed.sessionOutcome === "completed" ? parsed.sessionOutcome : null);
+    const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
+    setItems(parsedItems);
+    setRestoredSnapshotHasItems(parsedItems.length > 0);
+    setIndex(typeof parsed.index === "number" ? parsed.index : 0);
+    setShowExtendPrompt(Boolean(parsed.showExtendPrompt));
+    setShowPostReviewItem(Boolean(parsed.showPostReviewItem ?? parsed.showIncorrectReviewItem));
+    setCurrentReviewCorrect(typeof parsed.currentReviewCorrect === "boolean" ? parsed.currentReviewCorrect : null);
+    setResetCurrentResultError("");
+    setHasHydratedState(true);
   }, [sessionStorageKey]);
 
   useEffect(() => {
@@ -146,7 +134,7 @@ export default function SessionPage(): JSX.Element {
       currentReviewCorrect,
       showExtendPrompt,
     };
-    window.sessionStorage.setItem(sessionStorageKey, JSON.stringify(snapshot));
+    writeStoredSessionState(sessionStorageKey, snapshot);
   }, [
     hasHydratedState,
     sessionStorageKey,
@@ -183,15 +171,32 @@ export default function SessionPage(): JSX.Element {
     const tick = (): void => {
       const diffSeconds = Math.max(0, Math.ceil((sessionEndsAtMs - Date.now()) / 1000));
       setRemainingSeconds(diffSeconds);
-      if (diffSeconds <= 0) {
-        setShowExtendPrompt(true);
-      }
     };
 
     tick();
     const intervalId = window.setInterval(tick, 1000);
     return () => window.clearInterval(intervalId);
   }, [sessionEndsAtMs, sessionOutcome, showExtendPrompt]);
+
+  useEffect(() => {
+    const syncGlobalSessionAction = (event: Event): void => {
+      const detail = (event as CustomEvent<{ key?: string }>).detail;
+      if (detail?.key !== sessionStorageKey) {
+        return;
+      }
+      const snapshot = readStoredSessionState(sessionStorageKey);
+      if (!snapshot) {
+        return;
+      }
+      setSessionEndsAtMs(typeof snapshot.sessionEndsAtMs === "number" ? snapshot.sessionEndsAtMs : null);
+      setRemainingSeconds(typeof snapshot.remainingSeconds === "number" ? snapshot.remainingSeconds : 0);
+      setSessionOutcome(snapshot.sessionOutcome === "time_up" || snapshot.sessionOutcome === "completed" ? snapshot.sessionOutcome : null);
+      setShowExtendPrompt(Boolean(snapshot.showExtendPrompt));
+    };
+
+    window.addEventListener(ACTIVE_SESSION_CHANGED_EVENT, syncGlobalSessionAction);
+    return () => window.removeEventListener(ACTIVE_SESSION_CHANGED_EVENT, syncGlobalSessionAction);
+  }, [sessionStorageKey]);
 
   useEffect(() => {
     if (!hasHydratedState) {
@@ -482,33 +487,6 @@ export default function SessionPage(): JSX.Element {
   const seconds = remainingSeconds % 60;
   const formattedRemaining = `${minutes}:${String(seconds).padStart(2, "0")}`;
 
-  const extendSession = (): void => {
-    const extensionMinutes = 5;
-    const nextEndsAt = Date.now() + extensionMinutes * 60 * 1000;
-    setSessionEndsAtMs(nextEndsAt);
-    setRemainingSeconds(extensionMinutes * 60);
-    setShowExtendPrompt(false);
-  };
-
-  const endSessionNow = (): void => {
-    setShowExtendPrompt(false);
-    setSessionOutcome("time_up");
-  };
-
-  const extendPromptOverlay = showExtendPrompt ? (
-    <div className="blocking-modal-overlay session-extend-overlay" role="dialog" aria-modal="true">
-      <section className="blocking-modal">
-        <p className="error">{t("session.extendPromptTitle")}</p>
-        <p>{t("session.extendPromptMessage")}</p>
-        <div className="actions">
-          <button onClick={extendSession}>{t("session.extendYes")}</button>
-          <button className="secondary-button" onClick={endSessionNow}>
-            {t("session.extendNo")}
-          </button>
-        </div>
-      </section>
-    </div>
-  ) : null;
   const openedItemModal = (loadingOpenedItem || openedItem || openedItemError) ? (
     <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
       <div className="blocking-modal related-dialogs-modal">
@@ -612,7 +590,6 @@ export default function SessionPage(): JSX.Element {
     return (
       <>
         <main className="container">{t("session.loading")}</main>
-        {extendPromptOverlay}
         {newWordsCelebrationOverlay}
       </>
     );
@@ -622,7 +599,6 @@ export default function SessionPage(): JSX.Element {
     return (
       <>
         <main className="container error">{t("session.error", { message: error })}</main>
-        {extendPromptOverlay}
         {newWordsCelebrationOverlay}
       </>
     );
@@ -634,7 +610,6 @@ export default function SessionPage(): JSX.Element {
         <main className="container">
           <p>{t("session.empty")}</p>
         </main>
-        {extendPromptOverlay}
         {newWordsCelebrationOverlay}
       </>
     );
@@ -644,7 +619,6 @@ export default function SessionPage(): JSX.Element {
     return (
       <>
         <main className="container">{t("session.loading")}</main>
-        {extendPromptOverlay}
         {newWordsCelebrationOverlay}
       </>
     );
@@ -727,7 +701,6 @@ export default function SessionPage(): JSX.Element {
             </div>
           </main>
       {openedItemModal}
-      {extendPromptOverlay}
       {newWordsCelebrationOverlay}
     </>
   );
