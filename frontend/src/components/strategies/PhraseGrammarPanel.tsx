@@ -15,7 +15,18 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     | "strategies.grammar.verbPositionSubordinateClause"
     | "strategies.grammar.separableVerbMainClause"
     | "strategies.grammar.modalVerbWithInfinitive"
-    | "strategies.grammar.reflexiveVerb";
+    | "strategies.grammar.reflexiveVerb"
+    | "strategies.grammar.auxiliaryVerb"
+    | "strategies.grammar.pastParticiple"
+    | "strategies.grammar.perfectWithHabenOrSein"
+    | "strategies.grammar.imperative"
+    | "strategies.grammar.konjunktivIi"
+    | "strategies.grammar.negationNicht"
+    | "strategies.grammar.negationKein"
+    | "strategies.grammar.prepositionAccusative"
+    | "strategies.grammar.prepositionDative"
+    | "strategies.grammar.twoWayPrepositionLocation"
+    | "strategies.grammar.twoWayPrepositionDirection";
   present:
     | "strategies.grammar.verbPositionStatementNote"
     | "strategies.grammar.verbPositionYesNoQuestionNote"
@@ -23,7 +34,18 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     | "strategies.grammar.verbPositionSubordinateClauseNote"
     | "strategies.grammar.separableVerbMainClauseNote"
     | "strategies.grammar.modalVerbWithInfinitiveNote"
-    | "strategies.grammar.reflexiveVerbNote";
+    | "strategies.grammar.reflexiveVerbNote"
+    | "strategies.grammar.auxiliaryVerbNote"
+    | "strategies.grammar.pastParticipleNote"
+    | "strategies.grammar.perfectWithHabenOrSeinNote"
+    | "strategies.grammar.imperativeNote"
+    | "strategies.grammar.konjunktivIiNote"
+    | "strategies.grammar.negationNichtNote"
+    | "strategies.grammar.negationKeinNote"
+    | "strategies.grammar.prepositionAccusativeNote"
+    | "strategies.grammar.prepositionDativeNote"
+    | "strategies.grammar.twoWayPrepositionLocationNote"
+    | "strategies.grammar.twoWayPrepositionDirectionNote";
   example: JSX.Element;
 }> = {
   verb_position_main_clause: {
@@ -60,6 +82,61 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     title: "strategies.grammar.reflexiveVerb",
     present: "strategies.grammar.reflexiveVerbNote",
     example: <>sich freuen → Ich <strong>freue mich</strong>.</>,
+  },
+  auxiliary_verb: {
+    title: "strategies.grammar.auxiliaryVerb",
+    present: "strategies.grammar.auxiliaryVerbNote",
+    example: <>haben + gemacht → Ich <strong>habe</strong> das gemacht.</>,
+  },
+  past_participle: {
+    title: "strategies.grammar.pastParticiple",
+    present: "strategies.grammar.pastParticipleNote",
+    example: <>machen → <strong>gemacht</strong></>,
+  },
+  perfect_with_haben_or_sein: {
+    title: "strategies.grammar.perfectWithHabenOrSein",
+    present: "strategies.grammar.perfectWithHabenOrSeinNote",
+    example: <><span>machen → Ich <strong>habe</strong> das <strong>gemacht</strong>.</span><br /><span>gehen → Ich <strong>bin</strong> nach Hause <strong>gegangen</strong>.</span></>,
+  },
+  imperative: {
+    title: "strategies.grammar.imperative",
+    present: "strategies.grammar.imperativeNote",
+    example: <>kommen → <strong>Komm!</strong> (du) · <strong>Kommt!</strong> (ihr) · <strong>Kommen Sie!</strong> (Sie)</>,
+  },
+  konjunktiv_ii: {
+    title: "strategies.grammar.konjunktivIi",
+    present: "strategies.grammar.konjunktivIiNote",
+    example: <>können → Ich <strong>könnte</strong> kommen.</>,
+  },
+  negation_nicht: {
+    title: "strategies.grammar.negationNicht",
+    present: "strategies.grammar.negationNichtNote",
+    example: <>Ich komme. → Ich komme <strong>nicht</strong>.</>,
+  },
+  negation_kein: {
+    title: "strategies.grammar.negationKein",
+    present: "strategies.grammar.negationKeinNote",
+    example: <>Ich habe ein Auto. → Ich habe <strong>kein Auto</strong>.</>,
+  },
+  preposition_accusative: {
+    title: "strategies.grammar.prepositionAccusative",
+    present: "strategies.grammar.prepositionAccusativeNote",
+    example: <>für → Das ist <strong>für den Hund</strong>.</>,
+  },
+  preposition_dative: {
+    title: "strategies.grammar.prepositionDative",
+    present: "strategies.grammar.prepositionDativeNote",
+    example: <>mit → Ich komme <strong>mit dem Hund</strong>.</>,
+  },
+  two_way_preposition_location: {
+    title: "strategies.grammar.twoWayPrepositionLocation",
+    present: "strategies.grammar.twoWayPrepositionLocationNote",
+    example: <>in + Wo? → Ich bin <strong>in der Küche</strong>.</>,
+  },
+  two_way_preposition_direction: {
+    title: "strategies.grammar.twoWayPrepositionDirection",
+    present: "strategies.grammar.twoWayPrepositionDirectionNote",
+    example: <>in + Wohin? → Ich gehe <strong>in die Küche</strong>.</>,
   },
 };
 

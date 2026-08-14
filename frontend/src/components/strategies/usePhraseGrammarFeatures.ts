@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { analyzeContentItemPhraseGrammarFeatures, fetchContentItemPhraseGrammarExamples } from "../../apiStrategies";
 import type { StudyLanguageCode } from "../../types";
@@ -7,6 +7,9 @@ import {
   type PhraseGrammarFeatureKey,
   type PhraseGrammarFeatureState,
 } from "./phraseGrammarTypes";
+
+const analysisCache = new Map<string, PhraseGrammarFeatureKey[]>();
+const pendingAnalyses = new Map<string, Promise<PhraseGrammarFeatureKey[]>>();
 
 function initialFeatureState(): PhraseGrammarFeatureState {
   return {
@@ -38,28 +41,36 @@ export function usePhraseGrammarFeatures({
   const [featureKeys, setFeatureKeys] = useState<PhraseGrammarFeatureKey[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const analysisKeyRef = useRef("");
 
   const analyze = (force = false): void => {
     const analysisKey = `${itemId}:${sourceLanguage}:${targetLanguage}`;
-    if (itemId <= 0 || isLoading || (!force && analysisKeyRef.current === analysisKey)) {
+    if (itemId <= 0 || isLoading) {
       return;
     }
-    analysisKeyRef.current = analysisKey;
+    if (!force && analysisCache.has(analysisKey)) {
+      setFeatureKeys(analysisCache.get(analysisKey) || []);
+      return;
+    }
     setIsLoading(true);
     setError("");
-    void analyzeContentItemPhraseGrammarFeatures(itemId, sourceLanguage, targetLanguage)
-      .then((response) => {
-        const detected = response.feature_keys.filter(
-          (key): key is PhraseGrammarFeatureKey => PHRASE_GRAMMAR_FEATURE_KEYS.includes(key as PhraseGrammarFeatureKey),
-        );
+    const pendingAnalysis = force
+      ? createAnalysis(itemId, sourceLanguage, targetLanguage)
+      : pendingAnalyses.get(analysisKey) || createAnalysis(itemId, sourceLanguage, targetLanguage);
+    if (!force && !pendingAnalyses.has(analysisKey)) {
+      pendingAnalyses.set(analysisKey, pendingAnalysis);
+    }
+    void pendingAnalysis
+      .then((detected) => {
+        analysisCache.set(analysisKey, detected);
         setFeatureKeys(detected);
       })
       .catch((requestError) => {
-        analysisKeyRef.current = "";
         setError(requestError instanceof Error ? requestError.message : "Failed to analyze phrase grammar");
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        pendingAnalyses.delete(analysisKey);
+        setIsLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -67,7 +78,6 @@ export function usePhraseGrammarFeatures({
     setFeatureKeys([]);
     setIsLoading(false);
     setError("");
-    analysisKeyRef.current = "";
   }, [itemId]);
 
   useEffect(() => {
@@ -106,4 +116,15 @@ export function usePhraseGrammarFeatures({
   };
 
   return { featureKeys, features, isLoading, error, refresh: () => analyze(true), toggleFeature };
+}
+
+function createAnalysis(
+  itemId: number,
+  sourceLanguage: StudyLanguageCode,
+  targetLanguage: StudyLanguageCode,
+): Promise<PhraseGrammarFeatureKey[]> {
+  return analyzeContentItemPhraseGrammarFeatures(itemId, sourceLanguage, targetLanguage)
+    .then((response) => response.feature_keys.filter(
+      (key): key is PhraseGrammarFeatureKey => PHRASE_GRAMMAR_FEATURE_KEYS.includes(key as PhraseGrammarFeatureKey),
+    ));
 }

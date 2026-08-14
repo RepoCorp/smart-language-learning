@@ -5,6 +5,17 @@ VERB_POSITION_SUBORDINATE_CLAUSE = "verb_position_subordinate_clause"
 SEPARABLE_VERB_MAIN_CLAUSE = "separable_verb_main_clause"
 MODAL_VERB_WITH_INFINITIVE = "modal_verb_with_infinitive"
 REFLEXIVE_VERB = "reflexive_verb"
+AUXILIARY_VERB = "auxiliary_verb"
+PAST_PARTICIPLE = "past_participle"
+PERFECT_WITH_HABEN_OR_SEIN = "perfect_with_haben_or_sein"
+IMPERATIVE = "imperative"
+KONJUNKTIV_II = "konjunktiv_ii"
+NEGATION_NICHT = "negation_nicht"
+NEGATION_KEIN = "negation_kein"
+PREPOSITION_ACCUSATIVE = "preposition_accusative"
+PREPOSITION_DATIVE = "preposition_dative"
+TWO_WAY_PREPOSITION_LOCATION = "two_way_preposition_location"
+TWO_WAY_PREPOSITION_DIRECTION = "two_way_preposition_direction"
 
 PHRASE_GRAMMAR_FEATURES = {
     VERB_POSITION_MAIN_CLAUSE: (
@@ -29,5 +40,43 @@ PHRASE_GRAMMAR_FEATURES = {
     ),
     REFLEXIVE_VERB: (
         "The sentence contains a reflexive verb used with a reflexive pronoun that refers back to the subject."
+    ),
+    AUXILIARY_VERB: (
+        "The sentence uses haben, sein, or werden as an auxiliary verb to form another grammatical construction."
+    ),
+    PAST_PARTICIPLE: (
+        "The sentence contains a German past participle (Partizip II), such as gemacht, gesehen, or gegangen."
+    ),
+    PERFECT_WITH_HABEN_OR_SEIN: (
+        "The sentence uses haben or sein together with a past participle to form the Perfekt tense."
+    ),
+    IMPERATIVE: (
+        "The sentence contains a verb in the imperative form used to give a direct instruction, request, or command."
+    ),
+    KONJUNKTIV_II: (
+        "The sentence clearly uses Konjunktiv II, such as würde, wäre, hätte, könnte, or möchte, "
+        "to express a hypothetical situation, wish, suggestion, or polite request."
+    ),
+    NEGATION_NICHT: (
+        "The sentence uses nicht to negate a verb, adjective, adverb, phrase, or sentence."
+    ),
+    NEGATION_KEIN: (
+        "The sentence uses kein or one of its inflected forms to negate a noun."
+    ),
+    PREPOSITION_ACCUSATIVE: (
+        "The sentence contains a preposition that requires the following noun or pronoun to be in "
+        "the accusative case, such as für, ohne, durch, gegen, or um."
+    ),
+    PREPOSITION_DATIVE: (
+        "The sentence contains a preposition that requires the following noun or pronoun to be in "
+        "the dative case, such as mit, nach, aus, zu, von, or bei."
+    ),
+    TWO_WAY_PREPOSITION_LOCATION: (
+        "The sentence uses a two-way preposition (Wechselpräposition) with the dative case to "
+        "express location (Wo?)."
+    ),
+    TWO_WAY_PREPOSITION_DIRECTION: (
+        "The sentence uses a two-way preposition (Wechselpräposition) with the accusative case to "
+        "express destination or change of location (Wohin?)."
     ),
 }

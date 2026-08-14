@@ -11,7 +11,7 @@ Ningun otro arreglito que no sea vital!!!
   - Indicar si son separables, reflexivos..
   - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
 - Frases: ir añadiendo reglas
-- Añadir mas grammar features 
+- Añadir mas grammar features. Agruparlas si el model empieza  a tener problemas con ellas y la interfaz es muy complicada.
 - Que detecte los errores de las features en la conversacion 
 - Que en el ejercicio de bloques detecte el tipo de error
 

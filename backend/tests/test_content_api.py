@@ -2002,15 +2002,7 @@ def test_content_item_regenerate_keeps_a_selected_subphrase(monkeypatch):
 
 @pytest.mark.django_db
 def test_phrase_grammar_features_are_persisted_and_returned_together(monkeypatch):
-    from learning.grammar_features import (
-        MODAL_VERB_WITH_INFINITIVE,
-        REFLEXIVE_VERB,
-        SEPARABLE_VERB_MAIN_CLAUSE,
-        VERB_POSITION_MAIN_CLAUSE,
-        VERB_POSITION_SUBORDINATE_CLAUSE,
-        VERB_POSITION_W_QUESTION,
-        VERB_POSITION_YES_NO_QUESTION,
-    )
+    from learning.grammar_features import PHRASE_GRAMMAR_FEATURES
     from learning.views.content import management_items_phrase_grammar as phrase_grammar_views
 
     phrase = Item.objects.create(
@@ -2023,15 +2015,7 @@ def test_phrase_grammar_features_are_persisted_and_returned_together(monkeypatch
     monkeypatch.setattr(
         phrase_grammar_views,
         "_call_openai_json_logged",
-        lambda **kwargs: [
-            VERB_POSITION_MAIN_CLAUSE,
-            VERB_POSITION_YES_NO_QUESTION,
-            VERB_POSITION_W_QUESTION,
-            VERB_POSITION_SUBORDINATE_CLAUSE,
-            SEPARABLE_VERB_MAIN_CLAUSE,
-            MODAL_VERB_WITH_INFINITIVE,
-            REFLEXIVE_VERB,
-        ],
+        lambda **kwargs: list(PHRASE_GRAMMAR_FEATURES),
     )
 
     client = APIClient()
@@ -2041,24 +2025,9 @@ def test_phrase_grammar_features_are_persisted_and_returned_together(monkeypatch
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "feature_keys": [
-            VERB_POSITION_MAIN_CLAUSE,
-            VERB_POSITION_YES_NO_QUESTION,
-            VERB_POSITION_W_QUESTION,
-            VERB_POSITION_SUBORDINATE_CLAUSE,
-            SEPARABLE_VERB_MAIN_CLAUSE,
-            MODAL_VERB_WITH_INFINITIVE,
-            REFLEXIVE_VERB,
-        ]
-    }
-    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_MAIN_CLAUSE).exists()
-    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_YES_NO_QUESTION).exists()
-    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_W_QUESTION).exists()
-    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_SUBORDINATE_CLAUSE).exists()
-    assert phrase.grammar_features.filter(feature_key=SEPARABLE_VERB_MAIN_CLAUSE).exists()
-    assert phrase.grammar_features.filter(feature_key=MODAL_VERB_WITH_INFINITIVE).exists()
-    assert phrase.grammar_features.filter(feature_key=REFLEXIVE_VERB).exists()
+    assert response.json() == {"feature_keys": list(PHRASE_GRAMMAR_FEATURES)}
+    for feature_key in PHRASE_GRAMMAR_FEATURES:
+        assert phrase.grammar_features.filter(feature_key=feature_key).exists()
 
 
 @pytest.mark.django_db

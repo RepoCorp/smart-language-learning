@@ -1,7 +1,12 @@
 import { useMemo, type ReactNode } from "react";
 
 import { useI18n } from "../../i18n";
-import { PHRASE_STRATEGIES, STRATEGY_LABELS, WORD_STRATEGIES } from "./strategyConstants";
+import {
+  PHRASE_STRATEGIES,
+  PHRASE_STRATEGY_LABELS,
+  STRATEGY_LABELS,
+  WORD_STRATEGIES,
+} from "./strategyConstants";
 
 export default function StrategiesModal({
   itemType,
@@ -25,6 +30,7 @@ export default function StrategiesModal({
     () => (itemType === "word" ? [...WORD_STRATEGIES] : [...PHRASE_STRATEGIES]),
     [itemType],
   );
+  const labels = itemType === "word" ? STRATEGY_LABELS : PHRASE_STRATEGY_LABELS;
 
   return (
     <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
@@ -49,7 +55,7 @@ export default function StrategiesModal({
             >
               {strategies.map((strategy, index) => (
                 <option key={strategy} value={strategy}>
-                  {index + 1}. {STRATEGY_LABELS[strategy] || strategy}
+                  {index + 1}. {labels[strategy] || strategy}
                 </option>
               ))}
             </select>
