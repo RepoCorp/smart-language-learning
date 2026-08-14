@@ -9,9 +9,7 @@ import {
 import {
   fetchContentItemDetail,
   generateContentItemFunnyImageExercise,
-  regenerateContentItem,
   regenerateContentDialogAudio,
-  refreshContentItemWord,
   submitReview,
 } from "../api";
 import {
@@ -32,6 +30,7 @@ import DangerousButton from "./DangerousButton";
 import CompareWordsModal from "./CompareWordsModal";
 import DialogActionIcon from "./DialogActionIcon";
 import ItemActionToolbar from "./ItemActionToolbar";
+import ItemAdminActionsModal from "./ItemAdminActionsModal";
 import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
 import WordExerciseActions from "./WordExerciseActions";
@@ -57,6 +56,7 @@ import { useNounExerciseModal } from "./useNounExerciseModal";
 import { useItemQuestions } from "./useItemQuestions";
 import { useRepeatExerciseLoop } from "./useRepeatExerciseLoop";
 import { useItemStrategies } from "./strategies/useItemStrategies";
+import { useItemAdminActions } from "./useItemAdminActions";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
 import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
 import RelatedDialogTurns from "./dialogs/RelatedDialogTurns";
@@ -216,8 +216,6 @@ export default function NewItem({
   const [generatingNounCaseKey, setGeneratingNounCaseKey] = useState<
     "" | "nominative" | "accusative" | "dative" | "genitive"
   >("");
-  const [refreshingWord, setRefreshingWord] = useState<boolean>(false);
-  const [regeneratingAudio, setRegeneratingAudio] = useState<boolean>(false);
   const [generatingFunnyImageExercise, setGeneratingFunnyImageExercise] =
     useState<boolean>(false);
   const [exerciseError, setExerciseError] = useState<string>("");
@@ -313,6 +311,40 @@ export default function NewItem({
     targetLanguage,
     refreshRelatedDialogHistory: showDialogsModal,
     questionError: t("newItem.questionsError"),
+  });
+  const applyRegeneratedItemDetail = (detail: Awaited<ReturnType<typeof fetchContentItemDetail>>): void => {
+    setSourceText(detail.spanish_text || "");
+    setTargetText(detail.german_text || "");
+    setNotes(detail.notes || "");
+    setPluralGerman(detail.plural_german || "");
+    setAudioUrl(detail.audio_url || "");
+    setWordType(detail.word_type || "");
+    setExercisePhrases(detail.exercise_phrases || {});
+    setDialogPhraseAnswer(detail.dialog_phrase_answer || "");
+    setDialogPhraseScene(detail.dialog_phrase_scene || "");
+    setDialogPhraseSceneAudioUrls(detail.dialog_phrase_scene_audio_urls || []);
+    setDialogPhraseOptions(detail.dialog_phrase_options || []);
+    setDialogPhraseTurns(detail.dialog_phrase_turns || []);
+    setDialogPhraseOddIndex(detail.dialog_phrase_odd_index ?? null);
+    setRelatedDialogs(detail.related_dialogs || []);
+    setCompareWords(detail.compare_words || []);
+    setCompareWordsInsights(detail.compare_words_insights || "");
+    replaceItemQuestions(detail.item_questions || []);
+    setSelectedExerciseKeys([]);
+  };
+  const itemAdminActions = useItemAdminActions({
+    itemId: item.id,
+    itemType: item.item_type,
+    initialIsLearned: Boolean(item.is_learned),
+    sourceLanguage,
+    targetLanguage,
+    onItemRegenerated: applyRegeneratedItemDetail,
+    onDialogsRescanned: (dialogs, createdCount) => {
+      setRelatedDialogs(dialogs);
+      setWordRefreshMessage(t("newItem.wordRefreshComplete", { count: createdCount }));
+    },
+    onAudioRegenerated: (nextAudioUrl) => setAudioUrl(nextAudioUrl || audioUrl),
+    onDeleted: () => onClose?.(),
   });
   const [showDialogTargetTextById, setShowDialogTargetTextById] = useState<
     Record<number, boolean>
@@ -1153,79 +1185,6 @@ export default function NewItem({
     }
   };
 
-  const refreshWordData = async (): Promise<void> => {
-    if (refreshingWord || item.item_type !== "word" || item.id <= 0) {
-      return;
-    }
-    setRefreshingWord(true);
-    setExerciseError("");
-    setWordRefreshMessage("");
-    try {
-      const payload = await refreshContentItemWord(
-        item.id,
-        sourceLanguage,
-        targetLanguage,
-      );
-      setRelatedDialogs(payload.related_dialogs || []);
-      setWordRefreshMessage(
-        t("newItem.wordRefreshComplete", {
-          count: payload.dialog_occurrences_created || 0,
-        }),
-      );
-    } catch (error) {
-      setExerciseError(
-        error instanceof Error ? error.message : t("newItem.wordRefreshError"),
-      );
-    } finally {
-      setRefreshingWord(false);
-    }
-  };
-
-  const regenerateItemData = async (): Promise<void> => {
-    if (regeneratingAudio || refreshingWord || item.id <= 0) {
-      return;
-    }
-    setRegeneratingAudio(true);
-    setExerciseError("");
-    setWordRefreshMessage("");
-    try {
-      await regenerateContentItem(item.id, sourceLanguage, targetLanguage);
-      const detail = await fetchContentItemDetail(
-        item.id,
-        sourceLanguage,
-        targetLanguage,
-      );
-      setSourceText(detail.spanish_text || "");
-      setTargetText(detail.german_text || "");
-      setNotes(detail.notes || "");
-      setPluralGerman(detail.plural_german || "");
-      setAudioUrl(detail.audio_url || "");
-      setWordType(detail.word_type || "");
-      setExercisePhrases(detail.exercise_phrases || {});
-      setDialogPhraseAnswer(detail.dialog_phrase_answer || "");
-      setDialogPhraseScene(detail.dialog_phrase_scene || "");
-      setDialogPhraseSceneAudioUrls(
-        detail.dialog_phrase_scene_audio_urls || [],
-      );
-      setDialogPhraseOptions(detail.dialog_phrase_options || []);
-      setDialogPhraseTurns(detail.dialog_phrase_turns || []);
-      setDialogPhraseOddIndex(detail.dialog_phrase_odd_index ?? null);
-      setRelatedDialogs(detail.related_dialogs || []);
-      setCompareWords(detail.compare_words || []);
-      setCompareWordsInsights(detail.compare_words_insights || "");
-      replaceItemQuestions(detail.item_questions || []);
-      setSelectedExerciseKeys([]);
-    } catch (error) {
-      setExerciseError(
-        error instanceof Error
-          ? error.message
-          : t("newItem.itemRegenerationError"),
-      );
-    } finally {
-      setRegeneratingAudio(false);
-    }
-  };
-
   const generateFunnyImageExercise = async (): Promise<void> => {
     if (
       generatingFunnyImageExercise ||
@@ -1409,8 +1368,6 @@ export default function NewItem({
         <ItemActionToolbar
           itemType={item.item_type}
           loadingExercises={loadingExercises}
-          regeneratingAudio={regeneratingAudio}
-          refreshingWord={refreshingWord}
           showMobileActionLabels={showMobileActionLabels}
           hasQuestions={itemQuestions.length > 0}
           hasCompareWordsContent={
@@ -1423,8 +1380,7 @@ export default function NewItem({
           onOpenRelatedDialogs={() => setShowDialogsModal(true)}
           onOpenQuestions={() => openQuestions()}
           onOpenCompareWords={openCompareWordsModal}
-          onRegenerateItem={regenerateItemData}
-          onRefreshWordData={refreshWordData}
+          onOpenAdminActions={() => itemAdminActions.setOpen(true)}
           onShowTooltip={showItemActionTooltip}
           onHideTooltip={hideItemActionTooltip}
         />
@@ -1442,6 +1398,20 @@ export default function NewItem({
         </div>
       )}
       {wordRefreshMessage && <p className="hint">{wordRefreshMessage}</p>}
+      <ItemAdminActionsModal
+        open={itemAdminActions.open}
+        isWord={item.item_type === "word"}
+        isLearned={itemAdminActions.isLearned}
+        activeAction={itemAdminActions.activeAction}
+        message={itemAdminActions.message}
+        error={itemAdminActions.error}
+        onClose={() => itemAdminActions.setOpen(false)}
+        onRegenerateItem={itemAdminActions.regenerateItem}
+        onRescanDialogs={itemAdminActions.rescanDialogs}
+        onRegenerateAudio={itemAdminActions.regenerateAudio}
+        onToggleLearned={itemAdminActions.toggleLearned}
+        onDelete={itemAdminActions.deleteItem}
+      />
       {exerciseError && !showExerciseModal && (
         <p className="error">{exerciseError}</p>
       )}

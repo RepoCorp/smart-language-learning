@@ -11,11 +11,8 @@ Ningun otro arreglito que no sea vital!!!
 - Verbos:
   - Indicar si son separables, reflexivos..
   - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
-- Palabras en general: Añadir tambien a las reglas cosas como conjugacion, caso, genero... para que detecte errores en la conversacion
-- Frases: 
-- De las conversaciones saca errores. Los muestra y sugiere repasarlo. Que sea bien empatico 😂
-- Que en el ejercicio de bloques detecte el tipo de error
-- Añadir mucha más Metadata a las palabras (desde la gramática) y usarla en ejercicios
+- Palabras en general: Añadir tambien a las reglas cosas como conjugacion, caso, genero... para que detecte errores en la conversacion 
+- Añadir más Metadata a las palabras (desde la gramática) y usarla en ejercicios
 
 
 ## New functionalities 
@@ -27,6 +24,7 @@ En dialogos de palabras está cogiendo tambien palabras que significan lo mismo 
 
 
 ### Tier 1
+Hacer post para "promocionar"  la aplicacion
 Que un modelo tambien sirva de manual de usuario, y pueda ir dando instrucciones empezando con la forma mas simple de usar la aplicacion
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
@@ -40,6 +38,7 @@ Spread items from same phrase considering sides, Que al escoger sesión procure 
 Problema con palabras que toma como.expresion como.bitte y gleichfalls
 
 ## FUTURE WORK (some important, some not so important)
+- Que en el ejercicio de bloques detecte el tipo de error
 Que en gramar se pueda abrir el ejercicio de bloques, de pronto sin el hint del tamaño del espacio para la palabra. De pronto no con las palabras independientes si no con las partes que estan involucradas en la regla
     Que capturen esas reglas de órdenes y grupos de palabras gramaticales. Que en los bloques uno tenga que armar sub bloques para ayudar con la estructura de la frase, o poner de entrada algunas palabras y solo tenga que ubicar en las que se ha equivocado en el pasado
 Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Depronto incluso que la celebración ayude, como que las letras hagan la ola

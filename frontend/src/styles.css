@@ -3232,6 +3232,21 @@ textarea {
   margin: 0;
 }
 
+.item-admin-actions-modal {
+  max-width: 360px;
+}
+
+.item-admin-actions-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.item-admin-actions-list > button {
+  width: 100%;
+}
+
+
 .conversation-review-corrected {
   margin: 4px 0 0 0;
   color: #7a3e00;

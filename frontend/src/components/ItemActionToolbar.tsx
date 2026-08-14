@@ -1,7 +1,6 @@
 import type { FocusEvent, PointerEvent } from "react";
 
 import { useI18n } from "../i18n";
-import DangerousButton from "./DangerousButton";
 
 type ItemActionIconName =
   | "test"
@@ -13,8 +12,7 @@ type ItemActionIconName =
   | "questions"
   | "compareWords"
   | "audio"
-  | "regenerateItem"
-  | "refresh";
+  | "admin";
 
 function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
   const commonProps = {
@@ -106,23 +104,17 @@ function ItemActionIcon({ name }: { name: ItemActionIconName }): JSX.Element {
       </svg>
     );
   }
-  if (name === "regenerateItem") {
+  if (name === "admin") {
     return (
       <svg {...commonProps}>
-        <path d="M12 4 6 7v5c0 3.8 2.5 7.2 6 8 3.5-.8 6-4.2 6-8V7l-6-3Z" />
-        <path d="M9.5 12h5" />
-        <path d="m12 9.5 2.5 2.5L12 14.5" />
+        <circle cx="6" cy="7" r="1.5" />
+        <circle cx="6" cy="12" r="1.5" />
+        <circle cx="6" cy="17" r="1.5" />
+        <path d="M10 7h8M10 12h8M10 17h8" />
       </svg>
     );
   }
-  return (
-    <svg {...commonProps}>
-      <path d="M20 12a8 8 0 0 1-13.7 5.7" />
-      <path d="M4 12A8 8 0 0 1 17.7 6.3" />
-      <path d="M17 3v4h4" />
-      <path d="M7 21v-4H3" />
-    </svg>
-  );
+  return <svg {...commonProps} />;
 }
 
 type TooltipEvent = PointerEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>;
@@ -130,8 +122,6 @@ type TooltipEvent = PointerEvent<HTMLButtonElement> | FocusEvent<HTMLButtonEleme
 type Props = {
   itemType: "word" | "phrase";
   loadingExercises: boolean;
-  regeneratingAudio: boolean;
-  refreshingWord: boolean;
   showMobileActionLabels: boolean;
   hasQuestions: boolean;
   hasCompareWordsContent: boolean;
@@ -140,8 +130,7 @@ type Props = {
   onOpenRelatedDialogs: () => void;
   onOpenQuestions: () => void;
   onOpenCompareWords: () => void;
-  onRegenerateItem: () => void;
-  onRefreshWordData: () => void;
+  onOpenAdminActions: () => void;
   onShowTooltip: (event: TooltipEvent, label: string) => void;
   onHideTooltip: () => void;
 };
@@ -173,8 +162,6 @@ function iconButtonProps(
 export default function ItemActionToolbar({
   itemType,
   loadingExercises,
-  regeneratingAudio,
-  refreshingWord,
   showMobileActionLabels,
   hasQuestions,
   hasCompareWordsContent,
@@ -183,8 +170,7 @@ export default function ItemActionToolbar({
   onOpenRelatedDialogs,
   onOpenQuestions,
   onOpenCompareWords,
-  onRegenerateItem,
-  onRefreshWordData,
+  onOpenAdminActions,
   onShowTooltip,
   onHideTooltip,
 }: Props): JSX.Element {
@@ -244,32 +230,14 @@ export default function ItemActionToolbar({
           )}
         </div>
         <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
-          <DangerousButton
-            className="secondary-button item-action-button item-action-button-icon dangerous-action-button"
-            onConfirm={onRegenerateItem}
-            disabled={regeneratingAudio || refreshingWord}
-            {...iconButtonProps(
-              regeneratingAudio ? t("newItem.itemRegenerating") : t("newItem.regenerateItem"),
-              onShowTooltip,
-              onHideTooltip,
-            )}
+          <button
+            type="button"
+            className="secondary-button item-action-button item-action-button-icon"
+            onClick={onOpenAdminActions}
+            {...iconButtonProps(t("newItem.actionGroupDanger"), onShowTooltip, onHideTooltip)}
           >
-            <ItemActionIcon name="regenerateItem" />
-          </DangerousButton>
-          {itemType === "word" && (
-            <DangerousButton
-              className="secondary-button item-action-button item-action-button-icon dangerous-action-button"
-              onConfirm={onRefreshWordData}
-              disabled={refreshingWord || regeneratingAudio}
-              {...iconButtonProps(
-                refreshingWord ? t("newItem.wordRefreshRunning") : t("newItem.wordRefresh"),
-                onShowTooltip,
-                onHideTooltip,
-              )}
-            >
-              <ItemActionIcon name="refresh" />
-            </DangerousButton>
-          )}
+            <ItemActionIcon name="admin" />
+          </button>
         </div>
       </div>
     </div>
