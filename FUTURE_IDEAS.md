@@ -10,6 +10,7 @@ Ningun otro arreglito que no sea vital!!!
 - Verbos:
   - Indicar si son separables, reflexivos..
   - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
+- Palabras: Añadir tambien a las reglas cosas como conjugacion, caso, genero... para que detecte errores en la conversacion
 - Frases: ir añadiendo reglas
 - Añadir mas grammar features. Agruparlas si el model empieza  a tener problemas con ellas y la interfaz es muy complicada.
 - De las conversaciones saca errores. Los muestra y sugiere repasarlo. Que sea bien empatico 😂

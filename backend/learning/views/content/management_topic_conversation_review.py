@@ -62,6 +62,7 @@ class ContentTopicConversationReviewView(APIView):
                 try:
                     correction_payload = generate_user_correction_with_question_model(
                         user_text=user_text,
+                        assistant_text=assistant_text,
                         history=history_so_far,
                         source_language=source_language,
                         target_language=target_language,

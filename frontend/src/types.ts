@@ -401,6 +401,8 @@ export interface ContentItemConversationResponse {
   user_corrected_text?: string;
   user_corrected_translation_text?: string;
   user_correction_explanation?: string;
+  user_natural_alternative_text?: string;
+  user_natural_alternative_translation_text?: string;
   user_is_grammatically_correct?: boolean;
   user_makes_sense_in_context?: boolean;
   user_needs_correction?: boolean;

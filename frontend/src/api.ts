@@ -1040,6 +1040,7 @@ export async function fetchTopicConversationUserCorrection(
   roleText: string,
   goalText: string,
   userText: string,
+  assistantText: string,
   history: Array<{ user_text: string; assistant_text: string }>,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
@@ -1047,6 +1048,8 @@ export async function fetchTopicConversationUserCorrection(
   user_corrected_text: string;
   user_corrected_translation_text: string;
   user_correction_explanation: string;
+  user_natural_alternative_text: string;
+  user_natural_alternative_translation_text: string;
 }> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
@@ -1061,6 +1064,7 @@ export async function fetchTopicConversationUserCorrection(
       role_text: roleText,
       goal_text: goalText,
       user_text: userText,
+      assistant_text: assistantText,
       history,
     }),
   });
@@ -1071,6 +1075,8 @@ export async function fetchTopicConversationUserCorrection(
     user_corrected_text: string;
     user_corrected_translation_text: string;
     user_correction_explanation: string;
+    user_natural_alternative_text: string;
+    user_natural_alternative_translation_text: string;
   };
 }
 

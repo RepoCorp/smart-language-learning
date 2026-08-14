@@ -34,12 +34,14 @@ class ContentTopicConversationUserCorrectionView(APIView):
         notes = str(request.data.get("notes", "")).strip()
         role_text = str(request.data.get("role_text", "")).strip()
         user_text = str(request.data.get("user_text", "")).strip()
+        assistant_text = str(request.data.get("assistant_text", "")).strip()
         if not user_text:
             return Response({"detail": "user_text is required"}, status=status.HTTP_400_BAD_REQUEST)
         history = _parse_item_conversation_history(request.data.get("history"))
         try:
             correction_payload = generate_user_correction_with_question_model(
                 user_text=user_text,
+                assistant_text=assistant_text,
                 history=history,
                 source_language=source_language,
                 target_language=target_language,
@@ -53,6 +55,8 @@ class ContentTopicConversationUserCorrectionView(APIView):
                 "user_corrected_text": str(correction_payload.get("corrected_user_text", "")).strip(),
                 "user_corrected_translation_text": str(correction_payload.get("corrected_user_source_translation", "")).strip(),
                 "user_correction_explanation": explanation,
+                "user_natural_alternative_text": str(correction_payload.get("natural_alternative_text", "")).strip(),
+                "user_natural_alternative_translation_text": str(correction_payload.get("natural_alternative_source_translation", "")).strip(),
             }
         )
 

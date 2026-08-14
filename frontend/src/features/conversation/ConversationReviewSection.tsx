@@ -26,6 +26,7 @@ type Props = {
   sentenceActionStatus: Record<string, SentenceActionStatus>;
   originalUserTexts?: Record<number, string>;
   correctedUserTexts?: Record<number, string>;
+  naturalUserAlternatives?: Record<number, { target: string; source: string }>;
   readOnly?: boolean;
   loading?: boolean;
   loadingMessage?: string;
@@ -60,6 +61,7 @@ export default function ConversationReviewSection({
   sentenceActionStatus,
   originalUserTexts,
   correctedUserTexts,
+  naturalUserAlternatives,
   readOnly = false,
   loading = false,
   loadingMessage = "",
@@ -89,6 +91,7 @@ export default function ConversationReviewSection({
           readOnly={readOnly}
           originalUserTexts={originalUserTexts}
           correctedUserTexts={correctedUserTexts}
+          naturalUserAlternatives={naturalUserAlternatives}
         />
         {(primaryAction || secondaryAction) && (
           <div className="actions">

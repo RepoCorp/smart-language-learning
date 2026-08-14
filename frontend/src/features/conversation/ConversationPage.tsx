@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   fetchContentItemDetail,
-  fetchTopicConversationUserCorrection,
   fetchTopicConversationUserLiteralTranslation,
-  generateTopicConversationReview,
   regenerateTopicConversationGoal,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
@@ -15,7 +13,7 @@ import { useI18n } from "../../i18n";
 import { usePromptPreferences } from "../../promptPreferences";
 import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../../studyLanguageMetadata";
 import { useStudyLanguages } from "../../studyLanguages";
-import type { ContentDialogRecord, ContentItemConversationResponse, SessionItem } from "../../types";
+import type { ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
 import {
@@ -28,11 +26,10 @@ import ConversationSetupCard from "./ConversationSetupCard";
 import ConversationReviewSection from "./ConversationReviewSection";
 import { CONVERSATION_SEND_ENABLE_DELAY_SECONDS } from "./conversationConstants";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
-import { buildFinishedConversationTranscript, buildGeneratedReviewOriginalUserTexts } from "./conversationReviewTranscript";
 import { CREATE_NEW_OPTION, RANDOM_TOPIC_OPTION } from "./conversationSetupOptions";
 import ConversationTurns from "./ConversationTurns";
 import { useConversationGoalEvaluation } from "./useConversationGoalEvaluation";
-import { useConversationReviewPreparation } from "./useConversationReviewPreparation";
+import { useConversationReview } from "./useConversationReview";
 import { useConversationScroll } from "./useConversationScroll";
 import { useConversationSetup } from "./useConversationSetup";
 import {
@@ -46,7 +43,6 @@ import {
 
 const CONVERSATION_ASSISTANT_HINT_LIMIT = 3;
 
-interface ConversationTurn extends ContentItemConversationResponse {}
 type ConversationHelpEntry = {
   request_kind?: "coach" | "say";
   request_text: string;
@@ -102,7 +98,7 @@ export default function ConversationPage(): JSX.Element {
   const [showOpeningTranslation, setShowOpeningTranslation] = useState<boolean>(false);
   const [showTargetText, setShowTargetText] = useState<boolean>(targetPromptMode === "text");
 
-  const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([]);
+  const [conversationTurns, setConversationTurns] = useState<ContentItemConversationResponse[]>([]);
   const [conversationLoading, setConversationLoading] = useState<boolean>(false);
   const [autoStartListening, setAutoStartListening] = useState<boolean>(false);
   const [conversationError, setConversationError] = useState<string>("");
@@ -110,7 +106,6 @@ export default function ConversationPage(): JSX.Element {
   const [conversationPendingUserTurn, setConversationPendingUserTurn] = useState<boolean>(false);
   const [conversationFinished, setConversationFinished] = useState<boolean>(false);
   const [conversationEnded, setConversationEnded] = useState<boolean>(false);
-  const [conversationReviewDialog, setConversationReviewDialog] = useState<ContentDialogRecord | null>(null);
   const [assistantSpeaking, setAssistantSpeaking] = useState<boolean>(false);
   const [assistantHintsUsed, setAssistantHintsUsed] = useState<number>(0);
   const [assistantRevealUsedByTurn, setAssistantRevealUsedByTurn] = useState<Record<number, boolean>>({});
@@ -121,10 +116,6 @@ export default function ConversationPage(): JSX.Element {
   const [helpSayInput, setHelpSayInput] = useState<string>("");
   const [helpHistory, setHelpHistory] = useState<ConversationHelpEntry[]>([]);
   const [conversationTranslationVisible, setConversationTranslationVisible] = useState<Record<number, boolean>>({});
-  const [conversationCorrectionVisible, setConversationCorrectionVisible] = useState<Record<number, boolean>>({});
-  const [conversationUserTranslationVisible, setConversationUserTranslationVisible] = useState<Record<number, boolean>>({});
-  const [conversationUserTranslationLoading, setConversationUserTranslationLoading] = useState<Record<number, boolean>>({});
-  const [conversationUserCorrectionLoading, setConversationUserCorrectionLoading] = useState<Record<number, boolean>>({});
   const [sentenceActionStatus, setSentenceActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error" | "missing_source">>({});
   const [pendingSentenceAdd, setPendingSentenceAdd] = useState<{
     key: string;
@@ -158,9 +149,14 @@ export default function ConversationPage(): JSX.Element {
   };
   const hideSourceText = targetPromptMode === "audio" && !showTargetText;
   const {
-    remainingCount: conversationReviewPreparationRemainingCount,
-    ready: conversationReviewPreparationReady,
-  } = useConversationReviewPreparation({
+    reviewDialog: conversationReviewDialog,
+    generateReview: generateConversationReview,
+    resetReview: resetConversationReview,
+    preparationRemainingCount: conversationReviewPreparationRemainingCount,
+    preparationReady: conversationReviewPreparationReady,
+    finishedTranscript,
+    generatedReviewAnnotations,
+  } = useConversationReview({
     enabled: started,
     topic: activeTopic,
     notes: activeNotes,
@@ -170,6 +166,13 @@ export default function ConversationPage(): JSX.Element {
     setTurns: setConversationTurns,
     sourceLanguage,
     targetLanguage,
+    setLoading: setConversationLoading,
+    clearError: () => setConversationError(""),
+    reportError: (error) => {
+      const detail = error instanceof Error ? error.message : "";
+      setConversationError(detail || t("newItem.questionsError"));
+    },
+    onReviewGenerated: () => setConversationEnded(true),
   });
   const {
     clearGoalAchievementMessage,
@@ -211,75 +214,6 @@ export default function ConversationPage(): JSX.Element {
   const updateResponseLevel = (level: ConversationResponseLevel): void => {
     setResponseLevel(level);
     setStoredConversationResponseLevel(level);
-  };
-
-  const toggleUserTurnTranslation = async (index: number): Promise<void> => {
-    const nextVisible = !Boolean(conversationUserTranslationVisible[index]);
-    if (nextVisible && !conversationTurns[index]?.user_translation_text) {
-      setConversationUserTranslationLoading((current) => ({ ...current, [index]: true }));
-      try {
-        const payload = await fetchTopicConversationUserLiteralTranslation(
-          conversationTurns[index].user_text,
-          sourceLanguage,
-          targetLanguage,
-        );
-        setConversationTurns((current) => current.map((turn, turnIndex) => (
-          turnIndex === index ? { ...turn, user_translation_text: payload.user_translation_text || "" } : turn
-        )));
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "";
-        setConversationError(detail || t("newItem.questionsError"));
-        return;
-      } finally {
-        setConversationUserTranslationLoading((current) => ({ ...current, [index]: false }));
-      }
-    }
-    setConversationUserTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
-    if (nextVisible) {
-      window.setTimeout(scrollConversationToBottom, 0);
-    }
-  };
-
-  const toggleUserTurnCorrection = async (index: number): Promise<void> => {
-    const nextVisible = !Boolean(conversationCorrectionVisible[index]);
-    if (nextVisible && !conversationTurns[index]?.user_corrected_text) {
-      setConversationUserCorrectionLoading((current) => ({ ...current, [index]: true }));
-      try {
-        const payload = await fetchTopicConversationUserCorrection(
-          activeTopic,
-          activeNotes,
-          activeRole,
-          conversationGoal,
-          conversationTurns[index].user_text,
-          conversationTurns.slice(0, index).map((turn) => ({
-            user_text: turn.user_text,
-            assistant_text: turn.assistant_text,
-          })),
-          sourceLanguage,
-          targetLanguage,
-        );
-        setConversationTurns((current) => current.map((turn, turnIndex) => (
-          turnIndex === index
-            ? {
-              ...turn,
-              user_corrected_text: payload.user_corrected_text || "",
-              user_corrected_translation_text: payload.user_corrected_translation_text || "",
-              user_correction_explanation: payload.user_correction_explanation || "",
-            }
-            : turn
-        )));
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "";
-        setConversationError(detail || t("newItem.questionsError"));
-        return;
-      } finally {
-        setConversationUserCorrectionLoading((current) => ({ ...current, [index]: false }));
-      }
-    }
-    setConversationCorrectionVisible((current) => ({ ...current, [index]: nextVisible }));
-    if (nextVisible) {
-      window.setTimeout(scrollConversationToBottom, 0);
-    }
   };
 
   const toggleAssistantTurnTranslation = (index: number): void => {
@@ -337,32 +271,6 @@ export default function ConversationPage(): JSX.Element {
     hideAssistantTurnHelper();
     void startRecording(conversationLoading);
   };
-
-  const generateConversationReview = async (): Promise<void> => {
-    setConversationError("");
-    setConversationLoading(true);
-    try {
-      const dialog = await generateTopicConversationReview(
-        activeTopic,
-        activeNotes,
-        activeRole,
-        conversationGoal,
-        conversationTurns,
-        sourceLanguage,
-        targetLanguage,
-      );
-      setConversationReviewDialog(dialog);
-      setConversationEnded(true);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "";
-      setConversationError(detail || t("newItem.questionsError"));
-    } finally {
-      setConversationLoading(false);
-    }
-  };
-
-  const finishedTranscript = buildFinishedConversationTranscript(activeTopic, conversationTurns);
-  const generatedReviewOriginalUserTexts = buildGeneratedReviewOriginalUserTexts(conversationTurns);
 
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
   const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
@@ -576,7 +484,7 @@ export default function ConversationPage(): JSX.Element {
     hideAssistantTurnHelper();
     setConversationFinished(true);
     setConversationEnded(false);
-    setConversationReviewDialog(null);
+    resetConversationReview();
     clearGoalAchievementMessage();
   };
 
@@ -608,10 +516,6 @@ export default function ConversationPage(): JSX.Element {
     setShowOpeningTranslation(false);
     setConversationTurns([]);
     setConversationTranslationVisible({});
-    setConversationCorrectionVisible({});
-    setConversationUserTranslationVisible({});
-    setConversationUserTranslationLoading({});
-    setConversationUserCorrectionLoading({});
     setSentenceActionStatus({});
     setWordActionStatus({});
     setPendingWordAdd(null);
@@ -620,7 +524,7 @@ export default function ConversationPage(): JSX.Element {
     setConversationPendingUserTurn(false);
     setConversationFinished(false);
     setConversationEnded(false);
-    setConversationReviewDialog(null);
+    resetConversationReview();
     setAssistantSpeaking(false);
     setAssistantHintsUsed(0);
     setAssistantRevealUsedByTurn({});
@@ -771,10 +675,6 @@ export default function ConversationPage(): JSX.Element {
     setConversationPhase("active");
     setConversationTurns([]);
     setConversationTranslationVisible({});
-    setConversationCorrectionVisible({});
-    setConversationUserTranslationVisible({});
-    setConversationUserTranslationLoading({});
-    setConversationUserCorrectionLoading({});
     setSentenceActionStatus({});
     setWordActionStatus({});
     setPendingWordAdd(null);
@@ -788,7 +688,7 @@ export default function ConversationPage(): JSX.Element {
     setConversationFinished(false);
     setAutoStartListening(false);
     setConversationEnded(false);
-    setConversationReviewDialog(null);
+    resetConversationReview();
     setAssistantSpeaking(false);
     setAssistantHintsUsed(0);
     setAssistantRevealUsedByTurn({});
@@ -1051,15 +951,6 @@ export default function ConversationPage(): JSX.Element {
     }
   };
 
-  const hasTurnCorrection = (turn: ConversationTurn): boolean => {
-    if (turn.user_needs_correction) {
-      return true;
-    }
-    const corrected = (turn.user_corrected_text || "").trim().toLowerCase();
-    const original = (turn.user_text || "").trim().toLowerCase();
-    return Boolean(corrected && corrected !== original);
-  };
-
   return (
     <main className="container" data-testid="conversation-page">
       <h1>{t("conversation.title")}</h1>
@@ -1173,6 +1064,7 @@ export default function ConversationPage(): JSX.Element {
             readOnly
             originalUserTexts={conversationReviewPreparationReady ? finishedTranscript.originalUserTexts : {}}
             correctedUserTexts={conversationReviewPreparationReady ? finishedTranscript.correctedUserTexts : {}}
+            naturalUserAlternatives={conversationReviewPreparationReady ? finishedTranscript.naturalUserAlternatives : {}}
             loading={conversationLoading || !conversationReviewPreparationReady}
             loadingMessage={!conversationReviewPreparationReady
               ? `${t("conversation.finishedPreparing")} (${conversationReviewPreparationRemainingCount})`
@@ -1208,7 +1100,8 @@ export default function ConversationPage(): JSX.Element {
             requestAddWordFromConversation={requestAddWordFromTurnToken}
             requestAddSentenceFromConversation={requestAddSentenceFromConversation}
             sentenceActionStatus={sentenceActionStatus}
-            originalUserTexts={generatedReviewOriginalUserTexts}
+            originalUserTexts={generatedReviewAnnotations.originalUserTexts}
+            naturalUserAlternatives={generatedReviewAnnotations.naturalUserAlternatives}
             primaryAction={{
               label: t("conversation.restart"),
               onClick: restartConversation,

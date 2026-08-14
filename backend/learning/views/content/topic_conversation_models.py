@@ -36,6 +36,7 @@ GOAL_LABELS_BY_LANGUAGE: dict[str, tuple[str, str]] = {
 def analyze_user_turn(
     *,
     user_text: str,
+    assistant_text: str,
     history: list[dict[str, str]],
     source_language: str,
     target_language: str,
@@ -117,6 +118,7 @@ def literal_translate_user_text(
 def generate_user_correction(
     *,
     user_text: str,
+    assistant_text: str,
     history: list[dict[str, str]],
     source_language: str,
     target_language: str,
@@ -128,6 +130,8 @@ def generate_user_correction(
             "corrected_user_text": "",
             "corrected_user_source_translation": "",
             "corrected_user_explanation": "",
+            "natural_alternative_text": "",
+            "natural_alternative_source_translation": "",
         }
     source_name = language_display_name(source_language)
     target_name = language_display_name(target_language)
@@ -144,6 +148,7 @@ def generate_user_correction(
             f"{context_label}"
             f"Recent conversation:\n{_recent_history_text(history, limit=12)}\n"
             f"Learner message ({target_name}): {user_clean}\n"
+            f"Assistant reply after the learner message ({target_name}): {str(assistant_text).strip()}\n"
         ),
         timeout_seconds=8,
         model=_require_question_model(),
@@ -156,12 +161,16 @@ def generate_user_correction(
     corrected_user_text = str(parsed.get("corrected_user_text", "")).strip()
     corrected_user_source_translation = str(parsed.get("corrected_user_source_translation", "")).strip()
     corrected_user_explanation = str(parsed.get("corrected_user_explanation", "")).strip()
+    natural_alternative_text = str(parsed.get("natural_alternative_text", "")).strip()
+    natural_alternative_source_translation = str(parsed.get("natural_alternative_source_translation", "")).strip()
     if not corrected_user_text or not corrected_user_source_translation or not corrected_user_explanation:
         raise RuntimeError("Question model request failed")
     return {
         "corrected_user_text": corrected_user_text[:1200],
         "corrected_user_source_translation": corrected_user_source_translation[:1200],
         "corrected_user_explanation": corrected_user_explanation[:1200],
+        "natural_alternative_text": natural_alternative_text[:1200],
+        "natural_alternative_source_translation": natural_alternative_source_translation[:1200],
     }
 
 

@@ -22,6 +22,7 @@ type Props = {
   readOnly?: boolean;
   originalUserTexts?: Record<number, string>;
   correctedUserTexts?: Record<number, string>;
+  naturalUserAlternatives?: Record<number, { target: string; source: string }>;
 };
 
 export default function ConversationReviewTurns({
@@ -35,6 +36,7 @@ export default function ConversationReviewTurns({
   readOnly = false,
   originalUserTexts = {},
   correctedUserTexts = {},
+  naturalUserAlternatives = {},
 }: Props): JSX.Element {
   const { t } = useI18n();
 
@@ -99,6 +101,15 @@ export default function ConversationReviewTurns({
               <p className="conversation-review-corrected">
                 <strong>{t("conversation.correctedLabel")}</strong> {correctedUserTexts[index]}
               </p>
+            )}
+            {speaker === "user" && naturalUserAlternatives[index] && (
+              <div className="conversation-review-natural">
+                <strong>{t("conversation.moreNatural")}</strong>
+                <span>{naturalUserAlternatives[index].target}</span>
+                {naturalUserAlternatives[index].source && (
+                  <small>{naturalUserAlternatives[index].source}</small>
+                )}
+              </div>
             )}
           </div>
         );

@@ -103,6 +103,7 @@ export function useConversationReviewPreparation({
             roleText,
             goalText,
             turns[nextTask.index].user_text,
+            turns[nextTask.index].assistant_text,
             turns.slice(0, nextTask.index).map((turn) => ({
               user_text: turn.user_text,
               assistant_text: turn.assistant_text,
@@ -117,6 +118,8 @@ export function useConversationReviewPreparation({
                 user_corrected_text: payload.user_corrected_text || turn.user_text || "",
                 user_corrected_translation_text: payload.user_corrected_translation_text || "",
                 user_correction_explanation: payload.user_correction_explanation || "",
+                user_natural_alternative_text: payload.user_natural_alternative_text || "",
+                user_natural_alternative_translation_text: payload.user_natural_alternative_translation_text || "",
               }
               : turn
           )));

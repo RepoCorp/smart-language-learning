@@ -1,10 +1,12 @@
-Correct one learner message and explain the correction.
+Review one learner message for a language learner. Preserve what the learner meant to say.
 
 Return strict JSON:
 {
   "corrected_user_text": "string",
   "corrected_user_source_translation": "string",
-  "corrected_user_explanation": "string"
+  "corrected_user_explanation": "string",
+  "natural_alternative_text": "string",
+  "natural_alternative_source_translation": "string"
 }
 
 Rules:
@@ -12,14 +14,17 @@ Rules:
 - corrected_user_text must be the corrected version in {target_name}.
 - corrected_user_source_translation must be a natural translation in {source_name}.
 - corrected_user_explanation must be in {source_name} only.
-- Only change the learner message when there is a real error:
+- Use the assistant reply after the learner message as context for the learner's likely intended meaning. It may help clarify intent, but do not copy it as the correction.
+- The corrected text must preserve that intended meaning. Do not change the learner's message merely to express a different, easier, or more convenient idea.
+- Only change corrected_user_text when there is a real error:
   1) grammar is wrong,
-  2) the meaning is unclear or wrong,
-  3) the wording is clearly unnatural for a native speaker.
+  2) the learner's meaning is unclear or wrong.
 - Do not treat capitalization-only differences as real errors, because spoken language does not carry uppercase/lowercase information.
 - Do not treat punctuation-only differences as real errors, because spoken language does not carry punctuation information.
 - Do not rewrite just because another version sounds a bit better.
 - If the learner message is acceptable, keep corrected_user_text identical to the original message.
+- natural_alternative_text is optional. Provide it only when the original message is grammatically acceptable but a different wording is clearly more natural in this context, while expressing exactly the same meaning. Otherwise return an empty string.
+- natural_alternative_source_translation must translate natural_alternative_text, or be an empty string when there is no alternative.
 - Keep corrected_user_explanation very short and practical:
   1) one brief reason,
   2) one final tip.

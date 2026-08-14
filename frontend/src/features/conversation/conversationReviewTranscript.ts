@@ -4,6 +4,7 @@ export type ConversationReviewTranscript = {
   dialog: ContentDialogRecord;
   originalUserTexts: Record<number, string>;
   correctedUserTexts: Record<number, string>;
+  naturalUserAlternatives: Record<number, { target: string; source: string }>;
 };
 
 export function buildFinishedConversationTranscript(
@@ -13,6 +14,7 @@ export function buildFinishedConversationTranscript(
   const reviewTurns: ContentDialogRecord["turns"] = [];
   const originalUserTexts: Record<number, string> = {};
   const correctedUserTexts: Record<number, string> = {};
+  const naturalUserAlternatives: Record<number, { target: string; source: string }> = {};
   let reviewTurnIndex = 0;
 
   for (const turn of turns) {
@@ -31,6 +33,13 @@ export function buildFinishedConversationTranscript(
       originalUserTexts[reviewTurnIndex] = userText;
       if (correctedUserText && correctedUserText !== userText) {
         correctedUserTexts[reviewTurnIndex] = correctedUserText;
+      }
+      const naturalAlternative = (turn.user_natural_alternative_text || "").trim();
+      if (naturalAlternative && naturalAlternative !== correctedUserText) {
+        naturalUserAlternatives[reviewTurnIndex] = {
+          target: naturalAlternative,
+          source: (turn.user_natural_alternative_translation_text || "").trim(),
+        };
       }
       reviewTurnIndex += 1;
     }
@@ -57,13 +66,15 @@ export function buildFinishedConversationTranscript(
     },
     originalUserTexts,
     correctedUserTexts,
+    naturalUserAlternatives,
   };
 }
 
-export function buildGeneratedReviewOriginalUserTexts(
+export function buildGeneratedReviewAnnotations(
   turns: ContentItemConversationResponse[],
-): Record<number, string> {
+): Pick<ConversationReviewTranscript, "originalUserTexts" | "naturalUserAlternatives"> {
   const originalUserTexts: Record<number, string> = {};
+  const naturalUserAlternatives: Record<number, { target: string; source: string }> = {};
   let reviewTurnIndex = 0;
 
   for (const turn of turns) {
@@ -72,6 +83,13 @@ export function buildGeneratedReviewOriginalUserTexts(
 
     if (userText) {
       originalUserTexts[reviewTurnIndex] = userText;
+      const naturalAlternative = (turn.user_natural_alternative_text || "").trim();
+      if (naturalAlternative && naturalAlternative !== userText) {
+        naturalUserAlternatives[reviewTurnIndex] = {
+          target: naturalAlternative,
+          source: (turn.user_natural_alternative_translation_text || "").trim(),
+        };
+      }
       reviewTurnIndex += 1;
     }
     if (assistantText) {
@@ -79,5 +97,5 @@ export function buildGeneratedReviewOriginalUserTexts(
     }
   }
 
-  return originalUserTexts;
+  return { originalUserTexts, naturalUserAlternatives };
 }

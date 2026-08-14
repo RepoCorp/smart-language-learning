@@ -3156,6 +3156,24 @@ textarea {
   font-size: 12px;
 }
 
+.conversation-review-natural {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--color-accent);
+  border-radius: 4px;
+  background: var(--color-accent-surface);
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.conversation-review-natural small {
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
 .conversation-notes-wrap {
   margin-top: 10px;
 }
