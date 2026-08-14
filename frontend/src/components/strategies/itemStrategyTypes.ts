@@ -137,6 +137,7 @@ export type ItemStrategiesModalProps = {
     isRunning: boolean;
     isMuted: boolean;
     canStart: boolean;
+    originalAudioUrl: string;
     onStart: (playback?: string[] | { lines?: string[]; audioSources?: string[] }) => void;
     onStop: () => void;
     onToggleMute: () => void;

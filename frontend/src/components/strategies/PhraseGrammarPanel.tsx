@@ -270,16 +270,16 @@ export default function PhraseGrammarPanel({
       secondsLeft={loop.secondsLeft}
       isRunning={loop.isRunning}
       isMuted={loop.isMuted}
-      canStart={selectedExamples.length > 0}
+      canStart={Boolean(targetText.trim())}
       canSelectEntries={exampleEntries.length > 0}
       hasSelectedEntries={selectedExamples.length > 0}
       onUnselectAll={() => setSelectedExampleKeys([])}
       onSelectAll={selectAllExamples}
       onSelectRandom={selectRandomExample}
       onStart={() => loop.onStart({
-        lines: selectedExamples.map((entry) => entry.target),
-        audioSources: selectedExamples.every((entry) => entry.audioUrl)
-          ? selectedExamples.map((entry) => entry.audioUrl)
+        lines: [targetText, ...selectedExamples.map((entry) => entry.target)],
+        audioSources: loop.originalAudioUrl && selectedExamples.every((entry) => entry.audioUrl)
+          ? [loop.originalAudioUrl, ...selectedExamples.map((entry) => entry.audioUrl)]
           : [],
       })}
       onStop={loop.onStop}

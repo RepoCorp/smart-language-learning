@@ -2167,6 +2167,7 @@ export default function NewItem({
               isRunning: exerciseRunning,
               isMuted: exerciseMuted,
               canStart: item.item_type === "phrase" && Boolean(audioUrl),
+              originalAudioUrl: audioUrl,
               onStart: startExercise,
               onStop: stopExercise,
               onToggleMute: toggleExerciseMute,

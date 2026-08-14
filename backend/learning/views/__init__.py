@@ -65,6 +65,7 @@ from .auth import (
     AuthUsersView,
 )
 from .difficult_items import CompleteDifficultItemView
+from .grammar_pool import PhraseGrammarPoolView
 from .configuration import ElevenLabsVoiceDisableView, ElevenLabsVoicePreviewView, ElevenLabsVoicesView
 
 __all__ = [
@@ -137,4 +138,5 @@ __all__ = [
     "ElevenLabsVoicesView",
     "ElevenLabsVoiceDisableView",
     "ElevenLabsVoicePreviewView",
+    "PhraseGrammarPoolView",
 ]

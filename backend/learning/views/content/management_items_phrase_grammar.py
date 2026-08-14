@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import random
+
+from django.db.models.functions import Length
 from django.utils import timezone
 
 from ...grammar_features import PHRASE_GRAMMAR_FEATURES
@@ -29,6 +32,50 @@ def _grammar_feature_list() -> str:
 def _requested_feature_key(request: Request) -> str | None:
     feature_key = str(request.query_params.get("feature_key", "")).strip()
     return feature_key if feature_key in PHRASE_GRAMMAR_FEATURES else None
+
+
+def _short_phrase_examples(examples, limit: int = 5) -> list[Item]:
+    """Favor concise examples while keeping enough variety between visits."""
+    candidates = list(examples[:30])
+    selected: list[Item] = []
+    while candidates and len(selected) < limit:
+        weights = [1 / max(len(candidate.german_text.split()), 1) ** 2 for candidate in candidates]
+        selected_index = random.choices(range(len(candidates)), weights=weights, k=1)[0]
+        selected.append(candidates.pop(selected_index))
+    return sorted(selected, key=lambda example: (example.target_length, example.id))
+
+
+def analyze_phrase_grammar_features(item: Item) -> list[str] | None:
+    if item.target_language != "german":
+        detected_features: set[str] = set()
+    else:
+        parsed = _call_openai_json_logged(
+            label="content_item_phrase_grammar_features",
+            system_prompt=_render_prompt(
+                PHRASE_GRAMMAR_FEATURES_PROMPT,
+                sentence=item.german_text,
+                grammar_features=_grammar_feature_list(),
+            ),
+            user_input=item.german_text,
+            timeout_seconds=12,
+            model=WORD_EXERCISE_MODEL,
+            temperature=1.0,
+            top_p=1.0,
+            presence_penalty=0.0,
+        )
+        if not isinstance(parsed, list) or not all(isinstance(value, str) for value in parsed):
+            return None
+        detected_features = set(parsed).intersection(PHRASE_GRAMMAR_FEATURES)
+
+    for feature_key in detected_features:
+        ItemGrammarFeature.objects.get_or_create(item=item, feature_key=feature_key)
+    item.phrase_grammar_checked_at = timezone.now()
+    item.save(update_fields=["phrase_grammar_checked_at"])
+    return [
+        feature_key
+        for feature_key in PHRASE_GRAMMAR_FEATURES
+        if feature_key in detected_features
+    ]
 
 
 class ContentItemPhraseGrammarFeaturesView(APIView):
@@ -63,8 +110,10 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
                 grammar_features__feature_key=feature_key,
             )
             .exclude(id=item.id)
-            .order_by("?")[:5]
+            .annotate(target_length=Length("german_text"))
+            .order_by("target_length", "id")
         )
+        selected_examples = _short_phrase_examples(examples)
         return Response(
             {
                 "examples": [
@@ -73,7 +122,7 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
                         "source_text": example.spanish_text,
                         "audio_url": example.audio_url,
                     }
-                    for example in examples
+                    for example in selected_examples
                 ]
             }
         )
@@ -89,38 +138,12 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
         ).first()
         if not item:
             return Response({"detail": "Phrase not found"}, status=status.HTTP_404_NOT_FOUND)
-        if target_language != "german":
-            return Response({"feature_keys": []})
-
-        parsed = _call_openai_json_logged(
-            label="content_item_phrase_grammar_features",
-            system_prompt=_render_prompt(
-                PHRASE_GRAMMAR_FEATURES_PROMPT,
-                sentence=item.german_text,
-                grammar_features=_grammar_feature_list(),
-            ),
-            user_input=item.german_text,
-            timeout_seconds=12,
-            model=WORD_EXERCISE_MODEL,
-            temperature=1.0,
-            top_p=1.0,
-            presence_penalty=0.0,
-        )
-        if not isinstance(parsed, list) or not all(isinstance(value, str) for value in parsed):
+        feature_keys = analyze_phrase_grammar_features(item)
+        if feature_keys is None:
             return Response({"detail": "Failed to analyze phrase grammar"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        detected_features = set(parsed).intersection(PHRASE_GRAMMAR_FEATURES)
-        for feature_key in detected_features:
-            ItemGrammarFeature.objects.get_or_create(item=item, feature_key=feature_key)
-        item.phrase_grammar_checked_at = timezone.now()
-        item.save(update_fields=["phrase_grammar_checked_at"])
         return Response(
             {
-                "feature_keys": [
-                    feature_key
-                    for feature_key in PHRASE_GRAMMAR_FEATURES
-                    if feature_key in detected_features
-                ],
+                "feature_keys": feature_keys,
                 "analyzed": True,
             }
         )

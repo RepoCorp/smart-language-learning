@@ -5,9 +5,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..auth import get_request_user
 from ..languages import language_display_name
 from ..models import DisabledElevenLabsVoice
+from .admin_access import require_admin
 from .content.audio import configured_elevenlabs_voice_ids, create_elevenlabs_audio_file, fetch_elevenlabs_voices
 
 ELEVENLABS_PREVIEW_TEXT_BY_LANGUAGE = {
@@ -18,13 +18,6 @@ ELEVENLABS_PREVIEW_TEXT_BY_LANGUAGE = {
     "italian": "Ciao. Questa e una prova della voce.",
     "portuguese": "Ola. Esta e uma demonstracao de voz.",
 }
-
-
-def _require_admin(request: Request):
-    user = get_request_user(request)
-    if user is None or not user.is_superuser:
-        return None
-    return user
 
 
 def _voice_payload(voice: dict[str, object], disabled_voice_ids: set[str]) -> dict[str, object]:
@@ -44,7 +37,7 @@ def _voice_payload(voice: dict[str, object], disabled_voice_ids: set[str]) -> di
 
 class ElevenLabsVoicesView(APIView):
     def get(self, request: Request) -> Response:
-        if _require_admin(request) is None:
+        if require_admin(request) is None:
             return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
 
         target_language = str(request.query_params.get("target_language", "german")).strip().lower() or "german"
@@ -81,7 +74,7 @@ class ElevenLabsVoicesView(APIView):
 
 class ElevenLabsVoiceDisableView(APIView):
     def post(self, request: Request) -> Response:
-        if _require_admin(request) is None:
+        if require_admin(request) is None:
             return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
 
         voice_id = str(request.data.get("voice_id", "")).strip()
@@ -106,7 +99,7 @@ class ElevenLabsVoiceDisableView(APIView):
 
 class ElevenLabsVoicePreviewView(APIView):
     def post(self, request: Request) -> Response:
-        if _require_admin(request) is None:
+        if require_admin(request) is None:
             return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
 
         voice_id = str(request.data.get("voice_id", "")).strip()

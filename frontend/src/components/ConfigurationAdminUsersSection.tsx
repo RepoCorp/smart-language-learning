@@ -9,6 +9,8 @@ import {
   type AuthUser,
 } from "../authApi";
 import { useI18n } from "../i18n";
+import { useStudyLanguages } from "../studyLanguages";
+import ConfigurationGrammarPoolSection from "./ConfigurationGrammarPoolSection";
 
 interface ConfigurationAdminUsersSectionProps {
   canCreateUsers?: boolean;
@@ -18,6 +20,7 @@ export default function ConfigurationAdminUsersSection({
   canCreateUsers = false,
 }: ConfigurationAdminUsersSectionProps): JSX.Element | null {
   const { t } = useI18n();
+  const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
@@ -109,6 +112,11 @@ export default function ConfigurationAdminUsersSection({
 
   return (
     <>
+      <ConfigurationGrammarPoolSection
+        canManage={canCreateUsers}
+        sourceLanguage={sourceLanguage}
+        targetLanguage={targetLanguage}
+      />
       <section className="card settings-card">
         <h2 className="settings-title">{t("config.registrationRequestsTitle")}</h2>
         <p className="settings-subtitle">{t("config.registrationRequestsSubtitle")}</p>
