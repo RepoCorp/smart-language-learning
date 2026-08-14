@@ -129,6 +129,7 @@ export function useItemStrategies({
     itemId,
     sourceLanguage,
     targetLanguage,
+    enabled: modalOpen && selectedStrategy === GRAMMAR_STRATEGY && itemType === "phrase" && targetLanguage === "german",
   });
 
   return {

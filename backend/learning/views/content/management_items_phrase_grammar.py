@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...grammar_features import PHRASE_GRAMMAR_FEATURES, VERB_POSITION_MAIN_CLAUSE
+from ...grammar_features import PHRASE_GRAMMAR_FEATURES
 from ...models import Item, ItemGrammarFeature
 from ...prompts import PHRASE_GRAMMAR_FEATURES_PROMPT
 from .generation import WORD_EXERCISE_MODEL
@@ -25,7 +25,7 @@ def _grammar_feature_list() -> str:
 
 
 def _requested_feature_key(request: Request) -> str | None:
-    feature_key = str(request.query_params.get("feature_key", VERB_POSITION_MAIN_CLAUSE)).strip()
+    feature_key = str(request.query_params.get("feature_key", "")).strip()
     return feature_key if feature_key in PHRASE_GRAMMAR_FEATURES else None
 
 
@@ -66,9 +66,6 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
         )
 
     def post(self, request: Request, item_id: int) -> Response:
-        feature_key = _requested_feature_key(request)
-        if not feature_key:
-            return Response({"detail": "Unknown grammar feature"}, status=status.HTTP_400_BAD_REQUEST)
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         item = apply_user_scope(Item.objects, user).filter(
@@ -80,10 +77,7 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
         if not item:
             return Response({"detail": "Phrase not found"}, status=status.HTTP_404_NOT_FOUND)
         if target_language != "german":
-            return Response({"feature_present": False})
-
-        if item.grammar_features.filter(feature_key=feature_key).exists():
-            return Response({"feature_present": True})
+            return Response({"feature_keys": []})
 
         parsed = _call_openai_json_logged(
             label="content_item_phrase_grammar_features",
@@ -103,7 +97,14 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
             return Response({"detail": "Failed to analyze phrase grammar"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         detected_features = set(parsed).intersection(PHRASE_GRAMMAR_FEATURES)
-        feature_present = feature_key in detected_features
-        if feature_present:
+        for feature_key in detected_features:
             ItemGrammarFeature.objects.get_or_create(item=item, feature_key=feature_key)
-        return Response({"feature_present": feature_present})
+        return Response(
+            {
+                "feature_keys": [
+                    feature_key
+                    for feature_key in PHRASE_GRAMMAR_FEATURES
+                    if feature_key in detected_features
+                ]
+            }
+        )

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { useI18n } from "../../i18n";
+import GrammarMethodologyFooter from "./GrammarMethodologyFooter";
 
 export type StaticGrammarRow = {
   topic: ReactNode;
@@ -12,7 +13,6 @@ export default function StaticGrammarTable({ rows }: { rows: StaticGrammarRow[] 
   const { t } = useI18n();
   return (
     <div className="grammar-strategy-panel">
-      <p className="grammar-strategy-intro">{t("strategies.grammar.description")}</p>
       <div className="grammar-strategy-table-wrap">
         <table className="grammar-strategy-table">
           <thead>
@@ -33,7 +33,7 @@ export default function StaticGrammarTable({ rows }: { rows: StaticGrammarRow[] 
           </tbody>
         </table>
       </div>
-      <p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p>
+      <GrammarMethodologyFooter />
     </div>
   );
 }

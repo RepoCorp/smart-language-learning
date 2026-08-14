@@ -104,7 +104,7 @@ export type ContentItemGrammarExamplesResponse = {
 };
 
 export type ContentItemPhraseGrammarFeaturesResponse = {
-  feature_present: boolean;
+  feature_keys: string[];
 };
 
 export type ContentItemPhraseGrammarExamplesResponse = {

@@ -6,8 +6,14 @@ Ningun otro arreglito que no sea vital!!!
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 - Introducir gramatica, gradualmente. Empecemos con sustantivos.
   - Other things that change depending on the gender of the word.
+  - Case declinations para plural
+- Verbos:
+  - Indicar si son separables, reflexivos..
+  - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
+- Frases: ir añadiendo reglas
 - Añadir mas grammar features 
 - Que detecte los errores de las features en la conversacion 
+- Que en el ejercicio de bloques detecte el tipo de error
 
 ## New functionalities 
 De las conversaciones saca errores. Darle al modelo la lista de errores que tenemos incluidas y el dice si/cuales de esos están y sugiere repasarlo. Que sea bien empatico 😂

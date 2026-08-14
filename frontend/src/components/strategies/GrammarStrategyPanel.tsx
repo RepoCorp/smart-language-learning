@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n";
+import GrammarMethodologyFooter from "./GrammarMethodologyFooter";
 import type { GermanGrammarNounExample, StudyLanguageCode } from "../../types";
 import PhraseGrammarPanel from "./PhraseGrammarPanel";
 import type { PhraseGrammarStrategy } from "./phraseGrammarTypes";
@@ -91,8 +92,7 @@ export default function GrammarStrategyPanel({
     return (
       <div className="word-strategies-placeholder-card grammar-strategy-panel">
         <p className="word-strategies-placeholder-title"><strong>{t("strategies.grammar.title")}</strong></p>
-        <p>{t("strategies.grammar.description")}</p>
-        <p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p>
+        <GrammarMethodologyFooter />
       </div>
     );
   }
@@ -109,10 +109,9 @@ export default function GrammarStrategyPanel({
   if (!selectedExample || !selectedNoun) {
     return (
       <div className="grammar-strategy-panel">
-        <p className="grammar-strategy-intro">{t("strategies.grammar.description")}</p>
         <GenderTabs selectedGender={selectedGender} sourceGender={noun.gender} availableExamples={availableExamples} onSelect={setSelectedGender} />
         <p className="hint">{isLoadingExamples ? t("dialogs.loading") : t("strategies.grammar.genderUnavailable")}</p>
-        <p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p>
+        <GrammarMethodologyFooter />
       </div>
     );
   }
@@ -124,7 +123,6 @@ export default function GrammarStrategyPanel({
 
   return (
     <div className="grammar-strategy-panel">
-      <p className="grammar-strategy-intro">{t("strategies.grammar.description")}</p>
       <GenderTabs selectedGender={selectedGender} sourceGender={noun.gender} availableExamples={availableExamples} onSelect={setSelectedGender} />
       <div className="grammar-strategy-table-wrap">
         <table className="grammar-strategy-table">
@@ -174,7 +172,7 @@ export default function GrammarStrategyPanel({
           </tbody>
         </table>
       </div>
-      <p className="hint grammar-strategy-footnote">{t("strategies.grammar.footnote")}</p>
+      <GrammarMethodologyFooter />
     </div>
   );
 }

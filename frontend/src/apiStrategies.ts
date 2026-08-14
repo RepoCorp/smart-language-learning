@@ -35,14 +35,12 @@ export async function fetchContentItemGrammarExamples(
 
 export async function analyzeContentItemPhraseGrammarFeatures(
   itemId: number,
-  featureKey: string,
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentItemPhraseGrammarFeaturesResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
-    feature_key: featureKey,
   });
   const response = await apiFetch(
     `${API_BASE}/content/items/${itemId}/strategies/grammar-features?${params.toString()}`,

@@ -2001,8 +2001,16 @@ def test_content_item_regenerate_keeps_a_selected_subphrase(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_phrase_grammar_feature_is_persisted_only_when_detected(monkeypatch):
-    from learning.grammar_features import VERB_POSITION_MAIN_CLAUSE
+def test_phrase_grammar_features_are_persisted_and_returned_together(monkeypatch):
+    from learning.grammar_features import (
+        MODAL_VERB_WITH_INFINITIVE,
+        REFLEXIVE_VERB,
+        SEPARABLE_VERB_MAIN_CLAUSE,
+        VERB_POSITION_MAIN_CLAUSE,
+        VERB_POSITION_SUBORDINATE_CLAUSE,
+        VERB_POSITION_W_QUESTION,
+        VERB_POSITION_YES_NO_QUESTION,
+    )
     from learning.views.content import management_items_phrase_grammar as phrase_grammar_views
 
     phrase = Item.objects.create(
@@ -2015,7 +2023,15 @@ def test_phrase_grammar_feature_is_persisted_only_when_detected(monkeypatch):
     monkeypatch.setattr(
         phrase_grammar_views,
         "_call_openai_json_logged",
-        lambda **kwargs: [VERB_POSITION_MAIN_CLAUSE],
+        lambda **kwargs: [
+            VERB_POSITION_MAIN_CLAUSE,
+            VERB_POSITION_YES_NO_QUESTION,
+            VERB_POSITION_W_QUESTION,
+            VERB_POSITION_SUBORDINATE_CLAUSE,
+            SEPARABLE_VERB_MAIN_CLAUSE,
+            MODAL_VERB_WITH_INFINITIVE,
+            REFLEXIVE_VERB,
+        ],
     )
 
     client = APIClient()
@@ -2025,8 +2041,24 @@ def test_phrase_grammar_feature_is_persisted_only_when_detected(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json() == {"feature_present": True}
+    assert response.json() == {
+        "feature_keys": [
+            VERB_POSITION_MAIN_CLAUSE,
+            VERB_POSITION_YES_NO_QUESTION,
+            VERB_POSITION_W_QUESTION,
+            VERB_POSITION_SUBORDINATE_CLAUSE,
+            SEPARABLE_VERB_MAIN_CLAUSE,
+            MODAL_VERB_WITH_INFINITIVE,
+            REFLEXIVE_VERB,
+        ]
+    }
     assert phrase.grammar_features.filter(feature_key=VERB_POSITION_MAIN_CLAUSE).exists()
+    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_YES_NO_QUESTION).exists()
+    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_W_QUESTION).exists()
+    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_SUBORDINATE_CLAUSE).exists()
+    assert phrase.grammar_features.filter(feature_key=SEPARABLE_VERB_MAIN_CLAUSE).exists()
+    assert phrase.grammar_features.filter(feature_key=MODAL_VERB_WITH_INFINITIVE).exists()
+    assert phrase.grammar_features.filter(feature_key=REFLEXIVE_VERB).exists()
 
 
 @pytest.mark.django_db
@@ -2065,7 +2097,7 @@ def test_yes_no_question_grammar_feature_is_persisted_and_returns_matching_examp
     response = client.post(f"/api/content/items/{phrase.id}/strategies/grammar-features?{params}")
 
     assert response.status_code == 200
-    assert response.json() == {"feature_present": True}
+    assert response.json() == {"feature_keys": [VERB_POSITION_YES_NO_QUESTION]}
     assert phrase.grammar_features.filter(feature_key=VERB_POSITION_YES_NO_QUESTION).exists()
     assert "Return only a valid JSON array" in captured_prompts[0]
     assert "Never return a bare feature ID" in captured_prompts[0]
@@ -2098,7 +2130,7 @@ def test_phrase_grammar_feature_does_not_store_an_absent_feature(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json() == {"feature_present": False}
+    assert response.json() == {"feature_keys": []}
     assert not phrase.grammar_features.filter(feature_key=VERB_POSITION_MAIN_CLAUSE).exists()
 
 
@@ -2114,7 +2146,7 @@ def test_phrase_grammar_examples_return_other_phrases_with_the_feature():
 
     client = APIClient()
     response = client.get(
-        f"/api/content/items/{current.id}/strategies/grammar-features?source_language=spanish&target_language=german",
+        f"/api/content/items/{current.id}/strategies/grammar-features?source_language=spanish&target_language=german&feature_key=verb_position_main_clause",
     )
 
     assert response.status_code == 200

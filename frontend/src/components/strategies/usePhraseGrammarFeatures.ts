@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { analyzeContentItemPhraseGrammarFeatures, fetchContentItemPhraseGrammarExamples } from "../../apiStrategies";
 import type { StudyLanguageCode } from "../../types";
@@ -11,11 +11,8 @@ import {
 function initialFeatureState(): PhraseGrammarFeatureState {
   return {
     isOpen: false,
-    isLoading: false,
-    featurePresent: null,
     error: "",
     examples: [],
-    examplesVisible: false,
     isLoadingExamples: false,
   };
 }
@@ -30,50 +27,55 @@ export function usePhraseGrammarFeatures({
   itemId,
   sourceLanguage,
   targetLanguage,
+  enabled,
 }: {
   itemId: number;
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
+  enabled: boolean;
 }) {
   const [features, setFeatures] = useState(initialFeatures);
+  const [featureKeys, setFeatureKeys] = useState<PhraseGrammarFeatureKey[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const analysisKeyRef = useRef("");
+
+  const analyze = (force = false): void => {
+    const analysisKey = `${itemId}:${sourceLanguage}:${targetLanguage}`;
+    if (itemId <= 0 || isLoading || (!force && analysisKeyRef.current === analysisKey)) {
+      return;
+    }
+    analysisKeyRef.current = analysisKey;
+    setIsLoading(true);
+    setError("");
+    void analyzeContentItemPhraseGrammarFeatures(itemId, sourceLanguage, targetLanguage)
+      .then((response) => {
+        const detected = response.feature_keys.filter(
+          (key): key is PhraseGrammarFeatureKey => PHRASE_GRAMMAR_FEATURE_KEYS.includes(key as PhraseGrammarFeatureKey),
+        );
+        setFeatureKeys(detected);
+      })
+      .catch((requestError) => {
+        analysisKeyRef.current = "";
+        setError(requestError instanceof Error ? requestError.message : "Failed to analyze phrase grammar");
+      })
+      .finally(() => setIsLoading(false));
+  };
 
   useEffect(() => {
     setFeatures(initialFeatures());
+    setFeatureKeys([]);
+    setIsLoading(false);
+    setError("");
+    analysisKeyRef.current = "";
   }, [itemId]);
 
-  const toggleFeature = (featureKey: PhraseGrammarFeatureKey): void => {
-    const feature = features[featureKey];
-    const nextOpen = !feature.isOpen;
-    setFeatures((current) => ({
-      ...current,
-      [featureKey]: { ...current[featureKey], isOpen: nextOpen },
-    }));
-    if (!nextOpen || feature.featurePresent !== null || feature.isLoading || itemId <= 0) return;
-    setFeatures((current) => ({
-      ...current,
-      [featureKey]: { ...current[featureKey], isLoading: true, error: "" },
-    }));
-    void analyzeContentItemPhraseGrammarFeatures(itemId, featureKey, sourceLanguage, targetLanguage)
-      .then((response) => setFeatures((current) => ({
-        ...current,
-        [featureKey]: { ...current[featureKey], featurePresent: response.feature_present },
-      })))
-      .catch((requestError) => setFeatures((current) => ({
-        ...current,
-        [featureKey]: { ...current[featureKey], error: requestError instanceof Error ? requestError.message : "Failed to analyze phrase grammar" },
-      })))
-      .finally(() => setFeatures((current) => ({
-        ...current,
-        [featureKey]: { ...current[featureKey], isLoading: false },
-      })));
-  };
+  useEffect(() => {
+    if (enabled) analyze();
+  }, [enabled, itemId, sourceLanguage, targetLanguage]);
 
-  const showExamples = (featureKey: PhraseGrammarFeatureKey): void => {
+  const loadExamples = (featureKey: PhraseGrammarFeatureKey): void => {
     const feature = features[featureKey];
-    setFeatures((current) => ({
-      ...current,
-      [featureKey]: { ...current[featureKey], examplesVisible: true },
-    }));
     if (feature.examples.length || feature.isLoadingExamples || itemId <= 0) return;
     setFeatures((current) => ({
       ...current,
@@ -94,5 +96,14 @@ export function usePhraseGrammarFeatures({
       })));
   };
 
-  return { features, toggleFeature, showExamples };
+  const toggleFeature = (featureKey: PhraseGrammarFeatureKey): void => {
+    const willOpen = !features[featureKey].isOpen;
+    setFeatures((current) => ({
+      ...current,
+      [featureKey]: { ...current[featureKey], isOpen: willOpen },
+    }));
+    if (willOpen) loadExamples(featureKey);
+  };
+
+  return { featureKeys, features, isLoading, error, refresh: () => analyze(true), toggleFeature };
 }

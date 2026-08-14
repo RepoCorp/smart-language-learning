@@ -2501,25 +2501,60 @@ textarea {
   gap: 10px;
 }
 
-.grammar-strategy-intro,
-.grammar-strategy-footnote {
+.grammar-strategy-methodology {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-style: italic;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.grammar-strategy-methodology p {
   margin: 0;
 }
 
 .grammar-phrase-features {
+  display: grid;
+  gap: 8px;
+}
+
+.grammar-phrase-features .content-collapsible-card {
   border: 1px solid var(--color-border-strong);
   border-radius: 10px;
   overflow: hidden;
+  background: var(--color-surface);
 }
 
 .grammar-phrase-features .content-collapsible-body {
+  gap: 6px;
+  padding: 0 12px 12px;
   text-align: left;
+}
+
+.grammar-phrase-feature-definition,
+.grammar-phrase-feature-example {
+  margin: 0;
+  line-height: 1.3;
+}
+
+.grammar-phrase-feature-example {
+  padding: 4px 6px;
+  border-left: 2px solid var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-surface-alt) 65%, transparent);
+}
+
+.grammar-phrase-feature-example-label {
+  color: var(--color-text-muted);
+  font-size: 0.78em;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .grammar-phrase-examples {
   display: grid;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .grammar-phrase-example {
