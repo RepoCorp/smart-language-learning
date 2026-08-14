@@ -3,6 +3,7 @@ from .core import *  # noqa: F401,F403
 from .management import (
     ContentTopicConversationGoalEvaluationView,
     ContentTopicConversationGoalRegenerateView,
+    ContentTopicConversationErrorAnalysisView,
     ContentTopicConversationStartView,
     ContentTopicConversationHelpView,
     ContentTopicConversationRealtimeSessionView,
@@ -85,6 +86,7 @@ __all__ = [
     "ContentTopicConversationStartView",
     "ContentTopicConversationGoalEvaluationView",
     "ContentTopicConversationGoalRegenerateView",
+    "ContentTopicConversationErrorAnalysisView",
     "ContentTopicConversationHelpView",
     "ContentTopicConversationRealtimeSessionView",
     "ContentTopicConversationReviewView",

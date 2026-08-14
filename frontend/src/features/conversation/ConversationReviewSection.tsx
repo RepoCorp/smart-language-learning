@@ -2,6 +2,7 @@ import { useI18n } from "../../i18n";
 import type { ContentDialogRecord, StudyLanguageCode } from "../../types";
 import BlockingLoadingOverlay from "../../components/BlockingLoadingOverlay";
 import ConversationReviewTurns, { type SentenceActionStatus } from "./ConversationReviewTurns";
+import { useConversationReviewErrorInfo } from "./useConversationReviewErrorInfo";
 
 type Props = {
   topic: string;
@@ -70,6 +71,10 @@ export default function ConversationReviewSection({
   error = "",
 }: Props): JSX.Element {
   const { t } = useI18n();
+  const { byTurn: errorInfoByTurn, requestErrorInfo } = useConversationReviewErrorInfo({
+    sourceLanguage,
+    targetLanguage,
+  });
 
   return (
     <BlockingLoadingOverlay loading={loading} message={loadingMessage}>
@@ -92,6 +97,8 @@ export default function ConversationReviewSection({
           originalUserTexts={originalUserTexts}
           correctedUserTexts={correctedUserTexts}
           naturalUserAlternatives={naturalUserAlternatives}
+          errorInfoByTurn={errorInfoByTurn}
+          onRequestErrorInfo={readOnly ? undefined : requestErrorInfo}
         />
         {(primaryAction || secondaryAction) && (
           <div className="actions">

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .management import APIView, Request, Response, _normalized_pair, _parse_item_conversation_history, status
 from .management_topic_conversation_shared import conversation_context_label
+from .conversation_error_analysis import analyze_conversation_turn_error
 from .topic_conversation_models import (
     generate_conversation_help as generate_conversation_help_with_question_model,
     generate_target_phrase_help as generate_target_phrase_help_with_question_model,
@@ -59,6 +60,30 @@ class ContentTopicConversationUserCorrectionView(APIView):
                 "user_natural_alternative_translation_text": str(correction_payload.get("natural_alternative_source_translation", "")).strip(),
             }
         )
+
+
+class ContentTopicConversationErrorAnalysisView(APIView):
+    def post(self, request: Request) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        original_text = str(request.data.get("original_text", "")).strip()
+        corrected_text = str(request.data.get("corrected_text", "")).strip()
+        if not original_text or not corrected_text:
+            return Response(
+                {"detail": "original_text and corrected_text are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(original_text) > 1200 or len(corrected_text) > 1200:
+            return Response({"detail": "Text is too long"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            error_text = analyze_conversation_turn_error(
+                original_text=original_text,
+                corrected_text=corrected_text,
+                source_language=source_language,
+                target_language=target_language,
+            )
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"error_text": error_text})
 
 
 class ContentTopicConversationHelpView(APIView):

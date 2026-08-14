@@ -1,6 +1,8 @@
 import { useI18n } from "../../i18n";
 import type { ContentDialogRecord, StudyLanguageCode } from "../../types";
 import DialogTurnText, { type ActionStatus } from "../../components/DialogTurnText";
+import FormattedModelText from "../../components/FormattedModelText";
+import type { ConversationReviewErrorInfo } from "./useConversationReviewErrorInfo";
 
 export type SentenceActionStatus = "idle" | "saving" | "added" | "exists" | "error" | "missing_source";
 
@@ -23,6 +25,8 @@ type Props = {
   originalUserTexts?: Record<number, string>;
   correctedUserTexts?: Record<number, string>;
   naturalUserAlternatives?: Record<number, { target: string; source: string }>;
+  errorInfoByTurn?: Record<number, ConversationReviewErrorInfo>;
+  onRequestErrorInfo?: (turnIndex: number, originalText: string, correctedText: string) => Promise<void>;
 };
 
 export default function ConversationReviewTurns({
@@ -37,6 +41,8 @@ export default function ConversationReviewTurns({
   originalUserTexts = {},
   correctedUserTexts = {},
   naturalUserAlternatives = {},
+  errorInfoByTurn = {},
+  onRequestErrorInfo,
 }: Props): JSX.Element {
   const { t } = useI18n();
 
@@ -48,6 +54,9 @@ export default function ConversationReviewTurns({
         const phraseStatus = sentenceActionStatus[phraseKey] || "idle";
         const wholePhraseStatus: ActionStatus = phraseStatus === "missing_source" ? "error" : phraseStatus;
         const naturalAlternative = naturalUserAlternatives[index];
+        const originalText = originalUserTexts[index]?.trim() || "";
+        const hasCorrection = speaker === "user" && Boolean(originalText) && originalText !== turn.target_text.trim();
+        const errorInfo = errorInfoByTurn[index];
         const naturalPhraseKey = `conversation-review-natural-${dialog.dialog_id}-${index}`;
         const naturalPhraseStatus = sentenceActionStatus[naturalPhraseKey] || "idle";
         return (
@@ -95,10 +104,33 @@ export default function ConversationReviewTurns({
                 } : undefined}
               />
             </div>
-            {speaker === "user" && originalUserTexts[index] && originalUserTexts[index].trim() !== turn.target_text.trim() && (
-              <p className="conversation-review-original">
-                <strong>{t("conversation.helpYouSaid")}</strong> {originalUserTexts[index]}
-              </p>
+            {hasCorrection && (
+              <>
+                <p className="conversation-review-original">
+                  <strong>{t("conversation.helpYouSaid")}</strong> {originalText}
+                </p>
+                {onRequestErrorInfo && (
+                  <div className="conversation-review-error-info">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => void onRequestErrorInfo(index, originalText, turn.target_text)}
+                      disabled={errorInfo?.loading}
+                    >
+                      {errorInfo?.loading ? t("newItem.questionsLoading") : t("strategies.grammar.askAboutRule")}
+                    </button>
+                    {errorInfo?.text && (
+                      <>
+                        <FormattedModelText text={errorInfo.text} className="conversation-review-error-text" />
+                        <button type="button" className="secondary-button" disabled>
+                          Add to exercises
+                        </button>
+                      </>
+                    )}
+                    {errorInfo?.error && <small className="error">{errorInfo.error}</small>}
+                  </div>
+                )}
+              </>
             )}
             {speaker === "user" && correctedUserTexts[index] && correctedUserTexts[index].trim() !== turn.target_text.trim() && (
               <p className="conversation-review-corrected">

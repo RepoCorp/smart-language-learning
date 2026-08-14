@@ -51,6 +51,7 @@ WORD_METADATA_RULE_PROMPTS = {
     "verb": _load("word_metadata_rules_verb.txt"),
 }
 TOPIC_CONVERSATION_ANALYZE_USER_TURN_PROMPT = _load("topic_conversation_analyze_user_turn.txt")
+TOPIC_CONVERSATION_ERROR_ANALYSIS_PROMPT = _load("topic_conversation_error_analysis.txt")
 TOPIC_CONVERSATION_GOAL_EVALUATION_PROMPT = _load("topic_conversation_goal_evaluation.txt")
 TOPIC_CONVERSATION_GOAL_TRANSLATION_PROMPT = _load("topic_conversation_goal_translation.txt")
 TOPIC_CONVERSATION_HELP_PROMPT = _load("topic_conversation_help.txt")

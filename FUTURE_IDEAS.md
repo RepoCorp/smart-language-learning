@@ -8,7 +8,6 @@ Ningun otro arreglito que no sea vital!!!
 - Sustantivos:
   - Other things that change depending on the gender of the word.
   - Case declinations para plural
-  - Detecte en las conversaciones cuando se equivoca en el articulo
 - Verbos:
   - Indicar si son separables, reflexivos..
   - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
