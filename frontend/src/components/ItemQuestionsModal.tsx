@@ -136,6 +136,13 @@ export default function ItemQuestionsModal({
             ref={questionInputRef}
             value={questionInput}
             onChange={(event) => setQuestionInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+                return;
+              }
+              event.preventDefault();
+              void submitQuestion(questionInput);
+            }}
             placeholder={t("newItem.questionsPlaceholder")}
             disabled={askingQuestion}
             rows={5}

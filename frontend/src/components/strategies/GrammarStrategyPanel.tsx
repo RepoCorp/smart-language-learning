@@ -52,6 +52,7 @@ export default function GrammarStrategyPanel({
   itemType,
   phraseGrammar,
   onAskAboutPhraseGrammarRule,
+  onOpenPhraseGrammarExample,
   phraseGrammarLoop,
 }: {
   wordType: string;
@@ -63,6 +64,7 @@ export default function GrammarStrategyPanel({
   itemType: "word" | "phrase";
   phraseGrammar: PhraseGrammarStrategy;
   onAskAboutPhraseGrammarRule: (question: string) => void;
+  onOpenPhraseGrammarExample: (itemId: number) => void;
   phraseGrammarLoop: ItemStrategiesModalProps["phraseGrammarLoop"];
 }): JSX.Element {
   const { t } = useI18n();
@@ -80,7 +82,7 @@ export default function GrammarStrategyPanel({
   }, [noun?.gender]);
 
   if (itemType === "phrase") {
-    return <PhraseGrammarPanel targetLanguage={targetLanguage} targetText={targetText} phraseGrammar={phraseGrammar} onAskAboutRule={onAskAboutPhraseGrammarRule} loop={phraseGrammarLoop} />;
+    return <PhraseGrammarPanel targetLanguage={targetLanguage} targetText={targetText} phraseGrammar={phraseGrammar} onAskAboutRule={onAskAboutPhraseGrammarRule} onOpenItem={onOpenPhraseGrammarExample} loop={phraseGrammarLoop} />;
   }
 
   if (isGermanVerb) {

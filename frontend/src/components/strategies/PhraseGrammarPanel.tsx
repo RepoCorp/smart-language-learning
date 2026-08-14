@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useI18n } from "../../i18n";
 import type { StudyLanguageCode } from "../../types";
 import GrammarMethodologyFooter from "./GrammarMethodologyFooter";
-import PhraseSelectionList, { type PhraseSelectionEntry } from "./PhraseSelectionList";
+import GrammarPhraseExampleList, { type GrammarPhraseExampleEntry } from "./GrammarPhraseExampleList";
 import StrategyLoopPanel from "./StrategyLoopPanel";
 import {
   type PhraseGrammarFeatureKey,
@@ -155,12 +155,14 @@ export default function PhraseGrammarPanel({
   targetText,
   phraseGrammar,
   onAskAboutRule,
+  onOpenItem,
   loop,
 }: {
   targetLanguage: StudyLanguageCode;
   targetText: string;
   phraseGrammar: PhraseGrammarStrategy;
   onAskAboutRule: (question: string) => void;
+  onOpenItem: (itemId: number) => void;
   loop: {
     secondsLeft: number;
     isRunning: boolean;
@@ -183,10 +185,11 @@ export default function PhraseGrammarPanel({
       target: example.target_text,
       source: example.source_text,
       audioUrl: example.audio_url,
+      itemId: example.item_id,
     }))
   ));
   const selectedExamples = exampleEntries.filter((entry) => selectedExampleKeys.includes(entry.key));
-  const toggleExample = (entry: PhraseSelectionEntry): void => {
+  const toggleExample = (entry: GrammarPhraseExampleEntry): void => {
     setSelectedExampleKeys((current) => (
       current.includes(entry.key)
         ? current.filter((key) => key !== entry.key)
@@ -242,10 +245,11 @@ export default function PhraseGrammarPanel({
                   {!feature.isLoadingExamples && (
                     feature.examples.length > 0 ? (
                       <div className="grammar-phrase-examples">
-                        <PhraseSelectionList
+                        <GrammarPhraseExampleList
                           entries={exampleEntries.filter((entry) => entry.key.startsWith(`${featureKey}:`))}
                           selectedKeys={selectedExampleKeys}
                           onToggleEntry={toggleExample}
+                          onOpenItem={onOpenItem}
                           disabled={loop.isRunning}
                         />
                       </div>

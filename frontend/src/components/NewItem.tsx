@@ -2162,6 +2162,7 @@ export default function NewItem({
             grammarStrategy={grammarStrategy}
             phraseGrammarStrategy={phraseGrammarStrategy}
             onAskAboutPhraseGrammarRule={openQuestions}
+            onOpenPhraseGrammarExample={openLinkedDialogItem}
             phraseGrammarLoop={{
               secondsLeft: exerciseSecondsLeft,
               isRunning: exerciseRunning,

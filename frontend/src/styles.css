@@ -2634,6 +2634,35 @@ textarea {
   margin-top: 4px;
 }
 
+.grammar-phrase-example-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.grammar-phrase-example-row .exercise-phrase-row {
+  min-width: 0;
+}
+
+.grammar-phrase-example-open-button {
+  display: grid;
+  width: 36px;
+  min-width: 36px;
+  padding: 6px;
+  place-items: center;
+}
+
+.grammar-phrase-example-open-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 .grammar-phrase-example {
   padding: 8px 10px;
   border: 1px solid var(--color-border);
@@ -4543,13 +4572,10 @@ textarea {
 }
 
 .exercise-phrase-row span {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(
-      90px,
-      auto
-    );
-  align-items: center;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   min-width: 0;
   text-align: left;
 }
@@ -4572,7 +4598,6 @@ textarea {
   color: var(--color-text-muted);
   line-height: 1.2;
   min-width: 0;
-  justify-self: start;
   text-align: left;
 }
 

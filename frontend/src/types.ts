@@ -109,7 +109,7 @@ export type ContentItemPhraseGrammarFeaturesResponse = {
 };
 
 export type ContentItemPhraseGrammarExamplesResponse = {
-  examples: Array<{ target_text: string; source_text: string; audio_url: string }>;
+  examples: Array<{ item_id: number; target_text: string; source_text: string; audio_url: string }>;
 };
 
 export interface DialogPhraseTurn {

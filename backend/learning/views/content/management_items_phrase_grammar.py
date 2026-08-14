@@ -118,6 +118,7 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
             {
                 "examples": [
                     {
+                        "item_id": example.id,
                         "target_text": example.german_text,
                         "source_text": example.spanish_text,
                         "audio_url": example.audio_url,

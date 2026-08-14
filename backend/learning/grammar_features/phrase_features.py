@@ -73,8 +73,8 @@ PHRASE_GRAMMAR_FEATURES = {
         "the accusative case, such as für, ohne, durch, gegen, or um."
     ),
     PREPOSITION_DATIVE: (
-        "The sentence contains a dative preposition such as mit, nach, aus, zu, von, or bei "
-        "followed by an explicit noun phrase whose dative form is clearly visible."
+        "The sentence contains a preposition that requires the following noun, pronoun, or nominal "
+        "expression to be in the dative case, such as mit, nach, aus, zu, von, or bei."
     ),
     TWO_WAY_PREPOSITION_LOCATION: (
         "The sentence uses a two-way preposition (Wechselpräposition) with the dative case to "

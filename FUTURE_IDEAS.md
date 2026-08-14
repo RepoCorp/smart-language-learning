@@ -28,6 +28,7 @@ Ningun otro arreglito que no sea vital!!!
 ### Problemas
 En dialogos de palabras está cogiendo tambien palabras que significan lo mismo en español pero no son la misma en el idioma target
 
+
 ### Tier 1
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
