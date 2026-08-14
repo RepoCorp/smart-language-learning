@@ -55,11 +55,15 @@ SPANISH_FEATURE_TITLES = {
 
 
 def _feature_catalog(source_language: str) -> str:
-    titles = SPANISH_FEATURE_TITLES if source_language == "spanish" else ENGLISH_FEATURE_TITLES
+    titles = _feature_titles(source_language)
     return "\n".join(
-        f"- Title: {titles[feature_key]}\n  Definition: {description}"
+        f"- ID: {feature_key}\n  Title: {titles[feature_key]}\n  Definition: {description}"
         for feature_key, description in PHRASE_GRAMMAR_FEATURES.items()
     )
+
+
+def _feature_titles(source_language: str) -> dict[str, str]:
+    return SPANISH_FEATURE_TITLES if source_language == "spanish" else ENGLISH_FEATURE_TITLES
 
 
 def analyze_conversation_turn_error(
@@ -68,7 +72,7 @@ def analyze_conversation_turn_error(
     corrected_text: str,
     source_language: str,
     target_language: str,
-) -> str:
+) -> dict[str, object]:
     original_clean = str(original_text).strip()
     corrected_clean = str(corrected_text).strip()
     if not original_clean or not corrected_clean:
@@ -97,7 +101,30 @@ def analyze_conversation_turn_error(
         presence_penalty=0.0,
         json_mode=True,
     )
-    error_text = str(parsed.get("error_text", "")).strip() if isinstance(parsed, dict) else ""
-    if not error_text:
+    raw_errors = parsed.get("errors") if isinstance(parsed, dict) else None
+    if not isinstance(raw_errors, list) or not raw_errors:
         raise RuntimeError("Question model request failed")
-    return error_text[:1600]
+    explanations: list[str] = []
+    grammar_feature_keys: set[str] = set()
+    word_item_targets: list[str] = []
+    for raw_error in raw_errors:
+        if not isinstance(raw_error, dict):
+            raise RuntimeError("Question model request failed")
+        explanation = str(raw_error.get("explanation", "")).strip()
+        if not explanation:
+            raise RuntimeError("Question model request failed")
+        explanations.append(explanation)
+        feature_key = raw_error.get("grammar_feature_key")
+        if feature_key is not None:
+            if not isinstance(feature_key, str) or feature_key not in PHRASE_GRAMMAR_FEATURES:
+                raise RuntimeError("Question model request failed")
+            grammar_feature_keys.add(feature_key)
+        word_target = raw_error.get("word_item_target")
+        if isinstance(word_target, str) and word_target.strip():
+            word_item_targets.append(word_target.strip())
+    error_text = "\n".join(f"- {explanation.lstrip('- ').strip()}" for explanation in explanations)
+    return {
+        "error_text": error_text[:1600],
+        "grammar_feature_keys": sorted(grammar_feature_keys),
+        "word_item_targets": word_item_targets[:8],
+    }

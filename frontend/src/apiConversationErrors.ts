@@ -6,7 +6,7 @@ export async function requestConversationTurnErrorInfo(
   correctedText: string,
   sourceLanguage: StudyLanguageCode,
   targetLanguage: StudyLanguageCode,
-): Promise<string> {
+): Promise<ConversationTurnErrorAnalysis> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
     target_language: targetLanguage,
@@ -28,9 +28,47 @@ export async function requestConversationTurnErrorInfo(
     }
     throw new Error(detail);
   }
-  const payload = (await response.json()) as { error_text?: string };
+  const payload = (await response.json()) as {
+    error_text?: string;
+    grammar_feature_keys?: string[];
+    word_item_targets?: string[];
+  };
   if (!payload.error_text) {
     throw new Error("The error analysis was empty");
   }
-  return payload.error_text;
+  return {
+    errorText: payload.error_text,
+    grammarFeatureKeys: payload.grammar_feature_keys || [],
+    wordItemTargets: payload.word_item_targets || [],
+  };
+}
+
+export type ConversationTurnErrorAnalysis = {
+  errorText: string;
+  grammarFeatureKeys: string[];
+  wordItemTargets: string[];
+};
+
+export async function addConversationErrorExercises(
+  analysis: ConversationTurnErrorAnalysis,
+  sourceLanguage: StudyLanguageCode,
+  targetLanguage: StudyLanguageCode,
+): Promise<number[]> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/conversation/error-exercises?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grammar_feature_keys: analysis.grammarFeatureKeys,
+      word_item_targets: analysis.wordItemTargets,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to add exercises");
+  }
+  const payload = (await response.json()) as { added_item_ids?: number[] };
+  return payload.added_item_ids || [];
 }

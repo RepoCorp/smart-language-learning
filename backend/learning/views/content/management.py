@@ -243,7 +243,10 @@ from .management_items import (
     ContentWordsView,
 )
 from .management_topic_admin import ContentTopicDeleteView
-from .management_topic_conversation_aux import ContentTopicConversationErrorAnalysisView
+from .management_topic_conversation_aux import (
+    ContentTopicConversationErrorAnalysisView,
+    ContentTopicConversationErrorExercisesView,
+)
 from .management_topic_conversation import (
     ContentTopicConversationGoalEvaluationView,
     ContentTopicConversationGoalRegenerateView,

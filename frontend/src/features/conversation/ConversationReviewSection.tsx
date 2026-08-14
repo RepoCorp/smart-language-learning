@@ -71,7 +71,7 @@ export default function ConversationReviewSection({
   error = "",
 }: Props): JSX.Element {
   const { t } = useI18n();
-  const { byTurn: errorInfoByTurn, requestErrorInfo } = useConversationReviewErrorInfo({
+  const { byTurn: errorInfoByTurn, requestErrorInfo, addExercises } = useConversationReviewErrorInfo({
     sourceLanguage,
     targetLanguage,
   });
@@ -99,6 +99,7 @@ export default function ConversationReviewSection({
           naturalUserAlternatives={naturalUserAlternatives}
           errorInfoByTurn={errorInfoByTurn}
           onRequestErrorInfo={readOnly ? undefined : requestErrorInfo}
+          onAddErrorExercises={readOnly ? undefined : addExercises}
         />
         {(primaryAction || secondaryAction) && (
           <div className="actions">

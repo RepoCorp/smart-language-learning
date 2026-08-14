@@ -27,6 +27,7 @@ type Props = {
   naturalUserAlternatives?: Record<number, { target: string; source: string }>;
   errorInfoByTurn?: Record<number, ConversationReviewErrorInfo>;
   onRequestErrorInfo?: (turnIndex: number, originalText: string, correctedText: string) => Promise<void>;
+  onAddErrorExercises?: (turnIndex: number) => Promise<void>;
 };
 
 export default function ConversationReviewTurns({
@@ -43,6 +44,7 @@ export default function ConversationReviewTurns({
   naturalUserAlternatives = {},
   errorInfoByTurn = {},
   onRequestErrorInfo,
+  onAddErrorExercises,
 }: Props): JSX.Element {
   const { t } = useI18n();
 
@@ -122,8 +124,13 @@ export default function ConversationReviewTurns({
                     {errorInfo?.text && (
                       <>
                         <FormattedModelText text={errorInfo.text} className="conversation-review-error-text" />
-                        <button type="button" className="secondary-button" disabled>
-                          Add to exercises
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => void onAddErrorExercises?.(index)}
+                          disabled={!onAddErrorExercises || errorInfo.addingExercises || errorInfo.exercisesAdded}
+                        >
+                          {errorInfo.addingExercises ? "Adding..." : errorInfo.exercisesAdded ? "Added to exercises" : "Add to exercises"}
                         </button>
                       </>
                     )}

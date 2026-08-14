@@ -3,6 +3,8 @@ from __future__ import annotations
 from .management import APIView, Request, Response, _normalized_pair, _parse_item_conversation_history, status
 from .management_topic_conversation_shared import conversation_context_label
 from .conversation_error_analysis import analyze_conversation_turn_error
+from .conversation_error_exercises import add_conversation_error_exercises
+from ...auth import get_request_user
 from .topic_conversation_models import (
     generate_conversation_help as generate_conversation_help_with_question_model,
     generate_target_phrase_help as generate_target_phrase_help_with_question_model,
@@ -75,7 +77,7 @@ class ContentTopicConversationErrorAnalysisView(APIView):
         if len(original_text) > 1200 or len(corrected_text) > 1200:
             return Response({"detail": "Text is too long"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            error_text = analyze_conversation_turn_error(
+            analysis = analyze_conversation_turn_error(
                 original_text=original_text,
                 corrected_text=corrected_text,
                 source_language=source_language,
@@ -83,7 +85,27 @@ class ContentTopicConversationErrorAnalysisView(APIView):
             )
         except RuntimeError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        return Response({"error_text": error_text})
+        return Response(analysis)
+
+
+class ContentTopicConversationErrorExercisesView(APIView):
+    def post(self, request: Request) -> Response:
+        source_language, target_language = _normalized_pair(request)
+        grammar_feature_keys = request.data.get("grammar_feature_keys", [])
+        word_item_targets = request.data.get("word_item_targets", [])
+        if not isinstance(grammar_feature_keys, list) or not isinstance(word_item_targets, list):
+            return Response(
+                {"detail": "grammar_feature_keys and word_item_targets must be lists"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        added_item_ids = add_conversation_error_exercises(
+            user=get_request_user(request),
+            source_language=source_language,
+            target_language=target_language,
+            grammar_feature_keys=[str(value) for value in grammar_feature_keys],
+            word_item_targets=[str(value) for value in word_item_targets],
+        )
+        return Response({"added_item_ids": added_item_ids})
 
 
 class ContentTopicConversationHelpView(APIView):

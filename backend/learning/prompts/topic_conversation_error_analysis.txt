@@ -2,7 +2,13 @@ You are helping a language learner understand a correction made to one of their 
 
 Return valid JSON only, using ordinary JSON double quotes:
 {
-  "error_text": ""
+  "errors": [
+    {
+      "explanation": "",
+      "grammar_feature_key": null,
+      "word_item_target": null
+    }
+  ]
 }
 
 Write error_text in {source_name}.
@@ -23,3 +29,12 @@ Rules:
 - Never show an internal grammar-feature ID.
 - Do not invent errors or grammar-feature titles.
 - If the messages differ but there is no clear learner error, say that no clear error could be identified.
+
+For each entry in errors:
+- explanation is the learner-facing positive mini-rule. Never show an internal ID in it.
+- grammar_feature_key is the exact machine-readable value after `ID:` for the provided grammar feature violated by this specific error, or null when no provided feature applies.
+- grammar_feature_key must never contain a learner-facing title. For example, use `verb_position_main_clause`, not `Posición del verbo: enunciado`.
+- word_item_target is a correct dictionary target form for the affected word when the issue is article, case, agreement, conjugation, or vocabulary form, or null when no word needs practice.
+- Use the infinitive for verbs and the dictionary article plus noun for German nouns.
+- Do not include words for a word-order-only rule unless a word itself needs practice.
+- Return one entry per real error. Always return the errors array.
