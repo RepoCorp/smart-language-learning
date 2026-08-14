@@ -22,6 +22,7 @@ Rules:
 - Keep the whole dialogue within a single realistic interaction scope on the topic (no scene changes, no unrelated subtopics).
 - Avoid weird jumps in topic, unnatural wording, or textbook/meta language.
 - Prefer common, practical situations and vocabulary; vary examples without becoming quirky or overly imaginative.
+- Represent a diverse everyday world. Do not default people, occupations, or social roles to men when gender is irrelevant. When gendered language is natural, include women and men across generated dialogues without relying on stereotypes.
 - Avoid overused starters like "Hola, ¿cómo estás?" unless the topic/context is explicitly about greetings or reuniting.
 - Do not reuse the same key verb or key noun in consecutive turns unless required by the scenario.
 - Include relevant study notes only when useful; otherwise use an empty string.

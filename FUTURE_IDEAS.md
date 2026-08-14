@@ -44,7 +44,6 @@ Que en gramar se pueda abrir el ejercicio de bloques, de pronto sin el hint del 
 Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Depronto incluso que la celebración ayude, como que las letras hagan la ola
 Uno escribir su propio goal
 Como hacer que encuentre los diálogos en las distintas formas del verbo o sustantivo
-Related dialogs no deja poner modo solo audio
 Que funcione en landscape
 Escribir encima de la imagen?
 Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
