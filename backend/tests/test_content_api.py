@@ -2030,6 +2030,54 @@ def test_phrase_grammar_feature_is_persisted_only_when_detected(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_yes_no_question_grammar_feature_is_persisted_and_returns_matching_examples(monkeypatch):
+    from learning.grammar_features import VERB_POSITION_YES_NO_QUESTION
+    from learning.views.content import management_items_phrase_grammar as phrase_grammar_views
+
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="¿Vives en Berlin?",
+        german_text="Wohnst du in Berlin?",
+        source_language="spanish",
+        target_language="german",
+    )
+    matching = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="¿Vienes hoy?",
+        german_text="Kommst du heute?",
+        source_language="spanish",
+        target_language="german",
+    )
+    ItemGrammarFeature.objects.create(item=matching, feature_key=VERB_POSITION_YES_NO_QUESTION)
+    captured_prompts = []
+    def fake_call_openai_json_logged(**kwargs):
+        captured_prompts.append(kwargs["system_prompt"])
+        return [VERB_POSITION_YES_NO_QUESTION]
+
+    monkeypatch.setattr(
+        phrase_grammar_views,
+        "_call_openai_json_logged",
+        fake_call_openai_json_logged,
+    )
+
+    client = APIClient()
+    params = "source_language=spanish&target_language=german&feature_key=verb_position_yes_no_question"
+    response = client.post(f"/api/content/items/{phrase.id}/strategies/grammar-features?{params}")
+
+    assert response.status_code == 200
+    assert response.json() == {"feature_present": True}
+    assert phrase.grammar_features.filter(feature_key=VERB_POSITION_YES_NO_QUESTION).exists()
+    assert "Return only a valid JSON array" in captured_prompts[0]
+    assert "Never return a bare feature ID" in captured_prompts[0]
+
+    examples_response = client.get(f"/api/content/items/{phrase.id}/strategies/grammar-features?{params}")
+    assert examples_response.status_code == 200
+    assert examples_response.json()["examples"] == [
+        {"target_text": "Kommst du heute?", "source_text": "¿Vienes hoy?"}
+    ]
+
+
+@pytest.mark.django_db
 def test_phrase_grammar_feature_does_not_store_an_absent_feature(monkeypatch):
     from learning.grammar_features import VERB_POSITION_MAIN_CLAUSE
     from learning.views.content import management_items_phrase_grammar as phrase_grammar_views

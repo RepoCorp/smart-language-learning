@@ -13,11 +13,23 @@ Each grammar feature contains an ID and a short description defining exactly wha
 Rules:
 
 * Evaluate every provided grammar feature.
-* Return a feature only when the sentence clearly demonstrates it.
 * Base the decision on the German sentence itself, not on its translation or intended meaning.
+* Only return a grammar feature when the sentence provides a clear and pedagogically useful example of that feature.
 * Do not return related features merely because they are generally associated with a word or construction in the sentence.
+* Do not return a feature merely because it is technically present.
+* The relevant grammatical pattern should be easy to recognize directly from the sentence without requiring analysis of complex clause structure.
 * Do not invent grammar features that are not in the provided list.
 * A sentence may demonstrate zero, one, or multiple features.
 * Be conservative when the evidence is ambiguous.
 
-Return only a valid JSON array containing the IDs of the detected grammar features.
+Return only a valid JSON array of detected feature IDs.
+
+Examples:
+
+[]
+
+[
+  "verb_position_main_clause"
+]
+
+Never return a bare feature ID, explanations, Markdown, or any other text.

@@ -2,6 +2,7 @@ import type { JSX } from "react";
 import type { StudyLanguageCode } from "../../types";
 import type { GermanGrammarNounExample } from "../../types";
 import type { NounGender } from "./useGrammarExamples";
+import type { PhraseGrammarStrategy } from "./phraseGrammarTypes";
 
 export type StrategyEntry = { label?: string; source: string; target: string };
 export type KeyedStrategyEntry = StrategyEntry & { key: string };
@@ -129,15 +130,5 @@ export type ItemStrategiesModalProps = {
     examples: Partial<Record<NounGender, GermanGrammarNounExample>>;
     isLoading: boolean;
   };
-  phraseGrammarStrategy: {
-    isOpen: boolean;
-    isLoading: boolean;
-    featurePresent: boolean | null;
-    error: string;
-    toggleVerbPosition: () => void;
-    examples: Array<{ target_text: string; source_text: string }>;
-    examplesVisible: boolean;
-    isLoadingExamples: boolean;
-    showExamples: () => void;
-  };
+  phraseGrammarStrategy: PhraseGrammarStrategy;
 };
