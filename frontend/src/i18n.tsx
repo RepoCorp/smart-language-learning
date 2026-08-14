@@ -460,6 +460,7 @@ const messages = {
       "Learn with dialogs, reviews, and exercises generated from the content you actually want to study.",
     "authLanding.description":
       "Smart Learn helps you generate useful content around your real interests, collect words and expressions, review them in both directions, and practice them with dialog audio, exercises, and conversation drills.",
+    "authLanding.storyLink": "Read why I built Smart Learn",
     "authLanding.feature1Title": "Save what matters",
     "authLanding.feature1Body":
       "Turn dialog lines and expressions into reusable study items instead of memorizing isolated vocabulary lists.",
@@ -1280,6 +1281,7 @@ const messages = {
       "Aprende con diálogos, repasos y ejercicios generados a partir del contenido que realmente quieres estudiar.",
     "authLanding.description":
       "Smart Learn te ayuda a generar contenido útil alrededor de tus intereses reales, guardar palabras y expresiones, repasarlas en ambas direcciones y practicarlas con audio de diálogos, ejercicios y conversaciones.",
+    "authLanding.storyLink": "Lee por qué construí Smart Learn",
     "authLanding.feature1Title": "Guarda lo importante",
     "authLanding.feature1Body":
       "Convierte líneas de diálogo y expresiones en elementos de estudio reutilizables en lugar de memorizar listas aisladas.",

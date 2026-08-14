@@ -13,7 +13,7 @@ interface AuthLandingProps {
 }
 
 export default function AuthLanding({ onAuthenticated }: AuthLandingProps): JSX.Element {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const [identifier, setIdentifier] = useState("");
   const [pin, setPin] = useState("");
   const [authError, setAuthError] = useState("");
@@ -25,6 +25,9 @@ export default function AuthLanding({ onAuthenticated }: AuthLandingProps): JSX.
   const [registerSuccess, setRegisterSuccess] = useState("");
   const [registerBusy, setRegisterBusy] = useState(false);
   const [canSubmitRegistrationRequest, setCanSubmitRegistrationRequest] = useState(false);
+  const storyUrl = language === "es"
+    ? "https://medium.com/@catalinadelacuesta/constru%C3%AD-la-aplicaci%C3%B3n-para-aprender-idiomas-que-yo-quer%C3%ADa-usar-9e10934eb68a"
+    : "https://medium.com/@catalinadelacuesta/i-built-the-language-learning-app-i-wanted-to-use-0e247d132639";
 
   useEffect(() => {
     let mounted = true;
@@ -87,6 +90,11 @@ export default function AuthLanding({ onAuthenticated }: AuthLandingProps): JSX.
         <p className="auth-landing-kicker">{t("authLanding.kicker")}</p>
         <h1 className="auth-landing-title">{t("authLanding.title")}</h1>
         <p className="auth-landing-description">{t("authLanding.description")}</p>
+        <p className="auth-landing-story-links">
+          <a href={storyUrl} target="_blank" rel="noreferrer">
+            {t("authLanding.storyLink")}
+          </a>
+        </p>
         <div className="auth-landing-feature-grid">
           <article className="auth-landing-feature-card">
             <h2>{t("authLanding.feature1Title")}</h2>

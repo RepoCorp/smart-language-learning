@@ -3246,6 +3246,63 @@ textarea {
   width: 100%;
 }
 
+.getting-started-modal {
+  width: min(640px, 100%);
+  padding: 24px;
+  text-align: left;
+}
+
+.getting-started-modal h2 {
+  margin: 0;
+  padding-right: 36px;
+}
+
+.getting-started-intro {
+  margin: 8px 0 16px;
+  color: var(--color-text-soft);
+}
+
+.getting-started-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.getting-started-steps li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.getting-started-step-number {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-accent-surface);
+  color: var(--color-accent-strong);
+  font-weight: 700;
+}
+
+.getting-started-steps p,
+.getting-started-note {
+  margin: 4px 0 0;
+  color: var(--color-text-soft);
+}
+
+.getting-started-note {
+  margin-top: 14px;
+  font-style: italic;
+}
+
 
 .conversation-review-corrected {
   margin: 4px 0 0 0;
@@ -5428,7 +5485,7 @@ button.verb-exercise-entry:disabled {
 .auth-landing-title {
   margin: 0;
   max-width: 11ch;
-  font-size: clamp(2.6rem, 5vw, 4.8rem);
+  font-size: clamp(2.2rem, 4vw, 3.9rem);
   line-height: 0.95;
   font-weight: 900;
   color: var(--color-text);
@@ -5440,6 +5497,20 @@ button.verb-exercise-entry:disabled {
   font-size: 1.02rem;
   line-height: 1.65;
   color: var(--color-text-soft);
+}
+
+.auth-landing-story-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: -8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.auth-landing-story-links a {
+  color: var(--color-accent-strong);
+  font-weight: 700;
 }
 
 .auth-landing-feature-grid {
