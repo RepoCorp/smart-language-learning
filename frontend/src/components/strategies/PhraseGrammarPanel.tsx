@@ -161,7 +161,7 @@ export default function PhraseGrammarPanel({
   targetLanguage: StudyLanguageCode;
   targetText: string;
   phraseGrammar: PhraseGrammarStrategy;
-  onAskAboutRule: (question: string) => void;
+  onAskAboutRule: (question: string, grammarFeatureKey: PhraseGrammarFeatureKey) => void;
   onOpenItem: (itemId: number) => void;
   loop: {
     secondsLeft: number;
@@ -230,10 +230,13 @@ export default function PhraseGrammarPanel({
                     <button
                       type="button"
                       className="grammar-phrase-feature-question-link"
-                      onClick={() => onAskAboutRule(t("strategies.grammar.askAboutRuleQuestion", {
-                        rule: t(copy.title),
-                        phrase: targetText,
-                      }))}
+                      onClick={() => onAskAboutRule(
+                        t("strategies.grammar.askAboutRuleQuestion", {
+                          rule: t(copy.title),
+                          phrase: targetText,
+                        }),
+                        featureKey,
+                      )}
                     >
                       {t("strategies.grammar.askAboutRule")}
                     </button>

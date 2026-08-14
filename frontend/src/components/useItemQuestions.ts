@@ -20,17 +20,19 @@ export function useItemQuestions({
 }): {
   showQuestionsModal: boolean;
   prefilledQuestion: string;
+  prefilledGrammarFeatureKey: string;
   itemQuestions: ItemQuestionExchange[];
   itemQuestionError: string;
   askingQuestion: boolean;
-  openQuestions: (question?: string) => void;
+  openQuestions: (question?: string, options?: { grammarFeatureKey?: string }) => void;
   closeQuestions: () => void;
   resetQuestions: () => void;
   replaceItemQuestions: (questions: ItemQuestionExchange[]) => void;
-  askItemQuestion: (questionText: string) => Promise<void>;
+  askItemQuestion: (questionText: string, grammarFeatureKey?: string) => Promise<void>;
 } {
   const [showQuestionsModal, setShowQuestionsModal] = useState(false);
   const [prefilledQuestion, setPrefilledQuestion] = useState("");
+  const [prefilledGrammarFeatureKey, setPrefilledGrammarFeatureKey] = useState("");
   const [itemQuestions, setItemQuestions] = useState<ItemQuestionExchange[]>(initialQuestions);
   const [itemQuestionError, setItemQuestionError] = useState("");
   const [askingQuestion, setAskingQuestion] = useState(false);
@@ -40,6 +42,7 @@ export function useItemQuestions({
     setItemQuestionError("");
     setAskingQuestion(false);
     setPrefilledQuestion("");
+    setPrefilledGrammarFeatureKey("");
     setShowQuestionsModal(false);
   };
 
@@ -62,12 +65,19 @@ export function useItemQuestions({
     return () => { cancelled = true; };
   }, [itemId, sourceLanguage, targetLanguage, showQuestionsModal, refreshRelatedDialogHistory]);
 
-  const askItemQuestion = async (questionText: string): Promise<void> => {
+  const askItemQuestion = async (questionText: string, grammarFeatureKey = ""): Promise<void> => {
     if (askingQuestion || !questionText.trim()) return;
     setAskingQuestion(true);
     setItemQuestionError("");
     try {
-      const response = await askContentItemQuestion(itemId, questionText, itemQuestions, sourceLanguage, targetLanguage);
+      const response = await askContentItemQuestion(
+        itemId,
+        questionText,
+        itemQuestions,
+        sourceLanguage,
+        targetLanguage,
+        grammarFeatureKey,
+      );
       setItemQuestions(response.conversation || []);
     } catch (error) {
       setItemQuestionError(error instanceof Error && error.message ? error.message : questionError);
@@ -79,11 +89,13 @@ export function useItemQuestions({
   return {
     showQuestionsModal,
     prefilledQuestion,
+    prefilledGrammarFeatureKey,
     itemQuestions,
     itemQuestionError,
     askingQuestion,
-    openQuestions: (question = "") => {
+    openQuestions: (question = "", options = {}) => {
       setPrefilledQuestion(question);
+      setPrefilledGrammarFeatureKey(options.grammarFeatureKey || "");
       setShowQuestionsModal(true);
     },
     closeQuestions: () => setShowQuestionsModal(false),

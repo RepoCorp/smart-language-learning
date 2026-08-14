@@ -14,6 +14,9 @@ Rules:
   related=true, result_code="RELATED_OK", and provide concise answer (3 to 6 short lines, A1-A2), reason="".
 - If question is NOT related to this item, set:
   related=false, result_code="UNRELATED_QUESTION", answer="", and provide a short reason.
+- related and result_code are internal classification fields. Never mention whether the question is
+  related, accepted, valid, or invalid in answer. Do not begin an answer with Yes, No, an affirmation,
+  or a restatement of the question; start directly with the useful explanation.
 - Treat the question intent as about {target_name} by default.
 - Even when question text is in {source_name}, interpret it as a request about {target_name} usage.
 - Do not reinterpret the question as source-language learning content.

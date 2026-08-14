@@ -14,8 +14,9 @@ type Props = {
   targetLanguageLabel: string;
   targetText: string;
   initialQuestion?: string;
+  initialGrammarFeatureKey?: string;
   onClose: () => void;
-  onAskQuestion: (questionText: string) => Promise<void>;
+  onAskQuestion: (questionText: string, grammarFeatureKey?: string) => Promise<void>;
 };
 
 export default function ItemQuestionsModal({
@@ -28,11 +29,13 @@ export default function ItemQuestionsModal({
   targetLanguageLabel,
   targetText,
   initialQuestion = "",
+  initialGrammarFeatureKey = "",
   onClose,
   onAskQuestion,
 }: Props): JSX.Element | null {
   const { t } = useI18n();
   const [questionInput, setQuestionInput] = useState<string>("");
+  const [activeGrammarFeatureKey, setActiveGrammarFeatureKey] = useState("");
   const questionsHistoryRef = useRef<HTMLDivElement | null>(null);
   const questionInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -53,8 +56,9 @@ export default function ItemQuestionsModal({
       return;
     }
     setQuestionInput(initialQuestion);
+    setActiveGrammarFeatureKey(initialGrammarFeatureKey);
     questionInputRef.current?.focus();
-  }, [open, initialQuestion]);
+  }, [open, initialQuestion, initialGrammarFeatureKey]);
 
   useEffect(() => {
     if (!open) {
@@ -70,12 +74,13 @@ export default function ItemQuestionsModal({
     });
   }, [open, orderedItemQuestions, askingQuestion]);
 
-  const submitQuestion = async (questionText: string): Promise<void> => {
+  const submitQuestion = async (questionText: string, grammarFeatureKey = ""): Promise<void> => {
     const trimmed = questionText.trim();
     if (askingQuestion || !trimmed) {
       return;
     }
-    await onAskQuestion(trimmed);
+    await onAskQuestion(trimmed, grammarFeatureKey);
+    setActiveGrammarFeatureKey("");
     setQuestionInput("");
     window.setTimeout(() => {
       questionInputRef.current?.focus({ preventScroll: true });
@@ -129,7 +134,7 @@ export default function ItemQuestionsModal({
           className="item-questions-actions"
           onSubmit={(event) => {
             event.preventDefault();
-            void submitQuestion(questionInput);
+            void submitQuestion(questionInput, activeGrammarFeatureKey);
           }}
         >
           <textarea
@@ -141,7 +146,7 @@ export default function ItemQuestionsModal({
                 return;
               }
               event.preventDefault();
-              void submitQuestion(questionInput);
+              void submitQuestion(questionInput, activeGrammarFeatureKey);
             }}
             placeholder={t("newItem.questionsPlaceholder")}
             disabled={askingQuestion}

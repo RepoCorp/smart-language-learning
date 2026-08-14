@@ -701,6 +701,7 @@ export async function askContentItemQuestion(
   conversationHistory: Array<{ question_text: string; answer_text: string; created_at?: string }> = [],
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
+  grammarFeatureKey = "",
 ): Promise<ContentItemQuestionResponse> {
   const params = new URLSearchParams({
     source_language: sourceLanguage,
@@ -709,7 +710,11 @@ export async function askContentItemQuestion(
   const response = await apiFetch(`${API_BASE}/content/items/${itemId}/question?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question_text: questionText, conversation_history: conversationHistory }),
+    body: JSON.stringify({
+      question_text: questionText,
+      conversation_history: conversationHistory,
+      grammar_feature_key: grammarFeatureKey,
+    }),
   });
   if (!response.ok) {
     let detail = "Failed to answer item question";

@@ -131,7 +131,7 @@ export type ItemStrategiesModalProps = {
     isLoading: boolean;
   };
   phraseGrammarStrategy: PhraseGrammarStrategy;
-  onAskAboutPhraseGrammarRule: (question: string) => void;
+  onAskAboutPhraseGrammarRule: (question: string, grammarFeatureKey: string) => void;
   onOpenPhraseGrammarExample: (itemId: number) => void;
   phraseGrammarLoop: {
     secondsLeft: number;

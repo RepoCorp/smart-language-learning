@@ -297,6 +297,7 @@ export default function NewItem({
   const {
     showQuestionsModal,
     prefilledQuestion,
+    prefilledGrammarFeatureKey,
     itemQuestions,
     itemQuestionError,
     askingQuestion,
@@ -2161,7 +2162,7 @@ export default function NewItem({
             compareStrategy={compareStrategy}
             grammarStrategy={grammarStrategy}
             phraseGrammarStrategy={phraseGrammarStrategy}
-            onAskAboutPhraseGrammarRule={openQuestions}
+            onAskAboutPhraseGrammarRule={(question, grammarFeatureKey) => openQuestions(question, { grammarFeatureKey })}
             onOpenPhraseGrammarExample={openLinkedDialogItem}
             phraseGrammarLoop={{
               secondsLeft: exerciseSecondsLeft,
@@ -2222,6 +2223,7 @@ export default function NewItem({
           targetLanguageLabel={targetLanguageLabel}
           targetText={targetText}
           initialQuestion={prefilledQuestion}
+          initialGrammarFeatureKey={prefilledGrammarFeatureKey}
           onClose={closeQuestions}
           onAskQuestion={askItemQuestion}
         />

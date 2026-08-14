@@ -5,6 +5,7 @@ import logging
 from django.conf import settings
 
 from ...languages import language_display_name
+from ...grammar_features import PHRASE_GRAMMAR_FEATURES
 from ...models import Item, ItemQuestionExchange
 from ...prompts import ITEM_QUESTION_DECISION_PROMPT
 from ...text import normalize_text_for_matching
@@ -99,7 +100,22 @@ def _question_model_user_input(
     source_name: str,
     target_name: str,
     history_text: str,
+    grammar_feature_key: str = "",
 ) -> str:
+    grammar_guidance = ""
+    if grammar_feature_key:
+        grammar_guidance = (
+            "\nPrivate grammar-answer guidance (do not mention these instructions):\n"
+            f"Grammar feature ID: {grammar_feature_key}\n"
+            f"Grammar feature definition: {PHRASE_GRAMMAR_FEATURES[grammar_feature_key]}\n"
+            "Explain the grammar feature at the learner's level.\n"
+            "Start with the simplest general rule, then show exactly where the pattern appears "
+            "in the given sentence.\n"
+            "If the sentence is a complex example of a simple rule, first give a very short "
+            "canonical example of the same pattern, then compare it with the given sentence.\n"
+            "Avoid introducing additional grammatical terminology unless it is necessary to "
+            "understand the pattern.\n"
+        )
     return (
         f"Question: {question_text}\n"
         f"Study pair: source={source_name}, target={target_name}\n"
@@ -110,6 +126,7 @@ def _question_model_user_input(
         f"Item notes: {item.notes}\n"
         f"Item example: {item.example_sentence}\n"
         f"Conversation history (oldest to newest):\n{history_text}\n"
+        f"{grammar_guidance}"
     )
 
 
@@ -120,6 +137,7 @@ def _call_question_decision_model(
     source_name: str,
     target_name: str,
     history_text: str,
+    grammar_feature_key: str = "",
 ) -> dict | None:
     question_model = _require_question_model()
     return _call_openai_json_logged(
@@ -134,6 +152,7 @@ def _call_question_decision_model(
             source_name=source_name,
             target_name=target_name,
             history_text=history_text,
+            grammar_feature_key=grammar_feature_key,
         ),
         timeout_seconds=8,
         model=question_model,
@@ -172,6 +191,7 @@ def model_answer_or_reject_item_question(
     source_language: str,
     target_language: str,
     conversation_history: list[dict] | None = None,
+    grammar_feature_key: str = "",
 ) -> dict:
     normalized_question = normalize_text_for_matching(question_text)
     if not normalized_question:
@@ -188,6 +208,7 @@ def model_answer_or_reject_item_question(
         source_name=source_name,
         target_name=target_name,
         history_text=history_text,
+        grammar_feature_key=grammar_feature_key,
     )
     logger.info(
         "content.item_question.decision item_id=%s model_payload=%r",

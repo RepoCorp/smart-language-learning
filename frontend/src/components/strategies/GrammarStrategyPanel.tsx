@@ -63,7 +63,7 @@ export default function GrammarStrategyPanel({
   isLoadingExamples: boolean;
   itemType: "word" | "phrase";
   phraseGrammar: PhraseGrammarStrategy;
-  onAskAboutPhraseGrammarRule: (question: string) => void;
+  onAskAboutPhraseGrammarRule: (question: string, grammarFeatureKey: string) => void;
   onOpenPhraseGrammarExample: (itemId: number) => void;
   phraseGrammarLoop: ItemStrategiesModalProps["phraseGrammarLoop"];
 }): JSX.Element {
