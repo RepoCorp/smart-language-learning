@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 
+import BlockingLoadingOverlay from "../BlockingLoadingOverlay";
 import { useI18n } from "../../i18n";
 import {
   PHRASE_STRATEGIES,
@@ -16,6 +17,8 @@ export default function StrategiesModal({
   onSelectedStrategyChange,
   onClose,
   strategyContent,
+  loading = false,
+  loadingMessage = "",
 }: {
   itemType: "word" | "phrase";
   sourceText: string;
@@ -24,6 +27,8 @@ export default function StrategiesModal({
   onSelectedStrategyChange: (strategy: string) => void;
   onClose: () => void;
   strategyContent: ReactNode;
+  loading?: boolean;
+  loadingMessage?: string;
 }): JSX.Element {
   const { t } = useI18n();
   const strategies = useMemo(
@@ -60,7 +65,9 @@ export default function StrategiesModal({
               ))}
             </select>
           </label>
-          {strategyContent}
+          <BlockingLoadingOverlay loading={loading} message={loadingMessage}>
+            {strategyContent}
+          </BlockingLoadingOverlay>
         </div>
       </div>
     </div>

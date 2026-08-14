@@ -12,12 +12,10 @@ Ningun otro arreglito que no sea vital!!!
   - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
 - Frases: ir añadiendo reglas
 - Añadir mas grammar features. Agruparlas si el model empieza  a tener problemas con ellas y la interfaz es muy complicada.
-- Que detecte los errores de las features en la conversacion 
+- De las conversaciones saca errores. Los muestra y sugiere repasarlo. Que sea bien empatico 😂
 - Que en el ejercicio de bloques detecte el tipo de error
 
 ## New functionalities 
-De las conversaciones saca errores. Darle al modelo la lista de errores que tenemos incluidas y el dice si/cuales de esos están y sugiere repasarlo. Que sea bien empatico 😂
-Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Depronto incluso que la celebración ayude, como que las letras hagan la ola
 
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
 
@@ -42,6 +40,7 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Depronto incluso que la celebración ayude, como que las letras hagan la ola
 Uno escribir su propio goal
 Como hacer que encuentre los diálogos en las distintas formas del verbo o sustantivo
 Hacer preguntas a las estrategias

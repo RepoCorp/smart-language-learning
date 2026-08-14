@@ -14,6 +14,8 @@ const STORAGE_KEY = "app_language";
 
 const messages = {
   en: {
+    "loading.reassurance": "This can take a moment. Your practice is on its way.",
+    "loading.preparingPractice": "Preparing your practice...",
     "lang.english": "English",
     "lang.spanish": "Spanish",
     "lang.label": "App language",
@@ -888,6 +890,8 @@ const messages = {
     "config.registrationRequestsUse": "Use request",
   },
   es: {
+    "loading.reassurance": "Esto puede tomar un momento. Tu práctica está en camino.",
+    "loading.preparingPractice": "Preparando tu práctica...",
     "lang.english": "Inglés",
     "lang.spanish": "Español",
     "lang.label": "Idioma de la app",

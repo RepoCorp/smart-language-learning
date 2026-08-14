@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useI18n } from "../../i18n";
+import BlockingLoadingOverlay from "../../components/BlockingLoadingOverlay";
 import type { ConversationTransport, GoalDifficulty } from "./useConversationTransport";
 import { CREATE_NEW_OPTION, RANDOM_TOPIC_OPTION } from "./conversationSetupOptions";
 import type { ConversationSetupGoal } from "./useConversationSetup";
@@ -237,28 +238,30 @@ export default function ConversationSetupCard({
 
       {!started && (
         <div className="actions">
-          <div className="conversation-setup-goal">
-            <p className="conversation-goal-banner-label">{t("conversation.goalLabel")}</p>
-            {goal ? (
-              <>
-                <p className="conversation-goal-banner-text">{goal.text}</p>
-                {usingRandomTopic && <p className="hint">{goal.topic}</p>}
-              </>
-            ) : (
-              <p className="hint">{t("conversation.goalRequired")}</p>
-            )}
-            {goalError && <p className="error">{goalError}</p>}
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={onGenerateGoal}
-              disabled={conversationLoading || goalGenerating || loadingTopics || !resolvedTopic}
-            >
-              {goalGenerating
-                ? t("conversation.goalRegenerating")
-                : goal ? t("conversation.goalRegenerate") : t("conversation.goalGenerate")}
-            </button>
-          </div>
+          <BlockingLoadingOverlay loading={goalGenerating} message={t("conversation.goalRegenerating")}>
+            <div className="conversation-setup-goal">
+              <p className="conversation-goal-banner-label">{t("conversation.goalLabel")}</p>
+              {goal ? (
+                <>
+                  <p className="conversation-goal-banner-text">{goal.text}</p>
+                  {usingRandomTopic && <p className="hint">{goal.topic}</p>}
+                </>
+              ) : (
+                <p className="hint">{t("conversation.goalRequired")}</p>
+              )}
+              {goalError && <p className="error">{goalError}</p>}
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onGenerateGoal}
+                disabled={conversationLoading || goalGenerating || loadingTopics || !resolvedTopic}
+              >
+                {goalGenerating
+                  ? t("conversation.goalRegenerating")
+                  : goal ? t("conversation.goalRegenerate") : t("conversation.goalGenerate")}
+              </button>
+            </div>
+          </BlockingLoadingOverlay>
           <button
             type="button"
             onClick={onStart}

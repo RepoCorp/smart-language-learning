@@ -1,5 +1,6 @@
 import { useI18n } from "../../i18n";
 import type { ContentDialogRecord, StudyLanguageCode } from "../../types";
+import BlockingLoadingOverlay from "../../components/BlockingLoadingOverlay";
 import ConversationReviewTurns, { type SentenceActionStatus } from "./ConversationReviewTurns";
 
 type Props = {
@@ -69,51 +70,52 @@ export default function ConversationReviewSection({
   const { t } = useI18n();
 
   return (
-    <div className="content-form-section conversation-review-card">
-      <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {topic}</p>
-      {role && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {role}</p>}
-      <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {goalDifficultyLabel}</p>
-      <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {goal}</p>
-      <p className="conversation-review-heading">{heading}</p>
-      <p className="hint">{description}</p>
-      <ConversationReviewTurns
-        dialog={dialog}
-        sourceLanguage={sourceLanguage}
-        targetLanguage={targetLanguage}
-        wordActionStatus={wordActionStatus}
-        requestAddWordFromConversation={requestAddWordFromConversation}
-        requestAddSentenceFromConversation={requestAddSentenceFromConversation}
-        sentenceActionStatus={sentenceActionStatus}
-        readOnly={readOnly}
-        originalUserTexts={originalUserTexts}
-        correctedUserTexts={correctedUserTexts}
-      />
-      {loading && loadingMessage && <p className="hint">{loadingMessage}</p>}
-      {(primaryAction || secondaryAction) && (
-        <div className="actions">
-          {primaryAction && (
-            <button
-              type="button"
-              className={primaryAction.secondary ? "secondary-button" : undefined}
-              onClick={primaryAction.onClick}
-              disabled={primaryAction.disabled}
-            >
-              {primaryAction.label}
-            </button>
-          )}
-          {secondaryAction && (
-            <button
-              type="button"
-              className={secondaryAction.secondary ? "secondary-button" : undefined}
-              onClick={secondaryAction.onClick}
-              disabled={secondaryAction.disabled}
-            >
-              {secondaryAction.label}
-            </button>
-          )}
-        </div>
-      )}
-      {error && <p className="error">{error}</p>}
-    </div>
+    <BlockingLoadingOverlay loading={loading} message={loadingMessage}>
+      <div className="content-form-section conversation-review-card">
+        <p className="item-chat-meta"><strong>{t("conversation.topicLabel")}</strong> {topic}</p>
+        {role && <p className="item-chat-meta"><strong>{t("conversation.roleLabel")}</strong> {role}</p>}
+        <p className="item-chat-meta"><strong>{t("conversation.goalDifficultyLabel")}</strong> {goalDifficultyLabel}</p>
+        <p className="item-chat-meta"><strong>{t("conversation.goalLabel")}</strong> {goal}</p>
+        <p className="conversation-review-heading">{heading}</p>
+        <p className="hint">{description}</p>
+        <ConversationReviewTurns
+          dialog={dialog}
+          sourceLanguage={sourceLanguage}
+          targetLanguage={targetLanguage}
+          wordActionStatus={wordActionStatus}
+          requestAddWordFromConversation={requestAddWordFromConversation}
+          requestAddSentenceFromConversation={requestAddSentenceFromConversation}
+          sentenceActionStatus={sentenceActionStatus}
+          readOnly={readOnly}
+          originalUserTexts={originalUserTexts}
+          correctedUserTexts={correctedUserTexts}
+        />
+        {(primaryAction || secondaryAction) && (
+          <div className="actions">
+            {primaryAction && (
+              <button
+                type="button"
+                className={primaryAction.secondary ? "secondary-button" : undefined}
+                onClick={primaryAction.onClick}
+                disabled={primaryAction.disabled}
+              >
+                {primaryAction.label}
+              </button>
+            )}
+            {secondaryAction && (
+              <button
+                type="button"
+                className={secondaryAction.secondary ? "secondary-button" : undefined}
+                onClick={secondaryAction.onClick}
+                disabled={secondaryAction.disabled}
+              >
+                {secondaryAction.label}
+              </button>
+            )}
+          </div>
+        )}
+        {error && <p className="error">{error}</p>}
+      </div>
+    </BlockingLoadingOverlay>
   );
 }
