@@ -3,6 +3,7 @@ export const PHRASE_GRAMMAR_FEATURE_KEYS = [
   "verb_position_yes_no_question",
   "verb_position_w_question",
   "verb_position_subordinate_clause",
+  "time_expression_position",
   "separable_verb_main_clause",
   "modal_verb_with_infinitive",
   "reflexive_verb",

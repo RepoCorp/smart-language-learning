@@ -50,6 +50,7 @@ export default function GrammarStrategyPanel({
   isLoadingExamples,
   itemType,
   phraseGrammar,
+  onAskAboutPhraseGrammarRule,
 }: {
   wordType: string;
   targetLanguage: StudyLanguageCode;
@@ -59,6 +60,7 @@ export default function GrammarStrategyPanel({
   isLoadingExamples: boolean;
   itemType: "word" | "phrase";
   phraseGrammar: PhraseGrammarStrategy;
+  onAskAboutPhraseGrammarRule: (question: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const noun = wordType.trim().toLowerCase() === "noun" && targetLanguage === "german"
@@ -75,7 +77,7 @@ export default function GrammarStrategyPanel({
   }, [noun?.gender]);
 
   if (itemType === "phrase") {
-    return <PhraseGrammarPanel targetLanguage={targetLanguage} phraseGrammar={phraseGrammar} />;
+    return <PhraseGrammarPanel targetLanguage={targetLanguage} targetText={targetText} phraseGrammar={phraseGrammar} onAskAboutRule={onAskAboutPhraseGrammarRule} />;
   }
 
   if (isGermanVerb) {

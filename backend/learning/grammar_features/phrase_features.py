@@ -2,6 +2,7 @@ VERB_POSITION_MAIN_CLAUSE = "verb_position_main_clause"
 VERB_POSITION_YES_NO_QUESTION = "verb_position_yes_no_question"
 VERB_POSITION_W_QUESTION = "verb_position_w_question"
 VERB_POSITION_SUBORDINATE_CLAUSE = "verb_position_subordinate_clause"
+TIME_EXPRESSION_POSITION = "time_expression_position"
 SEPARABLE_VERB_MAIN_CLAUSE = "separable_verb_main_clause"
 MODAL_VERB_WITH_INFINITIVE = "modal_verb_with_infinitive"
 REFLEXIVE_VERB = "reflexive_verb"
@@ -30,6 +31,10 @@ PHRASE_GRAMMAR_FEATURES = {
     VERB_POSITION_SUBORDINATE_CLAUSE: (
         "Finite/conjugated verb appears at the end of a subordinate clause introduced by a "
         "subordinating conjunction such as weil, dass, or wenn."
+    ),
+    TIME_EXPRESSION_POSITION: (
+        "Time expressions such as heute, morgen, or am Montag commonly appear early in the sentence; "
+        "when placed first, the conjugated verb remains in second position."
     ),
     SEPARABLE_VERB_MAIN_CLAUSE: (
         "A separable verb is split in a main clause, with the conjugated verb stem and its "

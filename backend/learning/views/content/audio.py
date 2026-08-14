@@ -21,14 +21,10 @@ from ...languages import (
 )
 from .tts_config import OPENAI_TTS_ITEM_DEFAULT_SPEED, OPENAI_TTS_PHRASE_DEFAULT_SPEED
 from .tts_instructions import openai_tts_language_instruction
+from .audio_provider import configured_tts_provider, should_use_elevenlabs
 
 logger = logging.getLogger(__name__)
 _s3_identity_logged = False
-
-def _configured_tts_provider() -> str:
-    provider = str(getattr(settings, "AUDIO_TTS_PROVIDER", "openai")).strip().lower()
-    return provider if provider in {"openai", "elevenlabs"} else "openai"
-
 
 def _comma_separated_values(value: str) -> list[str]:
     return [entry.strip() for entry in value.split(",") if entry.strip()]
@@ -117,12 +113,18 @@ def _elevenlabs_dialog_voice_ids(target_language: str) -> list[str]:
     return _elevenlabs_voice_ids(target_language=target_language)
 
 
-def select_dialog_speaker_voice_ids(target_language: str, seed: str = "") -> tuple[str, str] | None:
-    if _configured_tts_provider() != "elevenlabs":
+def select_dialog_speaker_voice_ids(
+    target_language: str,
+    seed: str = "",
+    *,
+    force_elevenlabs: bool = False,
+) -> tuple[str, str] | None:
+    if not force_elevenlabs and configured_tts_provider() != "elevenlabs":
         return None
     dialog_voices = _elevenlabs_dialog_voice_ids(target_language)
     logger.info(
-        "content.audio.dialog_voices.provider_check provider=elevenlabs elevenlabs_key=%s elevenlabs_dialog_voice_count=%d target_language=%s",
+        "content.audio.dialog_voices.provider_check provider=elevenlabs forced=%s elevenlabs_key=%s elevenlabs_dialog_voice_count=%d target_language=%s",
+        force_elevenlabs,
         bool(str(getattr(settings, "ELEVENLABS_API_KEY", "")).strip()),
         len(dialog_voices),
         target_language,
@@ -247,7 +249,14 @@ def _store_audio_bytes(filename: str, payload: bytes, content_type: str) -> str:
     return _build_local_audio_url(filename)
 
 
-def create_audio_file(text: str, prefix: str, target_language: str = "german", voice_id: str = "") -> str:
+def create_audio_file(
+    text: str,
+    prefix: str,
+    target_language: str = "german",
+    voice_id: str = "",
+    *,
+    force_elevenlabs: bool = False,
+) -> str:
     started_at = time.perf_counter()
     if not text.strip():
         logger.warning("content.audio.skipped prefix=%s reason=empty_text", prefix)
@@ -259,7 +268,7 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german", v
     filename = f"{prefix}-{slug[:32]}-{uuid4().hex[:8]}.mp3"
 
     default_speed = OPENAI_TTS_PHRASE_DEFAULT_SPEED if prefix == "phrase" else OPENAI_TTS_ITEM_DEFAULT_SPEED
-    if voice_id and _configured_tts_provider() == "elevenlabs":
+    if should_use_elevenlabs(voice_id=voice_id, force_elevenlabs=force_elevenlabs):
         tts_started_at = time.perf_counter()
         audio_bytes = _elevenlabs_tts_audio(
             text=text,
@@ -342,14 +351,21 @@ def create_audio_file(text: str, prefix: str, target_language: str = "german", v
     return audio_url
 
 
-def create_audio_data_url(text: str, prefix: str, target_language: str = "german", voice_id: str = "") -> str:
+def create_audio_data_url(
+    text: str,
+    prefix: str,
+    target_language: str = "german",
+    voice_id: str = "",
+    *,
+    force_elevenlabs: bool = False,
+) -> str:
     started_at = time.perf_counter()
     if not text.strip():
         logger.warning("content.audio.inline_skipped prefix=%s reason=empty_text", prefix)
         return ""
 
     default_speed = OPENAI_TTS_PHRASE_DEFAULT_SPEED if prefix == "phrase" else OPENAI_TTS_ITEM_DEFAULT_SPEED
-    if voice_id and _configured_tts_provider() == "elevenlabs":
+    if should_use_elevenlabs(voice_id=voice_id, force_elevenlabs=force_elevenlabs):
         tts_started_at = time.perf_counter()
         audio_bytes = _elevenlabs_tts_audio(
             text=text,
@@ -576,7 +592,7 @@ def fetch_elevenlabs_voices() -> list[dict[str, object]]:
 
 
 def _item_tts_audio_bytes(*, text: str, prefix: str, target_language: str, default_speed: float) -> tuple[bytes | None, str]:
-    if _configured_tts_provider() == "elevenlabs":
+    if configured_tts_provider() == "elevenlabs":
         voice_id = _elevenlabs_voice_id(target_language=target_language, kind=prefix, seed=f"{target_language}:{prefix}:{text}")
         audio_bytes = _elevenlabs_tts_audio(
             text=text,

@@ -7,11 +7,8 @@ import {
 } from "react";
 
 import {
-  askContentItemQuestion,
   fetchContentItemDetail,
   generateContentItemFunnyImageExercise,
-  quickAddPhraseFromConversation,
-  quickAddWordFromDialog,
   regenerateContentItem,
   regenerateContentDialogAudio,
   refreshContentItemWord,
@@ -33,6 +30,7 @@ import { usePromptPreferences } from "../promptPreferences";
 import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../studyLanguageMetadata";
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
+import { FullScreenLoadingOverlay } from "./BlockingLoadingOverlay";
 import DangerousButton from "./DangerousButton";
 import CompareWordsModal from "./CompareWordsModal";
 import DialogActionIcon from "./DialogActionIcon";
@@ -59,10 +57,13 @@ import {
   firstStrategyForItemType,
 } from "./strategies/strategyConstants";
 import { useNounExerciseModal } from "./useNounExerciseModal";
+import { useItemQuestions } from "./useItemQuestions";
 import { useItemStrategies } from "./strategies/useItemStrategies";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
 import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
 import RelatedDialogTurns from "./dialogs/RelatedDialogTurns";
+import DialogItemSavingModals from "./dialogs/DialogItemSavingModals";
+import { useDialogItemSaving } from "./dialogs/useDialogItemSaving";
 import useRelatedDialogPlayback from "./dialogs/useRelatedDialogPlayback";
 import type { DialogTurnAudioMode } from "./dialogs/useDialogTurnPlayback";
 import VerbExerciseSelector, {
@@ -228,44 +229,34 @@ export default function NewItem({
   const [selectedTestingAction, setSelectedTestingAction] =
     useState<string>("test");
   const [wordRefreshMessage, setWordRefreshMessage] = useState<string>("");
-  const [showQuestionsModal, setShowQuestionsModal] = useState<boolean>(false);
   const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>(
     [],
   );
   const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
   const [exerciseRunning, setExerciseRunning] = useState<boolean>(false);
   const [exerciseMuted, setExerciseMuted] = useState<boolean>(false);
-  const [wordActionStatus, setWordActionStatus] = useState<
-    Record<string, "idle" | "saving" | "added" | "exists" | "error">
-  >({});
-  const [phraseActionStatus, setPhraseActionStatus] = useState<
-    Record<string, "idle" | "saving" | "added" | "exists" | "error">
-  >({});
-  const [phraseActionError, setPhraseActionError] = useState<
-    Record<string, string>
-  >({});
-  const [pendingWordAdd, setPendingWordAdd] = useState<{
-    key: string;
-    source: string;
-    target: string;
-    wordType: string;
-    dialogId?: number;
-    turnIndex?: number;
-    sourceLine: string;
-    targetLine: string;
-    clickedTargetToken: string;
-    note: string;
-  } | null>(null);
-  const [addingWord, setAddingWord] = useState<boolean>(false);
-  const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(
-    null,
-  );
-  const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
+  const {
+    wordActionStatus,
+    phraseActionStatus,
+    phraseActionError,
+    pendingWordAdd,
+    addingWord,
+    openedLinkedWord,
+    isSaving: savingDialogItem,
+    setPendingWordAdd,
+    setOpenedLinkedWord,
+    openLinkedWordItem: openLinkedDialogItem,
+    requestAddWordFromDialogToken,
+    confirmAddWordFromDialog,
+    addWholeTurnPhraseFromDialog: addWholeTurnPhraseFromRelatedDialog,
+    wholeTurnPhraseKey,
+  } = useDialogItemSaving({
+    sourceLanguage,
+    targetLanguage,
+    phraseKeyPrefix: "related",
+  });
   const [regeneratingRelatedDialogId, setRegeneratingRelatedDialogId] =
     useState<number | null>(null);
-  const [itemQuestions, setItemQuestions] = useState<
-    NonNullable<SessionItem["item_questions"]>
-  >(item.item_questions || []);
   const [exercisePhrases, setExercisePhrases] = useState(
     item.exercise_phrases || {},
   );
@@ -308,8 +299,25 @@ export default function NewItem({
     useState<boolean>(false);
   const [relatedDialogTurnAudioMode, setRelatedDialogTurnAudioMode] =
     useState<DialogTurnAudioMode>("natural");
-  const [itemQuestionError, setItemQuestionError] = useState<string>("");
-  const [askingQuestion, setAskingQuestion] = useState<boolean>(false);
+  const {
+    showQuestionsModal,
+    prefilledQuestion,
+    itemQuestions,
+    itemQuestionError,
+    askingQuestion,
+    openQuestions,
+    closeQuestions,
+    resetQuestions,
+    replaceItemQuestions,
+    askItemQuestion,
+  } = useItemQuestions({
+    itemId: item.id,
+    initialQuestions: item.item_questions || [],
+    sourceLanguage,
+    targetLanguage,
+    refreshHistory: showDialogsModal || showQuestionsModal,
+    questionError: t("newItem.questionsError"),
+  });
   const [showDialogTargetTextById, setShowDialogTargetTextById] = useState<
     Record<number, boolean>
   >({});
@@ -487,10 +495,7 @@ export default function NewItem({
   );
 
   useEffect(() => {
-    setItemQuestions(item.item_questions || []);
-    setItemQuestionError("");
-    setAskingQuestion(false);
-    setShowQuestionsModal(false);
+    resetQuestions();
     setShowWordIntroPracticeModal(false);
     setShowWordLetterPracticeModal(false);
     setShowPhraseBuilderModal(false);
@@ -500,38 +505,6 @@ export default function NewItem({
   useEffect(() => {
     setShowDialogTargetTextById({});
   }, [targetPromptMode]);
-
-  useEffect(() => {
-    if (!showDialogsModal && !showQuestionsModal) {
-      return;
-    }
-    let cancelled = false;
-    const loadLatestItemHistory = async (): Promise<void> => {
-      try {
-        const detail = await fetchContentItemDetail(
-          item.id,
-          sourceLanguage,
-          targetLanguage,
-        );
-        if (cancelled) {
-          return;
-        }
-        setItemQuestions(detail.item_questions || []);
-      } catch {
-        // Keep existing state if refresh fails.
-      }
-    };
-    void loadLatestItemHistory();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    showDialogsModal,
-    showQuestionsModal,
-    item.id,
-    sourceLanguage,
-    targetLanguage,
-  ]);
 
   useEffect(() => {
     setShowDialogTargetTextById({});
@@ -590,193 +563,6 @@ export default function NewItem({
     void audio.play().catch(() => undefined);
   };
 
-  const cleanToken = (value: string): string =>
-    value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
-
-  const requestAddWordFromDialogToken = async (
-    key: string,
-    sourceTokenRaw: string,
-    targetTokenRaw: string,
-    dialogId?: number,
-    turnIndex?: number,
-    sourceContextLine = "",
-    targetContextLine = "",
-  ): Promise<void> => {
-    const sourceToken = cleanToken(sourceTokenRaw);
-    const targetToken = cleanToken(targetTokenRaw);
-    if (!sourceToken || !targetToken) {
-      return;
-    }
-
-    setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
-    try {
-      const check = await quickAddWordFromDialog(
-        sourceToken,
-        targetToken,
-        sourceLanguage,
-        targetLanguage,
-        dialogId,
-        turnIndex,
-        true,
-        sourceContextLine,
-        targetContextLine,
-        targetToken,
-      );
-      if (check.exists && check.id) {
-        setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
-        setLoadingLinkedWord(true);
-        try {
-          const detail = await fetchContentItemDetail(
-            check.id,
-            sourceLanguage,
-            targetLanguage,
-          );
-          setOpenedLinkedWord({
-            id: detail.id,
-            item_type: detail.item_type,
-            spanish_text: detail.spanish_text,
-            german_text: detail.german_text,
-            example_sentence: detail.example_sentence || "",
-            notes: detail.notes || "",
-            word_type: detail.word_type || check.word_type || "",
-            plural_german: detail.plural_german || "",
-            audio_url: detail.audio_url || "",
-            exercise_phrases: detail.exercise_phrases || {},
-            mode: "new",
-            direction: null,
-            options: [],
-            dialog_phrase_answer: detail.dialog_phrase_answer || "",
-            dialog_phrase_scene: detail.dialog_phrase_scene || "",
-            dialog_phrase_scene_audio_urls:
-              detail.dialog_phrase_scene_audio_urls || [],
-            dialog_phrase_options: detail.dialog_phrase_options || [],
-            dialog_phrase_turns: detail.dialog_phrase_turns || [],
-            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
-            related_dialogs: detail.related_dialogs || [],
-            compare_words: detail.compare_words || [],
-            compare_words_insights: detail.compare_words_insights || "",
-            item_questions: detail.item_questions || [],
-          });
-        } finally {
-          setLoadingLinkedWord(false);
-        }
-        return;
-      }
-      setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
-      const resolvedWordType = String(check.word_type || "").trim();
-      if (!resolvedWordType) {
-        setWordActionStatus((current) => ({ ...current, [key]: "error" }));
-        return;
-      }
-      setPendingWordAdd({
-        key,
-        source: check.source_text || sourceToken,
-        target: check.target_text || targetToken,
-        wordType: resolvedWordType,
-        dialogId,
-        turnIndex,
-        sourceLine: sourceContextLine,
-        targetLine: targetContextLine,
-        clickedTargetToken: targetToken,
-        note: check.notes || "",
-      });
-    } catch {
-      setWordActionStatus((current) => ({ ...current, [key]: "error" }));
-    }
-  };
-
-  const openLinkedDialogItem = async (itemId: number): Promise<void> => {
-    setLoadingLinkedWord(true);
-    try {
-      const detail = await fetchContentItemDetail(
-        itemId,
-        sourceLanguage,
-        targetLanguage,
-      );
-      setOpenedLinkedWord({
-        id: detail.id,
-        item_type: detail.item_type,
-        spanish_text: detail.spanish_text,
-        german_text: detail.german_text,
-        example_sentence: detail.example_sentence || "",
-        notes: detail.notes || "",
-        word_type: detail.word_type || "",
-        plural_german: detail.plural_german || "",
-        audio_url: detail.audio_url || "",
-        exercise_phrases: detail.exercise_phrases || {},
-        mode: "new",
-        direction: null,
-        options: [],
-        dialog_phrase_answer: detail.dialog_phrase_answer || "",
-        dialog_phrase_scene: detail.dialog_phrase_scene || "",
-        dialog_phrase_scene_audio_urls:
-          detail.dialog_phrase_scene_audio_urls || [],
-        dialog_phrase_options: detail.dialog_phrase_options || [],
-        dialog_phrase_turns: detail.dialog_phrase_turns || [],
-        dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
-        related_dialogs: detail.related_dialogs || [],
-        compare_words: detail.compare_words || [],
-        compare_words_insights: detail.compare_words_insights || "",
-        item_questions: detail.item_questions || [],
-      });
-    } finally {
-      setLoadingLinkedWord(false);
-    }
-  };
-
-  const wholeTurnPhraseKey = (dialogId: number, turnIndex: number): string =>
-    `related-${dialogId}-turn-${turnIndex}-whole-phrase`;
-
-  const addWholeTurnPhraseFromRelatedDialog = async (
-    dialogId: number,
-    turn: {
-      source_text: string;
-      target_text: string;
-      speaker?: "a" | "b";
-      phrase_audio_url?: string;
-    },
-    turnIndex: number,
-  ): Promise<void> => {
-    if (!turn.source_text.trim() || !turn.target_text.trim()) {
-      return;
-    }
-    const statusKey = wholeTurnPhraseKey(dialogId, turnIndex);
-    setPhraseActionStatus((current) => ({ ...current, [statusKey]: "saving" }));
-    setPhraseActionError((current) => ({ ...current, [statusKey]: "" }));
-    try {
-      const resultPayload = await quickAddPhraseFromConversation(
-        turn.source_text,
-        turn.target_text,
-        sourceLanguage,
-        targetLanguage,
-        false,
-        dialogId,
-        turnIndex,
-        turn.source_text,
-        turn.target_text,
-      );
-      if (resultPayload.id) {
-        await openLinkedDialogItem(resultPayload.id);
-      }
-      setPhraseActionStatus((current) => ({
-        ...current,
-        [statusKey]: resultPayload.created ? "added" : "exists",
-      }));
-    } catch (error) {
-      setPhraseActionStatus((current) => ({
-        ...current,
-        [statusKey]: "error",
-      }));
-      setPhraseActionError((current) => ({
-        ...current,
-        [statusKey]:
-          error instanceof Error && error.message
-            ? error.message
-            : t("newItem.sentenceAddError"),
-      }));
-    }
-  };
-
   const regenerateRelatedDialogAudio = async (
     dialogId: number,
   ): Promise<void> => {
@@ -815,112 +601,6 @@ export default function NewItem({
 
   const openCompareWordsModal = (): void => {
     setShowCompareWordsModal(true);
-  };
-
-  const askItemQuestion = async (questionText: string): Promise<void> => {
-    if (askingQuestion || !questionText) {
-      return;
-    }
-    setAskingQuestion(true);
-    setItemQuestionError("");
-    try {
-      const response = await askContentItemQuestion(
-        item.id,
-        questionText,
-        itemQuestions,
-        sourceLanguage,
-        targetLanguage,
-      );
-      setItemQuestions(response.conversation || []);
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        setItemQuestionError(error.message);
-      } else {
-        setItemQuestionError(t("newItem.questionsError"));
-      }
-    } finally {
-      setAskingQuestion(false);
-    }
-  };
-
-  const confirmAddWordFromDialog = async (): Promise<void> => {
-    if (!pendingWordAdd || addingWord) {
-      return;
-    }
-
-    const {
-      key,
-      source,
-      target,
-      dialogId,
-      turnIndex,
-      sourceLine,
-      targetLine,
-      clickedTargetToken,
-    } = pendingWordAdd;
-    setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
-    setAddingWord(true);
-    try {
-      const result = await quickAddWordFromDialog(
-        source,
-        target,
-        sourceLanguage,
-        targetLanguage,
-        dialogId,
-        turnIndex,
-        false,
-        sourceLine,
-        targetLine,
-        clickedTargetToken,
-      );
-      setWordActionStatus((current) => ({
-        ...current,
-        [key]: result.created ? "added" : "exists",
-      }));
-      if (result.id) {
-        setLoadingLinkedWord(true);
-        try {
-          const detail = await fetchContentItemDetail(
-            result.id,
-            sourceLanguage,
-            targetLanguage,
-          );
-          setOpenedLinkedWord({
-            id: detail.id,
-            item_type: detail.item_type,
-            spanish_text: detail.spanish_text,
-            german_text: detail.german_text,
-            example_sentence: detail.example_sentence || "",
-            notes: detail.notes || "",
-            word_type: detail.word_type || result.word_type || "",
-            plural_german: detail.plural_german || "",
-            audio_url: detail.audio_url || result.audio_url || "",
-            exercise_phrases: detail.exercise_phrases || {},
-            mode: "new",
-            direction: null,
-            options: [],
-            dialog_phrase_answer: detail.dialog_phrase_answer || "",
-            dialog_phrase_scene: detail.dialog_phrase_scene || "",
-            dialog_phrase_scene_audio_urls:
-              detail.dialog_phrase_scene_audio_urls || [],
-            dialog_phrase_options: detail.dialog_phrase_options || [],
-            dialog_phrase_turns: detail.dialog_phrase_turns || [],
-            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
-            related_dialogs: detail.related_dialogs || [],
-            compare_words: detail.compare_words || [],
-            compare_words_insights: detail.compare_words_insights || "",
-            item_questions: detail.item_questions || [],
-          });
-        } finally {
-          setLoadingLinkedWord(false);
-        }
-      }
-    } catch {
-      setWordActionStatus((current) => ({ ...current, [key]: "error" }));
-    } finally {
-      setAddingWord(false);
-      setPendingWordAdd(null);
-    }
   };
 
   const sanitizeExerciseEntries = (
@@ -1566,7 +1246,7 @@ export default function NewItem({
       setRelatedDialogs(detail.related_dialogs || []);
       setCompareWords(detail.compare_words || []);
       setCompareWordsInsights(detail.compare_words_insights || "");
-      setItemQuestions(detail.item_questions || []);
+      replaceItemQuestions(detail.item_questions || []);
       setSelectedExerciseKeys([]);
     } catch (error) {
       setExerciseError(
@@ -1930,7 +1610,7 @@ export default function NewItem({
           }}
           onOpenTesting={openTestingModal}
           onOpenRelatedDialogs={() => setShowDialogsModal(true)}
-          onOpenQuestions={() => setShowQuestionsModal(true)}
+          onOpenQuestions={() => openQuestions()}
           onOpenCompareWords={openCompareWordsModal}
           onRegenerateItem={regenerateItemData}
           onRefreshWordData={refreshWordData}
@@ -2671,6 +2351,7 @@ export default function NewItem({
             compareStrategy={compareStrategy}
             grammarStrategy={grammarStrategy}
             phraseGrammarStrategy={phraseGrammarStrategy}
+            onAskAboutPhraseGrammarRule={openQuestions}
           />
         )}
       {showFunnyImageModal &&
@@ -2719,73 +2400,28 @@ export default function NewItem({
           sourceText={sourceText}
           targetLanguageLabel={targetLanguageLabel}
           targetText={targetText}
-          onClose={() => setShowQuestionsModal(false)}
+          initialQuestion={prefilledQuestion}
+          onClose={closeQuestions}
           onAskQuestion={askItemQuestion}
         />
       )}
-      {pendingWordAdd && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal add-word-modal">
-            <p className="add-word-modal-title">
-              <strong>{t("newItem.wordAddTitle")}</strong>
-            </p>
-            <p className="add-word-modal-word">{pendingWordAdd.target}</p>
-            <p className="add-word-modal-meaning">
-              {t("newItem.wordAddMeaning", {
-                translation: pendingWordAdd.source,
-              })}
-            </p>
-            <p className="add-word-modal-type">
-              <strong>
-                {t("newItem.wordAddType", { type: pendingWordAdd.wordType })}
-              </strong>
-            </p>
-            {pendingWordAdd.note && (
-              <p className="hint">
-                {t("newItem.wordAddNote", { note: pendingWordAdd.note })}
-              </p>
-            )}
-            <p className="hint">{t("newItem.wordAddPrompt")}</p>
-            <div className="actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setPendingWordAdd(null)}
-                disabled={addingWord}
-              >
-                {t("newItem.wordAddCancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmAddWordFromDialog()}
-                disabled={addingWord}
-              >
-                {addingWord
-                  ? t("newItem.wordAddSaving")
-                  : t("newItem.wordAddConfirmButton")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {loadingLinkedWord && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal add-word-modal">
-            <p>{t("session.loading")}</p>
-          </div>
-        </div>
-      )}
-      {openedLinkedWord && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal words-item-modal">
-            <NewItem
-              item={openedLinkedWord}
-              readOnly
-              onClose={() => setOpenedLinkedWord(null)}
-            />
-          </div>
-        </div>
-      )}
+      <DialogItemSavingModals
+        pendingWordAdd={pendingWordAdd}
+        addingWord={addingWord}
+        openedItemContent={openedLinkedWord && (
+          <NewItem
+            item={openedLinkedWord}
+            readOnly
+            onClose={() => setOpenedLinkedWord(null)}
+          />
+        )}
+        onCancelWordAdd={() => setPendingWordAdd(null)}
+        onConfirmWordAdd={() => void confirmAddWordFromDialog()}
+      />
+      <FullScreenLoadingOverlay
+        loading={savingDialogItem}
+        message={t("loading.savingItem")}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from "../../api";
 import { useI18n } from "../../i18n";
 import { usePromptPreferences } from "../../promptPreferences";
+import { toItemViewSessionItem } from "../../itemViewItem";
 import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../../studyLanguageMetadata";
 import { useStudyLanguages } from "../../studyLanguages";
 import type { ContentItemConversationResponse, SessionItem } from "../../types";
@@ -715,6 +716,16 @@ export default function ConversationPage(): JSX.Element {
     finishConversation();
   };
 
+  const openConversationItem = async (itemId: number): Promise<void> => {
+    setLoadingLinkedWord(true);
+    try {
+      const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
+      setOpenedLinkedWord(toItemViewSessionItem(detail));
+    } finally {
+      setLoadingLinkedWord(false);
+    }
+  };
+
   const requestAddWordFromTurnToken = async (
     key: string,
     sourceText: string,
@@ -747,37 +758,11 @@ export default function ConversationPage(): JSX.Element {
           setWordActionStatus((current) => ({ ...current, [key]: "error" }));
           return;
         }
-        setLoadingLinkedWord(true);
         try {
-          const detail = await fetchContentItemDetail(check.id, sourceLanguage, targetLanguage);
-          setOpenedLinkedWord({
-            id: detail.id,
-            item_type: detail.item_type,
-            spanish_text: detail.spanish_text,
-            german_text: detail.german_text,
-            example_sentence: detail.example_sentence || "",
-            notes: detail.notes || "",
-            word_type: detail.word_type || check.word_type || "",
-            plural_german: detail.plural_german || "",
-            audio_url: detail.audio_url || "",
-            exercise_phrases: detail.exercise_phrases || {},
-            mode: "new",
-            direction: null,
-            options: [],
-            dialog_phrase_answer: detail.dialog_phrase_answer || "",
-            dialog_phrase_scene: detail.dialog_phrase_scene || "",
-            dialog_phrase_scene_audio_urls: detail.dialog_phrase_scene_audio_urls || [],
-            dialog_phrase_options: detail.dialog_phrase_options || [],
-            dialog_phrase_turns: detail.dialog_phrase_turns || [],
-            dialog_phrase_odd_index: detail.dialog_phrase_odd_index ?? null,
-            related_dialogs: detail.related_dialogs || [],
-            compare_words: detail.compare_words || [],
-            compare_words_insights: detail.compare_words_insights || "",
-            item_questions: detail.item_questions || [],
-          });
+          await openConversationItem(check.id);
           setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
-        } finally {
-          setLoadingLinkedWord(false);
+        } catch {
+          setWordActionStatus((current) => ({ ...current, [key]: "error" }));
         }
         return;
       }
@@ -826,6 +811,9 @@ export default function ConversationPage(): JSX.Element {
         clickedTargetToken,
       );
       setWordActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+      if (result.id) {
+        await openConversationItem(result.id);
+      }
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
     } finally {
@@ -920,6 +908,9 @@ export default function ConversationPage(): JSX.Element {
       const check = await quickAddPhraseFromConversation(sourceText, targetText, sourceLanguage, targetLanguage, true, dialogId, turnIndex, sourceText, targetText);
       if (check.exists) {
         setSentenceActionStatus((current) => ({ ...current, [key]: "exists" }));
+        if (check.id) {
+          await openConversationItem(check.id);
+        }
         return;
       }
       setSentenceActionStatus((current) => ({ ...current, [key]: "idle" }));
@@ -944,6 +935,9 @@ export default function ConversationPage(): JSX.Element {
     try {
       const result = await quickAddPhraseFromConversation(source, target, sourceLanguage, targetLanguage, false, dialogId, turnIndex, source, target);
       setSentenceActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+      if (result.id) {
+        await openConversationItem(result.id);
+      }
     } catch {
       setSentenceActionStatus((current) => ({ ...current, [key]: "error" }));
     } finally {
@@ -971,6 +965,7 @@ export default function ConversationPage(): JSX.Element {
           goalError={goalError}
           conversationLoading={conversationLoading}
           started={started}
+          controlsLocked={conversationFinished}
           resolvedTopic={resolvedTopic}
           onSelectedTopicChange={setSelectedTopic}
           onCustomTopicChange={setCustomTopic}

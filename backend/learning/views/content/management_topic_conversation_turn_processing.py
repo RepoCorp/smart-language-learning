@@ -30,10 +30,11 @@ from .topic_conversation_models import (
 
 logger = logging.getLogger(__name__)
 
-def _conversation_assistant_voice_id(*, topic: str, notes: str, role_text: str, target_language: str) -> str:
+def _conversation_assistant_voice_id(*, voice_seed: str, target_language: str) -> str:
     speaker_voice_ids = select_dialog_speaker_voice_ids(
         target_language,
-        seed=f"conversation:{target_language}:{topic}:{notes}:{role_text}",
+        seed=f"conversation:{target_language}:{voice_seed}",
+        force_elevenlabs=True,
     )
     if not speaker_voice_ids:
         return ""
@@ -57,6 +58,7 @@ class ContentTopicConversationTurnView(APIView):
         skip_goal_evaluation = str(request.data.get("skip_goal_evaluation", "")).strip().lower() in {"1", "true", "yes", "on"}
         response_level = str(request.data.get("response_level", "A2")).strip().upper() or "A2"
         speech_speed = str(request.data.get("speech_speed", "normal")).strip().lower() or "normal"
+        voice_seed = str(request.data.get("voice_seed", "")).strip()
         effective_notes = build_effective_notes(
             notes=notes,
             goal_text=goal_text,
@@ -70,6 +72,8 @@ class ContentTopicConversationTurnView(APIView):
             return Response({"detail": "topic is too long"}, status=status.HTTP_400_BAD_REQUEST)
         if len(role_text) > 240:
             return Response({"detail": "role_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(voice_seed) > 120:
+            return Response({"detail": "voice_seed is too long"}, status=status.HTTP_400_BAD_REQUEST)
 
         audio_file = request.FILES.get("audio")
         if audio_file is None:
@@ -221,9 +225,7 @@ class ContentTopicConversationTurnView(APIView):
         if assistant_text and audio_is_enabled:
             audio_started_at = time.perf_counter()
             assistant_voice_id = _conversation_assistant_voice_id(
-                topic=topic,
-                notes=notes,
-                role_text=role_text,
+                voice_seed=voice_seed or f"legacy:{target_language}:{topic}:{notes}:{role_text}",
                 target_language=target_language,
             )
             if inline_audio_is_enabled:
@@ -232,6 +234,7 @@ class ContentTopicConversationTurnView(APIView):
                     "conversation",
                     target_language=target_language,
                     voice_id=assistant_voice_id,
+                    force_elevenlabs=True,
                 )
             else:
                 assistant_audio_url = create_audio_file(
@@ -239,13 +242,15 @@ class ContentTopicConversationTurnView(APIView):
                     "conversation",
                     target_language=target_language,
                     voice_id=assistant_voice_id,
+                    force_elevenlabs=True,
                 )
             assistant_audio_elapsed_ms = int((time.perf_counter() - audio_started_at) * 1000)
             logger.info(
-                "content.topic_conversation.turn_stage stage=assistant_audio elapsed_ms=%s has_audio=%s assistant_voice_id=%s",
+                "content.topic_conversation.turn_stage stage=assistant_audio elapsed_ms=%s has_audio=%s assistant_voice_id=%s conversation_voice_seed=%s",
                 assistant_audio_elapsed_ms,
                 bool(assistant_audio_url),
                 assistant_voice_id,
+                voice_seed,
             )
         elif assistant_text:
             logger.info("content.topic_conversation.turn_stage stage=assistant_audio skipped=true")

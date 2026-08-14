@@ -13,6 +13,7 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     | "strategies.grammar.verbPositionYesNoQuestion"
     | "strategies.grammar.verbPositionWQuestion"
     | "strategies.grammar.verbPositionSubordinateClause"
+    | "strategies.grammar.timeExpressionPosition"
     | "strategies.grammar.separableVerbMainClause"
     | "strategies.grammar.modalVerbWithInfinitive"
     | "strategies.grammar.reflexiveVerb"
@@ -32,6 +33,7 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     | "strategies.grammar.verbPositionYesNoQuestionNote"
     | "strategies.grammar.verbPositionWQuestionNote"
     | "strategies.grammar.verbPositionSubordinateClauseNote"
+    | "strategies.grammar.timeExpressionPositionNote"
     | "strategies.grammar.separableVerbMainClauseNote"
     | "strategies.grammar.modalVerbWithInfinitiveNote"
     | "strategies.grammar.reflexiveVerbNote"
@@ -67,6 +69,11 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     title: "strategies.grammar.verbPositionSubordinateClause",
     present: "strategies.grammar.verbPositionSubordinateClauseNote",
     example: <><strong>weil</strong> ich heute <strong>komme</strong></>,
+  },
+  time_expression_position: {
+    title: "strategies.grammar.timeExpressionPosition",
+    present: "strategies.grammar.timeExpressionPositionNote",
+    example: <><span>Ich gehe <strong>heute</strong> zur Arbeit.</span><br /><span><strong>Heute</strong> <strong>gehe</strong> ich zur Arbeit.</span></>,
   },
   separable_verb_main_clause: {
     title: "strategies.grammar.separableVerbMainClause",
@@ -142,10 +149,14 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
 
 export default function PhraseGrammarPanel({
   targetLanguage,
+  targetText,
   phraseGrammar,
+  onAskAboutRule,
 }: {
   targetLanguage: StudyLanguageCode;
+  targetText: string;
   phraseGrammar: PhraseGrammarStrategy;
+  onAskAboutRule: (question: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
   if (targetLanguage !== "german") {
@@ -174,7 +185,19 @@ export default function PhraseGrammarPanel({
               {feature.isOpen && (
                 <div className="content-collapsible-body">
                   {feature.error && <p className="error">{feature.error}</p>}
-                  <p className="grammar-phrase-feature-definition">{t(copy.present)}</p>
+                  <p className="grammar-phrase-feature-definition">
+                    {t(copy.present)} {" "}
+                    <button
+                      type="button"
+                      className="grammar-phrase-feature-question-link"
+                      onClick={() => onAskAboutRule(t("strategies.grammar.askAboutRuleQuestion", {
+                        rule: t(copy.title),
+                        phrase: targetText,
+                      }))}
+                    >
+                      {t("strategies.grammar.askAboutRule")}
+                    </button>
+                  </p>
                   <p className="grammar-phrase-feature-example">
                     <span className="grammar-phrase-feature-example-label">{t("strategies.grammar.example")}:</span> {copy.example}
                   </p>

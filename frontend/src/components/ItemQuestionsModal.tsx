@@ -13,6 +13,7 @@ type Props = {
   sourceText: string;
   targetLanguageLabel: string;
   targetText: string;
+  initialQuestion?: string;
   onClose: () => void;
   onAskQuestion: (questionText: string) => Promise<void>;
 };
@@ -26,6 +27,7 @@ export default function ItemQuestionsModal({
   sourceText,
   targetLanguageLabel,
   targetText,
+  initialQuestion = "",
   onClose,
   onAskQuestion,
 }: Props): JSX.Element | null {
@@ -50,8 +52,9 @@ export default function ItemQuestionsModal({
       setQuestionInput("");
       return;
     }
+    setQuestionInput(initialQuestion);
     questionInputRef.current?.focus();
-  }, [open]);
+  }, [open, initialQuestion]);
 
   useEffect(() => {
     if (!open) {

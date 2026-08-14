@@ -2535,6 +2535,21 @@ textarea {
   text-align: center;
 }
 
+.fullscreen-loading-overlay {
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 20px;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--color-surface) 64%, transparent);
+  text-align: center;
+}
+
 .blocking-loading-spinner {
   width: 26px;
   height: 26px;
@@ -2585,6 +2600,19 @@ textarea {
 .grammar-phrase-feature-example {
   margin: 0;
   line-height: 1.3;
+}
+
+.grammar-phrase-feature-question-link {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-strong);
+  font: inherit;
+  font-size: 0.82em;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .grammar-phrase-feature-example {
@@ -3172,6 +3200,11 @@ textarea {
 .conversation-review-natural small {
   color: var(--color-text-soft);
   font-size: 11px;
+}
+
+.conversation-review-natural-save {
+  align-self: flex-start;
+  margin-top: 2px;
 }
 
 .conversation-notes-wrap {

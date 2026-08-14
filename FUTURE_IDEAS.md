@@ -4,13 +4,14 @@
 Ningun otro arreglito que no sea vital!!! 
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
-- Introducir gramatica, gradualmente. Empecemos con sustantivos.
+### Gramatica
+- Sustantivos:
   - Other things that change depending on the gender of the word.
   - Case declinations para plural
 - Verbos:
   - Indicar si son separables, reflexivos..
   - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
-- Palabras: Añadir tambien a las reglas cosas como conjugacion, caso, genero... para que detecte errores en la conversacion
+- Palabras en general: Añadir tambien a las reglas cosas como conjugacion, caso, genero... para que detecte errores en la conversacion
 - Frases: ir añadiendo reglas
 - Añadir mas grammar features. Agruparlas si el model empieza  a tener problemas con ellas y la interfaz es muy complicada.
 - De las conversaciones saca errores. Los muestra y sugiere repasarlo. Que sea bien empatico 😂
@@ -41,19 +42,17 @@ Cosas como Ja, und ich würde dir insgesamt 4,55 Euro zurückgeben würde la 
 Confirmar la traduccion de las palabras es correcta. Me salio que der Bitte es "tener"
 
 ## FUTURE WORK (some important, some not so important)
+Que en gramar se pueda abrir el ejercicio de bloques, de pronto sin el hint del tamaño del espacio para la palabra. De pronto no con las palabras independientes si no con las partes que estan involucradas en la regla
 Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Depronto incluso que la celebración ayude, como que las letras hagan la ola
 Uno escribir su propio goal
 Como hacer que encuentre los diálogos en las distintas formas del verbo o sustantivo
 Hacer preguntas a las estrategias
-Strategies para frases
 Related dialogs no deja poner modo solo audio
 Que funcione en landscape
 Escribir encima de la imagen?
 Que en repeticion alguna manera de pedir que pronuncie la palabra/frase una vez al hacer click
-Delay entre frases de ejercicio repeticion
 Que no se pueda typear la opcion correcta en error completando la palabra si no que hay que mover el cuadrito a ver si entra en la palabra. De pronto mostrar todo el alfabeto y las pistas resaltadas
 en bloques no repetir audio desde el principio si no desde el ppio de la frase, es decir ppio o despues de un punto
-En ejercicios u otra parte tambien poner ejemplos en otros contextos, no solo de donde vino la palabra
 Revisar otros dialogos de las palabras separado de rehacer palabra
 Que la pregunta común llene el input pero permita escribir
 Recrear audio de un turno en particular que pudo haber quedado regu

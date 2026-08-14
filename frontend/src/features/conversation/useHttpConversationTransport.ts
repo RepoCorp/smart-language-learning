@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { sendTopicConversationAudio } from "../../api";
+import { sendTopicConversationAudio } from "../../apiConversation";
 import {
   CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS,
   CONVERSATION_MAX_RECORDING_MS,
@@ -10,6 +10,13 @@ import type { BaseConversationTransportArgs } from "./conversationTransportTypes
 const MIC_UNSUPPORTED = "Microphone recording is not supported on this device.";
 const MIC_DENIED = "Microphone permission was denied.";
 const AUDIO_FAILED = "Failed to process conversation audio";
+
+function createConversationVoiceSeed(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function useHttpConversationTransport({
   sourceLanguage,
@@ -41,6 +48,8 @@ export function useHttpConversationTransport({
   const autoRestartAfterAssistantRef = useRef<boolean>(true);
   const timedOutSubmissionRef = useRef<boolean>(false);
   const consecutiveTimeoutCountRef = useRef<number>(0);
+  const conversationVoiceSeedRef = useRef<string>("");
+  const previousConversationHistoryCountRef = useRef<number>(0);
 
   useEffect(() => {
     return () => {
@@ -60,6 +69,13 @@ export function useHttpConversationTransport({
     };
   }, []);
 
+  useEffect(() => {
+    if (previousConversationHistoryCountRef.current > 0 && conversationHistory.length === 0) {
+      conversationVoiceSeedRef.current = "";
+    }
+    previousConversationHistoryCountRef.current = conversationHistory.length;
+  }, [conversationHistory.length]);
+
   const clearTimer = (): void => {
     if (timerRef.current !== null) {
       window.clearInterval(timerRef.current);
@@ -76,19 +92,23 @@ export function useHttpConversationTransport({
     onPendingUserTurnChange(true);
     onError("");
     try {
-      const response = await sendTopicConversationAudio(
-        activeTopic,
-        activeNotes,
-        activeRole,
-        conversationGoal,
+      if (!conversationVoiceSeedRef.current) {
+        conversationVoiceSeedRef.current = createConversationVoiceSeed();
+      }
+      const response = await sendTopicConversationAudio({
+        topic: activeTopic,
+        notes: activeNotes,
+        roleText: activeRole,
+        goalText: conversationGoal,
         conversationPhase,
         audioBlob,
-        conversationHistory,
+        history: conversationHistory,
+        voiceSeed: conversationVoiceSeedRef.current,
         speechSpeed,
         responseLevel,
         sourceLanguage,
         targetLanguage,
-      );
+      });
       onConversationTurn(response);
       onPendingUserTurnChange(false);
       if (response.assistant_audio_url) {

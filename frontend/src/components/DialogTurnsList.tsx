@@ -83,6 +83,7 @@ export default function DialogTurnsList({
                 onTokenClick={(statusKey, token) => onTokenClick?.(statusKey, token, index, turn.source_text, turn.target_text)}
                 leadingAction={renderLeadingAction?.(turn, index)}
                 wholePhraseSaveAction={getWholePhraseSaveAction?.(turn, index)}
+                showSavingOverlay={false}
               />
             </div>
           </li>

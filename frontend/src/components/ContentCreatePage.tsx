@@ -4,6 +4,7 @@ import { confirmContent, fetchContentTopicContexts, fetchContentTopics, previewC
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentPreviewResponse } from "../types";
+import { FullScreenLoadingOverlay } from "./BlockingLoadingOverlay";
 import ContentCreateFormCard from "./contentCreate/ContentCreateFormCard";
 import ContentPreviewCard from "./contentCreate/ContentPreviewCard";
 import SavedDialogCard from "./contentCreate/SavedDialogCard";
@@ -262,13 +263,6 @@ export default function ContentCreatePage(): JSX.Element {
         />
       )}
 
-      {saving && (
-        <div className="blocking-modal-overlay" role="alert" aria-live="assertive" aria-busy="true">
-          <div className="blocking-modal">
-            <p>{t("content.saving")}</p>
-          </div>
-        </div>
-      )}
       <SavedDialogModals
         pendingWordAdd={savedDialog.pendingWordAdd}
         addingWord={savedDialog.addingWord}
@@ -277,6 +271,10 @@ export default function ContentCreatePage(): JSX.Element {
         onClosePendingWordAdd={savedDialog.closePendingWordAdd}
         onConfirmWordAdd={savedDialog.confirmAddWord}
         onCloseOpenedLinkedWord={savedDialog.closeOpenedLinkedWord}
+      />
+      <FullScreenLoadingOverlay
+        loading={saving || savedDialog.isSaving}
+        message={saving ? t("content.saving") : t("loading.savingItem")}
       />
     </main>
   );

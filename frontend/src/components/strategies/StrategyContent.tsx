@@ -66,6 +66,7 @@ export default function StrategyContent(props: Props): JSX.Element {
         isLoadingExamples={props.grammarStrategy.isLoading}
         itemType={props.itemType}
         phraseGrammar={props.phraseGrammarStrategy}
+        onAskAboutPhraseGrammarRule={props.onAskAboutPhraseGrammarRule}
       />
     );
   }

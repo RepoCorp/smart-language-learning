@@ -47,6 +47,9 @@ export default function ConversationReviewTurns({
         const phraseKey = `conversation-review-phrase-${dialog.dialog_id}-${index}`;
         const phraseStatus = sentenceActionStatus[phraseKey] || "idle";
         const wholePhraseStatus: ActionStatus = phraseStatus === "missing_source" ? "error" : phraseStatus;
+        const naturalAlternative = naturalUserAlternatives[index];
+        const naturalPhraseKey = `conversation-review-natural-${dialog.dialog_id}-${index}`;
+        const naturalPhraseStatus = sentenceActionStatus[naturalPhraseKey] || "idle";
         return (
           <div
             key={`${dialog.dialog_id}-${index}`}
@@ -102,13 +105,32 @@ export default function ConversationReviewTurns({
                 <strong>{t("conversation.correctedLabel")}</strong> {correctedUserTexts[index]}
               </p>
             )}
-            {speaker === "user" && naturalUserAlternatives[index] && (
+            {speaker === "user" && naturalAlternative && (
               <div className="conversation-review-natural">
                 <strong>{t("conversation.moreNatural")}</strong>
-                <span>{naturalUserAlternatives[index].target}</span>
-                {naturalUserAlternatives[index].source && (
-                  <small>{naturalUserAlternatives[index].source}</small>
+                <span>{naturalAlternative.target}</span>
+                {naturalAlternative.source && (
+                  <small>{naturalAlternative.source}</small>
                 )}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className="secondary-button conversation-review-natural-save"
+                    onClick={() => void requestAddSentenceFromConversation(
+                      naturalPhraseKey,
+                      naturalAlternative.source,
+                      naturalAlternative.target,
+                      dialog.dialog_id,
+                      index,
+                    )}
+                    disabled={naturalPhraseStatus === "saving"}
+                  >
+                    {naturalPhraseStatus === "saving" ? t("newItem.sentenceAddSaving") : t("newItem.sentenceAddConfirmButton")}
+                  </button>
+                )}
+                {naturalPhraseStatus === "added" && <small>{t("newItem.wordAddAdded")}</small>}
+                {naturalPhraseStatus === "exists" && <small>{t("newItem.wordAddExists")}</small>}
+                {naturalPhraseStatus === "error" && <small>{t("newItem.sentenceAddError")}</small>}
               </div>
             )}
           </div>

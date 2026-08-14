@@ -159,5 +159,10 @@ export default function useSavedDialogInteractions(
     setSavedDialogTurns((current) => current.map((turn, index) => index === turnIndex ? { ...turn, [mode === "clear" ? "clear_audio_url" : "phrase_audio_url"]: audioUrl } : turn));
   };
 
-  return { savedDialogId, savedDialogTurns, phraseActionStatus, phraseActionError, wordActionStatus, pendingWordAdd, addingWord, openedLinkedWord, loadingLinkedWord, reset, setSavedDialog, requestAddWord, confirmAddWord, addWholeTurnPhrase, updateTurnAudio, openItem, closeOpenedLinkedWord: () => setOpenedLinkedWord(null), closePendingWordAdd: () => setPendingWordAdd(null) };
+  const isSaving = addingWord
+    || loadingLinkedWord
+    || Object.values(wordActionStatus).includes("saving")
+    || Object.values(phraseActionStatus).includes("saving");
+
+  return { savedDialogId, savedDialogTurns, phraseActionStatus, phraseActionError, wordActionStatus, pendingWordAdd, addingWord, openedLinkedWord, loadingLinkedWord, isSaving, reset, setSavedDialog, requestAddWord, confirmAddWord, addWholeTurnPhrase, updateTurnAudio, openItem, closeOpenedLinkedWord: () => setOpenedLinkedWord(null), closePendingWordAdd: () => setPendingWordAdd(null) };
 }

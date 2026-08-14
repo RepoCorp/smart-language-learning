@@ -10,11 +10,13 @@ function CollapsibleSection({
   title,
   subtitle,
   accent = "neutral",
+  disabled = false,
   children,
 }: {
   title: string;
   subtitle?: string;
   accent?: "neutral" | "required";
+  disabled?: boolean;
   children: JSX.Element | JSX.Element[];
 }): JSX.Element {
   const [open, setOpen] = useState<boolean>(false);
@@ -26,6 +28,7 @@ function CollapsibleSection({
         className="content-collapsible-trigger"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
+        disabled={disabled}
       >
         <span className="content-collapsible-trigger-copy conversation-setup-trigger-copy">
           <strong>{title}</strong>
@@ -54,6 +57,7 @@ export default function ConversationSetupCard({
   goalError,
   conversationLoading,
   started,
+  controlsLocked,
   resolvedTopic,
   onSelectedTopicChange,
   onCustomTopicChange,
@@ -77,6 +81,7 @@ export default function ConversationSetupCard({
   goalError: string;
   conversationLoading: boolean;
   started: boolean;
+  controlsLocked: boolean;
   resolvedTopic: string;
   onSelectedTopicChange: (value: string) => void;
   onCustomTopicChange: (value: string) => void;
@@ -104,6 +109,7 @@ export default function ConversationSetupCard({
         title={t("content.section.topicTitle")}
         subtitle={topicSubtitle}
         accent={!resolvedTopic ? "required" : "neutral"}
+        disabled={controlsLocked}
       >
         <div className="content-form-section content-topic-section">
           <select
@@ -140,6 +146,7 @@ export default function ConversationSetupCard({
       <CollapsibleSection
         title={t("conversation.setupTitle")}
         subtitle={setupSubtitle}
+        disabled={controlsLocked}
       >
         <div className="content-form-section content-setting-block">
           <textarea
@@ -169,6 +176,7 @@ export default function ConversationSetupCard({
       <CollapsibleSection
         title={t("conversation.goalDifficultyLabel")}
         subtitle={difficultySubtitle}
+        disabled={controlsLocked}
       >
         <div className="content-form-section content-setting-block">
           <div className="exercise-audio-mode" role="radiogroup" aria-label={t("conversation.goalDifficultyLabel")}>
@@ -209,6 +217,7 @@ export default function ConversationSetupCard({
       <CollapsibleSection
         title={t("conversation.modeLabel")}
         subtitle={modeSubtitle}
+        disabled={controlsLocked}
       >
         <div className="content-form-section content-setting-block">
           <div className="exercise-audio-mode" role="radiogroup" aria-label={t("conversation.modeLabel")}>
