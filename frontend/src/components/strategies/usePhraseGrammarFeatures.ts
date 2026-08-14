@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { analyzeContentItemPhraseGrammarFeatures, fetchContentItemPhraseGrammarExamples } from "../../apiStrategies";
+import {
+  analyzeContentItemPhraseGrammarFeatures,
+  fetchContentItemPhraseGrammarExamples,
+  fetchContentItemPhraseGrammarFeatures,
+} from "../../apiStrategies";
 import type { StudyLanguageCode } from "../../types";
 import {
   PHRASE_GRAMMAR_FEATURE_KEYS,
@@ -55,7 +59,18 @@ export function usePhraseGrammarFeatures({
     setError("");
     const pendingAnalysis = force
       ? createAnalysis(itemId, sourceLanguage, targetLanguage)
-      : pendingAnalyses.get(analysisKey) || createAnalysis(itemId, sourceLanguage, targetLanguage);
+      : pendingAnalyses.get(analysisKey) || fetchContentItemPhraseGrammarFeatures(
+        itemId,
+        sourceLanguage,
+        targetLanguage,
+      ).then((saved) => {
+        const savedFeatureKeys = saved.feature_keys.filter(
+          (key): key is PhraseGrammarFeatureKey => PHRASE_GRAMMAR_FEATURE_KEYS.includes(key as PhraseGrammarFeatureKey),
+        );
+        return saved.analyzed
+          ? savedFeatureKeys
+          : createAnalysis(itemId, sourceLanguage, targetLanguage);
+      });
     if (!force && !pendingAnalyses.has(analysisKey)) {
       pendingAnalyses.set(analysisKey, pendingAnalysis);
     }

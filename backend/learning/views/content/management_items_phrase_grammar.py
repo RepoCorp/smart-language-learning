@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.utils import timezone
+
 from ...grammar_features import PHRASE_GRAMMAR_FEATURES
 from ...models import Item, ItemGrammarFeature
 from ...prompts import PHRASE_GRAMMAR_FEATURES_PROMPT
@@ -32,8 +34,6 @@ def _requested_feature_key(request: Request) -> str | None:
 class ContentItemPhraseGrammarFeaturesView(APIView):
     def get(self, request: Request, item_id: int) -> Response:
         feature_key = _requested_feature_key(request)
-        if not feature_key:
-            return Response({"detail": "Unknown grammar feature"}, status=status.HTTP_400_BAD_REQUEST)
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
         item = apply_user_scope(Item.objects, user).filter(
@@ -44,6 +44,15 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
         ).first()
         if not item:
             return Response({"detail": "Phrase not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not feature_key:
+            saved_feature_keys = set(item.grammar_features.values_list("feature_key", flat=True))
+            return Response({
+                "feature_keys": [
+                    key for key in PHRASE_GRAMMAR_FEATURES if key in saved_feature_keys
+                ],
+                "analyzed": item.phrase_grammar_checked_at is not None,
+            })
 
         examples = (
             apply_user_scope(Item.objects, user)
@@ -59,7 +68,11 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
         return Response(
             {
                 "examples": [
-                    {"target_text": example.german_text, "source_text": example.spanish_text}
+                    {
+                        "target_text": example.german_text,
+                        "source_text": example.spanish_text,
+                        "audio_url": example.audio_url,
+                    }
                     for example in examples
                 ]
             }
@@ -99,12 +112,15 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
         detected_features = set(parsed).intersection(PHRASE_GRAMMAR_FEATURES)
         for feature_key in detected_features:
             ItemGrammarFeature.objects.get_or_create(item=item, feature_key=feature_key)
+        item.phrase_grammar_checked_at = timezone.now()
+        item.save(update_fields=["phrase_grammar_checked_at"])
         return Response(
             {
                 "feature_keys": [
                     feature_key
                     for feature_key in PHRASE_GRAMMAR_FEATURES
                     if feature_key in detected_features
-                ]
+                ],
+                "analyzed": True,
             }
         )

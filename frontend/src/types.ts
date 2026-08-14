@@ -105,10 +105,11 @@ export type ContentItemGrammarExamplesResponse = {
 
 export type ContentItemPhraseGrammarFeaturesResponse = {
   feature_keys: string[];
+  analyzed: boolean;
 };
 
 export type ContentItemPhraseGrammarExamplesResponse = {
-  examples: Array<{ target_text: string; source_text: string }>;
+  examples: Array<{ target_text: string; source_text: string; audio_url: string }>;
 };
 
 export interface DialogPhraseTurn {

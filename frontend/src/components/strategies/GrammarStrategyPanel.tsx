@@ -4,6 +4,7 @@ import { useI18n } from "../../i18n";
 import GrammarMethodologyFooter from "./GrammarMethodologyFooter";
 import type { GermanGrammarNounExample, StudyLanguageCode } from "../../types";
 import PhraseGrammarPanel from "./PhraseGrammarPanel";
+import type { ItemStrategiesModalProps } from "./itemStrategyTypes";
 import type { PhraseGrammarStrategy } from "./phraseGrammarTypes";
 import StaticGrammarTable, { type StaticGrammarRow } from "./StaticGrammarTable";
 
@@ -51,6 +52,7 @@ export default function GrammarStrategyPanel({
   itemType,
   phraseGrammar,
   onAskAboutPhraseGrammarRule,
+  phraseGrammarLoop,
 }: {
   wordType: string;
   targetLanguage: StudyLanguageCode;
@@ -61,6 +63,7 @@ export default function GrammarStrategyPanel({
   itemType: "word" | "phrase";
   phraseGrammar: PhraseGrammarStrategy;
   onAskAboutPhraseGrammarRule: (question: string) => void;
+  phraseGrammarLoop: ItemStrategiesModalProps["phraseGrammarLoop"];
 }): JSX.Element {
   const { t } = useI18n();
   const noun = wordType.trim().toLowerCase() === "noun" && targetLanguage === "german"
@@ -77,7 +80,7 @@ export default function GrammarStrategyPanel({
   }, [noun?.gender]);
 
   if (itemType === "phrase") {
-    return <PhraseGrammarPanel targetLanguage={targetLanguage} targetText={targetText} phraseGrammar={phraseGrammar} onAskAboutRule={onAskAboutPhraseGrammarRule} />;
+    return <PhraseGrammarPanel targetLanguage={targetLanguage} targetText={targetText} phraseGrammar={phraseGrammar} onAskAboutRule={onAskAboutPhraseGrammarRule} loop={phraseGrammarLoop} />;
   }
 
   if (isGermanVerb) {

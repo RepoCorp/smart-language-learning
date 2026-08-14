@@ -1,7 +1,10 @@
+import { useState } from "react";
+
 import { useI18n } from "../../i18n";
 import type { StudyLanguageCode } from "../../types";
-import TargetPhraseText from "../TargetPhraseText";
 import GrammarMethodologyFooter from "./GrammarMethodologyFooter";
+import PhraseSelectionList, { type PhraseSelectionEntry } from "./PhraseSelectionList";
+import StrategyLoopPanel from "./StrategyLoopPanel";
 import {
   type PhraseGrammarFeatureKey,
   type PhraseGrammarStrategy,
@@ -152,18 +155,52 @@ export default function PhraseGrammarPanel({
   targetText,
   phraseGrammar,
   onAskAboutRule,
+  loop,
 }: {
   targetLanguage: StudyLanguageCode;
   targetText: string;
   phraseGrammar: PhraseGrammarStrategy;
   onAskAboutRule: (question: string) => void;
+  loop: {
+    secondsLeft: number;
+    isRunning: boolean;
+    isMuted: boolean;
+    canStart: boolean;
+    onStart: () => void;
+    onStop: () => void;
+    onToggleMute: () => void;
+  };
 }): JSX.Element {
   const { t } = useI18n();
+  const [selectedExampleKeys, setSelectedExampleKeys] = useState<string[]>([]);
   if (targetLanguage !== "german") {
     return <GrammarPlaceholder />;
   }
 
-  return (
+  const exampleEntries = phraseGrammar.featureKeys.flatMap((featureKey) => (
+    phraseGrammar.features[featureKey].examples.map((example, index) => ({
+      key: `${featureKey}:${index}:${example.target_text}:${example.source_text}`,
+      target: example.target_text,
+      source: example.source_text,
+      audioUrl: example.audio_url,
+    }))
+  ));
+  const selectedExamples = exampleEntries.filter((entry) => selectedExampleKeys.includes(entry.key));
+  const toggleExample = (entry: PhraseSelectionEntry): void => {
+    setSelectedExampleKeys((current) => (
+      current.includes(entry.key)
+        ? current.filter((key) => key !== entry.key)
+        : [...current, entry.key]
+    ));
+  };
+  const selectAllExamples = (): void => setSelectedExampleKeys(exampleEntries.map((entry) => entry.key));
+  const selectRandomExample = (): void => {
+    if (!exampleEntries.length) return;
+    const randomEntry = exampleEntries[Math.floor(Math.random() * exampleEntries.length)];
+    setSelectedExampleKeys([randomEntry.key]);
+  };
+
+  const grammarContent = (
     <div className="grammar-strategy-panel">
       <div className="actions">
         <button type="button" className="secondary-button" onClick={phraseGrammar.refresh} disabled={phraseGrammar.isLoading}>
@@ -205,7 +242,12 @@ export default function PhraseGrammarPanel({
                   {!feature.isLoadingExamples && (
                     feature.examples.length > 0 ? (
                       <div className="grammar-phrase-examples">
-                        {feature.examples.map((example) => <div key={`${example.target_text}|||${example.source_text}`} className="grammar-phrase-example"><TargetPhraseText as="p" text={example.target_text} variant="dialog" /><p className="dialog-turn-translation">{example.source_text}</p></div>)}
+                        <PhraseSelectionList
+                          entries={exampleEntries.filter((entry) => entry.key.startsWith(`${featureKey}:`))}
+                          selectedKeys={selectedExampleKeys}
+                          onToggleEntry={toggleExample}
+                          disabled={loop.isRunning}
+                        />
                       </div>
                     ) : <p className="hint">{t("strategies.grammar.noExamples")}</p>
                   )}
@@ -220,6 +262,29 @@ export default function PhraseGrammarPanel({
       )}
       <GrammarMethodologyFooter />
     </div>
+  );
+
+  return (
+    <StrategyLoopPanel
+      body={grammarContent}
+      secondsLeft={loop.secondsLeft}
+      isRunning={loop.isRunning}
+      isMuted={loop.isMuted}
+      canStart={selectedExamples.length > 0}
+      canSelectEntries={exampleEntries.length > 0}
+      hasSelectedEntries={selectedExamples.length > 0}
+      onUnselectAll={() => setSelectedExampleKeys([])}
+      onSelectAll={selectAllExamples}
+      onSelectRandom={selectRandomExample}
+      onStart={() => loop.onStart({
+        lines: selectedExamples.map((entry) => entry.target),
+        audioSources: selectedExamples.every((entry) => entry.audioUrl)
+          ? selectedExamples.map((entry) => entry.audioUrl)
+          : [],
+      })}
+      onStop={loop.onStop}
+      onToggleMute={loop.onToggleMute}
+    />
   );
 }
 

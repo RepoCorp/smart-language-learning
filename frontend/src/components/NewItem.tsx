@@ -20,10 +20,7 @@ import {
 } from "../apiNounExercises";
 import { deterministicIndex, deterministicTake } from "../deterministic";
 import {
-  BROWSER_EXERCISE_PHRASE_PAUSE_MS,
-  pauseBrowserExercisePhrases,
   playBrowserExerciseWord,
-  speakBrowserExerciseLinesOnce,
 } from "../exerciseBrowserSpeech";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
@@ -58,6 +55,7 @@ import {
 } from "./strategies/strategyConstants";
 import { useNounExerciseModal } from "./useNounExerciseModal";
 import { useItemQuestions } from "./useItemQuestions";
+import { useRepeatExerciseLoop } from "./useRepeatExerciseLoop";
 import { useItemStrategies } from "./strategies/useItemStrategies";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
 import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
@@ -232,9 +230,6 @@ export default function NewItem({
   const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>(
     [],
   );
-  const [exerciseSecondsLeft, setExerciseSecondsLeft] = useState<number>(30);
-  const [exerciseRunning, setExerciseRunning] = useState<boolean>(false);
-  const [exerciseMuted, setExerciseMuted] = useState<boolean>(false);
   const {
     wordActionStatus,
     phraseActionStatus,
@@ -315,17 +310,12 @@ export default function NewItem({
     initialQuestions: item.item_questions || [],
     sourceLanguage,
     targetLanguage,
-    refreshHistory: showDialogsModal || showQuestionsModal,
+    refreshRelatedDialogHistory: showDialogsModal,
     questionError: t("newItem.questionsError"),
   });
   const [showDialogTargetTextById, setShowDialogTargetTextById] = useState<
     Record<number, boolean>
   >({});
-  const exerciseTimerRef = useRef<number | null>(null);
-  const exerciseRunRef = useRef<number>(0);
-  const exerciseRunningRef = useRef<boolean>(false);
-  const exerciseMutedRef = useRef<boolean>(false);
-  const exerciseAudioRef = useRef<HTMLAudioElement | null>(null);
   const autoplayedAudioKeyRef = useRef<string>("");
   const {
     loadingAudioKey: loadingRelatedDialogAudioKey,
@@ -456,43 +446,6 @@ export default function NewItem({
     showWordLetterPracticeModal,
     showPhraseBuilderModal,
   ]);
-
-  useEffect(() => {
-    exerciseRunningRef.current = exerciseRunning;
-  }, [exerciseRunning]);
-
-  useEffect(() => {
-    exerciseMutedRef.current = exerciseMuted;
-    if (!exerciseMuted) {
-      return;
-    }
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-    if (exerciseAudioRef.current) {
-      exerciseAudioRef.current.pause();
-      exerciseAudioRef.current.currentTime = 0;
-    }
-  }, [exerciseMuted]);
-
-  useEffect(
-    () => () => {
-      exerciseRunRef.current += 1;
-      if (exerciseTimerRef.current !== null) {
-        window.clearInterval(exerciseTimerRef.current);
-        exerciseTimerRef.current = null;
-      }
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-      if (exerciseAudioRef.current) {
-        exerciseAudioRef.current.pause();
-        exerciseAudioRef.current.currentTime = 0;
-        exerciseAudioRef.current = null;
-      }
-    },
-    [],
-  );
 
   useEffect(() => {
     resetQuestions();
@@ -866,6 +819,19 @@ export default function NewItem({
                       : selectedRepeatExerciseEntries;
   const selectedExerciseEntries = selectedStrategyEntries;
   const exerciseLines = selectedExerciseEntries.map((entry) => entry.target);
+  const {
+    secondsLeft: exerciseSecondsLeft,
+    isRunning: exerciseRunning,
+    isMuted: exerciseMuted,
+    start: startExercise,
+    stop: stopExercise,
+    toggleMute: toggleExerciseMute,
+  } = useRepeatExerciseLoop({
+    defaultLines: exerciseLines,
+    audioSources: item.item_type === "phrase" && audioUrl ? [audioUrl] : [],
+    targetLanguage,
+    preferredBrowserVoiceURI,
+  });
   const wordPracticeItemBase: SessionItem = {
     ...item,
     spanish_text: sourceText,
@@ -1304,166 +1270,10 @@ export default function NewItem({
     }
   };
 
-  const playExerciseDoneSound = (): void => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const AudioContextClass =
-      window.AudioContext ||
-      (window as Window & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioContextClass) {
-      return;
-    }
-    const audioContext = new AudioContextClass();
-    const now = audioContext.currentTime;
-    const gain = audioContext.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.03, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
-    gain.connect(audioContext.destination);
-
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(659.25, now);
-    oscillator.frequency.setValueAtTime(783.99, now + 0.2);
-    oscillator.connect(gain);
-    oscillator.start(now);
-    oscillator.stop(now + 0.46);
-    oscillator.onended = () => {
-      void audioContext.close();
-    };
-  };
-
-  const stopExercise = (resetToFullTime = true): void => {
-    setExerciseRunning(false);
-    setExerciseSecondsLeft(resetToFullTime ? 30 : 0);
-    exerciseRunRef.current += 1;
-    if (exerciseTimerRef.current !== null) {
-      window.clearInterval(exerciseTimerRef.current);
-      exerciseTimerRef.current = null;
-    }
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-    if (exerciseAudioRef.current) {
-      exerciseAudioRef.current.pause();
-      exerciseAudioRef.current.currentTime = 0;
-      exerciseAudioRef.current = null;
-    }
-  };
-
-  const pauseBetweenExercisePhrases = async (runId: number): Promise<void> => {
-    await pauseBrowserExercisePhrases(
-      runId,
-      () => exerciseRunRef.current === runId && exerciseRunningRef.current,
-    );
-  };
-
-  const playAudioSourcesOnce = async (
-    sources: string[],
-    runId: number,
-  ): Promise<void> => {
-    for (let index = 0; index < sources.length; index += 1) {
-      const source = sources[index];
-      if (
-        !source ||
-        exerciseRunRef.current !== runId ||
-        !exerciseRunningRef.current
-      ) {
-        continue;
-      }
-      if (exerciseMutedRef.current) {
-        await new Promise<void>((resolve) =>
-          window.setTimeout(resolve, BROWSER_EXERCISE_PHRASE_PAUSE_MS),
-        );
-        continue;
-      }
-      await new Promise<void>((resolve) => {
-        const audio = new Audio(source);
-        exerciseAudioRef.current = audio;
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        audio.onpause = () => resolve();
-        void audio.play().catch(() => resolve());
-      });
-    }
-    exerciseAudioRef.current = null;
-  };
-
   const playFunnyImageWordAudio = (): void => {
-    if (!targetText.trim()) {
-      return;
-    }
-    if (exerciseRunningRef.current) {
-      stopExercise(false);
-    }
-    playBrowserExerciseWord(
-      targetText,
-      targetLanguage,
-      preferredBrowserVoiceURI,
-    );
-  };
-
-  const speakLinesOnce = async (
-    lines: string[],
-    runId: number,
-  ): Promise<void> => {
-    await speakBrowserExerciseLinesOnce({
-      lines,
-      runId,
-      isRunning: () =>
-        exerciseRunRef.current === runId && exerciseRunningRef.current,
-      isMuted: () => exerciseMutedRef.current,
-      targetLanguage,
-      preferredBrowserVoiceURI,
-    });
-  };
-
-  const startExercise = (overrideLines?: string[]): void => {
-    stopExercise();
-    const runId = exerciseRunRef.current;
-    setExerciseSecondsLeft(30);
-    setExerciseRunning(true);
-    exerciseRunningRef.current = true;
-    exerciseTimerRef.current = window.setInterval(() => {
-      setExerciseSecondsLeft((current) => {
-        if (current <= 1) {
-          stopExercise(false);
-          if (!exerciseMutedRef.current) {
-            playExerciseDoneSound();
-          }
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
-
-    const phraseExerciseAudioSources =
-      item.item_type === "phrase" && audioUrl ? [audioUrl] : [];
-    const linesToPlay =
-      overrideLines && overrideLines.length > 0 ? overrideLines : exerciseLines;
-    const usesBrowserSpeechLoop = phraseExerciseAudioSources.length === 0;
-    const playOnce = phraseExerciseAudioSources.length
-      ? () => playAudioSourcesOnce(phraseExerciseAudioSources, runId)
-      : () => speakLinesOnce(linesToPlay, runId);
-
-    const loop = (): void => {
-      if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
-        return;
-      }
-      void playOnce().then(async () => {
-        if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
-          return;
-        }
-        await pauseBetweenExercisePhrases(runId);
-        if (exerciseRunRef.current !== runId || !exerciseRunningRef.current) {
-          return;
-        }
-        loop();
-      });
-    };
-    loop();
+    if (!targetText.trim()) return;
+    if (exerciseRunning) stopExercise(false);
+    playBrowserExerciseWord(targetText, targetLanguage, preferredBrowserVoiceURI);
   };
 
   const startFunnyImagePhraseExercise = (): void => {
@@ -2166,7 +1976,7 @@ export default function NewItem({
             canStart={exerciseLines.length > 0}
             onStart={startExercise}
             onStop={stopExercise}
-            onToggleMute={() => setExerciseMuted((value) => !value)}
+            onToggleMute={toggleExerciseMute}
             formsContent={
               <FormsStrategyPanel
                 itemType={item.item_type}
@@ -2352,6 +2162,15 @@ export default function NewItem({
             grammarStrategy={grammarStrategy}
             phraseGrammarStrategy={phraseGrammarStrategy}
             onAskAboutPhraseGrammarRule={openQuestions}
+            phraseGrammarLoop={{
+              secondsLeft: exerciseSecondsLeft,
+              isRunning: exerciseRunning,
+              isMuted: exerciseMuted,
+              canStart: item.item_type === "phrase" && Boolean(audioUrl),
+              onStart: startExercise,
+              onStop: stopExercise,
+              onToggleMute: toggleExerciseMute,
+            }}
           />
         )}
       {showFunnyImageModal &&

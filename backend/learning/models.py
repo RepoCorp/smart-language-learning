@@ -34,6 +34,7 @@ class Item(models.Model):
     exercise_phrases = models.JSONField(default=dict, blank=True)
     confusing_with = models.ManyToManyField("self", blank=True, symmetrical=True)
     compare_words_insights = models.TextField(blank=True)
+    phrase_grammar_checked_at = models.DateTimeField(null=True, blank=True)
     is_learned = models.BooleanField(default=False)
     is_difficult = models.BooleanField(default=False)
     difficult_marked_at = models.DateTimeField(null=True, blank=True)

@@ -8,14 +8,14 @@ export function useItemQuestions({
   initialQuestions,
   sourceLanguage,
   targetLanguage,
-  refreshHistory,
+  refreshRelatedDialogHistory,
   questionError,
 }: {
   itemId: number;
   initialQuestions: ItemQuestionExchange[];
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
-  refreshHistory: boolean;
+  refreshRelatedDialogHistory: boolean;
   questionError: string;
 }): {
   showQuestionsModal: boolean;
@@ -48,7 +48,7 @@ export function useItemQuestions({
   }, [itemId]);
 
   useEffect(() => {
-    if (!refreshHistory) return;
+    if (!showQuestionsModal && !refreshRelatedDialogHistory) return;
     let cancelled = false;
     const loadLatestHistory = async (): Promise<void> => {
       try {
@@ -60,7 +60,7 @@ export function useItemQuestions({
     };
     void loadLatestHistory();
     return () => { cancelled = true; };
-  }, [itemId, sourceLanguage, targetLanguage, refreshHistory]);
+  }, [itemId, sourceLanguage, targetLanguage, showQuestionsModal, refreshRelatedDialogHistory]);
 
   const askItemQuestion = async (questionText: string): Promise<void> => {
     if (askingQuestion || !questionText.trim()) return;

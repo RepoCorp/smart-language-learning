@@ -25,7 +25,7 @@ export type PhraseGrammarFeatureKey = (typeof PHRASE_GRAMMAR_FEATURE_KEYS)[numbe
 export type PhraseGrammarFeatureState = {
   isOpen: boolean;
   error: string;
-  examples: Array<{ target_text: string; source_text: string }>;
+  examples: Array<{ target_text: string; source_text: string; audio_url: string }>;
   isLoadingExamples: boolean;
 };
 

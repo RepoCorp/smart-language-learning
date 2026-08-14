@@ -132,4 +132,13 @@ export type ItemStrategiesModalProps = {
   };
   phraseGrammarStrategy: PhraseGrammarStrategy;
   onAskAboutPhraseGrammarRule: (question: string) => void;
+  phraseGrammarLoop: {
+    secondsLeft: number;
+    isRunning: boolean;
+    isMuted: boolean;
+    canStart: boolean;
+    onStart: (playback?: string[] | { lines?: string[]; audioSources?: string[] }) => void;
+    onStop: () => void;
+    onToggleMute: () => void;
+  };
 };
