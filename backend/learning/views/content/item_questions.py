@@ -31,6 +31,7 @@ def _call_openai_json_logged(
     temperature: float = 0.2,
     top_p: float = 1.0,
     presence_penalty: float = 0.0,
+    json_mode: bool = False,
 ) -> dict | None:
     logger.info(
         "content.item_questions.model.request label=%s model=%s system_prompt=%s user_input=%s",
@@ -47,6 +48,7 @@ def _call_openai_json_logged(
         temperature=temperature,
         top_p=top_p,
         presence_penalty=presence_penalty,
+        json_mode=json_mode,
     )
     logger.info("content.item_questions.model.response label=%s parsed=%s", label, parsed)
     return parsed
@@ -159,6 +161,7 @@ def _call_question_decision_model(
         temperature=0.0,
         top_p=1.0,
         presence_penalty=0.0,
+        json_mode=True,
     )
 
 

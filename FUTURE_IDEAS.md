@@ -14,8 +14,6 @@ Ningun otro arreglito que no sea vital!!!
   - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
 - Palabras en general: Añadir tambien a las reglas cosas como conjugacion, caso, genero... para que detecte errores en la conversacion
 - Frases: 
-  - Que en los ejemplos escoja las frases mas cortas posibles.
-- Añadir mas grammar features. Agruparlas si el model empieza  a tener problemas con ellas y la interfaz es muy complicada.
 - De las conversaciones saca errores. Los muestra y sugiere repasarlo. Que sea bien empatico 😂
 - Que en el ejercicio de bloques detecte el tipo de error
 - Añadir mucha más Metadata a las palabras (desde la gramática) y usarla en ejercicios
@@ -30,6 +28,7 @@ En dialogos de palabras está cogiendo tambien palabras que significan lo mismo 
 
 
 ### Tier 1
+Que un modelo tambien sirva de manual de usuario, y pueda ir dando instrucciones empezando con la forma mas simple de usar la aplicacion
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?

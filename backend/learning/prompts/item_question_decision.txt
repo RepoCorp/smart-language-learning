@@ -9,6 +9,8 @@ Return strict JSON:
   "reason": "string"
 }}
 
+Use standard JSON string delimiters ("), never typographic quotes such as « or ».
+
 Rules:
 - If question is related to learning/using/understanding this item, set:
   related=true, result_code="RELATED_OK", and provide concise answer (3 to 6 short lines, A1-A2), reason="".
