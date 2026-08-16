@@ -1,0 +1,26 @@
+export const authMessages = {
+  en: {
+    "auth.pinSetupTitle": "Create your PIN",
+    "auth.pinSetupDescription": "Choose a PIN to secure your Smart Learn account.",
+    "auth.pinSetupPin": "New PIN",
+    "auth.pinSetupConfirm": "Confirm PIN",
+    "auth.pinSetupSubmit": "Create PIN",
+    "auth.pinSetupSubmitting": "Creating PIN...",
+    "auth.pinSetupMissingToken": "This PIN setup link is incomplete.",
+    "auth.pinSetupMismatch": "The PINs do not match.",
+    "auth.pinSetupMinLength": "Use at least 4 characters.",
+    "auth.pinSetupFailed": "This PIN setup link could not be used.",
+  },
+  es: {
+    "auth.pinSetupTitle": "Crea tu PIN",
+    "auth.pinSetupDescription": "Elige un PIN para proteger tu cuenta de Smart Learn.",
+    "auth.pinSetupPin": "PIN nuevo",
+    "auth.pinSetupConfirm": "Confirma el PIN",
+    "auth.pinSetupSubmit": "Crear PIN",
+    "auth.pinSetupSubmitting": "Creando PIN...",
+    "auth.pinSetupMissingToken": "Este enlace para crear el PIN está incompleto.",
+    "auth.pinSetupMismatch": "Los PIN no coinciden.",
+    "auth.pinSetupMinLength": "Usa al menos 4 caracteres.",
+    "auth.pinSetupFailed": "No se pudo usar este enlace para crear el PIN.",
+  },
+} as const;

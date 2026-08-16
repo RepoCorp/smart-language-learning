@@ -4,12 +4,12 @@ import {
   fetchAuthBootstrapStatus,
   loginWithPin,
   submitRegistrationRequest,
-  type AuthUser,
+  type AuthSession,
 } from "../authApi";
 import { useI18n } from "../i18n";
 
 interface AuthLandingProps {
-  onAuthenticated: (user: AuthUser) => void;
+  onAuthenticated: (session: AuthSession) => void;
 }
 
 export default function AuthLanding({ onAuthenticated }: AuthLandingProps): JSX.Element {
@@ -48,8 +48,7 @@ export default function AuthLanding({ onAuthenticated }: AuthLandingProps): JSX.
     setAuthError("");
     setAuthBusy(true);
     try {
-      const user = await loginWithPin(identifier, pin);
-      onAuthenticated(user);
+      onAuthenticated(await loginWithPin(identifier, pin));
       setPin("");
       setShowRegister(false);
     } catch {

@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
-import { getStoredAuthUser, logoutFromPinSession, type AuthUser } from "./authApi";
+import {
+  completeGettingStarted,
+  getStoredAuthUser,
+  logoutFromPinSession,
+  type AuthSession,
+  type AuthUser,
+} from "./authApi";
 import AuthLanding from "./components/AuthLanding";
 import ConfigurationsPage from "./components/ConfigurationsPage";
+import GettingStartedGuideModal from "./components/GettingStartedGuideModal";
+import PinSetupPage from "./components/PinSetupPage";
 import ContentCreatePage from "./components/ContentCreatePage";
 import ContentManagePage from "./components/ContentManagePage";
 import DialogsPage from "./components/DialogsPage";
@@ -20,6 +28,7 @@ export default function App(): JSX.Element {
   const navigate = useNavigate();
   const [authUser, setAuthUser] = useState<AuthUser | null>(() => getStoredAuthUser());
   const [authBusy, setAuthBusy] = useState(false);
+  const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [showPageMenu, setShowPageMenu] = useState(false);
   const pageMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -61,6 +70,16 @@ export default function App(): JSX.Element {
     }
   };
 
+  const handleAuthenticated = (session: AuthSession): void => {
+    setAuthUser(session.user);
+    setShowGettingStarted(session.show_getting_started);
+  };
+
+  const closeGettingStarted = (): void => {
+    setShowGettingStarted(false);
+    void completeGettingStarted();
+  };
+
   const pageOptions = [
     { path: "/session", label: "Session" },
     { path: "/dialogs", label: "Dialogs" },
@@ -76,7 +95,8 @@ export default function App(): JSX.Element {
 
   return (
     <>
-      {!authUser ? <AuthLanding onAuthenticated={setAuthUser} /> : null}
+      {!authUser && location.pathname === "/set-pin" ? <PinSetupPage onAuthenticated={handleAuthenticated} /> : null}
+      {!authUser && location.pathname !== "/set-pin" ? <AuthLanding onAuthenticated={handleAuthenticated} /> : null}
       {authUser ? (
         <>
           <OverviewStatsBar
@@ -158,6 +178,7 @@ export default function App(): JSX.Element {
             <Route path="*" element={<Navigate to="/session" replace />} />
           </Routes>
           <GlobalSessionEndPrompt />
+          <GettingStartedGuideModal open={showGettingStarted} onClose={closeGettingStarted} />
           {authUser.is_superuser && <DebugToolsPanel />}
         </>
       ) : null}

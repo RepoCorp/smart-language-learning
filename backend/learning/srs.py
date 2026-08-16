@@ -7,7 +7,7 @@ from .models import Item
 from .review_schedule import next_review_at
 
 MIN_INTERVAL_DAYS = 1
-MAX_INTERVAL_DAYS = 180
+MAX_INTERVAL_DAYS = 360
 
 
 def apply_review_result(item: Item, correct: bool, direction: str | None = None) -> Item:

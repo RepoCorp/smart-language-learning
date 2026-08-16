@@ -55,17 +55,10 @@ from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
 from .session_state import RestoreSessionItemStateView
-from .auth import (
-    AuthAdminCreateUserView,
-    AuthBootstrapStatusView,
-    AuthLoginView,
-    AuthLogoutView,
-    AuthMeView,
-    AuthRegistrationRequestsView,
-    AuthRegisterView,
-    AuthResetPinView,
-    AuthUsersView,
-)
+from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
+from .auth_admin import AuthAdminCreateUserView, AuthRegistrationRequestsView, AuthResetPinView, AuthUsersView
+from .auth_onboarding import AuthGettingStartedCompleteView
+from .auth_pin_setup import AuthPinSetupView
 from .difficult_items import CompleteDifficultItemView
 from .grammar_pool import PhraseGrammarPoolView
 from .configuration import ElevenLabsVoiceDisableView, ElevenLabsVoicePreviewView, ElevenLabsVoicesView
@@ -139,6 +132,8 @@ __all__ = [
     "AuthResetPinView",
     "AuthBootstrapStatusView",
     "AuthUsersView",
+    "AuthPinSetupView",
+    "AuthGettingStartedCompleteView",
     "ElevenLabsVoicesView",
     "ElevenLabsVoiceDisableView",
     "ElevenLabsVoicePreviewView",

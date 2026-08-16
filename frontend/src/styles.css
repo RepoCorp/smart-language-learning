@@ -936,6 +936,18 @@ body {
   margin-top: 8px;
 }
 
+.pin-setup-link {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+}
+
+.pin-setup-link input {
+  font-size: 0.82rem;
+}
+
 .prompt {
   font-weight: 600;
   margin-bottom: 12px;
@@ -3303,6 +3315,12 @@ textarea {
   font-style: italic;
 }
 
+.getting-started-reopen {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+}
+
 
 .conversation-review-corrected {
   margin: 4px 0 0 0;
@@ -5433,6 +5451,26 @@ button.verb-exercise-entry:disabled {
   max-width: 1180px;
   margin: 0 auto;
   padding: 48px 24px 64px;
+}
+
+.pin-setup-page {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.pin-setup-card {
+  width: min(420px, 100%);
+}
+
+.pin-setup-card label {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .auth-landing-hero {

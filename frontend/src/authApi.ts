@@ -10,6 +10,16 @@ export type AuthUser = {
   is_superuser: boolean;
 };
 
+export type AuthSession = {
+  user: AuthUser;
+  show_getting_started: boolean;
+};
+
+export type CreatedUserWithPinSetup = {
+  user: AuthUser;
+  pin_setup_token: string;
+};
+
 export type RegistrationRequestRecord = {
   id: number;
   username: string;
@@ -67,7 +77,7 @@ function clearStoredAuthSession(): void {
   window.localStorage.removeItem(AUTH_USER_KEY);
 }
 
-export async function loginWithPin(identifier: string, pin: string): Promise<AuthUser> {
+export async function loginWithPin(identifier: string, pin: string): Promise<AuthSession> {
   const response = await apiFetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -76,10 +86,38 @@ export async function loginWithPin(identifier: string, pin: string): Promise<Aut
   if (!response.ok) {
     throw new Error("Invalid credentials");
   }
-  const payload = (await response.json()) as { token: string; user: AuthUser };
+  const payload = (await response.json()) as { token: string; user: AuthUser; show_getting_started?: boolean };
   storeAuthSession(payload.token, payload.user);
   notifyOverviewStatsUpdated();
-  return payload.user;
+  return { user: payload.user, show_getting_started: Boolean(payload.show_getting_started) };
+}
+
+export async function completePinSetup(token: string, pin: string): Promise<AuthSession> {
+  const response = await apiFetch(`${API_BASE}/auth/pin-setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, pin }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to create PIN";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Keep default detail when error body is not JSON.
+    }
+    throw new Error(detail);
+  }
+  const payload = (await response.json()) as { token: string; user: AuthUser; show_getting_started?: boolean };
+  storeAuthSession(payload.token, payload.user);
+  notifyOverviewStatsUpdated();
+  return { user: payload.user, show_getting_started: Boolean(payload.show_getting_started) };
+}
+
+export async function completeGettingStarted(): Promise<void> {
+  await apiFetch(`${API_BASE}/auth/getting-started/complete`, { method: "POST" });
 }
 
 export async function submitRegistrationRequest(username: string, email: string): Promise<string> {
@@ -104,11 +142,11 @@ export async function submitRegistrationRequest(username: string, email: string)
   return payload.message;
 }
 
-export async function createUserWithPin(username: string, email: string, pin: string): Promise<AuthUser> {
+export async function createUserWithPinSetup(username: string, email: string): Promise<CreatedUserWithPinSetup> {
   const response = await apiFetch(`${API_BASE}/auth/admin-create`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, email, pin }),
+    body: JSON.stringify({ username, email }),
   });
   if (!response.ok) {
     let detail = "Failed to create user";
@@ -122,8 +160,7 @@ export async function createUserWithPin(username: string, email: string, pin: st
     }
     throw new Error(detail);
   }
-  const payload = (await response.json()) as { user: AuthUser };
-  return payload.user;
+  return (await response.json()) as CreatedUserWithPinSetup;
 }
 
 export async function resetUserPin(identifier: string, pin: string): Promise<AuthUser> {

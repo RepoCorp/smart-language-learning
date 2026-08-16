@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import {
-  createUserWithPin,
+  createUserWithPinSetup,
   fetchRegistrationRequests,
   fetchRegisteredUsers,
   type RegistrationRequestRecord,
@@ -23,7 +23,7 @@ export default function ConfigurationAdminUsersSection({
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [pin, setPin] = useState("");
+  const [pinSetupLink, setPinSetupLink] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
@@ -78,11 +78,11 @@ export default function ConfigurationAdminUsersSection({
     setCreateSuccess("");
     setCreating(true);
     try {
-      const user = await createUserWithPin(username, email, pin);
-      setCreateSuccess(t("config.userCreated", { username: user.username }));
+      const created = await createUserWithPinSetup(username, email);
+      setCreateSuccess(t("config.userCreated", { username: created.user.username }));
+      setPinSetupLink(`${window.location.origin}/set-pin?token=${encodeURIComponent(created.pin_setup_token)}`);
       setUsername("");
       setEmail("");
-      setPin("");
       void loadAdminData();
     } catch (error) {
       const message = error instanceof Error ? error.message : t("config.createUserFailed");
@@ -196,16 +196,6 @@ export default function ConfigurationAdminUsersSection({
               required
             />
           </label>
-          <label className="settings-field">
-            {t("config.pin")}
-            <input
-              type="password"
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-              autoComplete="new-password"
-              required
-            />
-          </label>
           <div className="actions">
             <button type="submit" disabled={creating}>
               {creating ? t("config.creatingUser") : t("config.createUser")}
@@ -213,6 +203,12 @@ export default function ConfigurationAdminUsersSection({
           </div>
           {createError ? <p className="error">{createError}</p> : null}
           {createSuccess ? <p className="hint">{createSuccess}</p> : null}
+          {pinSetupLink ? (
+            <div className="pin-setup-link">
+              <span>{t("config.pinSetupLink")}</span>
+              <input type="text" value={pinSetupLink} readOnly aria-label={t("config.pinSetupLink")} />
+            </div>
+          ) : null}
         </form>
       </section>
       <section className="card settings-card">

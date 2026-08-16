@@ -8,6 +8,7 @@ import {
 
 import { studyLanguageMessages } from "./i18nStudyLanguages";
 import { configurationMessages } from "./i18nConfig";
+import { authMessages } from "./i18nAuth";
 
 export type AppLanguage = "en" | "es";
 
@@ -26,6 +27,7 @@ const messages = {
     "study.target": "To",
     ...studyLanguageMessages.en,
     ...configurationMessages.en,
+    ...authMessages.en,
     "stats.ready": "Ready to review: {count}",
     "stats.future": "Future reviews: {count}",
     "stats.words": "Words: {count}",
@@ -833,6 +835,7 @@ const messages = {
     "lang.spanish": "Español",
     "lang.label": "Idioma de la app",
     ...configurationMessages.es,
+    ...authMessages.es,
     "study.label": "Par de estudio",
     "study.source": "De",
     "study.target": "A",

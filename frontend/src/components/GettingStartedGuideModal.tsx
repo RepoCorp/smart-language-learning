@@ -34,6 +34,7 @@ export default function GettingStartedGuideModal({ open, onClose }: Props): JSX.
           ))}
         </ol>
         <p className="getting-started-note">{t("config.gettingStartedNote")}</p>
+        <p className="getting-started-reopen">{t("config.gettingStartedReopen")}</p>
       </section>
     </div>
   );

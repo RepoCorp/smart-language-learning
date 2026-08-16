@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from ..auth import get_request_user
 from ..models import RegistrationRequest, UserAuthToken
+from .auth_onboarding import should_show_getting_started
 
 
 class AuthLoginView(APIView):
@@ -39,6 +40,7 @@ class AuthLoginView(APIView):
                     "email": user.email,
                     "is_superuser": bool(user.is_superuser),
                 },
+                "show_getting_started": should_show_getting_started(user),
             }
         )
 
@@ -71,77 +73,6 @@ class AuthRegisterView(APIView):
                 "message": "Registration request submitted",
             },
             status=status.HTTP_201_CREATED,
-        )
-
-
-class AuthAdminCreateUserView(APIView):
-    def post(self, request: Request) -> Response:
-        request_user = get_request_user(request)
-        if request_user is None or not request_user.is_superuser:
-            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
-
-        username = str(request.data.get("username", "")).strip()
-        email = str(request.data.get("email", "")).strip().lower()
-        pin = str(request.data.get("pin", "")).strip()
-        if not username or not email or not pin:
-            return Response({"detail": "username, email and pin are required"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(pin) < 4:
-            return Response({"detail": "pin must have at least 4 characters"}, status=status.HTTP_400_BAD_REQUEST)
-
-        User = get_user_model()
-        if User.objects.filter(username__iexact=username).exists():
-            return Response({"detail": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
-        if User.objects.filter(email__iexact=email).exists():
-            return Response({"detail": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = User.objects.create_user(username=username, email=email, password=pin)
-        RegistrationRequest.objects.filter(username__iexact=username).delete()
-        RegistrationRequest.objects.filter(email__iexact=email).delete()
-        return Response(
-            {
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    "is_superuser": bool(user.is_superuser),
-                },
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class AuthResetPinView(APIView):
-    def post(self, request: Request) -> Response:
-        request_user = get_request_user(request)
-        if request_user is None or not request_user.is_superuser:
-            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
-
-        identifier = str(request.data.get("identifier", "")).strip()
-        pin = str(request.data.get("pin", "")).strip()
-        if not identifier or not pin:
-            return Response({"detail": "identifier and pin are required"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(pin) < 4:
-            return Response({"detail": "pin must have at least 4 characters"}, status=status.HTTP_400_BAD_REQUEST)
-
-        User = get_user_model()
-        user = (
-            User.objects.filter(username__iexact=identifier).first()
-            or User.objects.filter(email__iexact=identifier).first()
-        )
-        if user is None:
-            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        user.set_password(pin)
-        user.save(update_fields=["password"])
-        return Response(
-            {
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    "is_superuser": bool(user.is_superuser),
-                },
-            }
         )
 
 
@@ -178,29 +109,3 @@ class AuthMeView(APIView):
 class AuthBootstrapStatusView(APIView):
     def get(self, request: Request) -> Response:
         return Response({"can_public_register": True})
-
-
-class AuthUsersView(APIView):
-    def get(self, request: Request) -> Response:
-        request_user = get_request_user(request)
-        if request_user is None or not request_user.is_superuser:
-            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
-
-        User = get_user_model()
-        users = User.objects.order_by("username", "id").values("id", "username", "email", "is_superuser")
-        return Response({"users": list(users)})
-
-
-class AuthRegistrationRequestsView(APIView):
-    def get(self, request: Request) -> Response:
-        request_user = get_request_user(request)
-        if request_user is None or not request_user.is_superuser:
-            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
-
-        requests = RegistrationRequest.objects.order_by("-created_at", "-id").values(
-            "id",
-            "username",
-            "email",
-            "created_at",
-        )
-        return Response({"requests": list(requests)})
