@@ -8,6 +8,9 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
+from ...ai_usage import reserve_ai_usage, settle_ai_usage
+from ...models import DailyAIUsage
+
 from ...languages import language_display_name
 from ...models import Item
 from ...prompts import STRATEGY_VISUALIZE_IMAGE_PROMPT, STRATEGY_VISUALIZE_PHRASE_PROMPT
@@ -73,10 +76,18 @@ def _call_openai_text_logged(
         },
         method="POST",
     )
+    reservation = reserve_ai_usage(
+        provider="openai",
+        category=DailyAIUsage.Category.TEXT,
+        units=1,
+        model=model_name,
+        feature="visualize-prompt",
+    )
     try:
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        settle_ai_usage(reservation, failed=True)
         logger.warning(
             "content.visualize.text.request_failed label=%s model=%s error=%s",
             label,
@@ -84,6 +95,13 @@ def _call_openai_text_logged(
             repr(exc),
         )
         return ""
+    usage = payload.get("usage") if isinstance(payload, dict) else {}
+    usage = usage if isinstance(usage, dict) else {}
+    settle_ai_usage(
+        reservation,
+        input_tokens=int(usage.get("prompt_tokens", 0) or 0),
+        output_tokens=int(usage.get("completion_tokens", 0) or 0),
+    )
     logger.info(
         "content.visualize.text.raw_response label=%s model=%s payload=%s",
         label,

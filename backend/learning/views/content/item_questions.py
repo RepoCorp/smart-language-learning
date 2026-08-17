@@ -113,8 +113,8 @@ def _question_model_user_input(
             "Explain the grammar feature at the learner's level.\n"
             "Start with the simplest general rule, then show exactly where the pattern appears "
             "in the given sentence.\n"
-            "If the sentence is a complex example of a simple rule, first give a very short "
-            "canonical example of the same pattern, then compare it with the given sentence.\n"
+            "Do not provide any additional examples of this rule. Explain only how the rule applies "
+            "to the study sentence.\n"
             "Avoid introducing additional grammatical terminology unless it is necessary to "
             "understand the pattern.\n"
         )

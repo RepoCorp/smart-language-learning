@@ -3,6 +3,7 @@ from .management_topic_conversation_start import (
     ContentTopicConversationRealtimeSessionView,
     ContentTopicConversationStartView,
 )
+from .management_topic_conversation_realtime_usage import ContentTopicConversationRealtimeUsageView
 from .management_topic_conversation_goal import ContentTopicConversationGoalEvaluationView, ContentTopicConversationGoalRegenerateView
 from .management_topic_conversation_turns import (
     ContentTopicConversationHelpView,
@@ -16,6 +17,7 @@ __all__ = [
     "ContentTopicConversationGoalEvaluationView",
     "ContentTopicConversationGoalRegenerateView",
     "ContentTopicConversationRealtimeSessionView",
+    "ContentTopicConversationRealtimeUsageView",
     "ContentTopicConversationReviewView",
     "ContentTopicConversationStartView",
     "ContentTopicConversationTurnView",

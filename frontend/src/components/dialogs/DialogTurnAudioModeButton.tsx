@@ -10,8 +10,7 @@ export default function DialogTurnAudioModeButton({
   onToggle: () => void;
 }): JSX.Element {
   const { t } = useI18n();
-  const useClearReplay = mode === "natural";
-  const label = useClearReplay ? t("dialogs.turnAudioUseClear") : t("dialogs.turnAudioUseNatural");
+  const label = mode === "natural" ? t("dialogs.turnAudioNaturalSelected") : t("dialogs.turnAudioClearSelected");
 
   return (
     <button

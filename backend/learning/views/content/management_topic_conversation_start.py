@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import time
-from urllib.error import HTTPError, URLError
-from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
+from ...ai_usage import realtime_seconds_remaining
 from ...auth import get_request_user
 from .management import APIView, Request, Response, status
 from .conversation_goal_phase import conversation_phase_instruction as build_realtime_phase_instruction
@@ -18,100 +15,10 @@ from .management_topic_conversation_shared import (
     validate_conversation_start_payload,
 )
 from .realtime_conversation_instructions import build_realtime_conversation_instructions
+from .realtime_client_secret import create_realtime_client_secret
 from .topic_pool import resolve_topic_choice
 
 logger = logging.getLogger(__name__)
-
-
-def build_realtime_safety_identifier(request: Request) -> str:
-    user = get_request_user(request)
-    if user is None:
-        return "anonymous"
-    raw_identifier = f"user:{getattr(user, 'id', '')}:{getattr(user, 'username', '')}"
-    return hashlib.sha256(raw_identifier.encode("utf-8")).hexdigest()
-
-
-def create_realtime_client_secret(*, request: Request, instructions: str) -> dict[str, object]:
-    api_key = str(getattr(settings, "OPENAI_API_KEY", "")).strip()
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
-
-    model = str(getattr(settings, "OPENAI_REALTIME_MODEL", "gpt-realtime-2.1")).strip() or "gpt-realtime-2.1"
-    voice = str(getattr(settings, "OPENAI_REALTIME_VOICE", "marin")).strip() or "marin"
-    transcription_model = (
-        str(getattr(settings, "OPENAI_REALTIME_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")).strip()
-        or "gpt-4o-mini-transcribe"
-    )
-    payload = {
-        "session": {
-            "type": "realtime",
-            "model": model,
-            "instructions": instructions,
-            "audio": {
-                "input": {"transcription": {"model": transcription_model}},
-                "output": {"voice": voice},
-            },
-        }
-    }
-    logger.info(
-        "content.topic_conversation.realtime_client_secret_started model=%s voice=%s transcription_model=%s instructions_length=%s",
-        model,
-        voice,
-        transcription_model,
-        len(instructions),
-    )
-    body = json.dumps(payload).encode("utf-8")
-    url_request = UrlRequest(
-        "https://api.openai.com/v1/realtime/client_secrets",
-        data=body,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "OpenAI-Safety-Identifier": build_realtime_safety_identifier(request),
-        },
-        method="POST",
-    )
-    timeout_seconds = int(getattr(settings, "OPENAI_REQUEST_TIMEOUT_SECONDS", 30))
-    started_at = time.perf_counter()
-    try:
-        with urlopen(url_request, timeout=timeout_seconds) as response:
-            response_payload = json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        response_body = ""
-        response_detail = ""
-        try:
-            response_body = exc.read().decode("utf-8", errors="replace")
-            parsed_body = json.loads(response_body)
-            response_detail = str(parsed_body.get("error", {}).get("message", "")).strip()
-        except Exception:
-            response_body = ""
-            response_detail = ""
-        logger.warning(
-            "content.topic_conversation.realtime_client_secret_failed error_class=%s status=%s elapsed_ms=%s body=%s",
-            exc.__class__.__name__,
-            getattr(exc, "code", ""),
-            int((time.perf_counter() - started_at) * 1000),
-            response_body[:1000],
-        )
-        error_message = "Could not create Realtime session"
-        if response_detail:
-            error_message = f"{error_message}: {response_detail}"
-        raise RuntimeError(error_message) from exc
-    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
-        logger.warning(
-            "content.topic_conversation.realtime_client_secret_failed error_class=%s elapsed_ms=%s",
-            exc.__class__.__name__,
-            int((time.perf_counter() - started_at) * 1000),
-        )
-        raise RuntimeError("Could not create Realtime session") from exc
-
-    logger.info(
-        "content.topic_conversation.realtime_client_secret_succeeded model=%s voice=%s elapsed_ms=%s",
-        model,
-        voice,
-        int((time.perf_counter() - started_at) * 1000),
-    )
-    return response_payload
 
 
 class ContentTopicConversationStartView(APIView):
@@ -287,5 +194,6 @@ class ContentTopicConversationRealtimeSessionView(APIView):
                     or "gpt-4o-mini-transcribe"
                 ),
                 "instructions": realtime_instructions,
+                "realtime_remaining_seconds": realtime_seconds_remaining(get_request_user(request)),
             }
         )

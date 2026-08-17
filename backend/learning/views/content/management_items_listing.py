@@ -29,7 +29,8 @@ from .exercise_payloads import MAX_EXERCISE_PHRASES, sanitize_exercise_payload
 from .exercise_persistence import merge_item_exercise_phrases, replace_forms_exercise_payload
 from .item_compare_payloads import compare_words_payload
 from ...item_states import filter_new_items, is_new_item
-from ...models import DialogTurn, Item, ItemDialogOccurrence
+from ...models import DailyAIUsage, DialogTurn, Item, ItemDialogOccurrence
+from ...ai_usage import reserve_ai_usage, settle_ai_usage
 from .core import (
     generate_funny_image_exercise_phrase_with_chatgpt,
     generate_word_exercise_phrases_with_chatgpt,
@@ -503,6 +504,13 @@ def _generate_openai_image(prompt: str) -> bytes | None:
         "n": 1,
     }
     attempt_started_at = time.perf_counter()
+    reservation = reserve_ai_usage(
+        provider="openai",
+        category=DailyAIUsage.Category.IMAGE,
+        units=1,
+        model=str(body["model"]),
+        feature="image-generation",
+    )
     request = UrlRequest(
         "https://api.openai.com/v1/images/generations",
         data=json.dumps(body).encode("utf-8"),
@@ -521,7 +529,9 @@ def _generate_openai_image(prompt: str) -> bytes | None:
                 body["size"],
                 round((time.perf_counter() - attempt_started_at) * 1000),
             )
+            settle_ai_usage(reservation)
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        settle_ai_usage(reservation, failed=True)
         error_details: dict[str, object] = {
             "error_class": exc.__class__.__name__,
             "model": body["model"],

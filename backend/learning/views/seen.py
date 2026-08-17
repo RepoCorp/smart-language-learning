@@ -24,5 +24,10 @@ class MarkSeenView(APIView):
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
         mark_item_seen(item)
-        record_completed_item(user, item, None)
-        return Response({"ok": True})
+        progress = record_completed_item(user, item, None)
+        new_items_completed = int(progress.get("new_items_completed_today", 0))
+        return Response({
+            "ok": True,
+            "new_items_completed_today": new_items_completed,
+            "show_new_items_celebration": bool(progress.get("new_item_added")) and new_items_completed % 5 == 0,
+        })

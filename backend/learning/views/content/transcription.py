@@ -9,6 +9,9 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
+from ...ai_usage import reserve_ai_usage, settle_ai_usage
+from ...models import DailyAIUsage
+
 logger = logging.getLogger(__name__)
 
 
@@ -106,10 +109,18 @@ def openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> st
         len(file_bytes),
         filename,
     )
+    reservation = reserve_ai_usage(
+        provider="openai",
+        category=DailyAIUsage.Category.TEXT,
+        units=1,
+        model=model_name,
+        feature="transcription",
+    )
     try:
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        settle_ai_usage(reservation, failed=True)
         logger.warning(
             "content.transcription.failed stage=request model=%s target_language=%s elapsed_ms=%s",
             model_name,
@@ -117,6 +128,7 @@ def openai_transcribe_audio_upload(uploaded_file, *, target_language: str) -> st
             int((time.perf_counter() - started_at) * 1000),
         )
         return ""
+    settle_ai_usage(reservation)
     text = str(payload.get("text", "")).strip()[:1000]
     logger.info(
         "content.transcription.finished model=%s target_language=%s elapsed_ms=%s transcript_length=%s",

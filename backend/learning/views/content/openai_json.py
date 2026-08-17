@@ -10,6 +10,9 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from django.conf import settings
 
+from ...ai_usage import reserve_ai_usage, settle_ai_usage
+from ...models import DailyAIUsage
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_TEMPERATURE = 1.0
@@ -64,12 +67,28 @@ def call_openai_json(
         method="POST",
     )
     opener = urlopen_fn or urlopen
+    reservation = reserve_ai_usage(
+        provider="openai",
+        category=DailyAIUsage.Category.TEXT,
+        units=1,
+        model=model_name,
+        feature="text-generation",
+    )
     try:
         with opener(request, timeout=effective_timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        settle_ai_usage(reservation, failed=True)
         _log_request_failure(call_id, model_name, exc)
         return None
+
+    usage = payload.get("usage") if isinstance(payload, dict) else {}
+    usage = usage if isinstance(usage, dict) else {}
+    settle_ai_usage(
+        reservation,
+        input_tokens=int(usage.get("prompt_tokens", 0) or 0),
+        output_tokens=int(usage.get("completion_tokens", 0) or 0),
+    )
 
     logger.info("content.generate.chatgpt.raw_response call_id=%s model=%s payload=%s", call_id, model_name, json.dumps(payload, ensure_ascii=False))
     try:

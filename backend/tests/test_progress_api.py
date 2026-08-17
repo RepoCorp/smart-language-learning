@@ -61,6 +61,26 @@ def test_progress_only_counts_reviews_for_the_active_language_pair():
 
 
 @pytest.mark.django_db
+def test_progress_excludes_difficult_items_deferred_until_tomorrow():
+    client, user = authenticated_client()
+    now = timezone.now()
+    Item.objects.create(
+        user=user,
+        item_type=Item.ItemType.WORD,
+        spanish_text="difícil",
+        german_text="schwierig",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+        is_difficult=True,
+        difficult_marked_at=now,
+    )
+
+    payload = client.get("/api/progress?source_language=spanish&target_language=german").json()
+
+    assert payload["due_reviews_remaining"] == 0
+
+
+@pytest.mark.django_db
 def test_progress_qualifies_when_five_completed_items_empty_the_daily_review_pool():
     client, user = authenticated_client()
     now = timezone.now()

@@ -2,15 +2,14 @@ import { FormEvent, useEffect, useState } from "react";
 
 import {
   createUserWithPinSetup,
+  deleteUserAccount,
   fetchRegistrationRequests,
   fetchRegisteredUsers,
   type RegistrationRequestRecord,
-  resetUserPin,
   type AuthUser,
 } from "../authApi";
 import { useI18n } from "../i18n";
-import { useStudyLanguages } from "../studyLanguages";
-import ConfigurationGrammarPoolSection from "./ConfigurationGrammarPoolSection";
+import ConfigurationAdminAIUsageSection from "./ConfigurationAdminAIUsageSection";
 
 interface ConfigurationAdminUsersSectionProps {
   canCreateUsers?: boolean;
@@ -20,24 +19,19 @@ export default function ConfigurationAdminUsersSection({
   canCreateUsers = false,
 }: ConfigurationAdminUsersSectionProps): JSX.Element | null {
   const { t } = useI18n();
-  const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [pinSetupLink, setPinSetupLink] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
-  const [resetIdentifier, setResetIdentifier] = useState("");
-  const [resetPin, setResetPin] = useState("");
-  const [resettingPin, setResettingPin] = useState(false);
-  const [resetPinError, setResetPinError] = useState("");
-  const [resetPinSuccess, setResetPinSuccess] = useState("");
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequestRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState("");
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [requestsError, setRequestsError] = useState("");
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
   const loadAdminData = async (): Promise<void> => {
     setLoadingUsers(true);
@@ -92,31 +86,25 @@ export default function ConfigurationAdminUsersSection({
     }
   };
 
-  const handleResetPin = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    setResetPinError("");
-    setResetPinSuccess("");
-    setResettingPin(true);
+  const handleDeleteUser = async (user: AuthUser): Promise<void> => {
+    if (!window.confirm(t("config.deleteUserConfirm", { username: user.username }))) {
+      return;
+    }
+    setDeletingUserId(user.id);
+    setUsersError("");
     try {
-      const user = await resetUserPin(resetIdentifier, resetPin);
-      setResetPinSuccess(t("config.resetPinSuccess", { username: user.username }));
-      setResetIdentifier("");
-      setResetPin("");
+      await deleteUserAccount(user.id);
+      await loadAdminData();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("config.resetPinFailed");
-      setResetPinError(message);
+      setUsersError(error instanceof Error ? error.message : t("config.deleteUserFailed"));
     } finally {
-      setResettingPin(false);
+      setDeletingUserId(null);
     }
   };
 
   return (
     <>
-      <ConfigurationGrammarPoolSection
-        canManage={canCreateUsers}
-        sourceLanguage={sourceLanguage}
-        targetLanguage={targetLanguage}
-      />
+      <ConfigurationAdminAIUsageSection canManage={canCreateUsers} />
       <section className="card settings-card">
         <h2 className="settings-title">{t("config.registrationRequestsTitle")}</h2>
         <p className="settings-subtitle">{t("config.registrationRequestsSubtitle")}</p>
@@ -166,6 +154,16 @@ export default function ConfigurationAdminUsersSection({
                 </div>
                 <div className="elevenlabs-voice-actions">
                   {user.is_superuser ? <span className="hint">{t("config.registeredUsersAdmin")}</span> : null}
+                  {!user.is_superuser ? (
+                    <button
+                      type="button"
+                      className="dangerous-button"
+                      disabled={deletingUserId === user.id}
+                      onClick={() => void handleDeleteUser(user)}
+                    >
+                      {deletingUserId === user.id ? t("config.deletingUser") : t("config.deleteUser")}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -209,39 +207,6 @@ export default function ConfigurationAdminUsersSection({
               <input type="text" value={pinSetupLink} readOnly aria-label={t("config.pinSetupLink")} />
             </div>
           ) : null}
-        </form>
-      </section>
-      <section className="card settings-card">
-        <h2 className="settings-title">{t("config.resetPinTitle")}</h2>
-        <p className="settings-subtitle">{t("config.resetPinSubtitle")}</p>
-        <form className="settings-create-user-form" onSubmit={handleResetPin}>
-          <label className="settings-field">
-            {t("config.userIdentifier")}
-            <input
-              type="text"
-              value={resetIdentifier}
-              onChange={(event) => setResetIdentifier(event.target.value)}
-              autoComplete="username"
-              required
-            />
-          </label>
-          <label className="settings-field">
-            {t("config.newPin")}
-            <input
-              type="password"
-              value={resetPin}
-              onChange={(event) => setResetPin(event.target.value)}
-              autoComplete="new-password"
-              required
-            />
-          </label>
-          <div className="actions">
-            <button type="submit" disabled={resettingPin}>
-              {resettingPin ? t("config.resettingPin") : t("config.resetPin")}
-            </button>
-          </div>
-          {resetPinError ? <p className="error">{resetPinError}</p> : null}
-          {resetPinSuccess ? <p className="hint">{resetPinSuccess}</p> : null}
         </form>
       </section>
     </>

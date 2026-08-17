@@ -1,6 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 const OVERVIEW_STATS_UPDATED_EVENT = "overview-stats-updated";
 const LEARNING_PROGRESS_UPDATED_EVENT = "learning-progress-updated";
+const AI_QUOTA_REACHED_EVENT = "ai-quota-reached";
 
 function apiRequestSummary(input: string, init?: RequestInit): { method: string; url: string } {
   return {
@@ -18,13 +19,25 @@ function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   }
   const request = apiRequestSummary(input, init);
   return fetch(input, { ...init, headers })
-    .then((response) => {
+    .then(async (response) => {
       if (!response.ok) {
         console.error("Backend request failed", {
           ...request,
           status: response.status,
           statusText: response.statusText,
         });
+      }
+      if (response.status === 429) {
+        try {
+          const payload = (await response.clone().json()) as { detail?: string };
+          window.dispatchEvent(new CustomEvent(AI_QUOTA_REACHED_EVENT, {
+            detail: payload.detail || "Your AI allowance has been reached. Please try again next week.",
+          }));
+        } catch {
+          window.dispatchEvent(new CustomEvent(AI_QUOTA_REACHED_EVENT, {
+            detail: "Your AI allowance has been reached. Please try again next week.",
+          }));
+        }
       }
       const contentType = response.headers.get("Content-Type") || "";
       if (response.ok && contentType.includes("text/html")) {
@@ -61,9 +74,14 @@ function getLearningProgressUpdatedEventName(): string {
   return LEARNING_PROGRESS_UPDATED_EVENT;
 }
 
+function getAIQuotaReachedEventName(): string {
+  return AI_QUOTA_REACHED_EVENT;
+}
+
 export {
   API_BASE,
   apiFetch,
+  getAIQuotaReachedEventName,
   getLearningProgressUpdatedEventName,
   getOverviewStatsUpdatedEventName,
   notifyLearningProgressUpdated,

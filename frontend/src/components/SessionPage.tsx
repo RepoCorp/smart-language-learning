@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
-import { completeDifficultItem, fetchContentItemDetail, fetchSession, markSeen, restoreSessionItemState, setContentItemLearned, submitReview } from "../api";
+import { completeDifficultItem, fetchContentItemDetail, fetchSession, restoreSessionItemState, setContentItemLearned, submitReview } from "../api";
+import { markSessionItemSeen } from "../apiSessionProgress";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
@@ -9,6 +10,7 @@ import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
 import PhraseReview from "./PhraseReview";
 import WordReview from "./WordReview";
+import { useNewItemCelebration } from "./useNewItemCelebration";
 import useSessionStudyActivity from "./useSessionStudyActivity";
 import {
   ACTIVE_SESSION_CHANGED_EVENT,
@@ -18,25 +20,10 @@ import {
   type StoredSessionState,
 } from "../features/session/sessionStorage";
 
-type DailyNewItemProgress = {
-  date: string;
-  count: number;
-};
-
-const DAILY_NEW_ITEM_CELEBRATION_INTERVAL = 5;
-
-function todayKey(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
 export default function SessionPage(): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const sessionStorageKey = activeSessionStorageKey(sourceLanguage, targetLanguage);
-  const dailyNewItemStorageKey = `daily_new_items_${sourceLanguage}_${targetLanguage}`;
   const [items, setItems] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -55,7 +42,11 @@ export default function SessionPage(): JSX.Element {
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
   const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
   const [openedItemError, setOpenedItemError] = useState<string>("");
-  const [showNewWordsCelebration, setShowNewWordsCelebration] = useState<boolean>(false);
+  const {
+    showNewItemCelebration,
+    registerConfirmedNewItem,
+    dismissNewItemCelebration,
+  } = useNewItemCelebration();
   const [resetCurrentResultError, setResetCurrentResultError] = useState<string>("");
   const [resettingCurrentResult, setResettingCurrentResult] = useState<boolean>(false);
   const [currentReviewResetVersion, setCurrentReviewResetVersion] = useState<number>(0);
@@ -319,31 +310,14 @@ export default function SessionPage(): JSX.Element {
       return;
     }
     try {
-      await markSeen(current.id);
+      const result = await markSessionItemSeen(current.id);
+      registerConfirmedNewItem(result);
     } catch (error) {
       if (isMissingItemError(error)) {
         handleMissingCurrentItem();
         return;
       }
       throw error;
-    }
-    if (current.mode === "new") {
-      const today = todayKey();
-      let currentProgress: DailyNewItemProgress = { date: today, count: 0 };
-      try {
-        const rawProgress = window.localStorage.getItem(dailyNewItemStorageKey);
-        const parsedProgress = rawProgress ? JSON.parse(rawProgress) as Partial<DailyNewItemProgress> : null;
-        if (parsedProgress?.date === today && typeof parsedProgress.count === "number") {
-          currentProgress = { date: today, count: parsedProgress.count };
-        }
-      } catch {
-        currentProgress = { date: today, count: 0 };
-      }
-      const nextProgress = { date: today, count: currentProgress.count + 1 };
-      window.localStorage.setItem(dailyNewItemStorageKey, JSON.stringify(nextProgress));
-      if (nextProgress.count > 0 && nextProgress.count % DAILY_NEW_ITEM_CELEBRATION_INTERVAL === 0) {
-        setShowNewWordsCelebration(true);
-      }
     }
     advance();
   };
@@ -455,7 +429,6 @@ export default function SessionPage(): JSX.Element {
     setError("");
     setResetCurrentResultError("");
     setSessionOutcome(null);
-    setShowNewWordsCelebration(false);
     setShowExtendPrompt(false);
     setRestoredSnapshotHasItems(false);
     setShowPostReviewItem(false);
@@ -479,7 +452,6 @@ export default function SessionPage(): JSX.Element {
     setCurrentReviewCorrect(null);
     setWaitingNext(false);
     setRestoredSnapshotHasItems(false);
-    setShowNewWordsCelebration(false);
     setResettingCurrentResult(false);
   };
 
@@ -507,7 +479,7 @@ export default function SessionPage(): JSX.Element {
       </div>
     </div>
   ) : null;
-  const newWordsCelebrationOverlay = showNewWordsCelebration ? (
+  const newWordsCelebrationOverlay = showNewItemCelebration ? (
     <div className="blocking-modal-overlay session-celebration-overlay" role="dialog" aria-modal="true">
       <section className="blocking-modal session-celebration-modal">
         <div className="session-celebration-burst" aria-hidden="true">
@@ -519,7 +491,7 @@ export default function SessionPage(): JSX.Element {
         <h2>{t("session.newWordsCelebrationTitle")}</h2>
         <p>{t("session.newWordsCelebrationMessage")}</p>
         <div className="actions">
-          <button type="button" onClick={() => setShowNewWordsCelebration(false)}>
+          <button type="button" onClick={dismissNewItemCelebration}>
             {t("session.newWordsCelebrationContinue")}
           </button>
         </div>
@@ -563,26 +535,29 @@ export default function SessionPage(): JSX.Element {
 
   if (sessionOutcome !== null) {
     return (
-      <main className="container">
-        <h1>{t("session.title")}</h1>
-        <section className="card">
-          {sessionOutcome === "time_up" ? (
-            <>
-              <p className="error">{t("session.timeUpTitle")}</p>
-              <p>{t("session.timeUpMessage")}</p>
-            </>
-          ) : (
-            <>
-              <p>{t("session.completedTitle")}</p>
-              <p>{t("session.completedMessage")}</p>
-            </>
-          )}
-          {resetCurrentResultError && <p className="error">{t("session.error", { message: resetCurrentResultError })}</p>}
-          <div className="actions">
-            <button onClick={resetToSessionStart}>{t("session.startAnother")}</button>
-          </div>
-        </section>
-      </main>
+      <>
+        <main className="container">
+          <h1>{t("session.title")}</h1>
+          <section className="card">
+            {sessionOutcome === "time_up" ? (
+              <>
+                <p className="error">{t("session.timeUpTitle")}</p>
+                <p>{t("session.timeUpMessage")}</p>
+              </>
+            ) : (
+              <>
+                <p>{t("session.completedTitle")}</p>
+                <p>{t("session.completedMessage")}</p>
+              </>
+            )}
+            {resetCurrentResultError && <p className="error">{t("session.error", { message: resetCurrentResultError })}</p>}
+            <div className="actions">
+              <button onClick={resetToSessionStart}>{t("session.startAnother")}</button>
+            </div>
+          </section>
+        </main>
+        {newWordsCelebrationOverlay}
+      </>
     );
   }
 

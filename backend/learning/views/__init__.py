@@ -38,6 +38,7 @@ from .content import (
     ContentTopicConversationStartView,
     ContentTopicConversationHelpView,
     ContentTopicConversationRealtimeSessionView,
+    ContentTopicConversationRealtimeUsageView,
     ContentTopicConversationReviewView,
     ContentTopicConversationTurnView,
     ContentTopicConversationUserCorrectionView,
@@ -56,7 +57,7 @@ from .seen import MarkSeenView
 from .session import SessionView
 from .session_state import RestoreSessionItemStateView
 from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
-from .auth_admin import AuthAdminCreateUserView, AuthRegistrationRequestsView, AuthResetPinView, AuthUsersView
+from .auth_admin import AuthAdminCreateUserView, AuthAIUsageLimitView, AuthAIUsageView, AuthDeleteUserView, AuthRegistrationRequestsView, AuthResetPinView, AuthUsersView
 from .auth_onboarding import AuthGettingStartedCompleteView
 from .auth_pin_setup import AuthPinSetupView
 from .difficult_items import CompleteDifficultItemView
@@ -103,6 +104,7 @@ __all__ = [
     "ContentTopicConversationStartView",
     "ContentTopicConversationHelpView",
     "ContentTopicConversationRealtimeSessionView",
+    "ContentTopicConversationRealtimeUsageView",
     "ContentTopicConversationReviewView",
     "ContentTopicConversationTurnView",
     "ContentTopicConversationUserCorrectionView",
@@ -127,6 +129,9 @@ __all__ = [
     "AuthLogoutView",
     "AuthMeView",
     "AuthAdminCreateUserView",
+    "AuthAIUsageView",
+    "AuthAIUsageLimitView",
+    "AuthDeleteUserView",
     "AuthRegisterView",
     "AuthRegistrationRequestsView",
     "AuthResetPinView",

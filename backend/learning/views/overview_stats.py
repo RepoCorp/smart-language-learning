@@ -8,6 +8,7 @@ from ..auth import apply_user_scope, get_request_user
 from ..item_states import filter_new_items
 from ..models import Item
 from ..review_schedule import local_day_bounds
+from ..review_availability import deferred_difficult_items_filter
 
 
 class OverviewStatsView(APIView):
@@ -49,6 +50,7 @@ class OverviewStatsView(APIView):
 
 def count_ready_reviews(now, *, user, source_language: str, target_language: str) -> int:
     _, tomorrow = local_day_bounds(now)
+    deferred_difficult_items = deferred_difficult_items_filter(now)
     return (
         apply_user_scope(Item.objects, user).filter(
             is_learned=False,
@@ -56,14 +58,14 @@ def count_ready_reviews(now, *, user, source_language: str, target_language: str
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=False,
             due_at_es_to_de__lt=tomorrow,
-        ).count()
+        ).exclude(deferred_difficult_items).count()
         + apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_de_to_es__isnull=False,
             due_at_de_to_es__lt=tomorrow,
-        ).count()
+        ).exclude(deferred_difficult_items).count()
     )
 
 

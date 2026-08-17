@@ -64,6 +64,24 @@ def test_overview_stats_counts_reviews_scheduled_later_today_as_ready():
 
 
 @pytest.mark.django_db
+def test_overview_stats_excludes_difficult_items_deferred_until_tomorrow():
+    now = timezone.now()
+    Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="difícil",
+        german_text="schwierig",
+        last_reviewed_at_es_to_de=now,
+        due_at_es_to_de=now,
+        is_difficult=True,
+        difficult_marked_at=now,
+    )
+
+    payload = APIClient().get("/api/overview-stats").json()
+
+    assert payload["ready_to_review"] == 0
+
+
+@pytest.mark.django_db
 def test_overview_stats_filters_by_language_pair():
     now = timezone.now()
 

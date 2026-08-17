@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.db.models import Q, Sum
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..auth import get_request_user
-from ..models import RegistrationRequest
+from ..models import DailyAIUsage, RegistrationRequest, UserAIUsageLimit
 from .auth_pin_setup import create_pin_setup_token
 
 
@@ -86,6 +90,24 @@ class AuthUsersView(APIView):
         return Response({"users": list(users)})
 
 
+class AuthDeleteUserView(APIView):
+    def post(self, request: Request) -> Response:
+        admin = _require_admin(request)
+        if admin is None:
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            user_id = int(request.data.get("user_id"))
+        except (TypeError, ValueError):
+            return Response({"detail": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if user_id == admin.id:
+            return Response({"detail": "You cannot delete your own account"}, status=status.HTTP_400_BAD_REQUEST)
+        user = get_user_model().objects.filter(id=user_id).first()
+        if user is None:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        user.delete()
+        return Response({"ok": True})
+
+
 class AuthRegistrationRequestsView(APIView):
     def get(self, request: Request) -> Response:
         if _require_admin(request) is None:
@@ -98,3 +120,66 @@ class AuthRegistrationRequestsView(APIView):
             "created_at",
         )
         return Response({"requests": list(requests)})
+
+
+class AuthAIUsageView(APIView):
+    def get(self, request: Request) -> Response:
+        if _require_admin(request) is None:
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+
+        today = timezone.localdate()
+        week_start = today - timedelta(days=today.weekday())
+        users = get_user_model().objects.order_by("username", "id")
+        usage_by_user = {
+            row["user_id"]: row
+            for row in DailyAIUsage.objects.filter(date__gte=week_start, date__lte=today)
+            .values("user_id")
+            .annotate(
+                generation_credits=Sum("quota_credits"),
+                realtime_seconds=Sum("usage_units", filter=Q(feature="realtime-session")),
+            )
+        }
+        limits = {limit.user_id: limit for limit in UserAIUsageLimit.objects.filter(user__in=users)}
+        return Response({
+            "week_start": week_start.isoformat(),
+            "defaults": {
+                "weekly_generation_credits": int(getattr(settings, "AI_USAGE_WEEKLY_GENERATION_CREDITS", 200)),
+                "weekly_realtime_minutes": int(getattr(settings, "AI_USAGE_WEEKLY_REALTIME_MINUTES", 45)),
+            },
+            "users": [
+                {
+                    **_user_payload(user),
+                    "is_blocked": bool(limits.get(user.id) and limits[user.id].is_blocked),
+                    "weekly_generation_credits": limits.get(user.id).weekly_generation_credits if user.id in limits else 0,
+                    "weekly_realtime_minutes": limits.get(user.id).weekly_realtime_minutes if user.id in limits else 0,
+                    "week_generation_credits": usage_by_user.get(user.id, {}).get("generation_credits") or 0,
+                    "week_realtime_minutes": (
+                        ((usage_by_user.get(user.id, {}).get("realtime_seconds") or 0) + 59) // 60
+                    ),
+                }
+                for user in users
+            ],
+        })
+
+
+class AuthAIUsageLimitView(APIView):
+    def post(self, request: Request) -> Response:
+        if _require_admin(request) is None:
+            return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            user_id = int(request.data.get("user_id"))
+        except (TypeError, ValueError):
+            return Response({"detail": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        user = get_user_model().objects.filter(id=user_id).first()
+        if user is None:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        limit, _ = UserAIUsageLimit.objects.get_or_create(user=user)
+        limit.is_blocked = bool(request.data.get("is_blocked", False))
+        for field in ("weekly_generation_credits", "weekly_realtime_minutes"):
+            try:
+                value = max(0, int(request.data.get(field, 0)))
+            except (TypeError, ValueError):
+                return Response({"detail": f"{field} must be a non-negative number"}, status=status.HTTP_400_BAD_REQUEST)
+            setattr(limit, field, value)
+        limit.save()
+        return Response({"ok": True})

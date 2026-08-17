@@ -32,6 +32,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "learning.ai_usage_middleware.AIUsageRequestContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -106,6 +107,8 @@ ELEVENLABS_OUTPUT_FORMAT = os.getenv("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128"
 ELEVENLABS_PCM_OUTPUT_FORMAT = os.getenv("ELEVENLABS_PCM_OUTPUT_FORMAT", "pcm_24000").strip()
 AUDIO_TTS_PROVIDER = os.getenv("AUDIO_TTS_PROVIDER", "openai").strip().lower()
 OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS = int(os.getenv("OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS", "120"))
+AI_USAGE_WEEKLY_GENERATION_CREDITS = int(os.getenv("AI_USAGE_WEEKLY_GENERATION_CREDITS", "200"))
+AI_USAGE_WEEKLY_REALTIME_MINUTES = int(os.getenv("AI_USAGE_WEEKLY_REALTIME_MINUTES", "45"))
 AUDIO_STORAGE_BACKEND = os.getenv("AUDIO_STORAGE_BACKEND", "local").strip().lower()
 AWS_S3_AUDIO_BUCKET = os.getenv("AWS_S3_AUDIO_BUCKET", "").strip()
 AWS_S3_AUDIO_PREFIX = os.getenv("AWS_S3_AUDIO_PREFIX", "audio").strip().strip("/")

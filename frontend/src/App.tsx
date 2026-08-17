@@ -9,6 +9,8 @@ import {
   type AuthUser,
 } from "./authApi";
 import AuthLanding from "./components/AuthLanding";
+import AdminPage from "./components/AdminPage";
+import AIQuotaNotice from "./components/AIQuotaNotice";
 import ConfigurationsPage from "./components/ConfigurationsPage";
 import GettingStartedGuideModal from "./components/GettingStartedGuideModal";
 import PinSetupPage from "./components/PinSetupPage";
@@ -172,12 +174,15 @@ export default function App(): JSX.Element {
                   authUser={authUser}
                   authBusy={authBusy}
                   onLogout={handleLogout}
+                  onOpenAdmin={() => navigate("/admin")}
                 />
               )}
             />
+            <Route path="/admin" element={authUser.is_superuser ? <AdminPage authUser={authUser} /> : <Navigate to="/configurations" replace />} />
             <Route path="*" element={<Navigate to="/session" replace />} />
           </Routes>
           <GlobalSessionEndPrompt />
+          <AIQuotaNotice />
           <GettingStartedGuideModal open={showGettingStarted} onClose={closeGettingStarted} />
           {authUser.is_superuser && <DebugToolsPanel />}
         </>

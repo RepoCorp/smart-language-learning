@@ -51,6 +51,7 @@ from .management_dialogs_listing import (
     ContentDialogTurnClearAudioView,
 )
 from .topics import ContentTopicContextsView, ContentTopicsView, save_topic
+from .management_topic_conversation_realtime_usage import ContentTopicConversationRealtimeUsageView
 
 __all__ = [
     "ContentConfirmView",
@@ -91,6 +92,7 @@ __all__ = [
     "ContentTopicConversationErrorExercisesView",
     "ContentTopicConversationHelpView",
     "ContentTopicConversationRealtimeSessionView",
+    "ContentTopicConversationRealtimeUsageView",
     "ContentTopicConversationReviewView",
     "ContentTopicConversationTurnView",
     "ContentTopicConversationUserCorrectionView",

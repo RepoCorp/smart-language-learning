@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 
-import { createTopicConversationRealtimeSession } from "../../api";
 import {
   CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS,
   CONVERSATION_MAX_RECORDING_MS,
 } from "./conversationConstants";
 import { buildRealtimeInstructions, buildRealtimeSessionUpdate } from "./conversationRealtimeInstructions";
+import { startRealtimeConversationSession } from "./realtimeSessionSetup";
+import { useRealtimeActiveAudioUsage } from "./useRealtimeActiveAudioUsage";
 import type {
   BaseConversationTransportArgs,
   ConversationPhase,
   ConversationResponseLevel,
   ConversationSpeechSpeed,
-  StartConversationTransportArgs,
 } from "./conversationTransportTypes";
-import { extractRealtimeText, logRealtime, type RealtimeServerEvent, warnRealtime } from "./conversationRealtimeSupport";
+import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
 export function useRealtimeConversationTransport({
   sourceLanguage,
   targetLanguage,
@@ -43,14 +43,6 @@ export function useRealtimeConversationTransport({
   const realtimePendingAssistantTextRef = useRef<string>("");
   const realtimeCompletedTurnRef = useRef<BaseConversationTransportArgs["onConversationTurn"] extends (response: infer T) => void ? T | null : null>(null);
   const realtimeAudioStoppedRef = useRef<boolean>(false);
-  const setupMetricsRef = useRef<{
-    sessionRequestMs: number;
-    microphoneMs: number;
-    offerMs: number;
-    localDescriptionMs: number;
-    sdpConnectMs: number;
-    remoteDescriptionMs: number;
-  } | null>(null);
   const timerRef = useRef<number | null>(null);
   const maxRecordingTimeoutRef = useRef<number | null>(null);
   const autoRestartAfterAssistantRef = useRef<boolean>(true);
@@ -58,6 +50,13 @@ export function useRealtimeConversationTransport({
   const baseInstructionsRef = useRef<string>("");
   const timedOutSubmissionRef = useRef<boolean>(false);
   const consecutiveTimeoutCountRef = useRef<number>(0);
+  const realtimeUsage = useRealtimeActiveAudioUsage({
+    onLimitReached: () => {
+      setConversationPaused(true);
+      onError("Your weekly live conversation minute limit has been reached. Please try again next week.");
+      closeRealtimeSession();
+    },
+  });
 
   const sendRealtimeSessionUpdate = (
     speed: ConversationSpeechSpeed,
@@ -105,6 +104,7 @@ export function useRealtimeConversationTransport({
   };
 
   const closeRealtimeSession = (): void => {
+    realtimeUsage.stopSession();
     activeSessionTokenRef.current += 1;
     dataChannelRef.current?.close();
     peerConnectionRef.current?.close();
@@ -171,6 +171,7 @@ export function useRealtimeConversationTransport({
     }
     logRealtime("push-to-talk-started");
     audioTrack.enabled = true;
+    realtimeUsage.setAudioActive(true);
     setConversationRecording(true);
     setConversationRecordingSeconds(0);
     timerRef.current = window.setInterval(() => {
@@ -198,6 +199,7 @@ export function useRealtimeConversationTransport({
     if (audioTrack) {
       audioTrack.enabled = false;
     }
+    realtimeUsage.setAudioActive(false);
     clearTimer();
     setConversationRecording(false);
     setConversationRecordingSeconds(0);
@@ -239,245 +241,20 @@ export function useRealtimeConversationTransport({
     onError("Realtime connection is not ready");
   };
 
-  const setupRealtimeConversation = async ({
-    topic,
-    notes,
-    roleText,
-    goalDifficulty,
-    goalText,
-  }: StartConversationTransportArgs): Promise<boolean> => {
-    const setupStartedAt = performance.now();
-    if (typeof window === "undefined" || typeof RTCPeerConnection === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      warnRealtime("unsupported");
-      return false;
-    }
-    setConversationRealtimeConnecting(true);
-    const sessionToken = activeSessionTokenRef.current + 1;
-    try {
-      logRealtime("setup-started", { topic, sourceLanguage, targetLanguage, goalDifficulty });
-      const session = await createTopicConversationRealtimeSession(
-        topic,
-        notes,
-        roleText,
-        goalDifficulty,
-        goalText,
-        conversationPhase,
-        sourceLanguage,
-        targetLanguage,
-      );
-      const sessionRequestMs = Math.round(performance.now() - setupStartedAt);
-      setupMetricsRef.current = {
-        sessionRequestMs,
-        microphoneMs: 0,
-        offerMs: 0,
-        localDescriptionMs: 0,
-        sdpConnectMs: 0,
-        remoteDescriptionMs: 0,
-      };
-      logRealtime("session-request-finished", {
-        elapsedMs: sessionRequestMs,
-      });
-      baseInstructionsRef.current = (session.instructions || "").trim();
-      logRealtime("session-response", {
-        realtimeEnabled: session.realtime_enabled,
-        hasClientSecret: Boolean(session.client_secret?.value),
-        voice: session.voice || "",
-        model: session.model || "",
-      });
-      const ephemeralKey = session.client_secret?.value?.trim() || "";
-      if (!session.realtime_enabled || !ephemeralKey) {
-        warnRealtime(!session.realtime_enabled ? "session-disabled" : "missing-client-secret");
-        return false;
-      }
-      closeRealtimeSession();
-      activeSessionTokenRef.current = sessionToken;
-      const peerConnection = new RTCPeerConnection();
-      const dataChannel = peerConnection.createDataChannel("oai-events");
-      const remoteAudio = document.createElement("audio");
-      remoteAudio.autoplay = true;
-      remoteAudio.setAttribute("playsinline", "true");
-      realtimeAudioRef.current = remoteAudio;
-      peerConnectionRef.current = peerConnection;
-      dataChannelRef.current = dataChannel;
-
-      peerConnection.ontrack = (event) => {
-        if (activeSessionTokenRef.current !== sessionToken) return;
-        remoteAudio.srcObject = event.streams[0];
-        logRealtime("remote-audio-track", { streamCount: event.streams.length });
-        void remoteAudio.play().catch(() => {});
-      };
-      peerConnection.addEventListener("connectionstatechange", () => logRealtime("peer-connection-state", { state: peerConnection.connectionState }));
-      peerConnection.addEventListener("iceconnectionstatechange", () => logRealtime("ice-connection-state", { state: peerConnection.iceConnectionState }));
-
-      dataChannel.addEventListener("open", () => {
-        if (activeSessionTokenRef.current !== sessionToken) return;
-        logRealtime("data-channel-open");
-        logRealtime("setup-finished", {
-          elapsedMs: Math.round(performance.now() - setupStartedAt),
-        });
-        logRealtime("setup-timing-summary", {
-          totalElapsedMs: Math.round(performance.now() - setupStartedAt),
-          sessionRequestMs: setupMetricsRef.current?.sessionRequestMs || 0,
-          microphoneMs: setupMetricsRef.current?.microphoneMs || 0,
-          offerMs: setupMetricsRef.current?.offerMs || 0,
-          localDescriptionMs: setupMetricsRef.current?.localDescriptionMs || 0,
-          sdpConnectMs: setupMetricsRef.current?.sdpConnectMs || 0,
-          remoteDescriptionMs: setupMetricsRef.current?.remoteDescriptionMs || 0,
-        });
-        sendRealtimeSessionUpdate(
-          speechSpeed,
-          responseLevel,
-          conversationPhase,
-          session.transcription_model || "gpt-4o-mini-transcribe",
-        );
-        setConversationRealtimeReady(true);
-        setConversationRealtimeVoice(session.voice || "");
-      });
-
-      dataChannel.addEventListener("message", (messageEvent) => {
-        if (activeSessionTokenRef.current !== sessionToken) return;
-        let event: RealtimeServerEvent;
-        try {
-          event = JSON.parse(messageEvent.data) as RealtimeServerEvent;
-        } catch {
-          warnRealtime("message-parse-failed");
-          return;
-        }
-        const eventType = String(event.type || "");
-        if (eventType) {
-          logRealtime("server-event", { type: eventType });
-        }
-        if (eventType === "response.created" || eventType === "output_audio_buffer.started") {
-          realtimeResponseActiveRef.current = true;
-          onAssistantSpeakingChange(true);
-        }
-        if (eventType === "response.done" || eventType === "response.output_audio.done") {
-          realtimeResponseActiveRef.current = false;
-        }
-        if (eventType === "output_audio_buffer.stopped") {
-          realtimeResponseActiveRef.current = false;
-          realtimeAudioStoppedRef.current = true;
-          onAssistantSpeakingChange(false);
-          flushCompletedTurn();
-        }
-        if (eventType === "conversation.item.input_audio_transcription.completed" || eventType === "conversation.item.input_audio_transcription.done") {
-          const transcript = (typeof event.transcript === "string" ? event.transcript : typeof event.item?.content?.[0]?.transcript === "string" ? event.item.content[0].transcript : "").trim();
-          realtimePendingUserTextRef.current = transcript;
-          return;
-        }
-        if (eventType === "response.output_audio_transcript.delta" && typeof event.delta === "string") {
-          realtimePendingAssistantTextRef.current += event.delta;
-          onPendingAssistantTextChange(realtimePendingAssistantTextRef.current);
-          return;
-        }
-        if (eventType === "response.output_audio_transcript.done") {
-          const assistantText = (typeof event.transcript === "string" ? event.transcript : "").trim();
-          if (assistantText) {
-            realtimePendingAssistantTextRef.current = assistantText;
-            onPendingAssistantTextChange(assistantText);
-          }
-          return;
-        }
-        if (eventType === "response.done") {
-          const assistantText = extractRealtimeText(event) || realtimePendingAssistantTextRef.current.trim();
-          realtimeCompletedTurnRef.current = {
-            user_text: realtimePendingUserTextRef.current.trim(),
-            user_translation_text: "",
-            user_corrected_text: "",
-            user_corrected_translation_text: "",
-            user_correction_explanation: "",
-            user_is_grammatically_correct: true,
-            user_makes_sense_in_context: true,
-            user_needs_correction: false,
-            assistant_text: assistantText,
-            assistant_translation_text: "",
-            assistant_audio_url: "",
-            goal_achieved: false,
-            goal_achievement_message: "",
-            next_goal_suggestion: "",
-          };
-          if (realtimeAudioStoppedRef.current) {
-            flushCompletedTurn();
-          }
-          return;
-        }
-        if (eventType === "output_audio_buffer.stopped" && autoRestartAfterAssistantRef.current) {
-          void startRecording(false);
-          return;
-        }
-        if (eventType === "error" || eventType === "invalid_request_error") {
-          onAssistantSpeakingChange(false);
-          onPendingUserTurnChange(false);
-          onLoadingChange(false);
-          onError(event.error?.message || event.message || "Realtime conversation error");
-        }
-      });
-      const microphoneStartedAt = performance.now();
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (activeSessionTokenRef.current !== sessionToken) return mediaStream.getTracks().forEach((track) => track.stop()), false;
-      if (setupMetricsRef.current) {
-        setupMetricsRef.current.microphoneMs = Math.round(performance.now() - microphoneStartedAt);
-      }
-      logRealtime("microphone-ready", {
-        elapsedMs: setupMetricsRef.current?.microphoneMs || Math.round(performance.now() - microphoneStartedAt),
-        audioTrackCount: mediaStream.getAudioTracks().length,
-      });
-      const audioTrack = mediaStream.getAudioTracks()[0];
-      if (!audioTrack) {
-        closeRealtimeSession();
-        return false;
-      }
-      realtimeStreamRef.current = mediaStream;
-      audioTrack.enabled = false;
-      peerConnection.addTrack(audioTrack, mediaStream);
-      logRealtime("local-audio-track-added");
-      const offerStartedAt = performance.now();
-      const offer = await peerConnection.createOffer();
-      if (setupMetricsRef.current) {
-        setupMetricsRef.current.offerMs = Math.round(performance.now() - offerStartedAt);
-      }
-      logRealtime("offer-created", {
-        elapsedMs: setupMetricsRef.current?.offerMs || Math.round(performance.now() - offerStartedAt),
-        sdpLength: (offer.sdp || "").length,
-      });
-      const localDescriptionStartedAt = performance.now();
-      await peerConnection.setLocalDescription(offer);
-      if (setupMetricsRef.current) {
-        setupMetricsRef.current.localDescriptionMs = Math.round(performance.now() - localDescriptionStartedAt);
-      }
-      logRealtime("local-description-set", {
-        elapsedMs: setupMetricsRef.current?.localDescriptionMs || Math.round(performance.now() - localDescriptionStartedAt),
-      });
-      const sdpConnectStartedAt = performance.now();
-      const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
-        method: "POST",
-        body: offer.sdp,
-        headers: { Authorization: `Bearer ${ephemeralKey}`, "Content-Type": "application/sdp" },
-      });
-      if (!sdpResponse.ok) {
-        throw new Error("Failed to connect Realtime audio session");
-      }
-      const answerSdp = await sdpResponse.text();
-      if (setupMetricsRef.current) {
-        setupMetricsRef.current.sdpConnectMs = Math.round(performance.now() - sdpConnectStartedAt);
-      }
-      logRealtime("sdp-connect-succeeded", {
-        elapsedMs: setupMetricsRef.current?.sdpConnectMs || Math.round(performance.now() - sdpConnectStartedAt),
-        answerLength: answerSdp.length,
-      });
-      const remoteDescriptionStartedAt = performance.now();
-      await peerConnection.setRemoteDescription({ type: "answer", sdp: answerSdp });
-      if (setupMetricsRef.current) {
-        setupMetricsRef.current.remoteDescriptionMs = Math.round(performance.now() - remoteDescriptionStartedAt);
-      }
-      logRealtime("remote-description-set", {
-        elapsedMs: setupMetricsRef.current?.remoteDescriptionMs || Math.round(performance.now() - remoteDescriptionStartedAt),
-      });
-      return true;
-    } finally {
-      setConversationRealtimeConnecting(false);
-    }
-  };
+  const setupRealtimeConversation = (args: Parameters<typeof startRealtimeConversationSession>[0]["args"]): Promise<boolean> =>
+    startRealtimeConversationSession({
+      args, sourceLanguage, targetLanguage, conversationPhase, conversationGoal, speechSpeed, responseLevel,
+      activeSessionTokenRef, baseInstructionsRef, streamRef: realtimeStreamRef, audioRef: realtimeAudioRef,
+      peerConnectionRef, dataChannelRef, responseActiveRef: realtimeResponseActiveRef,
+      pendingUserTextRef: realtimePendingUserTextRef, pendingAssistantTextRef: realtimePendingAssistantTextRef,
+      completedTurnRef: realtimeCompletedTurnRef, audioStoppedRef: realtimeAudioStoppedRef, autoRestartAfterAssistantRef,
+      closeSession: closeRealtimeSession, setConnecting: setConversationRealtimeConnecting,
+      setReady: setConversationRealtimeReady, setVoice: setConversationRealtimeVoice,
+      onUsageAllowance: realtimeUsage.startSession, onAudioActivityChange: realtimeUsage.setAudioActive,
+      sendSessionUpdate: (transcriptionModel) => sendRealtimeSessionUpdate(speechSpeed, responseLevel, conversationPhase, transcriptionModel),
+      onAssistantSpeakingChange, onPendingAssistantTextChange, onPendingUserTurnChange, onLoadingChange, onError,
+      flushCompletedTurn, startRecording: () => void startRecording(false),
+    });
   return {
     conversationPaused,
     conversationRecording,

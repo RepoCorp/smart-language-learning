@@ -8,6 +8,7 @@ from django.utils import timezone
 from .auth import apply_user_scope
 from .models import DailyLearningProgress, Item, LearningStreakPause, LearningStreakProfile
 from .review_schedule import local_day_bounds
+from .review_availability import deferred_difficult_items_filter
 
 ACTIVE_STUDY_SECONDS_REQUIRED = 30 * 60
 DAILY_POOL_ITEMS_REQUIRED = 5
@@ -41,7 +42,9 @@ def record_completed_item(user, item: Item, direction: str | None) -> dict:
         language_key = _language_key(item.source_language, item.target_language)
         entry_key = f"{language_key}:{item.id}:{direction or 'new'}"
         keys = set(str(value) for value in progress.completed_entry_keys)
+        entry_added = False
         if entry_key not in keys:
+            entry_added = True
             keys.add(entry_key)
             progress.completed_entry_keys = sorted(keys)
             completed_for_language = _completed_entry_count(progress, language_key)
@@ -52,7 +55,10 @@ def record_completed_item(user, item: Item, direction: str | None) -> dict:
             ) == 0:
                 progress.completed_daily_pool = True
             progress.save(update_fields=["completed_entry_keys", "completed_daily_pool", "updated_at"])
-        return progress_payload(user, source_language=item.source_language, target_language=item.target_language)
+        return {
+            **progress_payload(user, source_language=item.source_language, target_language=item.target_language),
+            "new_item_added": entry_added and direction is None,
+        }
 
 
 def create_pause(user, *, start_date, end_date, source_language: str = "spanish", target_language: str = "german") -> dict:
@@ -100,6 +106,7 @@ def progress_payload(user, *, source_language: str = "spanish", target_language:
     due_remaining = _due_review_count(user, source_language=source_language, target_language=target_language)
     active_seconds = int(today_progress.active_seconds_by_language.get(language_key, 0))
     completed_items = _completed_entry_count(today_progress, language_key)
+    new_items_completed = _new_item_entry_count(today_progress, language_key)
     qualifies_by_time = active_seconds >= ACTIVE_STUDY_SECONDS_REQUIRED
     qualifies_by_pool = completed_items >= DAILY_POOL_ITEMS_REQUIRED and due_remaining == 0
     qualified_today = qualifies_by_time or qualifies_by_pool
@@ -133,6 +140,7 @@ def progress_payload(user, *, source_language: str = "spanish", target_language:
         "qualifying_days_toward_flex": profile.qualifying_days_toward_flex,
         "active_seconds_today": active_seconds,
         "completed_items_today": completed_items,
+        "new_items_completed_today": new_items_completed,
         "due_reviews_remaining": due_remaining,
         "qualified_today": qualified_today,
         "qualification": "time" if qualifies_by_time else "pool" if qualifies_by_pool else "",
@@ -234,8 +242,18 @@ def _completed_entry_count(progress: DailyLearningProgress, language_key: str) -
     )
 
 
+def _new_item_entry_count(progress: DailyLearningProgress, language_key: str) -> int:
+    return sum(
+        1
+        for entry_key in progress.completed_entry_keys
+        if str(entry_key).startswith(f"{language_key}:") and str(entry_key).endswith(":new")
+    )
+
+
 def _due_review_count(user, *, source_language: str, target_language: str) -> int:
-    _, tomorrow = local_day_bounds(timezone.now())
+    now = timezone.now()
+    _, tomorrow = local_day_bounds(now)
+    deferred_difficult_items = deferred_difficult_items_filter(now)
     return (
         apply_user_scope(Item.objects, user).filter(
         is_learned=False,
@@ -243,12 +261,12 @@ def _due_review_count(user, *, source_language: str, target_language: str) -> in
         target_language=target_language,
         last_reviewed_at_es_to_de__isnull=False,
         due_at_es_to_de__lt=tomorrow,
-        ).count()
+        ).exclude(deferred_difficult_items).count()
         + apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_de_to_es__isnull=False,
             due_at_de_to_es__lt=tomorrow,
-        ).count()
+        ).exclude(deferred_difficult_items).count()
     )
