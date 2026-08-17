@@ -165,7 +165,7 @@ export interface SessionItem {
   mode: SessionMode;
   direction?: ReviewDirection | null;
   repeatedAfterFailure?: boolean;
-  repeatPracticeStep?: "word_intro" | "word_cloze" | "phrase_builder";
+  repeatPracticeStep?: "word_intro" | "word_cloze" | "word_parts" | "phrase_builder";
   options: string[];
   option_items?: Array<{
     id: number;

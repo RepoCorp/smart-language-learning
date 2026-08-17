@@ -1068,13 +1068,13 @@ describe("SessionPage", () => {
           id: 43,
           mode: "review",
           item_type: "word",
-          spanish_text: "mesa",
-          german_text: "Tisch",
+          spanish_text: "escribir",
+          german_text: "Schreiben",
           exercise_phrases: {
             phrases: [
               {
-                source_text: "La mesa está lista.",
-                target_text: "Der Tisch ist bereit.",
+                source_text: "Quiero escribir.",
+                target_text: "Ich möchte schreiben.",
               },
             ],
           },
@@ -1087,19 +1087,19 @@ describe("SessionPage", () => {
           id: 43,
           mode: "review",
           item_type: "word",
-          spanish_text: "mesa",
-          german_text: "Tisch",
+          spanish_text: "escribir",
+          german_text: "Schreiben",
           exercise_phrases: {
             phrases: [
               {
-                source_text: "La mesa está lista.",
-                target_text: "Der Tisch ist bereit.",
+                source_text: "Quiero escribir.",
+                target_text: "Ich möchte schreiben.",
               },
             ],
           },
           direction: "es_to_de",
           repeatedAfterFailure: true,
-          repeatPracticeStep: "word_cloze",
+          repeatPracticeStep: "word_parts",
           options: [],
         },
       ],
@@ -1108,18 +1108,19 @@ describe("SessionPage", () => {
     await renderSessionPageAndStart();
 
     expect(await screen.findByText(/Item 1 of 2/)).toBeInTheDocument();
-    await userEvent.type(screen.getByTestId("word-input"), "Tisch");
+    await userEvent.type(screen.getByTestId("word-input"), "Schreiben");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
 
     expect(await screen.findByText(/Item 2 of 2/)).toBeInTheDocument();
-    expect(await screen.findByText(/Complete the phrase with:/)).toBeInTheDocument();
-    expect(screen.getByText("mesa")).toBeInTheDocument();
-    expect(screen.getByText("_____")).toBeInTheDocument();
+    expect(await screen.findByText(/Build the word from its parts./)).toBeInTheDocument();
+    expect(screen.getByText("escribir")).toBeInTheDocument();
     expect(screen.queryByTestId("word-input")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "T" }));
-    await userEvent.click(screen.getByRole("button", { name: "i" }));
-    await userEvent.click(screen.getByRole("button", { name: "s" }));
-    await userEvent.click(screen.getByRole("button", { name: "c" }));
-    await userEvent.click(screen.getByRole("button", { name: "h" }));
+    fireEvent.click(screen.getByRole("button", { name: "Schr" }));
+    fireEvent.click(screen.getByRole("button", { name: "ei" }));
+    fireEvent.click(screen.getByRole("button", { name: "ben" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(completeDifficultItem).toHaveBeenCalledWith(43));
     expect(submitReview).not.toHaveBeenCalled();
     expect(await screen.findByText("Session completed")).toBeInTheDocument();

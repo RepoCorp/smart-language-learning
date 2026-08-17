@@ -7,6 +7,8 @@ import { buildWordPartUnits, shuffleWordPartTokens } from "./wordParts";
 interface WordPartsReviewProps {
   item: SessionItem;
   onAnswered: (correct: boolean) => Promise<void>;
+  reviewComplete?: boolean;
+  onNextItem?: () => Promise<void>;
 }
 
 const FEEDBACK_DELAY_MS = 500;
@@ -35,6 +37,8 @@ function smoothstep(value: number): number {
 export default function WordPartsReview({
   item,
   onAnswered,
+  reviewComplete = false,
+  onNextItem,
 }: WordPartsReviewProps): JSX.Element {
   const { t } = useI18n();
   const [placedTokenIds, setPlacedTokenIds] = useState<string[]>([]);
@@ -326,7 +330,7 @@ export default function WordPartsReview({
                     }
                     endPointerDrag(event.pointerId);
                   }}
-                  disabled={isPlaced || submitting}
+                  disabled={isPlaced || submitting || reviewComplete}
                   tabIndex={isPlaced ? -1 : undefined}
                 >
                   <span className="phrase-builder-token-text">{token.text}</span>
@@ -337,9 +341,14 @@ export default function WordPartsReview({
         </div>
       </div>
       <div className="actions">
-        <button type="button" className="secondary-button" onClick={resetPlacedTokens} disabled={submitting || placedCount === 0}>
+        <button type="button" className="secondary-button" onClick={resetPlacedTokens} disabled={submitting || reviewComplete || placedCount === 0}>
           {t("word.partsReset")}
         </button>
+        {onNextItem && (
+          <button type="button" onClick={() => void onNextItem()} disabled={!reviewComplete || submitting}>
+            {t("session.nextItem")}
+          </button>
+        )}
       </div>
       {feedback && <p className={`word-input-feedback ${submitting ? "word-input-feedback-success" : "word-input-feedback-error"}`}>{feedback}</p>}
     </div>

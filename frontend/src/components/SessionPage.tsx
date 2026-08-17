@@ -8,8 +8,7 @@ import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import NewItem from "./NewItem";
-import PhraseReview from "./PhraseReview";
-import WordReview from "./WordReview";
+import SessionCurrentItem from "./session/SessionCurrentItem";
 import { useNewItemCelebration } from "./useNewItemCelebration";
 import useSessionStudyActivity from "./useSessionStudyActivity";
 import {
@@ -644,29 +643,14 @@ export default function SessionPage(): JSX.Element {
               )}
             </div>
             <section className="card">
-          {current.mode === "new" ? (
-            <NewItem
-              key={currentRenderKey}
-              item={current}
-              onContinue={registerSeenItem}
-            />
-          ) : current.item_type === "word" ? (
-            <WordReview
-              key={currentRenderKey}
-              item={current}
-              onAnswered={register}
-              reviewComplete={showPostReviewItem}
-              onNextItem={continueAfterReviewedItem}
-            />
-          ) : (
-            <PhraseReview
-              key={currentRenderKey}
-              item={current}
-              onAnswered={register}
-              reviewComplete={showPostReviewItem}
-              onNextItem={continueAfterReviewedItem}
-            />
-          )}
+          <SessionCurrentItem
+            item={current}
+            renderKey={currentRenderKey}
+            reviewComplete={showPostReviewItem}
+            onNewItemContinue={registerSeenItem}
+            onReviewAnswered={register}
+            onNextItem={continueAfterReviewedItem}
+          />
             </section>
             {waitingNext && <p>{t("session.movingNext")}</p>}
             <div className="actions">

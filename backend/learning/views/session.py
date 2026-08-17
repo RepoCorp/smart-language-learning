@@ -378,7 +378,7 @@ def build_difficult_practice_entries(
                 mode="review",
                 direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
                 repeated_after_failure=True,
-                repeat_practice_step="word_cloze",
+                repeat_practice_step="word_parts",
             )
         )
 

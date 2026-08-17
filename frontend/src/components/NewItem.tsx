@@ -34,10 +34,10 @@ import ItemAdminActionsModal from "./ItemAdminActionsModal";
 import ItemQuestionsModal from "./ItemQuestionsModal";
 import PhraseReview from "./PhraseReview";
 import WordExerciseActions from "./WordExerciseActions";
-import WordPartsReview from "./WordPartsReview";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
-import ItemTestingModal from "./testing/ItemTestingModal";
+import ItemTestingExperience from "./testing/ItemTestingExperience";
+import { useItemTestingModal } from "./testing/useItemTestingModal";
 import { buildGermanPluralExerciseEntry } from "./wordExercisePrimaryEntry";
 import {
   ACT_STRATEGY,
@@ -182,16 +182,8 @@ export default function NewItem({
   const [showAllDialogs, setShowAllDialogs] = useState<boolean>(false);
   const [showDialogsModal, setShowDialogsModal] = useState<boolean>(false);
   const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
-  const [showTestingModal, setShowTestingModal] = useState<boolean>(false);
   const [showDirectTestModal, setShowDirectTestModal] =
     useState<boolean>(false);
-  const [directTestReviewComplete, setDirectTestReviewComplete] =
-    useState<boolean>(false);
-  const [directTestCorrect, setDirectTestCorrect] = useState<boolean | null>(
-    null,
-  );
-  const [directTestResetVersion, setDirectTestResetVersion] =
-    useState<number>(0);
   const [showWordIntroPracticeModal, setShowWordIntroPracticeModal] =
     useState<boolean>(false);
   const [showWordLetterPracticeModal, setShowWordLetterPracticeModal] =
@@ -222,12 +214,13 @@ export default function NewItem({
   const [selectedStrategy, setSelectedStrategy] = useState<string>(() =>
     firstStrategyForItemType(item.item_type),
   );
-  const [selectedTestingAction, setSelectedTestingAction] =
-    useState<string>("test");
   const [wordRefreshMessage, setWordRefreshMessage] = useState<string>("");
   const [selectedExerciseKeys, setSelectedExerciseKeys] = useState<string[]>(
     [],
   );
+  const itemTesting = useItemTestingModal(async (correct) => {
+    await submitReview(item.id, correct, "es_to_de");
+  });
   const {
     wordActionStatus,
     phraseActionStatus,
@@ -446,7 +439,7 @@ export default function NewItem({
         showDialogsModal ||
         showCompareWordsModal ||
         showExerciseModal ||
-        showTestingModal ||
+        itemTesting.isOpen ||
         showDirectTestModal ||
         showWordIntroPracticeModal ||
         showWordLetterPracticeModal ||
@@ -473,7 +466,7 @@ export default function NewItem({
     showDialogsModal,
     showCompareWordsModal,
     showExerciseModal,
-    showTestingModal,
+    itemTesting.isOpen,
     showDirectTestModal,
     showWordIntroPracticeModal,
     showWordLetterPracticeModal,
@@ -1264,40 +1257,14 @@ export default function NewItem({
     setShowPhraseBuilderModal(false);
   };
 
-  const closeTestingModal = (): void => {
-    setShowTestingModal(false);
-    setDirectTestReviewComplete(false);
-    setDirectTestCorrect(null);
-  };
-
-  const openTestingModal = (): void => {
-    setSelectedTestingAction("test");
-    setDirectTestReviewComplete(false);
-    setDirectTestCorrect(null);
-    setDirectTestResetVersion((value) => value + 1);
-    setShowTestingModal(true);
-  };
-
   const openPrimaryTestModal = (): void => {
-    setDirectTestReviewComplete(false);
-    setDirectTestCorrect(null);
-    setDirectTestResetVersion((value) => value + 1);
+    itemTesting.selectAction("test");
     setShowDirectTestModal(true);
   };
 
   const closeDirectTestModal = (): void => {
     setShowDirectTestModal(false);
-    setDirectTestReviewComplete(false);
-    setDirectTestCorrect(null);
-  };
-
-  const registerDirectTestAnswer = async (correct: boolean): Promise<void> => {
-    if (directTestReviewComplete) {
-      return;
-    }
-    await submitReview(item.id, correct, "es_to_de");
-    setDirectTestCorrect(correct);
-    setDirectTestReviewComplete(true);
+    itemTesting.selectAction("test");
   };
 
   const showItemActionTooltip = (
@@ -1376,7 +1343,7 @@ export default function NewItem({
           onOpenExercises={() => {
             void openExerciseModal();
           }}
-          onOpenTesting={openTestingModal}
+          onOpenTesting={itemTesting.open}
           onOpenRelatedDialogs={() => setShowDialogsModal(true)}
           onOpenQuestions={() => openQuestions()}
           onOpenCompareWords={openCompareWordsModal}
@@ -1771,67 +1738,21 @@ export default function NewItem({
           </div>
         </div>
       )}
-      {showTestingModal &&
-        (item.item_type === "word" || item.item_type === "phrase") && (
-          <ItemTestingModal
-            itemType={item.item_type}
-            selectedActionKey={selectedTestingAction}
-            onSelectedActionKeyChange={(value) => {
-              setSelectedTestingAction(value);
-              setDirectTestReviewComplete(false);
-              setDirectTestCorrect(null);
-              setDirectTestResetVersion((current) => current + 1);
-            }}
-            onClose={closeTestingModal}
-            testingContent={
-              selectedTestingAction === "warmup" &&
-              item.item_type === "word" ? (
-                <WordReview
-                  key={`testing-word-intro-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                  item={wordIntroPracticeItem}
-                  onAnswered={async () => closeTestingModal()}
-                />
-              ) : selectedTestingAction === "letters" &&
-                item.item_type === "word" ? (
-                <WordReview
-                  key={`testing-word-letter-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                  item={wordLetterPracticeItem}
-                  onAnswered={async () => closeTestingModal()}
-                />
-              ) : selectedTestingAction === "parts" &&
-                item.item_type === "word" ? (
-                <WordPartsReview
-                  key={`testing-word-parts-practice-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                  item={wordPartsPracticeItem}
-                  onAnswered={async () => closeTestingModal()}
-                />
-              ) : selectedTestingAction === "builder" &&
-                item.item_type === "phrase" ? (
-                <PhraseReview
-                  key={`testing-phrase-builder-${item.id}-${sourceText}-${targetText}-${selectedTestingAction}`}
-                  item={phraseBuilderItem}
-                  onAnswered={async () => closeTestingModal()}
-                />
-              ) : item.item_type === "word" ? (
-                <WordReview
-                  key={`testing-direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${directTestResetVersion}`}
-                  item={directTestItem}
-                  onAnswered={registerDirectTestAnswer}
-                  reviewComplete={directTestReviewComplete}
-                  onNextItem={async () => closeTestingModal()}
-                />
-              ) : (
-                <PhraseReview
-                  key={`testing-direct-phrase-test-${item.id}-${sourceText}-${targetText}-${directTestResetVersion}`}
-                  item={directTestItem}
-                  onAnswered={registerDirectTestAnswer}
-                  reviewComplete={directTestReviewComplete}
-                  onNextItem={async () => closeTestingModal()}
-                />
-              )
-            }
-          />
-        )}
+      {(item.item_type === "word" || item.item_type === "phrase") && (
+        <ItemTestingExperience
+          itemType={item.item_type}
+          itemId={item.id}
+          sourceText={sourceText}
+          targetText={targetText}
+          relatedDialogsCount={relatedDialogs.length}
+          wordIntroPracticeItem={wordIntroPracticeItem}
+          wordLetterPracticeItem={wordLetterPracticeItem}
+          wordPartsPracticeItem={wordPartsPracticeItem}
+          phraseBuilderItem={phraseBuilderItem}
+          directTestItem={directTestItem}
+          controller={itemTesting}
+        />
+      )}
       {showCompareWordsModal && item.item_type === "word" && (
         <CompareWordsModal
           open={showCompareWordsModal}
@@ -1867,18 +1788,18 @@ export default function NewItem({
               </p>
               {item.item_type === "word" ? (
                 <WordReview
-                  key={`direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${directTestResetVersion}`}
+                  key={`direct-word-test-${item.id}-${sourceText}-${targetText}-${relatedDialogs.length}-${itemTesting.directTestResetVersion}`}
                   item={directTestItem}
-                  onAnswered={registerDirectTestAnswer}
-                  reviewComplete={directTestReviewComplete}
+                  onAnswered={itemTesting.registerDirectTestAnswer}
+                  reviewComplete={itemTesting.directTestReviewComplete}
                   onNextItem={async () => closeDirectTestModal()}
                 />
               ) : (
                 <PhraseReview
-                  key={`direct-phrase-test-${item.id}-${sourceText}-${targetText}-${directTestResetVersion}`}
+                  key={`direct-phrase-test-${item.id}-${sourceText}-${targetText}-${itemTesting.directTestResetVersion}`}
                   item={directTestItem}
-                  onAnswered={registerDirectTestAnswer}
-                  reviewComplete={directTestReviewComplete}
+                  onAnswered={itemTesting.registerDirectTestAnswer}
+                  reviewComplete={itemTesting.directTestReviewComplete}
                   onNextItem={async () => closeDirectTestModal()}
                 />
               )}

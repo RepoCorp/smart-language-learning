@@ -198,8 +198,8 @@ def test_regular_session_includes_ready_difficult_item_exercises():
     assert [item["id"] for item in items[4:6]] == [phrase.id, phrase.id]
     assert items[0]["repeatPracticeStep"] == "word_intro"
     assert items[1]["repeatPracticeStep"] == "word_intro"
-    assert items[2]["repeatPracticeStep"] == "word_cloze"
-    assert items[3]["repeatPracticeStep"] == "word_cloze"
+    assert items[2]["repeatPracticeStep"] == "word_parts"
+    assert items[3]["repeatPracticeStep"] == "word_parts"
     assert items[4]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
     assert items[4]["repeatedAfterFailure"] is True
     assert "repeatPracticeStep" not in items[4] or items[4]["repeatPracticeStep"] is None
