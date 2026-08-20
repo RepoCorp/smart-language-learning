@@ -4,8 +4,6 @@ import BlockingLoadingOverlay from "../BlockingLoadingOverlay";
 import { useI18n } from "../../i18n";
 import {
   PHRASE_STRATEGIES,
-  PHRASE_STRATEGY_LABELS,
-  STRATEGY_LABELS,
   WORD_STRATEGIES,
 } from "./strategyConstants";
 
@@ -35,7 +33,12 @@ export default function StrategiesModal({
     () => (itemType === "word" ? [...WORD_STRATEGIES] : [...PHRASE_STRATEGIES]),
     [itemType],
   );
-  const labels = itemType === "word" ? STRATEGY_LABELS : PHRASE_STRATEGY_LABELS;
+  const labelFor = (strategy: string): string => {
+    if (itemType === "phrase" && strategy === "Forms") {
+      return t("strategies.option.repeat");
+    }
+    return t(`strategies.option.${strategy.toLowerCase()}`);
+  };
 
   return (
     <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
@@ -60,7 +63,7 @@ export default function StrategiesModal({
             >
               {strategies.map((strategy, index) => (
                 <option key={strategy} value={strategy}>
-                  {index + 1}. {labels[strategy] || strategy}
+                  {index + 1}. {labelFor(strategy)}
                 </option>
               ))}
             </select>

@@ -1871,6 +1871,7 @@ export default function NewItem({
                 itemType={item.item_type}
                 targetText={targetText}
                 sourceText={sourceText}
+                sourceLanguage={sourceLanguage}
                 sourceLanguageLabel={sourceLanguageLabel}
                 loadingExercises={loadingExercises}
                 exerciseError={exerciseError}

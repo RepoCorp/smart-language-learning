@@ -11,6 +11,7 @@ interface NounExerciseSelectorProps {
   selectedExerciseKeys: string[];
   exerciseRunning: boolean;
   generatingCaseKey?: string;
+  allowCaseRegeneration?: boolean;
   exerciseEntryKey: (entry: WordExerciseGridPrimaryEntry["entry"]) => string;
   onToggleEntry: (entry: WordExerciseGridPrimaryEntry["entry"]) => void;
   onSelectKeys: (keys: string[]) => void;
@@ -42,6 +43,7 @@ export default function NounExerciseSelector({
   selectedExerciseKeys,
   exerciseRunning,
   generatingCaseKey,
+  allowCaseRegeneration = true,
   exerciseEntryKey,
   onToggleEntry,
   onSelectKeys,
@@ -91,7 +93,7 @@ export default function NounExerciseSelector({
   const selectColumn = (sectionKey: string): void => {
     const keys = keysForSection(sectionKey);
     if (keys.length === 0) {
-      if (sectionKey === "nominative" || sectionKey === "accusative" || sectionKey === "dative" || sectionKey === "genitive") {
+      if (allowCaseRegeneration && (sectionKey === "nominative" || sectionKey === "accusative" || sectionKey === "dative" || sectionKey === "genitive")) {
         onGenerateCase(sectionKey);
       }
       return;
@@ -117,10 +119,10 @@ export default function NounExerciseSelector({
         selected: isExactSelection(keysForSection(section.key)),
         onClick: () => selectColumn(section.key),
         disabled: exerciseRunning || generatingCaseKey === section.key,
-        secondaryActionLabel: keysForSection(section.key).length > 0 ? "Regenerate case" : undefined,
+        secondaryActionLabel: allowCaseRegeneration && keysForSection(section.key).length > 0 ? "Regenerate case" : undefined,
         secondaryActionDisabled: generatingCaseKey === section.key || exerciseRunning,
-        secondaryActionRequiresConfirm: keysForSection(section.key).length > 0,
-        onSecondaryActionClick: keysForSection(section.key).length > 0 && (section.key === "nominative" || section.key === "accusative" || section.key === "dative" || section.key === "genitive")
+        secondaryActionRequiresConfirm: allowCaseRegeneration && keysForSection(section.key).length > 0,
+        onSecondaryActionClick: allowCaseRegeneration && keysForSection(section.key).length > 0 && (section.key === "nominative" || section.key === "accusative" || section.key === "dative" || section.key === "genitive")
           ? () => onGenerateCase(section.key)
           : undefined,
       }))}
