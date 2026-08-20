@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
 import { deterministicSort } from "../deterministic";
@@ -262,6 +262,7 @@ interface WordReviewProps {
   onAnswered: (correct: boolean) => Promise<void>;
   reviewComplete?: boolean;
   onNextItem?: () => Promise<void>;
+  postReviewActions?: ReactNode;
 }
 
 function RevealedReviewSummary({
@@ -321,6 +322,7 @@ export default function WordReview({
   onAnswered,
   reviewComplete = false,
   onNextItem,
+  postReviewActions,
 }: WordReviewProps): JSX.Element {
   const { t } = useI18n();
   const { targetPromptMode } = usePromptPreferences();
@@ -919,17 +921,21 @@ export default function WordReview({
                 {t("review.revealAnswer")}
               </button>
             </>
-          ) : (
+          ) : !reviewComplete ? (
             <>
               <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting || reviewComplete}>
                 {t("review.passed")}
               </button>
-              <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting || reviewComplete}>
+              <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} skipConfirmation disabled={isSubmitting || reviewComplete}>
                 {t("review.failed")}
               </DangerousButton>
+            </>
+          ) : (
+            <>
               <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
                 {t("session.nextItem")}
               </button>
+              {postReviewActions}
             </>
           )}
         </div>
@@ -1025,22 +1031,29 @@ export default function WordReview({
           />
         )}
         <div className="actions">
-          <button
-            type="button"
-            onMouseDown={(event) => event.preventDefault()}
-            onPointerDown={(event) => event.preventDefault()}
-            onTouchStart={(event) => event.preventDefault()}
-            onClick={revealNextWarmupLetter}
-            disabled={isSubmitting || reviewComplete || warmupRevealCount >= warmupRevealOrder.length}
-          >
-            {t("word.warmupRevealButton")}
-          </button>
-          <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting || reviewComplete}>
-            {t("word.failButton")}
-          </DangerousButton>
-          <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
-            {t("session.nextItem")}
-          </button>
+          {!reviewComplete && (
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onPointerDown={(event) => event.preventDefault()}
+              onTouchStart={(event) => event.preventDefault()}
+              onClick={revealNextWarmupLetter}
+              disabled={isSubmitting || warmupRevealCount >= warmupRevealOrder.length}
+            >
+              {t("word.warmupRevealButton")}
+            </button>
+          )}
+          {!reviewComplete && (
+            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} skipConfirmation disabled={isSubmitting}>
+              {t("word.failButton")}
+            </DangerousButton>
+          )}
+          {reviewComplete && (
+            <button type="button" onClick={() => void onNextItem?.()} disabled={isSubmitting}>
+              {t("session.nextItem")}
+            </button>
+          )}
+          {reviewComplete && postReviewActions}
         </div>
       </div>
     );
@@ -1096,18 +1109,21 @@ export default function WordReview({
           />
         )}
         <div className="actions">
-          {clozePhrase ? (
-            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting || reviewComplete}>
+          {!reviewComplete && clozePhrase ? (
+            <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} skipConfirmation disabled={isSubmitting || reviewComplete}>
               {t("word.failButton")}
             </DangerousButton>
-          ) : (
+          ) : !reviewComplete ? (
             <button type="button" onClick={() => void continueSuccessfulRetry()} disabled={isSubmitting || reviewComplete}>
               {t("review.continue")}
             </button>
+          ) : null}
+          {reviewComplete && (
+            <button type="button" onClick={() => void onNextItem?.()} disabled={isSubmitting}>
+              {t("session.nextItem")}
+            </button>
           )}
-          <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
-            {t("session.nextItem")}
-          </button>
+          {reviewComplete && postReviewActions}
         </div>
       </div>
     );
@@ -1220,22 +1236,29 @@ export default function WordReview({
       <p className="hint">{hint ? t("word.hint", { letter: hint }) : "\u00a0"}</p>
       <p className="hint" data-testid="word-hint-count">{t("word.hintCount", { count: totalWrittenWordAssistanceSteps })}</p>
       <div className="actions">
-        <button
-          type="button"
-          onMouseDown={(event) => event.preventDefault()}
-          onPointerDown={(event) => event.preventDefault()}
-          onTouchStart={(event) => event.preventDefault()}
-          onClick={handleHintButtonPress}
-          disabled={isSubmitting || reviewComplete}
-        >
-          {t("word.hintButton")}
-        </button>
-        <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} disabled={isSubmitting || reviewComplete}>
-          {t("word.failButton")}
-        </DangerousButton>
-        <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
-          {t("session.nextItem")}
-        </button>
+        {!reviewComplete && (
+          <button
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onPointerDown={(event) => event.preventDefault()}
+            onTouchStart={(event) => event.preventDefault()}
+            onClick={handleHintButtonPress}
+            disabled={isSubmitting}
+          >
+            {t("word.hintButton")}
+          </button>
+        )}
+        {!reviewComplete && (
+          <DangerousButton className="dangerous-primary-button" onConfirm={failWrittenAnswer} skipConfirmation disabled={isSubmitting}>
+            {t("word.failButton")}
+          </DangerousButton>
+        )}
+        {reviewComplete && (
+          <button type="button" onClick={() => void onNextItem?.()} disabled={isSubmitting}>
+            {t("session.nextItem")}
+          </button>
+        )}
+        {reviewComplete && postReviewActions}
       </div>
     </div>
   );

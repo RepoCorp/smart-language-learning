@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { fetchOverviewStats } from "../api";
 import { getOverviewStatsUpdatedEventName } from "../apiCore";
@@ -20,6 +21,7 @@ export default function OverviewStatsBar({
 }: OverviewStatsBarProps): JSX.Element {
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
 
   useEffect(() => {
@@ -63,12 +65,29 @@ export default function OverviewStatsBar({
       <div className="overview-stats-content">
         {topBarControl ? <div className="overview-stats-header">{topBarControl}</div> : null}
         <div className="overview-stats-metrics">
-          {metricCards.map((metric) => (
-            <div key={metric.key} className="overview-stats-metric-card">
+          {metricCards.map((metric) => {
+            const metricContent = (
+              <>
               <span className="overview-stats-metric-label">{metric.label}</span>
               <strong className="overview-stats-metric-value">{metric.value}</strong>
-            </div>
-          ))}
+              </>
+            );
+
+            return metric.key === "ready" ? (
+              <button
+                key={metric.key}
+                type="button"
+                className="overview-stats-metric-card"
+                onClick={() => navigate("/session")}
+              >
+                {metricContent}
+              </button>
+            ) : (
+              <div key={metric.key} className="overview-stats-metric-card">
+                {metricContent}
+              </div>
+            );
+          })}
         </div>
       </div>
     </header>

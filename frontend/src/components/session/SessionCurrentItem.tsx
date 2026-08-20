@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { SessionItem } from "../../types";
 import NewItem from "../NewItem";
 import PhraseReview from "../PhraseReview";
@@ -11,6 +13,7 @@ type SessionCurrentItemProps = {
   onNewItemContinue: () => Promise<void>;
   onReviewAnswered: (correct: boolean) => Promise<void>;
   onNextItem: () => Promise<void>;
+  postReviewActions?: ReactNode;
 };
 
 export default function SessionCurrentItem({
@@ -20,6 +23,7 @@ export default function SessionCurrentItem({
   onNewItemContinue,
   onReviewAnswered,
   onNextItem,
+  postReviewActions,
 }: SessionCurrentItemProps): JSX.Element {
   if (item.mode === "new") {
     return <NewItem key={renderKey} item={item} onContinue={onNewItemContinue} />;
@@ -33,6 +37,7 @@ export default function SessionCurrentItem({
         onAnswered={onReviewAnswered}
         reviewComplete={reviewComplete}
         onNextItem={onNextItem}
+        postReviewActions={postReviewActions}
       />
     );
   }
@@ -45,6 +50,7 @@ export default function SessionCurrentItem({
         onAnswered={onReviewAnswered}
         reviewComplete={reviewComplete}
         onNextItem={onNextItem}
+        postReviewActions={postReviewActions}
       />
     );
   }
@@ -56,6 +62,7 @@ export default function SessionCurrentItem({
       onAnswered={onReviewAnswered}
       reviewComplete={reviewComplete}
       onNextItem={onNextItem}
+      postReviewActions={postReviewActions}
     />
   );
 }

@@ -18,6 +18,8 @@ export const PHRASE_GRAMMAR_FEATURE_KEYS = [
   "preposition_dative",
   "two_way_preposition_location",
   "two_way_preposition_direction",
+  "adjective_ending_gender",
+  "adjective_ending_case",
 ] as const;
 
 export type PhraseGrammarFeatureKey = (typeof PHRASE_GRAMMAR_FEATURE_KEYS)[number];

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { useI18n } from "../../i18n";
+import { usePromptPreferences } from "../../promptPreferences";
 import DangerousButton from "../DangerousButton";
 
 function LoopActionIcon({ name }: { name: "clearAll" | "selectAll" | "random" | "refresh" | "mute" | "unmute" }): JSX.Element {
@@ -105,14 +106,16 @@ export default function StrategyLoopPanel({
   additionalDangerAction?: ReactNode;
 }): JSX.Element {
   const { t } = useI18n();
+  const { showMobileActionLabels } = usePromptPreferences();
 
   return (
-    <div className="strategy-loop-panel strategy-repeat-panel">
+    <div className={`strategy-loop-panel strategy-repeat-panel ${showMobileActionLabels ? "mobile-action-labels-expanded" : ""}`.trim()}>
       <div className="exercise-modal-scroll">
         {body}
       </div>
 
       <div className="exercise-modal-footer">
+        {canSelectEntries && <p className="hint strategy-loop-selection-hint">{t("newItem.exercisesSelectionHint")}</p>}
         <div className="strategy-loop-footer-row">
           {(onUnselectAll || onSelectAll || onSelectRandom) && (
             <div className="strategy-loop-selection-actions">
@@ -124,6 +127,7 @@ export default function StrategyLoopPanel({
                   disabled={isRunning || !hasSelectedEntries}
                   aria-label={t("newItem.exercisesUnselectAll")}
                   title={t("newItem.exercisesUnselectAll")}
+                  data-mobile-label={t("newItem.exercisesUnselectAll")}
                 >
                   <LoopActionIcon name="clearAll" />
                 </button>
@@ -136,6 +140,7 @@ export default function StrategyLoopPanel({
                   disabled={isRunning || !canSelectEntries}
                   aria-label={t("newItem.exercisesSelectAll")}
                   title={t("newItem.exercisesSelectAll")}
+                  data-mobile-label={t("newItem.exercisesSelectAll")}
                 >
                   <LoopActionIcon name="selectAll" />
                 </button>
@@ -148,6 +153,7 @@ export default function StrategyLoopPanel({
                   disabled={isRunning || !canSelectEntries}
                   aria-label={t("newItem.exercisesRandomSelection")}
                   title={t("newItem.exercisesRandomSelection")}
+                  data-mobile-label={t("newItem.exercisesRandomSelection")}
                 >
                   <LoopActionIcon name="random" />
                 </button>
@@ -164,6 +170,7 @@ export default function StrategyLoopPanel({
                   disabled={!canRegenerateContent || Boolean(regeneratingContent)}
                   aria-label={regeneratingContent ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
                   title={regeneratingContent ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
+                  data-mobile-label={regeneratingContent ? t("newItem.exercisesRegenerating") : t("newItem.exercisesRegenerate")}
                 >
                   <LoopActionIcon name="refresh" />
                 </DangerousButton>
@@ -194,6 +201,7 @@ export default function StrategyLoopPanel({
               onClick={onToggleMute}
               aria-label={isMuted ? t("newItem.exercisesUnmute") : t("newItem.exercisesMute")}
               title={isMuted ? t("newItem.exercisesUnmute") : t("newItem.exercisesMute")}
+              data-mobile-label={isMuted ? t("newItem.exercisesUnmute") : t("newItem.exercisesMute")}
             >
               <LoopActionIcon name={isMuted ? "unmute" : "mute"} />
             </button>

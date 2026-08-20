@@ -10,6 +10,8 @@ from .topic_conversation_model_support import (
 )
 
 ENGLISH_FEATURE_TITLES = {
+    "adjective_ending_gender": "Adjective ending: gender",
+    "adjective_ending_case": "Adjective ending: case",
     "verb_position_main_clause": "Verb position: statement",
     "verb_position_yes_no_question": "Verb position: yes/no question",
     "verb_position_w_question": "Verb position: W-question",
@@ -32,6 +34,8 @@ ENGLISH_FEATURE_TITLES = {
 }
 
 SPANISH_FEATURE_TITLES = {
+    "adjective_ending_gender": "Terminación del adjetivo: género",
+    "adjective_ending_case": "Terminación del adjetivo: caso",
     "verb_position_main_clause": "Posición del verbo: enunciado",
     "verb_position_yes_no_question": "Posición del verbo: pregunta de sí/no",
     "verb_position_w_question": "Posición del verbo: pregunta con W",

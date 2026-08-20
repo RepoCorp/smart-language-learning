@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import type { OverviewStatsResponse } from "../types";
 import ConfigurationAccountSection from "./ConfigurationAccountSection";
 import ConfigurationPreferencesSection from "./ConfigurationPreferencesSection";
+import GettingStartedGuideModal from "./GettingStartedGuideModal";
 
 interface ConfigurationsPageProps {
   canCreateUsers?: boolean;
@@ -23,9 +24,17 @@ export default function ConfigurationsPage({
 }: ConfigurationsPageProps): JSX.Element {
   const { t } = useI18n();
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
+  const [showGettingStarted, setShowGettingStarted] = useState(false);
 
   return (
     <main className="container">
+      <button
+        type="button"
+        className="getting-started-open-button"
+        onClick={() => setShowGettingStarted(true)}
+      >
+        {t("config.gettingStartedOpen")}
+      </button>
       <ConfigurationAccountSection authBusy={authBusy} authUser={authUser} onLogout={onLogout} stats={stats} />
       <ConfigurationPreferencesSection onStatsChange={setStats} />
       {canCreateUsers ? (
@@ -37,6 +46,7 @@ export default function ConfigurationsPage({
           </div>
         </section>
       ) : null}
+      <GettingStartedGuideModal open={showGettingStarted} onClose={() => setShowGettingStarted(false)} />
     </main>
   );
 }

@@ -8,7 +8,6 @@ import {
   fetchContentItems,
   fetchContentTopics,
   regenerateContentItemAudio,
-  setContentItemLearned,
 } from "../api";
 import NewItem from "./NewItem";
 import { useI18n } from "../i18n";
@@ -19,7 +18,7 @@ import ManageItemsSection from "./manage/ManageItemsSection";
 import ManagePaginationCard from "./manage/ManagePaginationCard";
 import ManageSectionCard from "./manage/ManageSectionCard";
 import ManageTopicsSection from "./manage/ManageTopicsSection";
-import { isManageReviewState, isManageSection, type ManageReviewState, type ManageSection } from "./manage/manageTypes";
+import { isManageSection, type ManageSection } from "./manage/manageTypes";
 
 const PAGE_SIZE = 25;
 
@@ -34,7 +33,6 @@ export default function ContentManagePage(): JSX.Element {
   const [deletingTopic, setDeletingTopic] = useState<string>("");
   const [deletingItemId, setDeletingItemId] = useState<number | null>(null);
   const [regeneratingAudioItemId, setRegeneratingAudioItemId] = useState<number | null>(null);
-  const [markingLearnedItemId, setMarkingLearnedItemId] = useState<number | null>(null);
   const [selectedTopics, setSelectedTopics] = useState<Record<string, boolean>>({});
   const [selectedItems, setSelectedItems] = useState<Record<number, boolean>>({});
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
@@ -44,8 +42,6 @@ export default function ContentManagePage(): JSX.Element {
   const [reloadToken, setReloadToken] = useState<number>(0);
   const sectionParam = searchParams.get("section");
   const currentSection: ManageSection = isManageSection(sectionParam) ? sectionParam : "words";
-  const reviewStateParam = searchParams.get("review_state");
-  const reviewState: ManageReviewState = isManageReviewState(reviewStateParam) ? reviewStateParam : "all";
   const filterQuery = searchParams.get("filter") || "";
   const openedItemParam = searchParams.get("item") || "";
   const pageParam = Number.parseInt(searchParams.get("page") || "1", 10);
@@ -57,8 +53,7 @@ export default function ContentManagePage(): JSX.Element {
 
   const busy = Boolean(deletingTopic)
     || deletingItemId !== null
-    || regeneratingAudioItemId !== null
-    || markingLearnedItemId !== null;
+    || regeneratingAudioItemId !== null;
 
   const updateSearchParams = (updates: Record<string, string | null>, resetPage = false): void => {
     const nextParams = new URLSearchParams(searchParams);
@@ -101,7 +96,7 @@ export default function ContentManagePage(): JSX.Element {
             sourceLanguage,
             targetLanguage,
             currentSection,
-            reviewState,
+            "all",
             page,
             PAGE_SIZE,
             filterQuery,
@@ -134,7 +129,7 @@ export default function ContentManagePage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [currentSection, filterQuery, page, reviewState, reloadToken, sourceLanguage, targetLanguage, t]);
+  }, [currentSection, filterQuery, page, reloadToken, sourceLanguage, targetLanguage, t]);
 
   useEffect(() => {
     const itemId = Number.parseInt(openedItemParam, 10);
@@ -302,29 +297,8 @@ export default function ContentManagePage(): JSX.Element {
     }
   };
 
-  const toggleLearned = async (item: ContentItemRecord): Promise<void> => {
-    if (busy) {
-      return;
-    }
-    setMarkingLearnedItemId(item.id);
-    setError("");
-    try {
-      const nextLearned = !Boolean(item.is_learned);
-      await setContentItemLearned(item.id, nextLearned, sourceLanguage, targetLanguage);
-      setReloadToken((current) => current + 1);
-    } catch {
-      setError(t("manage.error.updateLearned"));
-    } finally {
-      setMarkingLearnedItemId(null);
-    }
-  };
-
   const changeSection = (section: ManageSection): void => {
-    updateSearchParams({ section, review_state: section === "topics" ? null : reviewState }, true);
-  };
-
-  const changeReviewState = (nextReviewState: ManageReviewState): void => {
-    updateSearchParams({ review_state: nextReviewState === "all" ? null : nextReviewState }, true);
+    updateSearchParams({ section, review_state: null }, true);
   };
 
   const goToPreviousPage = (): void => {
@@ -340,13 +314,10 @@ export default function ContentManagePage(): JSX.Element {
       <h1>{t("manage.title")}</h1>
       <ManageSectionCard currentSection={currentSection} busy={busy} onChangeSection={changeSection} />
       <ManageFilterCard
-        currentSection={currentSection}
         filterQuery={filterQuery}
-        reviewState={reviewState}
         busy={busy}
         onFilterChange={(value) => updateSearchParams({ filter: value || null }, true)}
         onClearFilter={() => updateSearchParams({ filter: null }, true)}
-        onReviewStateChange={changeReviewState}
       />
       {loading && <p>{t("session.loading")}</p>}
       {error && <p className="error">{error}</p>}
@@ -378,7 +349,6 @@ export default function ContentManagePage(): JSX.Element {
           onToggleItemSelection={toggleItemSelection}
           onOpenItemModal={openItemModal}
           onRegenerateAudio={regenerateAudio}
-          onToggleLearned={toggleLearned}
         />
       )}
 

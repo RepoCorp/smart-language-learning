@@ -16,7 +16,6 @@ export default function ManageItemsSection({
   onToggleItemSelection,
   onOpenItemModal,
   onRegenerateAudio,
-  onToggleLearned,
 }: {
   currentSection: ManageSection;
   items: ContentItemRecord[];
@@ -30,7 +29,6 @@ export default function ManageItemsSection({
   onToggleItemSelection: (itemId: number) => void;
   onOpenItemModal: (itemId: number) => void;
   onRegenerateAudio: (item: ContentItemRecord) => Promise<void>;
-  onToggleLearned: (item: ContentItemRecord) => Promise<void>;
 }): JSX.Element {
   const { t } = useI18n();
 
@@ -85,14 +83,6 @@ export default function ManageItemsSection({
               >
                 {regeneratingAudioItemId === item.id ? t("manage.regeneratingAudio") : t("manage.regenerateAudio")}
               </DangerousButton>
-              <button
-                type="button"
-                className={`manage-item-action-button ${item.is_learned ? "manage-item-action-button-unmark" : "manage-item-action-button-mark"}`}
-                onClick={() => void onToggleLearned(item)}
-                disabled={busy}
-              >
-                {item.is_learned ? t("manage.unmarkLearned") : t("manage.markLearned")}
-              </button>
             </li>
           ))}
         </ul>

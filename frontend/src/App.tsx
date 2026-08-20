@@ -24,8 +24,10 @@ import SessionPage from "./components/SessionPage";
 import { DebugToolsPanel } from "./debugTools";
 import ConversationPage from "./features/conversation/ConversationPage";
 import GlobalSessionEndPrompt from "./features/session/GlobalSessionEndPrompt";
+import { useI18n } from "./i18n";
 
 export default function App(): JSX.Element {
+  const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
   const [authUser, setAuthUser] = useState<AuthUser | null>(() => getStoredAuthUser());
@@ -82,18 +84,16 @@ export default function App(): JSX.Element {
     void completeGettingStarted();
   };
 
-  const pageOptions = [
-    { path: "/session", label: "Session" },
-    { path: "/dialogs", label: "Dialogs" },
-    { path: "/conversation", label: "Conversation" },
-    { path: "/content/manage", label: "Manage content" },
-    { path: "/content/create", label: "Create content" },
-  ];
   const configPath = "/configurations";
+  const pageOptions = [
+    { path: "/session", label: t("menu.session") },
+    { path: "/dialogs", label: t("menu.dialogs") },
+    { path: "/conversation", label: t("menu.conversation") },
+    { path: "/content/manage", label: t("menu.manageContent") },
+    { path: "/content/create", label: t("menu.createContent") },
+    { path: configPath, label: t("menu.configuration") },
+  ];
   const selectedPagePath = pageOptions.some((option) => option.path === location.pathname) ? location.pathname : "/session";
-  const userBadgeLabel = authUser?.username?.trim().charAt(0).toUpperCase()
-    || authUser?.email?.trim().charAt(0).toUpperCase()
-    || "U";
 
   return (
     <>
@@ -113,6 +113,7 @@ export default function App(): JSX.Element {
                   <span className="app-top-bar-brand-text">Smart Learn</span>
                 </div>
                 <div className="app-top-bar-actions">
+                  <LearningStreakControl />
                   <div className="top-nav" ref={pageMenuRef}>
                     <button
                       type="button"
@@ -120,7 +121,7 @@ export default function App(): JSX.Element {
                       onClick={() => setShowPageMenu((value) => !value)}
                       aria-expanded={showPageMenu}
                       aria-haspopup="menu"
-                      aria-label="Open page menu"
+                      aria-label={t("menu.open")}
                     >
                       <span className="top-nav-menu-icon" aria-hidden="true">
                         <span />
@@ -145,16 +146,6 @@ export default function App(): JSX.Element {
                       </div>
                     ) : null}
                   </div>
-                  <LearningStreakControl />
-                  <button
-                    type="button"
-                    className={`app-top-bar-user-badge ${location.pathname === configPath ? "active" : ""}`}
-                    aria-label={authUser?.username || authUser?.email || "User"}
-                    aria-current={location.pathname === configPath ? "page" : undefined}
-                    onClick={() => navigate(configPath)}
-                  >
-                    {userBadgeLabel}
-                  </button>
                 </div>
               </div>
             )}

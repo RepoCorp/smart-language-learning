@@ -1296,9 +1296,6 @@ export default function NewItem({
         </button>
       )}
       <section className="item-view-header-card">
-        <p className="item-view-kicker">
-          {item.item_type === "word" ? t("newItem.word") : t("newItem.phrase")}
-        </p>
         <div className="item-view-title-row">
           <div className="item-view-title-block">
             <h2 className="item-view-title">{targetText || sourceText}</h2>

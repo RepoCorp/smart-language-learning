@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useI18n } from "../i18n";
 import type { SessionItem } from "../types";
@@ -9,6 +9,7 @@ interface WordPartsReviewProps {
   onAnswered: (correct: boolean) => Promise<void>;
   reviewComplete?: boolean;
   onNextItem?: () => Promise<void>;
+  postReviewActions?: ReactNode;
 }
 
 const FEEDBACK_DELAY_MS = 500;
@@ -39,6 +40,7 @@ export default function WordPartsReview({
   onAnswered,
   reviewComplete = false,
   onNextItem,
+  postReviewActions,
 }: WordPartsReviewProps): JSX.Element {
   const { t } = useI18n();
   const [placedTokenIds, setPlacedTokenIds] = useState<string[]>([]);
@@ -344,11 +346,12 @@ export default function WordPartsReview({
         <button type="button" className="secondary-button" onClick={resetPlacedTokens} disabled={submitting || reviewComplete || placedCount === 0}>
           {t("word.partsReset")}
         </button>
-        {onNextItem && (
+        {reviewComplete && onNextItem && (
           <button type="button" onClick={() => void onNextItem()} disabled={!reviewComplete || submitting}>
             {t("session.nextItem")}
           </button>
         )}
+        {reviewComplete && postReviewActions}
       </div>
       {feedback && <p className={`word-input-feedback ${submitting ? "word-input-feedback-success" : "word-input-feedback-error"}`}>{feedback}</p>}
     </div>

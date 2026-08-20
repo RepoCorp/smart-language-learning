@@ -272,7 +272,6 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });
     await userEvent.click(failedButton);
-    await userEvent.click(failedButton);
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(51, false, "de_to_es"));
   });
 
@@ -735,9 +734,12 @@ describe("SessionPage", () => {
     expect(screen.getByText("haus")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });
-    await userEvent.click(failedButton);
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
     await userEvent.click(failedButton);
     expect(screen.getByText(/Marked as incorrect by choice/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Passed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Failed" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(112, false, "de_to_es"));
   });
 
@@ -762,7 +764,6 @@ describe("SessionPage", () => {
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
     const failButton = screen.getByRole("button", { name: "Fail" });
-    await userEvent.click(failButton);
     await userEvent.click(failButton);
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(13, false, "es_to_de"));
   });
@@ -980,7 +981,6 @@ describe("SessionPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });
     await userEvent.click(failedButton);
-    await userEvent.click(failedButton);
     expect(screen.getByText(/Marked as incorrect by choice/)).toBeInTheDocument();
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(31, false, "de_to_es"));
   });
@@ -1006,7 +1006,6 @@ describe("SessionPage", () => {
     expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
     const failedButton = screen.getByRole("button", { name: "Failed" });
-    await userEvent.click(failedButton);
     await userEvent.click(failedButton);
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(48, false, "de_to_es"));
     expect(await screen.findByText("Session completed")).toBeInTheDocument();
@@ -1041,7 +1040,6 @@ describe("SessionPage", () => {
     const input = await screen.findByTestId("word-input");
     await userEvent.type(input, "haus");
     const failButton = screen.getByRole("button", { name: "Fail" });
-    await userEvent.click(failButton);
     await userEvent.click(failButton);
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(40, false, "es_to_de"));
 

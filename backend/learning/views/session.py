@@ -40,6 +40,7 @@ DIFFICULT_WORD_INTRO_SECONDS = 35
 DIFFICULT_WORD_CLOZE_SECONDS = 40
 DIFFICULT_PHRASE_REVIEW_SECONDS = 30
 DIFFICULT_PHRASE_BUILDER_SECONDS = 40
+MAX_DURATION_SESSION_ENTRIES = 40
 
 
 def _deterministic_hash(*parts: object) -> str:
@@ -159,7 +160,10 @@ def build_duration_based_session_entries(
     target_language: str,
 ) -> list[SessionEntry]:
     target_seconds = duration_minutes * 60
-    planning_limit = max(1, math.ceil(target_seconds / REVIEW_WORD_SECONDS) + 4)
+    planning_limit = min(
+        MAX_DURATION_SESSION_ENTRIES,
+        max(1, math.ceil(target_seconds / REVIEW_WORD_SECONDS) + 4),
+    )
 
     difficult_entries, difficult_item_ids = build_difficult_practice_entries(
         user=user,

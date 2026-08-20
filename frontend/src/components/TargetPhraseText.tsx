@@ -26,7 +26,11 @@ export default function TargetPhraseText({
 
   return (
     <Component className={classes}>
-      {hideText ? <span className="prompt-audio-placeholder">{t("prompt.audioOnly")}</span> : (children ?? text)}
+      {hideText ? (
+        <span className="prompt-audio-placeholder">
+          {variant === "dialog" ? t("dialogs.audioOnlyRevealText") : t("prompt.audioOnly")}
+        </span>
+      ) : (children ?? text)}
     </Component>
   );
 }

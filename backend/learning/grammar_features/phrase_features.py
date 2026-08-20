@@ -17,6 +17,8 @@ PREPOSITION_ACCUSATIVE = "preposition_accusative"
 PREPOSITION_DATIVE = "preposition_dative"
 TWO_WAY_PREPOSITION_LOCATION = "two_way_preposition_location"
 TWO_WAY_PREPOSITION_DIRECTION = "two_way_preposition_direction"
+ADJECTIVE_ENDING_GENDER = "adjective_ending_gender"
+ADJECTIVE_ENDING_CASE = "adjective_ending_case"
 
 PHRASE_GRAMMAR_FEATURES = {
     VERB_POSITION_MAIN_CLAUSE: (
@@ -83,5 +85,11 @@ PHRASE_GRAMMAR_FEATURES = {
     TWO_WAY_PREPOSITION_DIRECTION: (
         "The sentence uses a two-way preposition (Wechselpräposition) with the accusative case to "
         "express destination or change of location (Wohin?)."
+    ),
+    ADJECTIVE_ENDING_GENDER: (
+        "The sentence contains an adjective before a noun whose ending reflects the noun's grammatical gender."
+    ),
+    ADJECTIVE_ENDING_CASE: (
+        "The sentence contains an adjective before a noun whose ending reflects the noun's grammatical case."
     ),
 }

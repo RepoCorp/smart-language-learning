@@ -18,7 +18,7 @@ export default function ManageSectionCard({
       <div className="actions">
         <button
           type="button"
-          className={currentSection === "words" ? "secondary-button" : ""}
+          className={currentSection === "words" ? "" : "secondary-button"}
           onClick={() => onChangeSection("words")}
           disabled={busy}
         >
@@ -26,7 +26,7 @@ export default function ManageSectionCard({
         </button>
         <button
           type="button"
-          className={currentSection === "phrases" ? "secondary-button" : ""}
+          className={currentSection === "phrases" ? "" : "secondary-button"}
           onClick={() => onChangeSection("phrases")}
           disabled={busy}
         >
@@ -34,7 +34,7 @@ export default function ManageSectionCard({
         </button>
         <button
           type="button"
-          className={currentSection === "topics" ? "secondary-button" : ""}
+          className={currentSection === "topics" ? "" : "secondary-button"}
           onClick={() => onChangeSection("topics")}
           disabled={busy}
         >

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
-import { completeDifficultItem, fetchContentItemDetail, fetchSession, restoreSessionItemState, setContentItemLearned, submitReview } from "../api";
+import { completeDifficultItem, fetchContentItemDetail, fetchSession, restoreSessionItemState, submitReview } from "../api";
 import { markSessionItemSeen } from "../apiSessionProgress";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
@@ -321,22 +321,6 @@ export default function SessionPage(): JSX.Element {
     advance();
   };
 
-  const markCurrentAsLearned = async (): Promise<void> => {
-    if (!current || sessionOutcome !== null || showExtendPrompt) {
-      return;
-    }
-    try {
-      await setContentItemLearned(current.id, true, sourceLanguage, targetLanguage);
-    } catch (error) {
-      if (isMissingItemError(error)) {
-        handleMissingCurrentItem();
-        return;
-      }
-      throw error;
-    }
-    advance();
-  };
-
   const continueAfterReviewedItem = async (): Promise<void> => {
     if (!current || sessionOutcome !== null || showExtendPrompt || !showPostReviewItem) {
       return;
@@ -620,27 +604,9 @@ export default function SessionPage(): JSX.Element {
             </div>
             {resetCurrentResultError && <p className="error">{t("session.error", { message: resetCurrentResultError })}</p>}
             <div className="actions session-header-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => void openItemModal(current.id)}
-                disabled={loadingOpenedItem}
-              >
-                {t("words.openItem")}
-              </button>
               <DangerousButton className="secondary-button dangerous-action-button" onConfirm={resetToSessionStart}>
                 {t("session.restart")}
               </DangerousButton>
-              {showPostReviewItem && (
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => void resetCurrentResult()}
-                  disabled={waitingNext || resettingCurrentResult}
-                >
-                  {t("session.resetCurrentResult")}
-                </button>
-              )}
             </div>
             <section className="card">
           <SessionCurrentItem
@@ -650,14 +616,29 @@ export default function SessionPage(): JSX.Element {
             onNewItemContinue={registerSeenItem}
             onReviewAnswered={register}
             onNextItem={continueAfterReviewedItem}
+            postReviewActions={showPostReviewItem ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void openItemModal(current.id)}
+                  disabled={loadingOpenedItem}
+                >
+                  {t("words.openItem")}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void resetCurrentResult()}
+                  disabled={waitingNext || resettingCurrentResult}
+                >
+                  {t("session.resetCurrentResult")}
+                </button>
+              </>
+            ) : undefined}
           />
             </section>
             {waitingNext && <p>{t("session.movingNext")}</p>}
-            <div className="actions">
-              <DangerousButton className="secondary-button session-mark-learned-button" onConfirm={markCurrentAsLearned}>
-                {t("session.markLearned")}
-              </DangerousButton>
-            </div>
           </main>
       {openedItemModal}
       {newWordsCelebrationOverlay}

@@ -30,7 +30,9 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     | "strategies.grammar.prepositionAccusative"
     | "strategies.grammar.prepositionDative"
     | "strategies.grammar.twoWayPrepositionLocation"
-    | "strategies.grammar.twoWayPrepositionDirection";
+    | "strategies.grammar.twoWayPrepositionDirection"
+    | "strategies.grammar.adjectiveEndingGender"
+    | "strategies.grammar.adjectiveEndingCase";
   present:
     | "strategies.grammar.verbPositionStatementNote"
     | "strategies.grammar.verbPositionYesNoQuestionNote"
@@ -50,7 +52,9 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     | "strategies.grammar.prepositionAccusativeNote"
     | "strategies.grammar.prepositionDativeNote"
     | "strategies.grammar.twoWayPrepositionLocationNote"
-    | "strategies.grammar.twoWayPrepositionDirectionNote";
+    | "strategies.grammar.twoWayPrepositionDirectionNote"
+    | "strategies.grammar.adjectiveEndingGenderNote"
+    | "strategies.grammar.adjectiveEndingCaseNote";
   example: JSX.Element;
 }> = {
   verb_position_main_clause: {
@@ -147,6 +151,16 @@ const FEATURE_COPY: Record<PhraseGrammarFeatureKey, {
     title: "strategies.grammar.twoWayPrepositionDirection",
     present: "strategies.grammar.twoWayPrepositionDirectionNote",
     example: <>in + Wohin? → Ich gehe <strong>in die Küche</strong>.</>,
+  },
+  adjective_ending_gender: {
+    title: "strategies.grammar.adjectiveEndingGender",
+    present: "strategies.grammar.adjectiveEndingGenderNote",
+    example: <><span>gut →</span><br /><span>Masculine: gut<strong>er</strong> Hund</span><br /><span>Feminine: gut<strong>e</strong> Musik</span><br /><span>Neuter: gut<strong>es</strong> Essen</span></>,
+  },
+  adjective_ending_case: {
+    title: "strategies.grammar.adjectiveEndingCase",
+    present: "strategies.grammar.adjectiveEndingCaseNote",
+    example: <><span>gut + Hund →</span><br /><span>Nominative: gut<strong>er</strong> Hund</span><br /><span>Accusative: gut<strong>en</strong> Hund</span><br /><span>Dative: gut<strong>em</strong> Hund</span><br /><span>Genitive: gut<strong>en</strong> Hundes</span></>,
   },
 };
 

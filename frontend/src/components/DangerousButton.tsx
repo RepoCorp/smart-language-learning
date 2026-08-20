@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type MouseEvent, type ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-const DANGEROUS_BUTTON_ARMED_EVENT = "dangerous-button-armed";
+import { useI18n } from "../i18n";
 
 interface DangerousButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> {
   children: ReactNode;
   onConfirm: () => void | Promise<void>;
+  skipConfirmation?: boolean;
 }
 
 export default function DangerousButton({
@@ -12,84 +13,24 @@ export default function DangerousButton({
   className = "",
   disabled = false,
   onConfirm,
+  skipConfirmation = false,
   type = "button",
   ...props
 }: DangerousButtonProps): JSX.Element {
-  const [armed, setArmed] = useState<boolean>(false);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const { t } = useI18n();
 
-  useEffect(() => {
-    if (disabled) {
-      setArmed(false);
-    }
-  }, [disabled]);
-
-  useEffect(() => {
-    if (!armed) {
+  const handleClick = (): void => {
+    if (!skipConfirmation && typeof window !== "undefined" && !window.confirm(t("common.confirmDangerousAction"))) {
       return;
     }
-
-    const disarm = (): void => setArmed(false);
-    const handlePointerDown = (event: PointerEvent): void => {
-      if (buttonRef.current?.contains(event.target as Node)) {
-        return;
-      }
-      disarm();
-    };
-    const handleFocusIn = (event: FocusEvent): void => {
-      if (buttonRef.current?.contains(event.target as Node)) {
-        return;
-      }
-      disarm();
-    };
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        disarm();
-      }
-    };
-    const handleVisibilityChange = (): void => {
-      if (document.hidden) {
-        disarm();
-      }
-    };
-    const handleAnotherButtonArmed = (event: Event): void => {
-      if (event.target === buttonRef.current) {
-        return;
-      }
-      disarm();
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("focusin", handleFocusIn);
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    document.addEventListener(DANGEROUS_BUTTON_ARMED_EVENT, handleAnotherButtonArmed);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("focusin", handleFocusIn);
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.removeEventListener(DANGEROUS_BUTTON_ARMED_EVENT, handleAnotherButtonArmed);
-    };
-  }, [armed]);
-
-  const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
-    if (!armed) {
-      event.preventDefault();
-      setArmed(true);
-      buttonRef.current?.dispatchEvent(new CustomEvent(DANGEROUS_BUTTON_ARMED_EVENT, { bubbles: true }));
-      return;
-    }
-    setArmed(false);
     void onConfirm();
   };
 
   return (
     <button
       {...props}
-      ref={buttonRef}
       type={type}
-      className={`${className} ${armed ? "dangerous-button-armed" : ""}`.trim()}
+      className={className}
       disabled={disabled}
       onClick={handleClick}
     >

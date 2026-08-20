@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 import { useI18n } from "../i18n";
 
 type Props = {
@@ -6,9 +8,17 @@ type Props = {
 };
 
 const STEP_KEYS = ["languages", "content", "save", "session", "conversation"] as const;
+const STEP_PATHS: Record<(typeof STEP_KEYS)[number], string> = {
+  languages: "/configurations",
+  content: "/content/create",
+  save: "/dialogs",
+  session: "/session",
+  conversation: "/conversation",
+};
 
 export default function GettingStartedGuideModal({ open, onClose }: Props): JSX.Element | null {
   const { t } = useI18n();
+  const navigate = useNavigate();
 
   if (!open) {
     return null;
@@ -25,16 +35,30 @@ export default function GettingStartedGuideModal({ open, onClose }: Props): JSX.
         <ol className="getting-started-steps">
           {STEP_KEYS.map((key, index) => (
             <li key={key}>
-              <span className="getting-started-step-number" aria-hidden="true">{index + 1}</span>
-              <div>
-                <strong>{t(`config.gettingStarted.${key}.title`)}</strong>
-                <p>{t(`config.gettingStarted.${key}.body`)}</p>
-              </div>
+              <button
+                type="button"
+                className="getting-started-step"
+                onClick={() => {
+                  onClose();
+                  navigate(STEP_PATHS[key]);
+                }}
+              >
+                <span className="getting-started-step-number" aria-hidden="true">{index + 1}</span>
+                <span className="getting-started-step-copy">
+                  <strong>{t(`config.gettingStarted.${key}.title`)}</strong>
+                  <span>{t(`config.gettingStarted.${key}.body`)}</span>
+                </span>
+              </button>
             </li>
           ))}
         </ol>
         <p className="getting-started-note">{t("config.gettingStartedNote")}</p>
         <p className="getting-started-reopen">{t("config.gettingStartedReopen")}</p>
+        <div className="getting-started-close-action">
+          <button type="button" className="secondary-button" onClick={onClose}>
+            {t("config.gettingStartedClose")}
+          </button>
+        </div>
       </section>
     </div>
   );

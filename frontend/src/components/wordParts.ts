@@ -6,7 +6,7 @@ const PROTECTED_PREFIXES = [
   "ent", "ver", "zer", "be", "ge", "er", "ab", "an", "auf", "aus", "ein", "mit", "nach", "vor", "weg", "zurück", "zu",
 ];
 const PROTECTED_SUFFIXES = [
-  "lichkeit", "igkeit", "schaft", "heit", "keit", "ung", "chen", "lein", "lich", "isch", "bar", "ern", "eln", "en", "ig",
+  "igkeit", "schaft", "heit", "keit", "ung", "chen", "lein", "lich", "isch", "bar", "ern", "eln", "en", "ig",
 ];
 const PROTECTED_VOWEL_CLUSTERS = ["ai", "au", "äu", "ei", "eu", "ie", "aa", "ee", "oo"];
 const PROTECTED_CONSONANT_CLUSTERS = [

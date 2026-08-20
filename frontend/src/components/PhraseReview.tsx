@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { shouldAutoplayPrompt, suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
 import { selectBestSpeechSynthesisVoice } from "../browserSpeech";
@@ -20,6 +20,7 @@ interface PhraseReviewProps {
   onAnswered: (correct: boolean) => Promise<void>;
   reviewComplete?: boolean;
   onNextItem?: () => Promise<void>;
+  postReviewActions?: ReactNode;
 }
 
 function RevealedReviewSummary({
@@ -289,6 +290,7 @@ export default function PhraseReview({
   onAnswered,
   reviewComplete = false,
   onNextItem,
+  postReviewActions,
 }: PhraseReviewProps): JSX.Element {
   const { t } = useI18n();
   const debugTools = useDebugTools();
@@ -1074,11 +1076,14 @@ export default function PhraseReview({
           </div>
         </div>
         {phraseBuilderComplete && <p className="phrase-builder-success">{t("phrase.builderComplete")}</p>}
-        <div className="actions">
-          <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
-            {t("session.nextItem")}
-          </button>
-        </div>
+        {reviewComplete && (
+          <div className="actions">
+            <button type="button" onClick={() => void onNextItem?.()} disabled={isSubmitting}>
+              {t("session.nextItem")}
+            </button>
+            {postReviewActions}
+          </div>
+        )}
       </div>
     );
   }
@@ -1123,17 +1128,21 @@ export default function PhraseReview({
               {t("review.revealAnswer")}
             </button>
           </>
-        ) : (
-          <>
-            <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting || reviewComplete}>
-              {t("review.passed")}
+          ) : !reviewComplete ? (
+            <>
+              <button type="button" className="item-got-it-button" onClick={() => void markSelfGradedAnswer(true)} disabled={isSubmitting || reviewComplete}>
+                {t("review.passed")}
             </button>
-            <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} disabled={isSubmitting || reviewComplete}>
-              {t("review.failed")}
-            </DangerousButton>
-            <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
-              {t("session.nextItem")}
-            </button>
+              <DangerousButton className="dangerous-primary-button" onConfirm={() => markSelfGradedAnswer(false)} skipConfirmation disabled={isSubmitting || reviewComplete}>
+                {t("review.failed")}
+              </DangerousButton>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => void onNextItem?.()} disabled={!reviewComplete || isSubmitting}>
+                {t("session.nextItem")}
+              </button>
+              {postReviewActions}
           </>
         )}
       </div>

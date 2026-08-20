@@ -4,6 +4,8 @@ from .noun_gender import (
     sync_item_grammar_features,
 )
 from .phrase_features import (
+    ADJECTIVE_ENDING_CASE,
+    ADJECTIVE_ENDING_GENDER,
     AUXILIARY_VERB,
     IMPERATIVE,
     KONJUNKTIV_II,
@@ -27,6 +29,8 @@ from .phrase_features import (
 )
 
 __all__ = [
+    "ADJECTIVE_ENDING_CASE",
+    "ADJECTIVE_ENDING_GENDER",
     "AUXILIARY_VERB",
     "GERMAN_NOUN_GENDER_FEATURE_KEYS",
     "GERMAN_NOUN_GENDER_FEATURES",
