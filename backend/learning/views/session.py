@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 
 from ..auth import apply_user_scope, get_request_user
 from ..models import DialogTurn, Item, ItemDialogOccurrence
-from ..serializers import SessionItemSerializer
+from ..serializers import SessionPlanEntrySerializer
 from ..srs import build_session_restore_state
 from .dialog_phrase_match import build_dialog_phrase_match_payload
 from .content.item_compare_payloads import compare_words_payload
@@ -80,8 +80,7 @@ class SessionView(APIView):
             source_language=source_language,
             target_language=target_language,
         )
-        payload = serialize_entries(entries, user=user)
-        serializer = SessionItemSerializer(payload, many=True)
+        serializer = SessionPlanEntrySerializer(serialize_session_plan(entries), many=True)
         return Response({"items": serializer.data})
 
 
@@ -279,29 +278,17 @@ def build_new_entries(
     excluded_item_ids: set[int] | None = None,
 ) -> list[SessionEntry]:
     excluded_item_ids = excluded_item_ids or set()
-    new_words = list(
+    new_items = list(
         apply_user_scope(Item.objects, user).filter(
-            item_type=Item.ItemType.WORD,
+            item_type__in=[Item.ItemType.WORD, Item.ItemType.PHRASE],
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
             last_reviewed_at_es_to_de__isnull=True,
             last_reviewed_at_de_to_es__isnull=True,
-        ).exclude(id__in=excluded_item_ids).order_by("created_at", "id")
+        ).exclude(id__in=excluded_item_ids).order_by("created_at", "id")[:limit]
     )
-    new_phrases = list(
-        apply_user_scope(Item.objects, user).filter(
-            item_type=Item.ItemType.PHRASE,
-            is_learned=False,
-            source_language=source_language,
-            target_language=target_language,
-            last_reviewed_at_es_to_de__isnull=True,
-            last_reviewed_at_de_to_es__isnull=True,
-        ).exclude(id__in=excluded_item_ids).order_by("created_at", "id")
-    )
-
-    combined = sorted(new_words + new_phrases, key=lambda item: (item.created_at, item.id))
-    return [new_entry(item) for item in combined[:limit]]
+    return [new_entry(item) for item in new_items]
 
 
 def build_upcoming_entries(
@@ -422,6 +409,20 @@ def new_entry(item: Item) -> SessionEntry:
 
 def entry_key(entry: SessionEntry) -> tuple[int, str | None]:
     return entry.item.id, entry.direction
+
+
+def serialize_session_plan(entries: list[SessionEntry]) -> list[dict]:
+    return [
+        {
+            "id": entry.item.id,
+            "item_type": entry.item.item_type,
+            "mode": entry.mode,
+            "direction": entry.direction,
+            "repeatedAfterFailure": entry.repeated_after_failure,
+            "repeatPracticeStep": entry.repeat_practice_step,
+        }
+        for entry in entries
+    ]
 
 
 def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:

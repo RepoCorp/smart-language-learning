@@ -58,6 +58,23 @@ class SessionItemSerializer(serializers.Serializer):
     session_restore_state = SessionRestoreStateSerializer(required=False)
 
 
+class SessionPlanEntrySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    item_type = serializers.ChoiceField(choices=Item.ItemType.choices)
+    mode = serializers.ChoiceField(choices=["new", "review"])
+    direction = serializers.ChoiceField(
+        choices=Item.ReviewDirection.choices,
+        allow_null=True,
+        required=False,
+    )
+    repeatedAfterFailure = serializers.BooleanField(required=False)
+    repeatPracticeStep = serializers.ChoiceField(
+        choices=["word_intro", "word_cloze", "word_parts", "phrase_builder"],
+        required=False,
+        allow_null=True,
+    )
+
+
 class SubmitReviewSerializer(serializers.Serializer):
     item_id = serializers.IntegerField()
     correct = serializers.BooleanField()

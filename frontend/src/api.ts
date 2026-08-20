@@ -21,7 +21,9 @@ import type {
   ContentTopicsResponse,
   OverviewStatsResponse,
   ReviewDirection,
-  SessionResponse,
+  SessionItem,
+  SessionPlanItem,
+  SessionPlanResponse,
   SessionRestoreState,
   StudyLanguageCode,
 } from "./types";
@@ -99,7 +101,7 @@ export async function fetchSession(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   durationMinutes?: number,
-): Promise<SessionResponse> {
+): Promise<SessionPlanResponse> {
   const params = new URLSearchParams({
     size: String(size),
     source_language: sourceLanguage,
@@ -112,7 +114,38 @@ export async function fetchSession(
   if (!response.ok) {
     throw new Error("Failed to load session");
   }
-  return (await response.json()) as SessionResponse;
+  return (await response.json()) as SessionPlanResponse;
+}
+
+export async function fetchSessionItem(
+  entry: SessionPlanItem,
+  sourceLanguage: StudyLanguageCode,
+  targetLanguage: StudyLanguageCode,
+): Promise<SessionItem> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+    mode: entry.mode,
+    repeated_after_failure: String(Boolean(entry.repeatedAfterFailure)),
+  });
+  if (entry.direction) {
+    params.set("direction", entry.direction);
+  }
+  if (entry.repeatPracticeStep) {
+    params.set("repeat_practice_step", entry.repeatPracticeStep);
+  }
+  const response = await apiFetch(`${API_BASE}/session/items/${entry.id}?${params.toString()}`);
+  if (!response.ok) {
+    let detail = "Failed to load session item";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) detail = payload.detail;
+    } catch {
+      // Keep the default message.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as SessionItem;
 }
 
 export async function submitReview(itemId: number, correct: boolean, direction?: ReviewDirection | null): Promise<void> {

@@ -77,6 +77,7 @@ from .views import (
     OverviewStatsView,
     PhraseGrammarPoolView,
     RestoreSessionItemStateView,
+    SessionItemPayloadView,
     SessionView,
     SubmitReviewView,
 )
@@ -107,6 +108,7 @@ urlpatterns = [
     path("progress/pause", LearningProgressPauseView.as_view(), name="learning-progress-pause"),
     path("progress/resume", LearningProgressResumeView.as_view(), name="learning-progress-resume"),
     path("session", SessionView.as_view(), name="session"),
+    path("session/items/<int:item_id>", SessionItemPayloadView.as_view(), name="session-item-payload"),
     path("session/restore-item-state", RestoreSessionItemStateView.as_view(), name="session-restore-item-state"),
     path("review", SubmitReviewView.as_view(), name="review"),
     path("seen", MarkSeenView.as_view(), name="seen"),

@@ -205,6 +205,15 @@ export interface SessionItem {
   session_restore_state?: SessionRestoreState;
 }
 
+export interface SessionPlanItem {
+  id: number;
+  item_type: ItemType;
+  mode: SessionMode;
+  direction?: ReviewDirection | null;
+  repeatedAfterFailure?: boolean;
+  repeatPracticeStep?: "word_intro" | "word_cloze" | "word_parts" | "phrase_builder";
+}
+
 export type ItemQuestionType =
   | "grammar_explanation"
   | "more_examples"
@@ -219,8 +228,8 @@ export interface ItemQuestionExchange {
   created_at: string;
 }
 
-export interface SessionResponse {
-  items: SessionItem[];
+export interface SessionPlanResponse {
+  items: SessionPlanItem[];
 }
 
 export interface ContentCandidate {

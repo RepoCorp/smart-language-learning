@@ -55,6 +55,7 @@ from .progress import LearningProgressPauseView, LearningProgressResumeView, Lea
 from .review import SubmitReviewView
 from .seen import MarkSeenView
 from .session import SessionView
+from .session_item_payload import SessionItemPayloadView
 from .session_state import RestoreSessionItemStateView
 from .auth import AuthBootstrapStatusView, AuthLoginView, AuthLogoutView, AuthMeView, AuthRegisterView
 from .auth_admin import AuthAdminCreateUserView, AuthAIUsageLimitView, AuthAIUsageView, AuthDeleteUserView, AuthRegistrationRequestsView, AuthResetPinView, AuthUsersView
@@ -123,6 +124,7 @@ __all__ = [
     "SubmitReviewView",
     "MarkSeenView",
     "SessionView",
+    "SessionItemPayloadView",
     "RestoreSessionItemStateView",
     "CompleteDifficultItemView",
     "AuthLoginView",

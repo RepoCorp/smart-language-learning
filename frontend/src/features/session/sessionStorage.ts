@@ -1,4 +1,4 @@
-import type { SessionItem, StudyLanguageCode } from "../../types";
+import type { SessionPlanItem, StudyLanguageCode } from "../../types";
 
 export const ACTIVE_SESSION_CHANGED_EVENT = "sll:active-session-changed";
 
@@ -9,7 +9,7 @@ export type StoredSessionState = {
   remainingSeconds: number;
   sessionOutcome: "time_up" | "completed" | null;
   index: number;
-  items: SessionItem[];
+  items: SessionPlanItem[];
   showPostReviewItem: boolean;
   currentReviewCorrect: boolean | null;
   showExtendPrompt: boolean;

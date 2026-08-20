@@ -8,6 +8,22 @@ from learning.models import DialogTurn, Item, ItemDialogOccurrence, SavedDialog
 from learning.review_schedule import local_day_bounds
 
 
+def load_session_item_payload(client, entry, *, source_language="spanish", target_language="german"):
+    params = {
+        "source_language": source_language,
+        "target_language": target_language,
+        "mode": entry["mode"],
+        "repeated_after_failure": str(bool(entry.get("repeatedAfterFailure", False))).lower(),
+    }
+    if entry.get("direction"):
+        params["direction"] = entry["direction"]
+    if entry.get("repeatPracticeStep"):
+        params["repeat_practice_step"] = entry["repeatPracticeStep"]
+    response = client.get(f"/api/session/items/{entry['id']}", params)
+    assert response.status_code == 200
+    return response.json()
+
+
 @pytest.mark.django_db
 def test_session_prioritizes_due_reviews_then_new_items():
     now = timezone.now()
@@ -33,6 +49,8 @@ def test_session_prioritizes_due_reviews_then_new_items():
     assert items[0]["id"] == due.id
     assert items[0]["mode"] == "review"
     assert items[0]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
+    assert "related_dialogs" not in items[0]
+    assert "exercise_phrases" not in items[0]
     assert items[1]["id"] == new_item.id
     assert items[1]["mode"] == "new"
 
@@ -49,10 +67,11 @@ def test_session_includes_reviews_scheduled_later_today():
         due_at_es_to_de=tomorrow - timedelta(minutes=1),
     )
 
-    response = APIClient().get("/api/session", {"size": 1})
+    client = APIClient()
+    response = client.get("/api/session", {"size": 1})
 
     assert response.status_code == 200
-    item = response.json()["items"][0]
+    item = load_session_item_payload(client, response.json()["items"][0])
     assert item["id"] == later_today.id
     assert item["mode"] == "review"
 
@@ -273,7 +292,7 @@ def test_phrase_review_contains_correct_option():
     response = client.get("/api/session", {"size": 1})
 
     assert response.status_code == 200
-    item = response.json()["items"][0]
+    item = load_session_item_payload(client, response.json()["items"][0])
     options = item["options"]
     assert item["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
     assert phrase.german_text in options
@@ -299,7 +318,8 @@ def test_word_review_de_to_es_contains_multiple_choice_options():
     response = client.get("/api/session", {"size": 1})
 
     assert response.status_code == 200
-    item = response.json()["items"][0]
+    entry = response.json()["items"][0]
+    item = load_session_item_payload(client, entry)
     assert item["id"] == word.id
     assert item["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
     assert word.spanish_text in item["options"]
@@ -386,9 +406,10 @@ def test_phrase_directions_have_independent_session_status():
     client = APIClient()
     due_response = client.get("/api/session", {"size": 1})
     assert due_response.status_code == 200
-    due_item = due_response.json()["items"][0]
-    assert due_item["id"] == phrase.id
-    assert due_item["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
+    due_entry = due_response.json()["items"][0]
+    assert due_entry["id"] == phrase.id
+    assert due_entry["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
+    due_item = load_session_item_payload(client, due_entry)
     assert phrase.german_text in due_item["options"]
 
     upcoming_response = client.get("/api/session", {"size": 2})
@@ -508,8 +529,9 @@ def test_session_includes_related_dialogs_for_item():
         {"size": 1, "source_language": "spanish", "target_language": "german"},
     )
     assert response.status_code == 200
-    payload_item = response.json()["items"][0]
-    assert payload_item["id"] == item.id
+    entry = response.json()["items"][0]
+    assert entry["id"] == item.id
+    payload_item = load_session_item_payload(client, entry)
     assert len(payload_item["related_dialogs"]) == 1
     assert payload_item["related_dialogs"][0]["dialog_id"] == dialog.id
     assert payload_item["related_dialogs"][0]["audio_url"] == "http://localhost:8000/media/audio/dialog-mock.wav"
@@ -598,9 +620,10 @@ def test_phrase_target_to_source_uses_neighboring_dialog_line_as_answer():
     )
 
     assert response.status_code == 200
-    payload_item = response.json()["items"][0]
-    assert payload_item["id"] == phrase.id
-    assert payload_item["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
+    entry = response.json()["items"][0]
+    assert entry["id"] == phrase.id
+    assert entry["direction"] == Item.ReviewDirection.GERMAN_TO_SPANISH
+    payload_item = load_session_item_payload(client, entry)
     assert payload_item["dialog_phrase_answer"] == "Estoy perdido"
     assert payload_item["dialog_phrase_odd_index"] in {0, 1, 2, 3}
     assert len(payload_item["dialog_phrase_options"]) == 4
@@ -657,7 +680,8 @@ def test_phrase_target_to_source_session_uses_dialog_turn_audio_as_prompt_audio(
     )
 
     assert response.status_code == 200
-    payload_item = response.json()["items"][0]
-    assert payload_item["id"] == phrase.id
+    entry = response.json()["items"][0]
+    assert entry["id"] == phrase.id
+    payload_item = load_session_item_payload(client, entry)
     assert payload_item["audio_url"] == "http://localhost:8000/media/audio/openai-phrase.mp3"
     assert payload_item["prompt_audio_url"] == "http://localhost:8000/media/audio/elevenlabs-turn.mp3"

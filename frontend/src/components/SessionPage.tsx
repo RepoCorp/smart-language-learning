@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { suppressPromptAutoplayForAudio } from "../audioAutoplayGuard";
-import { completeDifficultItem, fetchContentItemDetail, fetchSession, restoreSessionItemState, submitReview } from "../api";
+import { completeDifficultItem, fetchContentItemDetail, restoreSessionItemState, submitReview } from "../api";
 import { markSessionItemSeen } from "../apiSessionProgress";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
@@ -11,33 +11,37 @@ import NewItem from "./NewItem";
 import SessionCurrentItem from "./session/SessionCurrentItem";
 import { useNewItemCelebration } from "./useNewItemCelebration";
 import useSessionStudyActivity from "./useSessionStudyActivity";
-import {
-  ACTIVE_SESSION_CHANGED_EVENT,
-  activeSessionStorageKey,
-  readStoredSessionState,
-  writeStoredSessionState,
-  type StoredSessionState,
-} from "../features/session/sessionStorage";
+import { useSessionItemPayloads } from "../features/session/useSessionItemPayloads";
+import { useSessionLifecycle } from "../features/session/useSessionLifecycle";
 
 export default function SessionPage(): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
-  const sessionStorageKey = activeSessionStorageKey(sourceLanguage, targetLanguage);
-  const [items, setItems] = useState<SessionItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [durationInput, setDurationInput] = useState<string>("10");
-  const [sessionDurationMinutes, setSessionDurationMinutes] = useState<number | null>(null);
-  const [sessionEndsAtMs, setSessionEndsAtMs] = useState<number | null>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
-  const [sessionOutcome, setSessionOutcome] = useState<"time_up" | "completed" | null>(null);
-  const [index, setIndex] = useState<number>(0);
+  const {
+    items,
+    setItems,
+    loading,
+    error,
+    setError,
+    durationInput,
+    setDurationInput,
+    sessionDurationMinutes,
+    setSessionDurationMinutes,
+    sessionEndsAtMs,
+    setSessionEndsAtMs,
+    remainingSeconds,
+    setRemainingSeconds,
+    sessionOutcome,
+    setSessionOutcome,
+    index,
+    setIndex,
+    showPostReviewItem,
+    setShowPostReviewItem,
+    setCurrentReviewCorrect,
+    showExtendPrompt,
+    setShowExtendPrompt,
+  } = useSessionLifecycle({ sourceLanguage, targetLanguage });
   const [waitingNext, setWaitingNext] = useState<boolean>(false);
-  const [showPostReviewItem, setShowPostReviewItem] = useState<boolean>(false);
-  const [currentReviewCorrect, setCurrentReviewCorrect] = useState<boolean | null>(null);
-  const [showExtendPrompt, setShowExtendPrompt] = useState<boolean>(false);
-  const [hasHydratedState, setHasHydratedState] = useState<boolean>(false);
-  const [restoredSnapshotHasItems, setRestoredSnapshotHasItems] = useState<boolean>(false);
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
   const [loadingOpenedItem, setLoadingOpenedItem] = useState<boolean>(false);
   const [openedItemError, setOpenedItemError] = useState<string>("");
@@ -50,6 +54,17 @@ export default function SessionPage(): JSX.Element {
   const [resettingCurrentResult, setResettingCurrentResult] = useState<boolean>(false);
   const [currentReviewResetVersion, setCurrentReviewResetVersion] = useState<number>(0);
   const reviewResultAudioRef = useRef<HTMLAudioElement | null>(null);
+  const {
+    currentItem: current,
+    currentItemLoading,
+    currentItemError,
+  } = useSessionItemPayloads({
+    entries: items,
+    index,
+    sourceLanguage,
+    targetLanguage,
+    planToken: sessionEndsAtMs,
+  });
 
   useSessionStudyActivity(
     sessionDurationMinutes !== null
@@ -61,154 +76,12 @@ export default function SessionPage(): JSX.Element {
     targetLanguage,
   );
 
-  const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
-    setLoading(true);
-    setError("");
-    setResetCurrentResultError("");
-    setShowPostReviewItem(false);
-    setCurrentReviewCorrect(null);
-    setCurrentReviewResetVersion(0);
-    try {
-      const data = await fetchSession(5, sourceLanguage, targetLanguage, durationMinutes);
-      const loadedItems = data.items || [];
-      setItems(loadedItems);
-      setIndex(0);
-    } catch {
-      setError(t("session.loadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t, sourceLanguage, targetLanguage]);
-
-  useEffect(() => {
-    setHasHydratedState(false);
-    setRestoredSnapshotHasItems(false);
-    const parsed = readStoredSessionState(sessionStorageKey);
-    if (!parsed) {
-      setHasHydratedState(true);
-      return;
-    }
-    setDurationInput(typeof parsed.durationInput === "string" ? parsed.durationInput : "10");
-    setSessionDurationMinutes(typeof parsed.sessionDurationMinutes === "number" ? parsed.sessionDurationMinutes : null);
-    setSessionEndsAtMs(typeof parsed.sessionEndsAtMs === "number" ? parsed.sessionEndsAtMs : null);
-    setRemainingSeconds(typeof parsed.remainingSeconds === "number" ? parsed.remainingSeconds : 0);
-    setSessionOutcome(parsed.sessionOutcome === "time_up" || parsed.sessionOutcome === "completed" ? parsed.sessionOutcome : null);
-    const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
-    setItems(parsedItems);
-    setRestoredSnapshotHasItems(parsedItems.length > 0);
-    setIndex(typeof parsed.index === "number" ? parsed.index : 0);
-    setShowExtendPrompt(Boolean(parsed.showExtendPrompt));
-    setShowPostReviewItem(Boolean(parsed.showPostReviewItem ?? parsed.showIncorrectReviewItem));
-    setCurrentReviewCorrect(typeof parsed.currentReviewCorrect === "boolean" ? parsed.currentReviewCorrect : null);
-    setResetCurrentResultError("");
-    setHasHydratedState(true);
-  }, [sessionStorageKey]);
-
-  useEffect(() => {
-    if (!hasHydratedState) {
-      return;
-    }
-    if (sessionDurationMinutes === null) {
-      window.sessionStorage.removeItem(sessionStorageKey);
-      return;
-    }
-    const snapshot: StoredSessionState = {
-      durationInput,
-      sessionDurationMinutes,
-      sessionEndsAtMs,
-      remainingSeconds,
-      sessionOutcome,
-      index,
-      items,
-      showPostReviewItem,
-      currentReviewCorrect,
-      showExtendPrompt,
-    };
-    writeStoredSessionState(sessionStorageKey, snapshot);
-  }, [
-    hasHydratedState,
-    sessionStorageKey,
-    durationInput,
-    sessionDurationMinutes,
-    sessionEndsAtMs,
-    remainingSeconds,
-    sessionOutcome,
-    index,
-    items,
-    showPostReviewItem,
-    currentReviewCorrect,
-    showExtendPrompt,
-  ]);
-
-  useEffect(() => {
-    if (!hasHydratedState || sessionDurationMinutes === null) {
-      return;
-    }
-    if (restoredSnapshotHasItems) {
-      return;
-    }
-    if (items.length > 0) {
-      return;
-    }
-    void loadSession(sessionDurationMinutes);
-  }, [hasHydratedState, restoredSnapshotHasItems, loadSession, sessionDurationMinutes, items.length]);
-
-  useEffect(() => {
-    if (sessionEndsAtMs === null || sessionOutcome !== null || showExtendPrompt) {
-      return;
-    }
-
-    const tick = (): void => {
-      const diffSeconds = Math.max(0, Math.ceil((sessionEndsAtMs - Date.now()) / 1000));
-      setRemainingSeconds(diffSeconds);
-    };
-
-    tick();
-    const intervalId = window.setInterval(tick, 1000);
-    return () => window.clearInterval(intervalId);
-  }, [sessionEndsAtMs, sessionOutcome, showExtendPrompt]);
-
-  useEffect(() => {
-    const syncGlobalSessionAction = (event: Event): void => {
-      const detail = (event as CustomEvent<{ key?: string }>).detail;
-      if (detail?.key !== sessionStorageKey) {
-        return;
-      }
-      const snapshot = readStoredSessionState(sessionStorageKey);
-      if (!snapshot) {
-        return;
-      }
-      setSessionEndsAtMs(typeof snapshot.sessionEndsAtMs === "number" ? snapshot.sessionEndsAtMs : null);
-      setRemainingSeconds(typeof snapshot.remainingSeconds === "number" ? snapshot.remainingSeconds : 0);
-      setSessionOutcome(snapshot.sessionOutcome === "time_up" || snapshot.sessionOutcome === "completed" ? snapshot.sessionOutcome : null);
-      setShowExtendPrompt(Boolean(snapshot.showExtendPrompt));
-    };
-
-    window.addEventListener(ACTIVE_SESSION_CHANGED_EVENT, syncGlobalSessionAction);
-    return () => window.removeEventListener(ACTIVE_SESSION_CHANGED_EVENT, syncGlobalSessionAction);
-  }, [sessionStorageKey]);
-
-  useEffect(() => {
-    if (!hasHydratedState) {
-      return;
-    }
-    if (!items.length) {
-      setIndex(0);
-      return;
-    }
-    if (index >= items.length) {
-      setIndex(items.length - 1);
-    }
-  }, [hasHydratedState, index, items.length]);
-
   useEffect(() => () => {
     if (reviewResultAudioRef.current) {
       reviewResultAudioRef.current.pause();
       reviewResultAudioRef.current = null;
     }
   }, []);
-
-  const current = items[index];
 
   const playReviewedItemAudio = useCallback((): void => {
     const audioUrl = current?.audio_url || "";
@@ -413,7 +286,6 @@ export default function SessionPage(): JSX.Element {
     setResetCurrentResultError("");
     setSessionOutcome(null);
     setShowExtendPrompt(false);
-    setRestoredSnapshotHasItems(false);
     setShowPostReviewItem(false);
     setCurrentReviewCorrect(null);
     setRemainingSeconds(parsed * 60);
@@ -434,7 +306,6 @@ export default function SessionPage(): JSX.Element {
     setShowPostReviewItem(false);
     setCurrentReviewCorrect(null);
     setWaitingNext(false);
-    setRestoredSnapshotHasItems(false);
     setResettingCurrentResult(false);
   };
 
@@ -544,7 +415,7 @@ export default function SessionPage(): JSX.Element {
     );
   }
 
-  if (loading) {
+  if (loading || (items.length > 0 && currentItemLoading)) {
     return (
       <>
         <main className="container">{t("session.loading")}</main>
@@ -553,10 +424,10 @@ export default function SessionPage(): JSX.Element {
     );
   }
 
-  if (error) {
+  if (error || currentItemError) {
     return (
       <>
-        <main className="container error">{t("session.error", { message: error })}</main>
+        <main className="container error">{t("session.error", { message: error || currentItemError })}</main>
         {newWordsCelebrationOverlay}
       </>
     );
