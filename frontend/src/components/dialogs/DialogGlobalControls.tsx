@@ -15,12 +15,14 @@ type Props = {
   targetPromptMode: "audio" | "text";
   turnAudioMode: DialogTurnAudioMode;
   regenerating: boolean;
+  deleting: boolean;
   onPlay: () => void;
   onTogglePause: () => void;
   onToggleText: () => void;
   onToggleTurnAudioMode: () => void;
   onCollapse: () => void;
   onRegenerate: () => void;
+  onDelete: () => void;
 };
 
 export default function DialogGlobalControls({
@@ -33,12 +35,14 @@ export default function DialogGlobalControls({
   targetPromptMode,
   turnAudioMode,
   regenerating,
+  deleting,
   onPlay,
   onTogglePause,
   onToggleText,
   onToggleTurnAudioMode,
   onCollapse,
   onRegenerate,
+  onDelete,
 }: Props): JSX.Element {
   const { t } = useI18n();
   const playbackLabel = isPaused
@@ -81,13 +85,16 @@ export default function DialogGlobalControls({
           <DialogActionIcon name="collapse" />
         </button>
       </div>
-      {hasTurns && (
-        <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
+      <div className="item-action-group item-action-group-danger" aria-label={t("newItem.actionGroupDanger")}>
+        {hasTurns && (
           <DangerousButton type="button" className="secondary-button exercise-action-icon-button dialog-list-action-button" onConfirm={onRegenerate} disabled={regenerating} aria-label={regenerating ? t("dialogs.loading") : t("manage.regenerateAudio")} title={regenerating ? t("dialogs.loading") : t("manage.regenerateAudio")} data-mobile-label={regenerating ? t("dialogs.loading") : t("manage.regenerateAudio")}>
             <DialogActionIcon name="refresh" />
           </DangerousButton>
-        </div>
-      )}
+        )}
+        <DangerousButton type="button" className="secondary-button exercise-action-icon-button dialog-list-action-button" onConfirm={onDelete} disabled={deleting} aria-label={t("dialogs.delete")} title={t("dialogs.delete")} data-mobile-label={t("dialogs.delete")}>
+          <DialogActionIcon name="delete" />
+        </DangerousButton>
+      </div>
     </>
   );
 }

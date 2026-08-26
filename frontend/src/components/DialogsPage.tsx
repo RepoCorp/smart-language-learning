@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import {
+  deleteContentDialog,
   fetchContentDialogDetail,
   regenerateContentDialogAudio,
 } from "../api";
@@ -49,6 +50,7 @@ export default function DialogsPage(): JSX.Element {
   const [expandedDialogId, setExpandedDialogId] = useState<number | null>(null);
   const [loadingDialogId, setLoadingDialogId] = useState<number | null>(null);
   const [regeneratingAudioDialogId, setRegeneratingAudioDialogId] = useState<number | null>(null);
+  const [deletingDialogId, setDeletingDialogId] = useState<number | null>(null);
   const {
     registerDialogRef,
     registerTurnRef,
@@ -181,6 +183,24 @@ export default function DialogsPage(): JSX.Element {
     }
   };
 
+  const deleteDialog = async (dialog: ContentDialogRecord): Promise<void> => {
+    if (deletingDialogId !== null) {
+      return;
+    }
+    stopCurrentPlayback();
+    setDeletingDialogId(dialog.dialog_id);
+    setError("");
+    try {
+      await deleteContentDialog(dialog.dialog_id, sourceLanguage, targetLanguage);
+      setDialogs((current) => current.filter((entry) => entry.dialog_id !== dialog.dialog_id));
+      setExpandedDialogId((current) => (current === dialog.dialog_id ? null : current));
+    } catch {
+      setError(t("dialogs.error.delete"));
+    } finally {
+      setDeletingDialogId(null);
+    }
+  };
+
   const hasPlayableDialogs = dialogs.some(dialogHasTurns);
   const renderDialogActionButtons = (dialog: ContentDialogRecord): JSX.Element => (
     <DialogGlobalControls
@@ -193,12 +213,14 @@ export default function DialogsPage(): JSX.Element {
       targetPromptMode={targetPromptMode}
       turnAudioMode={turnAudioMode}
       regenerating={regeneratingAudioDialogId === dialog.dialog_id}
+      deleting={deletingDialogId === dialog.dialog_id}
       onPlay={() => void playSingleDialog(dialog)}
       onTogglePause={togglePlaybackPause}
       onToggleText={() => setShowDialogText((value) => !value)}
       onToggleTurnAudioMode={() => setTurnAudioMode((current) => current === "natural" ? "clear" : "natural")}
       onCollapse={() => setExpandedDialogId(null)}
       onRegenerate={() => regenerateDialogAudio(dialog)}
+      onDelete={() => deleteDialog(dialog)}
     />
   );
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request as UrlRequest, urlopen
@@ -10,6 +11,8 @@ from django.conf import settings
 from ...ai_usage import reserve_ai_usage, settle_ai_usage
 from ...models import DailyAIUsage
 from ...languages import TTS_LANGUAGE_CODE_BY_STUDY_LANGUAGE
+
+logger = logging.getLogger(__name__)
 
 
 def openai_tts_audio(
@@ -86,13 +89,63 @@ def elevenlabs_tts_audio(
         headers={"xi-api-key": api_key, "Content-Type": "application/json"},
         method="POST",
     )
+    timeout_seconds = int(getattr(settings, "OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", 40))
     try:
-        with urlopen(request, timeout=int(getattr(settings, "OPENAI_TTS_REQUEST_TIMEOUT_SECONDS", 40))) as response:
+        with urlopen(request, timeout=timeout_seconds) as response:
             payload = response.read()
-    except (HTTPError, URLError, TimeoutError):
+    except HTTPError as exc:
         settle_ai_usage(reservation, failed=True)
+        try:
+            error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+        except Exception:
+            error_body = ""
+        logger.warning(
+            "content.audio.elevenlabs.request_failed status=%s reason=%s voice_id=%s model=%s target_language=%s output_format=%s text_length=%s response_body=%s",
+            exc.code,
+            exc.reason,
+            voice_id,
+            model_id,
+            target_language,
+            output,
+            len(text),
+            error_body,
+        )
+        return None
+    except URLError as exc:
+        settle_ai_usage(reservation, failed=True)
+        logger.warning(
+            "content.audio.elevenlabs.request_failed error=%s voice_id=%s model=%s target_language=%s output_format=%s text_length=%s timeout_seconds=%s",
+            exc.reason,
+            voice_id,
+            model_id,
+            target_language,
+            output,
+            len(text),
+            timeout_seconds,
+        )
+        return None
+    except TimeoutError:
+        settle_ai_usage(reservation, failed=True)
+        logger.warning(
+            "content.audio.elevenlabs.request_timed_out voice_id=%s model=%s target_language=%s output_format=%s text_length=%s timeout_seconds=%s",
+            voice_id,
+            model_id,
+            target_language,
+            output,
+            len(text),
+            timeout_seconds,
+        )
         return None
     settle_ai_usage(reservation)
+    if not payload:
+        logger.warning(
+            "content.audio.elevenlabs.empty_response voice_id=%s model=%s target_language=%s output_format=%s text_length=%s",
+            voice_id,
+            model_id,
+            target_language,
+            output,
+            len(text),
+        )
     return payload
 
 

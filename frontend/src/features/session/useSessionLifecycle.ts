@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchSession } from "../../api";
 import { useI18n } from "../../i18n";
@@ -57,27 +57,37 @@ export function useSessionLifecycle({
   const [showPostReviewItem, setShowPostReviewItem] = useState(false);
   const [currentReviewCorrect, setCurrentReviewCorrect] = useState<boolean | null>(null);
   const [showExtendPrompt, setShowExtendPrompt] = useState(false);
+  const [sessionPlanToken, setSessionPlanToken] = useState(0);
   const [hasHydratedState, setHasHydratedState] = useState(false);
   const [restoredSnapshotHasItems, setRestoredSnapshotHasItems] = useState(false);
+  const activeLoadIdRef = useRef(0);
 
   const loadSession = useCallback(async (durationMinutes: number): Promise<void> => {
+    const loadId = activeLoadIdRef.current + 1;
+    activeLoadIdRef.current = loadId;
     setLoading(true);
+    setSessionPlanToken((current) => current + 1);
     setItems([]);
     setError("");
     setShowPostReviewItem(false);
     setCurrentReviewCorrect(null);
     try {
       const data = await fetchSession(5, sourceLanguage, targetLanguage, durationMinutes);
+      if (activeLoadIdRef.current !== loadId) return;
       setItems(data.items || []);
       setIndex(0);
     } catch {
+      if (activeLoadIdRef.current !== loadId) return;
       setError(t("session.loadFailed"));
     } finally {
-      setLoading(false);
+      if (activeLoadIdRef.current === loadId) {
+        setLoading(false);
+      }
     }
   }, [sourceLanguage, t, targetLanguage]);
 
   useEffect(() => {
+    activeLoadIdRef.current += 1;
     setHasHydratedState(false);
     setRestoredSnapshotHasItems(false);
     const parsed = readStoredSessionState(sessionStorageKey);
@@ -135,9 +145,9 @@ export function useSessionLifecycle({
   ]);
 
   useEffect(() => {
-    if (!hasHydratedState || sessionDurationMinutes === null || restoredSnapshotHasItems || items.length > 0) return;
+    if (!hasHydratedState || loading || sessionDurationMinutes === null || restoredSnapshotHasItems || items.length > 0) return;
     void loadSession(sessionDurationMinutes);
-  }, [hasHydratedState, items.length, loadSession, restoredSnapshotHasItems, sessionDurationMinutes]);
+  }, [hasHydratedState, items.length, loadSession, loading, restoredSnapshotHasItems, sessionDurationMinutes]);
 
   useEffect(() => {
     if (sessionEndsAtMs === null || sessionOutcome !== null || showExtendPrompt) return;
@@ -197,6 +207,7 @@ export function useSessionLifecycle({
     setCurrentReviewCorrect,
     showExtendPrompt,
     setShowExtendPrompt,
+    sessionPlanToken,
     loadSession,
   };
 }

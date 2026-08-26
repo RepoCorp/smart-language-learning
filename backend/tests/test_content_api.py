@@ -3502,10 +3502,9 @@ def test_quick_add_phrase_rejects_translation_that_needs_unselected_words(monkey
 
 
 @pytest.mark.django_db
-def test_quick_add_word_expression_creates_phrase_item(monkeypatch):
+def test_quick_add_word_expression_creates_word_item(monkeypatch):
     from learning.views import content as content_views
     from learning.views.content import management as management_views
-    from learning.views.content import management_items_quick_add as quick_add_views
 
     monkeypatch.setattr(
         content_views,
@@ -3534,19 +3533,9 @@ def test_quick_add_word_expression_creates_phrase_item(monkeypatch):
             }
         raise AssertionError(f"Unexpected prompt: {system_prompt}")
 
-    def fake_call_openai_json_logged(**kwargs):
-        label = kwargs.get("label")
-        if label == "dialog_phrase_selection_validation":
-            return {"is_valid": True, "target_text": "von etwas halten", "reason": "valid expression"}
-        if label == "dialog_phrase_selection_translation":
-            return {"can_translate_without_non_selected_words": True, "source_text": "opinar sobre algo"}
-        raise AssertionError(f"Unexpected label: {label}")
-
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
     _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
     _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
-    monkeypatch.setattr(quick_add_views, "_call_openai_json_logged", fake_call_openai_json_logged)
-
     dialog = SavedDialog.objects.create(
         topic="opinions",
         context="conversation",
@@ -3582,19 +3571,19 @@ def test_quick_add_word_expression_creates_phrase_item(monkeypatch):
     assert payload["source_text"] == "opinar sobre algo"
     assert payload["target_text"] == "von etwas halten"
     created = Item.objects.get(
-        item_type=Item.ItemType.PHRASE,
+        item_type=Item.ItemType.WORD,
         spanish_text="opinar sobre algo",
         german_text="von etwas halten",
     )
+    assert created.word_type == "expression"
     assert created.notes == "The clicked word alone is misleading here."
-    assert not Item.objects.filter(item_type=Item.ItemType.WORD, german_text="von etwas halten").exists()
+    assert not Item.objects.filter(item_type=Item.ItemType.PHRASE, german_text="von etwas halten").exists()
     assert ItemDialogOccurrence.objects.filter(item=created, dialog=dialog, turn=turn, turn_index=0).exists()
 
 
 @pytest.mark.django_db
-def test_quick_add_word_expression_check_only_returns_phrase_span(monkeypatch):
+def test_quick_add_word_expression_check_only_returns_word_metadata(monkeypatch):
     from learning.views.content import management as management_views
-    from learning.views.content import management_items_quick_add as quick_add_views
 
     def fake_call_openai_json(system_prompt, user_input, **kwargs):
         if "Resolve a clicked target-language word translation" in system_prompt:
@@ -3617,19 +3606,9 @@ def test_quick_add_word_expression_check_only_returns_phrase_span(monkeypatch):
             }
         raise AssertionError(f"Unexpected prompt: {system_prompt}")
 
-    def fake_call_openai_json_logged(**kwargs):
-        label = kwargs.get("label")
-        if label == "dialog_phrase_selection_validation":
-            return {"is_valid": True, "target_text": "egal sein", "reason": "valid expression"}
-        if label == "dialog_phrase_selection_translation":
-            return {"can_translate_without_non_selected_words": True, "source_text": "dar igual"}
-        raise AssertionError(f"Unexpected label: {label}")
-
     monkeypatch.setattr(management_views, "call_openai_json", fake_call_openai_json)
     _patch_word_metadata_call(monkeypatch, fake_call_openai_json)
     _patch_dialog_click_call(monkeypatch, fake_call_openai_json)
-    monkeypatch.setattr(quick_add_views, "_call_openai_json_logged", fake_call_openai_json_logged)
-
     client = APIClient()
     response = client.post(
         "/api/content/words/add?source_language=spanish&target_language=german",

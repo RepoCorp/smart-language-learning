@@ -203,10 +203,26 @@ deploy_backend_step() {
   local health_check_unhealthy_threshold="${LIGHTSAIL_HEALTH_CHECK_UNHEALTHY_THRESHOLD:-6}"
   local health_check_timeout_seconds="${LIGHTSAIL_HEALTH_CHECK_TIMEOUT_SECONDS:-5}"
   local health_check_interval_seconds="${LIGHTSAIL_HEALTH_CHECK_INTERVAL_SECONDS:-10}"
+  local cloudwatch_log_group="${CLOUDWATCH_LOG_GROUP:-/${LIGHTSAIL_SERVICE_NAME}/${LIGHTSAIL_CONTAINER_NAME}}"
+  local cloudwatch_log_retention_days="${CLOUDWATCH_LOG_RETENTION_DAYS:-30}"
+  local cloudwatch_log_stream_name="${CLOUDWATCH_LOG_STREAM_NAME:-}"
+  if [[ -z "${cloudwatch_log_stream_name}" ]]; then
+    cloudwatch_log_stream_name="{machine_name}/{process_id}"
+  fi
   local deployment_json
   local deployment_version
   local deployment_state
   local service_url
+
+  echo "Ensuring CloudWatch log group ${cloudwatch_log_group}..."
+  aws logs create-log-group \
+    --log-group-name "${cloudwatch_log_group}" \
+    --region "${AWS_REGION}" \
+    >/dev/null 2>&1 || true
+  aws logs put-retention-policy \
+    --log-group-name "${cloudwatch_log_group}" \
+    --retention-in-days "${cloudwatch_log_retention_days}" \
+    --region "${AWS_REGION}"
 
   echo "Building backend container image ${backend_image_ref}..."
   (
@@ -224,7 +240,7 @@ deploy_backend_step() {
     --region "${AWS_REGION}" \
     >/tmp/lightsail-push.txt
 
-  deployment_json="$(python3 - "${BACKEND_ENV_FILE_ABS}" "${LIGHTSAIL_CONTAINER_NAME}" "${lightsail_image_ref}" "${LIGHTSAIL_CONTAINER_PORT}" "${LIGHTSAIL_HEALTH_CHECK_PATH}" "${health_check_healthy_threshold}" "${health_check_unhealthy_threshold}" "${health_check_timeout_seconds}" "${health_check_interval_seconds}" <<'PY'
+  deployment_json="$(python3 - "${BACKEND_ENV_FILE_ABS}" "${LIGHTSAIL_CONTAINER_NAME}" "${lightsail_image_ref}" "${LIGHTSAIL_CONTAINER_PORT}" "${LIGHTSAIL_HEALTH_CHECK_PATH}" "${health_check_healthy_threshold}" "${health_check_unhealthy_threshold}" "${health_check_timeout_seconds}" "${health_check_interval_seconds}" "${AWS_REGION}" "${cloudwatch_log_group}" "${cloudwatch_log_stream_name}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -239,6 +255,9 @@ from pathlib import Path
     unhealthy_threshold,
     timeout_seconds,
     interval_seconds,
+    aws_region,
+    cloudwatch_log_group,
+    cloudwatch_log_stream_name,
 ) = sys.argv[1:]
 env = {}
 for raw_line in Path(env_path).read_text().splitlines():
@@ -249,6 +268,10 @@ for raw_line in Path(env_path).read_text().splitlines():
     if not sep:
         raise SystemExit(f"Invalid backend env line: {raw_line}")
     env[key.strip()] = value.strip()
+
+env["AWS_DEFAULT_REGION"] = aws_region
+env["CLOUDWATCH_LOG_GROUP"] = cloudwatch_log_group
+env["CLOUDWATCH_LOG_STREAM_NAME"] = cloudwatch_log_stream_name
 
 payload = {
     "containers": {

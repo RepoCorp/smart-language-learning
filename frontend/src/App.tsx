@@ -136,7 +136,12 @@ export default function App(): JSX.Element {
                             key={option.path}
                             type="button"
                             className={`top-nav-menu-item ${selectedPagePath === option.path ? "active" : ""}`}
-                            onClick={() => navigate(option.path)}
+                            onClick={() => {
+                              setShowPageMenu(false);
+                              if (selectedPagePath !== option.path) {
+                                navigate(option.path);
+                              }
+                            }}
                             role="menuitem"
                             aria-current={selectedPagePath === option.path ? "page" : undefined}
                           >

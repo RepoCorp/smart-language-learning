@@ -40,6 +40,8 @@ export default function SessionPage(): JSX.Element {
     setCurrentReviewCorrect,
     showExtendPrompt,
     setShowExtendPrompt,
+    sessionPlanToken,
+    loadSession,
   } = useSessionLifecycle({ sourceLanguage, targetLanguage });
   const [waitingNext, setWaitingNext] = useState<boolean>(false);
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
@@ -63,7 +65,7 @@ export default function SessionPage(): JSX.Element {
     index,
     sourceLanguage,
     targetLanguage,
-    planToken: sessionEndsAtMs,
+    planToken: sessionPlanToken,
   });
 
   useSessionStudyActivity(
@@ -291,6 +293,7 @@ export default function SessionPage(): JSX.Element {
     setRemainingSeconds(parsed * 60);
     setSessionEndsAtMs(Date.now() + parsed * 60 * 1000);
     setSessionDurationMinutes(parsed);
+    void loadSession(parsed);
   };
 
   const resetToSessionStart = (): void => {

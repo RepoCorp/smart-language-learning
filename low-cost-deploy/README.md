@@ -133,6 +133,45 @@ What it does:
 - pushes the backend image to the Lightsail container service
 - creates a new Lightsail deployment using the env vars from `low-cost-deploy/backend.env`
 
+## CloudWatch Logs
+
+Lightsail container services keep only a short rolling window of their own container logs. The deploy script also sends Django application logs to CloudWatch Logs through the backend's AWS credentials.
+
+By default, a backend deploy creates the log group `/welearnsmart/lightsail/backend`, retains entries for 30 days, and uses separate streams per container process. Override these settings in `low-cost-deploy/deploy.env` if needed:
+
+```bash
+CLOUDWATCH_LOG_GROUP=/welearnsmart/lightsail/backend
+CLOUDWATCH_LOG_RETENTION_DAYS=30
+CLOUDWATCH_LOG_STREAM_NAME={machine_name}/{process_id}
+```
+
+The AWS identity configured in `low-cost-deploy/backend.env` also needs permission to write to that group. Add this policy to the backend IAM user, replacing the account ID if needed:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"],
+    "Resource": "arn:aws:logs:us-east-1:330056673401:log-group:/welearnsmart/lightsail/backend:*"
+  }]
+}
+```
+
+The local AWS CLI identity that runs the deploy script needs `logs:CreateLogGroup` and `logs:PutRetentionPolicy` for the same log group. After the next backend deploy, open **CloudWatch -> Logs -> Log groups -> `/welearnsmart/lightsail/backend`**.
+
+## Error Email Alerts
+
+Set up an inbox alert after CloudWatch logging has been deployed:
+
+```bash
+low-cost-deploy/configure_error_email_alerts.sh --email you@example.com
+```
+
+The script creates or updates an SNS topic, a CloudWatch Logs metric filter for `ERROR` entries, and an alarm. The default alarm emails once an error is detected during a five-minute window, then remains quiet until the alarm returns to normal. Use `--period-seconds 60` if you prefer faster alerts.
+
+AWS sends a confirmation message to the selected email address. Open that message and confirm the subscription; no alerts can be delivered until it is confirmed. The script is safe to run again to update the alarm configuration.
+
 ## Rough migration shape
 
 1. Create the S3 bucket for frontend deploy artifacts.

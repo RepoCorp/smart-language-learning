@@ -405,6 +405,23 @@ export async function fetchContentDialogDetail(
   return (await response.json()) as ContentDialogRecord;
 }
 
+export async function deleteContentDialog(
+  dialogId: number,
+  sourceLanguage: StudyLanguageCode = "spanish",
+  targetLanguage: StudyLanguageCode = "german",
+): Promise<void> {
+  const params = new URLSearchParams({
+    source_language: sourceLanguage,
+    target_language: targetLanguage,
+  });
+  const response = await apiFetch(`${API_BASE}/content/dialogs/${dialogId}?${params.toString()}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete dialog");
+  }
+}
+
 export async function generateContentDialogTurnAudio(
   dialogId: number,
   turnIndex: number,

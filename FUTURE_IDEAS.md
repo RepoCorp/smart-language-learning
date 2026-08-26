@@ -6,7 +6,6 @@ Ningun otro arreglito que no sea vital!!!
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 ### Gramatica
 - Sustantivos:
-  - Other things that change depending on the gender of the word.
   - Case declinations para plural
 - Verbos:
   - Indicar si son separables, reflexivos..
@@ -21,27 +20,26 @@ Ningun otro arreglito que no sea vital!!!
 
 ### Problemas
 En dialogos de palabras está cogiendo tambien palabras que significan lo mismo en español pero no son la misma en el idioma target
-
+ Ja, wir haben Gouda im Kühlregal., im la esta guardando como in pero con la nota correcta y saca error pero si guarda
+Los audios de partes de frases, y no se si tambien cuando el modelo saca mas que solo la palabra, están chuecos
+ Soll ich ihn einpacken? ihn la guardo er 
+Muchas veces saca error al guardar pero si parece que guardo 
 
 ### Tier 1
-Hacer post para "promocionar"  la aplicacion
+Hacer estrategia sing
 Que un modelo tambien sirva de manual de usuario, y pueda ir dando instrucciones empezando con la forma mas simple de usar la aplicacion
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?
 Quitar la selección de frase para imagen y cuando esta abierta decir solo la frase al presionar reproducir
-Algun security by obscurity, que igual deje el pin sencillo.
-Spread items from same phrase considering sides, Que al escoger sesión procure no incluir frases y sus palabras juntas
 
 
 #### PROMPTS/MODEL WORK
 Problema con palabras que toma como.expresion como.bitte y gleichfalls
 
 ## FUTURE WORK (some important, some not so important)
-- Que en el ejercicio de bloques detecte el tipo de error
 Que en gramar se pueda abrir el ejercicio de bloques, de pronto sin el hint del tamaño del espacio para la palabra. De pronto no con las palabras independientes si no con las partes que estan involucradas en la regla
     Que capturen esas reglas de órdenes y grupos de palabras gramaticales. Que en los bloques uno tenga que armar sub bloques para ayudar con la estructura de la frase, o poner de entrada algunas palabras y solo tenga que ubicar en las que se ha equivocado en el pasado
-Alguna celebración cuando finalmente logra la palabra. En ejercicio typing. Depronto incluso que la celebración ayude, como que las letras hagan la ola
 Uno escribir su propio goal
 Como hacer que encuentre los diálogos en las distintas formas del verbo o sustantivo
 Que funcione en landscape
@@ -59,11 +57,9 @@ Cómo hacer para que en el ejercicio de bloques sea más entrecomillas fácil eq
 El segundo ejercicio de palabra, el teclado completo, se va pendiendo la tecla qué es y se mueve al puesto como bloque. De pronto que prenda tres opciones pero de un color no verde, y cuando uno toca la que si es se pone verde y después uno la arrastra
 Que la palabra en la imagen sea completa por ejemplo herauskommen y que se muestre
 Que indefinido sea en sujeto
-Add con diese diesels...
 Ejercicio de escribir la palabra muchas veces, como lo de los treinta minutos. Pero algo que sea rapido: dibujandola sobre preescrita, con letras de teclado que se iluminan, con mover letras…?
 a difficult phrase exercise to type the phrase
 Modo no audio en ninguna parte (como cuando uno esta en publico y no puede escuchar)
-ejercicio de Ordenar letras
 Slider para tamaño session, separado para review y para aprender
 Memorización de reglas, como lo de algunos casos en los que los sustantivos tienen un género en particular (PONS)
 Que se pueda explicar algún problema que uno tenga con aprenderse algo y le haga ejercicios acorde
@@ -75,7 +71,6 @@ Secuencia: recuperacion activa (ejercicio dificil o auto evaluacion) si falla un
 Gratificacion: asociada a la palabra, no solo confeti. Por ejemplo arrastrando palabra a la imagen, cuando llegue se encaja con la imagen de una manera satisfactoria, se agranda, suena, un sonido corto de exito, aparece la respuesta, de pronto una fusion de la imagen y la palab
 Add a "dangerous" button to generate a small, simple, and the cheapest one possible image that represents the word, to the word item views.
 Que cuando uno complete los items de la sesion le haga fiesta
-Pilas con palabras que pueden ser masculino o femenino, cuando busca la palabra base que si diferencie las dos (el doctor, la doctora)
 Mejorar lo de los helpers
 Mejorar ejemplos de helpers y que la imagen lo represente mejor, como por ejemplo que es en el futuro o es como würde 
 Que el helper no lo traduzca como palabra si no como una explicacion o algo asi 

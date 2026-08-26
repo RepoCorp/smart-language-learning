@@ -120,17 +120,37 @@ def reserve_ai_usage(
             )) * 60
             if realtime_used_seconds >= realtime_limit_seconds:
                 raise AIUsageLimitExceeded("Your weekly live conversation minute limit has been reached. Please try again next week.")
-        used_credits = (
-            DailyAIUsage.objects.select_for_update()
-            .filter(user=user, date__gte=week_start, date__lte=today)
-            .aggregate(total=Sum("quota_credits"))["total"]
-            or 0
-        )
-        credit_limit = limit.weekly_generation_credits or int(
-            getattr(settings, "AI_USAGE_WEEKLY_GENERATION_CREDITS", 200)
-        )
-        if credit_limit > 0 and used_credits + credits > credit_limit:
-            raise AIUsageLimitExceeded("Your weekly AI usage limit has been reached. Please try again next week.")
+        if provider == "elevenlabs" and category == DailyAIUsage.Category.AUDIO:
+            used_characters = (
+                DailyAIUsage.objects.select_for_update()
+                .filter(
+                    user=user,
+                    date__gte=week_start,
+                    date__lte=today,
+                    provider="elevenlabs",
+                    category=DailyAIUsage.Category.AUDIO,
+                )
+                .aggregate(total=Sum("usage_units"))["total"]
+                or 0
+            )
+            character_limit = limit.weekly_elevenlabs_characters or int(
+                getattr(settings, "AI_USAGE_WEEKLY_ELEVENLABS_CHARACTERS", 10000)
+            )
+            if character_limit > 0 and used_characters + normalized_units > character_limit:
+                raise AIUsageLimitExceeded("Your weekly ElevenLabs character limit has been reached. Please try again next week.")
+        else:
+            used_credits = (
+                DailyAIUsage.objects.select_for_update()
+                .filter(user=user, date__gte=week_start, date__lte=today)
+                .exclude(provider="elevenlabs")
+                .aggregate(total=Sum("quota_credits"))["total"]
+                or 0
+            )
+            credit_limit = limit.weekly_generation_credits or int(
+                getattr(settings, "AI_USAGE_WEEKLY_GENERATION_CREDITS", 200)
+            )
+            if credit_limit > 0 and used_credits + credits > credit_limit:
+                raise AIUsageLimitExceeded("Your weekly AI usage limit has been reached. Please try again next week.")
         usage, _ = DailyAIUsage.objects.select_for_update().get_or_create(
             user=user,
             date=today,
@@ -142,7 +162,8 @@ def reserve_ai_usage(
         usage.request_count += 1
         if feature_name != "realtime-session":
             usage.usage_units += normalized_units
-        usage.quota_credits += credits
+        if provider != "elevenlabs":
+            usage.quota_credits += credits
         usage.save(update_fields=("request_count", "usage_units", "quota_credits", "updated_at"))
         return AIUsageReservation(daily_usage_id=usage.id)
 

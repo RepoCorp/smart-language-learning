@@ -14,7 +14,7 @@ export default function ConfigurationAdminAIUsageSection({
   canManage,
 }: ConfigurationAdminAIUsageSectionProps): JSX.Element | null {
   const [users, setUsers] = useState<AdminAIUsageUser[]>([]);
-  const [defaults, setDefaults] = useState({ weekly_generation_credits: 0, weekly_realtime_minutes: 0 });
+  const [defaults, setDefaults] = useState({ weekly_generation_credits: 0, weekly_elevenlabs_characters: 0, weekly_realtime_minutes: 0 });
   const [quotaInputValues, setQuotaInputValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -51,7 +51,7 @@ export default function ConfigurationAdminAIUsageSection({
 
   const updateQuotaInput = (
     userId: number,
-    field: "weekly_generation_credits" | "weekly_realtime_minutes",
+    field: "weekly_generation_credits" | "weekly_elevenlabs_characters" | "weekly_realtime_minutes",
     value: string,
   ): void => {
     const inputKey = `${userId}:${field}`;
@@ -61,7 +61,7 @@ export default function ConfigurationAdminAIUsageSection({
 
   const restoreDefaultQuotaInput = (
     userId: number,
-    field: "weekly_generation_credits" | "weekly_realtime_minutes",
+    field: "weekly_generation_credits" | "weekly_elevenlabs_characters" | "weekly_realtime_minutes",
   ): void => {
     const inputKey = `${userId}:${field}`;
     if (quotaInputValues[inputKey] === "") {
@@ -86,7 +86,7 @@ export default function ConfigurationAdminAIUsageSection({
     <section className="card settings-card">
       <h2 className="settings-title">AI usage limits</h2>
       <p className="settings-subtitle">
-        Default weekly budget: {defaults.weekly_generation_credits} generation credits and {defaults.weekly_realtime_minutes} live minutes.
+        Default weekly budget: {defaults.weekly_generation_credits} OpenAI generation credits, {defaults.weekly_elevenlabs_characters} ElevenLabs characters, and {defaults.weekly_realtime_minutes} live minutes.
         A user limit of 0 uses these defaults.
       </p>
       {loading ? <p className="hint">Loading AI usage...</p> : null}
@@ -96,7 +96,7 @@ export default function ConfigurationAdminAIUsageSection({
           <div className="ai-usage-row" key={user.id}>
             <div>
               <strong>{user.username}</strong>
-              <p className="hint">This week: {user.week_generation_credits} generation credits, {user.week_realtime_minutes} live minutes</p>
+              <p className="hint">This week: {user.week_generation_credits} OpenAI generation credits, {user.week_elevenlabs_characters} ElevenLabs characters, {user.week_realtime_minutes} live minutes</p>
             </div>
             <label><input type="checkbox" checked={user.is_blocked} onChange={(event) => updateUser(user.id, { is_blocked: event.target.checked })} /> Block AI</label>
             <label>
@@ -107,6 +107,16 @@ export default function ConfigurationAdminAIUsageSection({
                 value={quotaInputValues[`${user.id}:weekly_generation_credits`] ?? String(user.weekly_generation_credits)}
                 onChange={(event) => updateQuotaInput(user.id, "weekly_generation_credits", event.target.value)}
                 onBlur={() => restoreDefaultQuotaInput(user.id, "weekly_generation_credits")}
+              />
+            </label>
+            <label>
+              ElevenLabs characters
+              <input
+                type="number"
+                min="0"
+                value={quotaInputValues[`${user.id}:weekly_elevenlabs_characters`] ?? String(user.weekly_elevenlabs_characters)}
+                onChange={(event) => updateQuotaInput(user.id, "weekly_elevenlabs_characters", event.target.value)}
+                onBlur={() => restoreDefaultQuotaInput(user.id, "weekly_elevenlabs_characters")}
               />
             </label>
             <label>

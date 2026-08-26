@@ -54,6 +54,27 @@ def test_submit_review_schedules_the_next_review_at_the_start_of_its_calendar_da
 
 
 @pytest.mark.django_db
+def test_submit_review_moves_a_direction_forward_when_it_would_share_the_other_due_date():
+    _, tomorrow = local_day_bounds(timezone.now())
+    item = Item.objects.create(
+        item_type=Item.ItemType.WORD,
+        spanish_text="hola",
+        german_text="hallo",
+        due_at_de_to_es=tomorrow,
+    )
+
+    response = APIClient().post(
+        "/api/review",
+        {"item_id": item.id, "correct": True, "direction": Item.ReviewDirection.SPANISH_TO_GERMAN},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    item.refresh_from_db()
+    assert item.due_at_es_to_de == tomorrow + timedelta(days=1)
+
+
+@pytest.mark.django_db
 def test_submit_review_resets_progress_on_incorrect_answer():
     item = Item.objects.create(
         item_type=Item.ItemType.WORD,

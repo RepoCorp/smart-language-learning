@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { FocusEvent, PointerEvent } from "react";
 
 import { useI18n } from "../i18n";
@@ -177,10 +178,42 @@ export default function ItemActionToolbar({
   const { t } = useI18n();
   const highlightClassName = "item-action-button-has-content";
   const openStrategiesLabel = t("newItem.openStrategies");
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const didHorizontalScroll = useRef(false);
+
+  const startToolbarGesture = (event: PointerEvent<HTMLDivElement>): void => {
+    pointerStart.current = { x: event.clientX, y: event.clientY };
+    didHorizontalScroll.current = false;
+  };
+
+  const trackToolbarGesture = (event: PointerEvent<HTMLDivElement>): void => {
+    if (!pointerStart.current) {
+      return;
+    }
+    const horizontalDistance = Math.abs(event.clientX - pointerStart.current.x);
+    const verticalDistance = Math.abs(event.clientY - pointerStart.current.y);
+    if (horizontalDistance > 8 && horizontalDistance > verticalDistance) {
+      didHorizontalScroll.current = true;
+    }
+  };
 
   return (
     <div className={showMobileActionLabels ? "mobile-action-labels-expanded" : undefined}>
-      <div className="actions item-actions-toolbar">
+      <div
+        className="actions item-actions-toolbar"
+        onPointerDown={startToolbarGesture}
+        onPointerMove={trackToolbarGesture}
+        onPointerUp={() => { pointerStart.current = null; }}
+        onPointerCancel={() => { pointerStart.current = null; }}
+        onClickCapture={(event) => {
+          if (!didHorizontalScroll.current) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          didHorizontalScroll.current = false;
+        }}
+      >
         <div className="item-action-group item-action-group-primary" aria-label={t("newItem.actionGroupPractice")}>
           <button
             type="button"

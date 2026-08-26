@@ -26,6 +26,12 @@ class OverviewStatsView(APIView):
         ).filter(
             Q(last_reviewed_at_es_to_de__isnull=False) | Q(last_reviewed_at_de_to_es__isnull=False),
         ).count()
+        saved_items_queryset = apply_user_scope(Item.objects, user).filter(
+            source_language=source_language,
+            target_language=target_language,
+        )
+        saved_word_items = saved_items_queryset.filter(item_type=Item.ItemType.WORD).count()
+        saved_phrase_items = saved_items_queryset.filter(item_type=Item.ItemType.PHRASE).count()
         not_started = filter_new_items(apply_user_scope(Item.objects, user).filter(
             source_language=source_language,
             target_language=target_language,
@@ -42,6 +48,9 @@ class OverviewStatsView(APIView):
                 "ready_to_review": ready_to_review,
                 "future_reviews": future_reviews,
                 "word_items": word_items,
+                "saved_items": saved_word_items + saved_phrase_items,
+                "saved_word_items": saved_word_items,
+                "saved_phrase_items": saved_phrase_items,
                 "not_started": not_started,
                 "difficult_items": difficult_items,
             }

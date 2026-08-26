@@ -4,6 +4,7 @@ import type { AuthUser } from "../authApi";
 import { useI18n } from "../i18n";
 import type { OverviewStatsResponse } from "../types";
 import ConfigurationAccountSection from "./ConfigurationAccountSection";
+import ConfigurationDocumentationSection from "./ConfigurationDocumentationSection";
 import ConfigurationPreferencesSection from "./ConfigurationPreferencesSection";
 import GettingStartedGuideModal from "./GettingStartedGuideModal";
 
@@ -28,13 +29,7 @@ export default function ConfigurationsPage({
 
   return (
     <main className="container">
-      <button
-        type="button"
-        className="getting-started-open-button"
-        onClick={() => setShowGettingStarted(true)}
-      >
-        {t("config.gettingStartedOpen")}
-      </button>
+      <ConfigurationDocumentationSection onOpenGettingStarted={() => setShowGettingStarted(true)} />
       <ConfigurationAccountSection authBusy={authBusy} authUser={authUser} onLogout={onLogout} stats={stats} />
       <ConfigurationPreferencesSection onStatsChange={setStats} />
       {canCreateUsers ? (

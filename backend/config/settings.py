@@ -108,6 +108,7 @@ ELEVENLABS_PCM_OUTPUT_FORMAT = os.getenv("ELEVENLABS_PCM_OUTPUT_FORMAT", "pcm_24
 AUDIO_TTS_PROVIDER = os.getenv("AUDIO_TTS_PROVIDER", "openai").strip().lower()
 OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS = int(os.getenv("OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS", "120"))
 AI_USAGE_WEEKLY_GENERATION_CREDITS = int(os.getenv("AI_USAGE_WEEKLY_GENERATION_CREDITS", "200"))
+AI_USAGE_WEEKLY_ELEVENLABS_CHARACTERS = int(os.getenv("AI_USAGE_WEEKLY_ELEVENLABS_CHARACTERS", "10000"))
 AI_USAGE_WEEKLY_REALTIME_MINUTES = int(os.getenv("AI_USAGE_WEEKLY_REALTIME_MINUTES", "45"))
 AUDIO_STORAGE_BACKEND = os.getenv("AUDIO_STORAGE_BACKEND", "local").strip().lower()
 AWS_S3_AUDIO_BUCKET = os.getenv("AWS_S3_AUDIO_BUCKET", "").strip()
@@ -125,6 +126,10 @@ DEV_CONVERSATION_ENABLE_GOAL_EVALUATION = _env_flag("DEV_CONVERSATION_ENABLE_GOA
 DEV_CONVERSATION_ENABLE_AUDIO = _env_flag("DEV_CONVERSATION_ENABLE_AUDIO", "1")
 DEV_CONVERSATION_RETURN_INLINE_AUDIO = _env_flag("DEV_CONVERSATION_RETURN_INLINE_AUDIO", "1")
 DEV_CONVERSATION_USE_REALTIME = _env_flag("DEV_CONVERSATION_USE_REALTIME", "1")
+CLOUDWATCH_LOG_GROUP = os.getenv("CLOUDWATCH_LOG_GROUP", "").strip()
+CLOUDWATCH_LOG_STREAM_NAME = os.getenv("CLOUDWATCH_LOG_STREAM_NAME", "{machine_name}/{process_id}").strip()
+# A previous deployment script escaped the braces in the default template.
+CLOUDWATCH_LOG_STREAM_NAME = CLOUDWATCH_LOG_STREAM_NAME.replace("\\{", "{").replace("\\}", "}")
 
 LOGGING = {
     "version": 1,
@@ -148,3 +153,19 @@ LOGGING = {
         },
     },
 }
+
+if CLOUDWATCH_LOG_GROUP:
+    LOGGING["handlers"]["cloudwatch"] = {
+        "class": "watchtower.CloudWatchLogHandler",
+        "level": "INFO",
+        "formatter": "standard",
+        "log_group_name": CLOUDWATCH_LOG_GROUP,
+        "log_stream_name": CLOUDWATCH_LOG_STREAM_NAME,
+        "create_log_group": False,
+        "send_interval": 10,
+    }
+    LOGGING["loggers"]["learning.views.content"]["handlers"].append("cloudwatch")
+    LOGGING["root"] = {
+        "handlers": ["console", "cloudwatch"],
+        "level": "INFO",
+    }

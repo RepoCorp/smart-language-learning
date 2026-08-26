@@ -26,10 +26,20 @@ export default function ConfigurationAccountSection({
           <strong>{authUser?.email || authUser?.username || t("config.noCurrentUser")}</strong>
         </div>
         <div className="settings-field">
-          {t("config.accountTitle")}
+          {t("config.learningStatsTitle")}
           <div className="settings-stats-list">
-            <span>{t("stats.future", { count: stats?.future_reviews ?? "-" })}</span>
-            <span>{t("stats.words", { count: stats?.word_items ?? "-" })}</span>
+            <div className="settings-stat-group">
+              <strong>{t("config.savedMaterialTitle")}</strong>
+              <span>{t("stats.savedItems", {
+                words: stats?.saved_word_items ?? "-",
+                phrases: stats?.saved_phrase_items ?? "-",
+              })}</span>
+              <span>{t("stats.notStarted", { count: stats?.not_started ?? "-" })}</span>
+            </div>
+            <div className="settings-stat-group">
+              <strong>{t("config.reviewQueueTitle")}</strong>
+              <span>{t("stats.futureBothDirections", { count: stats?.future_reviews ?? "-" })}</span>
+            </div>
           </div>
         </div>
       </div>

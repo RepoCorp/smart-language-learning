@@ -39,6 +39,9 @@ def test_overview_stats_returns_expected_counts():
     assert payload["ready_to_review"] == 1
     assert payload["future_reviews"] == 1
     assert payload["word_items"] == 1
+    assert payload["saved_items"] == 3
+    assert payload["saved_word_items"] == 2
+    assert payload["saved_phrase_items"] == 1
     assert payload["not_started"] == 1
     assert payload["difficult_items"] == 0
 
@@ -115,6 +118,9 @@ def test_overview_stats_filters_by_language_pair():
     assert payload["ready_to_review"] == 1
     assert payload["future_reviews"] == 0
     assert payload["word_items"] == 1
+    assert payload["saved_items"] == 1
+    assert payload["saved_word_items"] == 1
+    assert payload["saved_phrase_items"] == 0
     assert payload["not_started"] == 0
     assert payload["difficult_items"] == 0
 
@@ -152,6 +158,9 @@ def test_overview_stats_excludes_items_marked_as_learned():
     assert payload["ready_to_review"] == 0
     assert payload["future_reviews"] == 0
     assert payload["word_items"] == 1
+    assert payload["saved_items"] == 2
+    assert payload["saved_word_items"] == 2
+    assert payload["saved_phrase_items"] == 0
     assert payload["not_started"] == 1
     assert payload["difficult_items"] == 0
 

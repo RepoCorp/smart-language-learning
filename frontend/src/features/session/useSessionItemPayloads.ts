@@ -33,6 +33,7 @@ export function useSessionItemPayloads({
   const payloadCacheRef = useRef(new Map<string, SessionItem>());
   const pendingPayloadsRef = useRef(new Map<string, Promise<SessionItem>>());
   const [currentItem, setCurrentItem] = useState<SessionItem | null>(null);
+  const [currentItemKey, setCurrentItemKey] = useState("");
   const [currentItemLoading, setCurrentItemLoading] = useState(false);
   const [currentItemError, setCurrentItemError] = useState("");
   const currentEntry = entries[index] || null;
@@ -64,6 +65,7 @@ export function useSessionItemPayloads({
     payloadCacheRef.current.clear();
     pendingPayloadsRef.current.clear();
     setCurrentItem(null);
+    setCurrentItemKey("");
     setCurrentItemError("");
   }, [planToken, sourceLanguage, targetLanguage]);
 
@@ -71,6 +73,7 @@ export function useSessionItemPayloads({
     let active = true;
     if (!currentEntry) {
       setCurrentItem(null);
+      setCurrentItemKey("");
       setCurrentItemLoading(false);
       setCurrentItemError("");
       return () => {
@@ -81,6 +84,7 @@ export function useSessionItemPayloads({
     const cached = payloadCacheRef.current.get(currentEntryKey);
     if (cached) {
       setCurrentItem(cached);
+      setCurrentItemKey(currentEntryKey);
       setCurrentItemLoading(false);
       setCurrentItemError("");
       return () => {
@@ -89,12 +93,14 @@ export function useSessionItemPayloads({
     }
 
     setCurrentItem(null);
+    setCurrentItemKey("");
     setCurrentItemLoading(true);
     setCurrentItemError("");
     void loadPayload(currentEntry)
       .then((payload) => {
         if (!active) return;
         setCurrentItem(payload);
+        setCurrentItemKey(currentEntryKey);
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -118,5 +124,10 @@ export function useSessionItemPayloads({
     }
   }, [entries, index, loadPayload]);
 
-  return { currentItem, currentItemLoading, currentItemError };
+  return {
+    // Avoid briefly remounting a review with the previous item's payload while the next one loads.
+    currentItem: currentItemKey === currentEntryKey ? currentItem : null,
+    currentItemLoading,
+    currentItemError,
+  };
 }

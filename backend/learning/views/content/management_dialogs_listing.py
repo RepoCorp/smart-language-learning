@@ -130,6 +130,21 @@ class ContentDialogDetailView(APIView):
             }
         )
 
+    def delete(self, request: Request, dialog_id: int) -> Response:
+        user = get_request_user(request)
+        source_language, target_language = _normalized_pair(request)
+        dialog = apply_user_scope(SavedDialog.objects, user).filter(
+            id=dialog_id,
+            source_language=source_language,
+            target_language=target_language,
+        ).first()
+        if not dialog:
+            return Response({"detail": "Dialog not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        dialog.delete()
+        logger.info("content.dialog.deleted dialog_id=%s", dialog_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class ContentDialogTurnAudioView(APIView):
     def post(self, request: Request, dialog_id: int, turn_index: int) -> Response:

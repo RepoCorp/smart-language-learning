@@ -491,10 +491,19 @@ def _prompt_audio_url_for_entry(entry: SessionEntry, *, user) -> str:
         .first()
     )
     if occurrence:
+        if not (
+            _normalized_phrase_text(entry.item.spanish_text) == _normalized_phrase_text(occurrence.turn.source_text)
+            and _normalized_phrase_text(entry.item.german_text) == _normalized_phrase_text(occurrence.turn.target_text)
+        ):
+            return item_audio_url
         turn_audio_url = str(occurrence.turn.audio_url or "").strip()
         if turn_audio_url:
             return turn_audio_url
     return item_audio_url
+
+
+def _normalized_phrase_text(value: str) -> str:
+    return " ".join((value or "").split()).casefold()
 
 
 def build_review_options(entries: list[SessionEntry], *, user) -> dict[tuple[int, str | None], list[dict]]:

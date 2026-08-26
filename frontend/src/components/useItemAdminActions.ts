@@ -45,6 +45,7 @@ export function useItemAdminActions({
     if (itemId <= 0 || activeAction) {
       return;
     }
+    setOpen(false);
     setActiveAction(action);
     setMessage("");
     setError("");

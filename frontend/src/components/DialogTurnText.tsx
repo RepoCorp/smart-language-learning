@@ -26,6 +26,7 @@ interface DialogTurnTextProps {
   statusKeyPrefix?: string;
   highlightWord?: string;
   hideTargetText?: boolean;
+  disableWordClicks?: boolean;
   onTokenClick?: (statusKey: string, token: string, tokenIndex: number) => void;
   onOpenItem?: (itemId: number) => void | Promise<void>;
   wordMatches?: (token: string, word: string) => boolean;
@@ -49,6 +50,7 @@ export default function DialogTurnText({
   statusKeyPrefix,
   highlightWord = "",
   hideTargetText = false,
+  disableWordClicks = false,
   onTokenClick,
   onOpenItem,
   wordMatches,
@@ -113,16 +115,21 @@ export default function DialogTurnText({
               const status = tokenStatus[statusKey] || "idle";
               const selectedClass = selectingPhrase ? selectedPhraseTokenClass(tokenIndex) : "";
               const showHighlight = !!highlightWord && wordMatches?.(token, highlightWord);
+              const tokenContent = disableWordClicks ? (
+                <span className={showHighlight ? "turn-word-highlight" : undefined}>{token}</span>
+              ) : (
+                <button
+                  type="button"
+                  className={`turn-token-button ${showHighlight ? "turn-word-highlight" : ""} ${selectedClass}`}
+                  onClick={() => selectingPhrase ? togglePhraseSelectionToken(tokenIndex) : onTokenClick?.(statusKey, token, tokenIndex)}
+                  disabled={!selectingPhrase && status === "saving"}
+                >
+                  {token}
+                </button>
+              );
               return (
                 <span key={statusKey} className="turn-token-wrap">
-                  <button
-                    type="button"
-                    className={`turn-token-button ${showHighlight ? "turn-word-highlight" : ""} ${selectedClass}`}
-                    onClick={() => selectingPhrase ? togglePhraseSelectionToken(tokenIndex) : onTokenClick?.(statusKey, token, tokenIndex)}
-                    disabled={!selectingPhrase && status === "saving"}
-                  >
-                    {token}
-                  </button>
+                  {tokenContent}
                   {tokenIndex < tokens.length - 1 ? " " : ""}
                   {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
                   {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}

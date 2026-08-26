@@ -11,12 +11,14 @@ import type { OverviewStatsResponse } from "../types";
 interface OverviewStatsBarProps {
   topBarControl?: ReactNode;
   showFutureReviews?: boolean;
+  showNotStarted?: boolean;
   showWordCount?: boolean;
 }
 
 export default function OverviewStatsBar({
   topBarControl,
   showFutureReviews = true,
+  showNotStarted = true,
   showWordCount = true,
 }: OverviewStatsBarProps): JSX.Element {
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
@@ -55,8 +57,8 @@ export default function OverviewStatsBar({
 
   const metricCards = [
     { key: "ready", label: t("stats.readyLabel"), value: stats?.ready_to_review ?? "-" },
+    ...(showNotStarted ? [{ key: "not-started", label: t("stats.newLabel"), value: stats?.not_started ?? "-" }] : []),
     ...(showFutureReviews ? [{ key: "future", label: t("stats.futureLabel"), value: stats?.future_reviews ?? "-" }] : []),
-    { key: "not-started", label: t("stats.notStartedLabel"), value: stats?.not_started ?? "-" },
     ...(showWordCount ? [{ key: "words", label: t("stats.wordsLabel"), value: stats?.word_items ?? "-" }] : []),
   ];
 

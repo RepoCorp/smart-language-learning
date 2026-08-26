@@ -501,6 +501,9 @@ export interface OverviewStatsResponse {
   ready_to_review: number;
   future_reviews: number;
   word_items: number;
+  saved_items: number;
+  saved_word_items: number;
+  saved_phrase_items: number;
   not_started: number;
   difficult_items: number;
 }

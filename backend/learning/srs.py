@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from django.utils import timezone
 
-from .models import Item
+from .models import Item, ItemDialogOccurrence
 from .review_schedule import next_review_at
 
 MIN_INTERVAL_DAYS = 1
@@ -22,13 +22,15 @@ def apply_review_result(item: Item, correct: bool, direction: str | None = None)
 
 def mark_item_seen(item: Item) -> Item:
     now = timezone.now()
+    reserved_dates = _linked_item_due_dates(item)
     item.interval_days_es_to_de = MIN_INTERVAL_DAYS
     item.last_reviewed_at_es_to_de = now
-    item.due_at_es_to_de = next_review_at(now, item.interval_days_es_to_de)
+    item.due_at_es_to_de = _next_available_due_at(now, item.interval_days_es_to_de, reserved_dates)
+    reserved_dates.add(timezone.localdate(item.due_at_es_to_de))
 
     item.interval_days_de_to_es = MIN_INTERVAL_DAYS
     item.last_reviewed_at_de_to_es = now
-    item.due_at_de_to_es = next_review_at(now, item.interval_days_de_to_es)
+    item.due_at_de_to_es = _next_available_due_at(now, item.interval_days_de_to_es, reserved_dates)
     item.save(
         update_fields=[
             "interval_days_es_to_de",
@@ -71,6 +73,8 @@ def _apply_directional_review_result(item: Item, correct: bool, now, suffix: str
     interval_days_field = f"interval_days_{suffix}"
     last_reviewed_at_field = f"last_reviewed_at_{suffix}"
     due_at_field = f"due_at_{suffix}"
+    other_suffix = "de_to_es" if suffix == "es_to_de" else "es_to_de"
+    other_due_at = getattr(item, f"due_at_{other_suffix}")
 
     repetition_count = max(0, int(getattr(item, repetition_count_field) or 0))
     current_interval = max(MIN_INTERVAL_DAYS, int(getattr(item, interval_days_field) or MIN_INTERVAL_DAYS))
@@ -87,7 +91,11 @@ def _apply_directional_review_result(item: Item, correct: bool, now, suffix: str
     setattr(item, repetition_count_field, repetition_count)
     setattr(item, interval_days_field, interval_days)
     setattr(item, last_reviewed_at_field, now)
-    setattr(item, due_at_field, next_review_at(now, interval_days))
+    reserved_dates = _linked_item_due_dates(item)
+    if other_due_at:
+        reserved_dates.add(timezone.localdate(other_due_at))
+    due_at = _next_available_due_at(now, interval_days, reserved_dates)
+    setattr(item, due_at_field, due_at)
     item.save(
         update_fields=[
             repetition_count_field,
@@ -98,6 +106,39 @@ def _apply_directional_review_result(item: Item, correct: bool, now, suffix: str
         ]
     )
     return item
+
+
+def _linked_item_due_dates(item: Item) -> set:
+    linked_item_type = Item.ItemType.PHRASE if item.item_type == Item.ItemType.WORD else Item.ItemType.WORD
+    turn_ids = ItemDialogOccurrence.objects.filter(item=item).values("turn_id")
+    linked_item_ids = (
+        ItemDialogOccurrence.objects.filter(
+            turn_id__in=turn_ids,
+            item__item_type=linked_item_type,
+            item__user_id=item.user_id,
+        )
+        .exclude(item_id=item.id)
+        .values("item_id")
+        .distinct()
+    )
+    due_dates = set()
+    for due_es_to_de, due_de_to_es in Item.objects.filter(id__in=linked_item_ids).values_list(
+        "due_at_es_to_de",
+        "due_at_de_to_es",
+    ):
+        for due_at in (due_es_to_de, due_de_to_es):
+            if due_at:
+                due_dates.add(timezone.localdate(due_at))
+    return due_dates
+
+
+def _next_available_due_at(now, interval_days: int, reserved_dates: set):
+    candidate_interval = interval_days
+    due_at = next_review_at(now, candidate_interval)
+    while timezone.localdate(due_at) in reserved_dates:
+        candidate_interval += 1
+        due_at = next_review_at(now, candidate_interval)
+    return due_at
 
 
 def _success_growth_factor(streak: int) -> float:

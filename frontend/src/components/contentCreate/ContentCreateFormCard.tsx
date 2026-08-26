@@ -12,25 +12,25 @@ type ProficiencyLevel = "A1" | "A2" | "B1" | "B2";
 function CollapsibleSection({
   title,
   subtitle,
-  defaultOpen,
+  open,
+  onToggle,
   children,
   accent = "neutral",
 }: {
   title: string;
   subtitle?: string;
-  defaultOpen?: boolean;
+  open: boolean;
+  onToggle: () => void;
   children: JSX.Element | JSX.Element[];
   accent?: "neutral" | "required";
 }): JSX.Element {
-  const [open, setOpen] = useState<boolean>(Boolean(defaultOpen));
-
   return (
     <section className={`content-collapsible-section content-collapsible-section-${accent}${open ? " content-collapsible-section-open" : ""}`}>
       <button
         type="button"
         className="content-collapsible-trigger"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={onToggle}
       >
         <span className="content-collapsible-trigger-copy">
           <strong>{title}</strong>
@@ -97,6 +97,7 @@ export default function ContentCreateFormCard({
   onGeneratePreview: () => void;
 }): JSX.Element {
   const { t } = useI18n();
+  const [openSection, setOpenSection] = useState<"topic" | "context" | "options" | null>(null);
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
   const shouldCreateNewContext = selectedContext === CREATE_NEW_OPTION;
   const usingRandomTopic = selectedTopic === RANDOM_TOPIC_OPTION;
@@ -112,6 +113,8 @@ export default function ContentCreateFormCard({
           ? t("content.topic.requiredBadge")
           : (usingRandomTopic ? t("content.topic.random") : (resolvedTopic ? resolvedTopic : t("content.section.topicSubtitleEmpty")))}
         accent={needsCustomTopic ? "required" : "neutral"}
+        open={openSection === "topic"}
+        onToggle={() => setOpenSection((current) => current === "topic" ? null : "topic")}
       >
         <div className="content-form-section content-topic-section">
           <select
@@ -155,6 +158,8 @@ export default function ContentCreateFormCard({
       <CollapsibleSection
         title={t("content.section.contextTitle")}
         subtitle={selectedContext === CREATE_NEW_OPTION ? customContext.trim() || t("content.context.none") : selectedContext || t("content.context.none")}
+        open={openSection === "context"}
+        onToggle={() => setOpenSection((current) => current === "context" ? null : "context")}
       >
         <div className="content-form-section">
           <select
@@ -188,6 +193,8 @@ export default function ContentCreateFormCard({
 
       <CollapsibleSection
         title={t("content.section.optionsTitle")}
+        open={openSection === "options"}
+        onToggle={() => setOpenSection((current) => current === "options" ? null : "options")}
       >
         <>
           <div className="content-form-section content-setting-block">

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from .management import (
     APIView,
     Request,
@@ -13,6 +15,7 @@ from .management import (
 )
 from .dialog_click_resolution import resolve_dialog_click_word_pair as _resolve_dialog_click_word_pair
 from .dialog_item_context import (
+    ensure_audio_for_dialog_turn,
     link_item_to_dialog_turn,
 )
 from .core import (
@@ -25,6 +28,9 @@ from .core import (
 from .types import ContentCandidate
 from .word_metadata import normalize_word_metadata as _normalize_word_metadata
 from ...models import DialogTurn, Item, SavedDialog
+
+
+logger = logging.getLogger(__name__)
 
 
 GERMAN_NOUN_PLURAL_PROMPT = """
@@ -391,34 +397,13 @@ class ContentWordQuickAddView(APIView):
                 source_line=source_line,
                 target_line=target_line,
             )
-        except (RuntimeError, TypeError, ValueError):
+        except (RuntimeError, TypeError, ValueError) as exc:
+            logger.exception(
+                "content.words.quick_add.metadata_generation_failed error=%s",
+                exc.__class__.__name__,
+            )
             return Response({"detail": "Word metadata generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         final_notes = model_note or notes
-        if word_type == "expression":
-            try:
-                source_text, target_text = _resolve_dialog_phrase_selection(
-                    selected_target_text=target_text,
-                    source_line=source_line,
-                    target_line=target_line,
-                    source_language=source_language,
-                    target_language=target_language,
-                )
-            except ValueError:
-                return Response({"detail": "Selected words do not form a complete expression."}, status=status.HTTP_400_BAD_REQUEST)
-            except RuntimeError:
-                return Response({"detail": "Phrase translation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            return _phrase_quick_add_response(
-                user=user,
-                source_language=source_language,
-                target_language=target_language,
-                source_text=source_text,
-                target_text=target_text,
-                notes=final_notes,
-                word_type=word_type,
-                dialog_id_raw=dialog_id_raw,
-                turn_index_raw=turn_index_raw,
-                check_only=check_only,
-            )
         source_text, target_text = normalize_word_pair_for_item_save(
             spanish_text=source_text,
             german_text=target_text,

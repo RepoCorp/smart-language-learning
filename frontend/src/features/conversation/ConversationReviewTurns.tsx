@@ -79,6 +79,7 @@ export default function ConversationReviewTurns({
                 targetLanguage={targetLanguage}
                 tokenStatus={wordActionStatus}
                 statusKeyPrefix={`conversation-review-${dialog.dialog_id}-${index}-target`}
+                disableWordClicks={readOnly}
                 onTokenClick={(statusKey, token) => {
                   if (readOnly) {
                     return;

@@ -30,8 +30,10 @@ export type RegistrationRequestRecord = {
 export type AdminAIUsageUser = AuthUser & {
   is_blocked: boolean;
   weekly_generation_credits: number;
+  weekly_elevenlabs_characters: number;
   weekly_realtime_minutes: number;
   week_generation_credits: number;
+  week_elevenlabs_characters: number;
   week_realtime_minutes: number;
 };
 
@@ -56,6 +58,7 @@ type AdminAIUsageResponse = {
   week_start: string;
   defaults: {
     weekly_generation_credits: number;
+    weekly_elevenlabs_characters: number;
     weekly_realtime_minutes: number;
   };
   users: AdminAIUsageUser[];
@@ -287,6 +290,7 @@ export async function updateAdminAIUsageLimit(user: AdminAIUsageUser): Promise<v
       user_id: user.id,
       is_blocked: user.is_blocked,
       weekly_generation_credits: user.weekly_generation_credits,
+      weekly_elevenlabs_characters: user.weekly_elevenlabs_characters,
       weekly_realtime_minutes: user.weekly_realtime_minutes,
     }),
   });

@@ -9,25 +9,27 @@ import type { ConversationSetupGoal } from "./useConversationSetup";
 function CollapsibleSection({
   title,
   subtitle,
+  open,
+  onToggle,
   accent = "neutral",
   disabled = false,
   children,
 }: {
   title: string;
   subtitle?: string;
+  open: boolean;
+  onToggle: () => void;
   accent?: "neutral" | "required";
   disabled?: boolean;
   children: JSX.Element | JSX.Element[];
 }): JSX.Element {
-  const [open, setOpen] = useState<boolean>(false);
-
   return (
     <section className={`content-collapsible-section content-collapsible-section-${accent}${open ? " content-collapsible-section-open" : ""}`}>
       <button
         type="button"
         className="content-collapsible-trigger"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={onToggle}
         disabled={disabled}
       >
         <span className="content-collapsible-trigger-copy conversation-setup-trigger-copy">
@@ -93,6 +95,7 @@ export default function ConversationSetupCard({
   onStart: () => void;
 }): JSX.Element {
   const { t } = useI18n();
+  const [openSection, setOpenSection] = useState<"topic" | "setup" | "difficulty" | "mode" | null>(null);
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
   const usingRandomTopic = selectedTopic === RANDOM_TOPIC_OPTION;
   const topicSubtitle = usingRandomTopic ? t("content.topic.random") : (resolvedTopic || "");
@@ -108,6 +111,8 @@ export default function ConversationSetupCard({
       <CollapsibleSection
         title={t("content.section.topicTitle")}
         subtitle={topicSubtitle}
+        open={openSection === "topic"}
+        onToggle={() => setOpenSection((current) => current === "topic" ? null : "topic")}
         accent={!resolvedTopic ? "required" : "neutral"}
         disabled={controlsLocked}
       >
@@ -146,6 +151,8 @@ export default function ConversationSetupCard({
       <CollapsibleSection
         title={t("conversation.setupTitle")}
         subtitle={setupSubtitle}
+        open={openSection === "setup"}
+        onToggle={() => setOpenSection((current) => current === "setup" ? null : "setup")}
         disabled={controlsLocked}
       >
         <div className="content-form-section content-setting-block">
@@ -176,6 +183,8 @@ export default function ConversationSetupCard({
       <CollapsibleSection
         title={t("conversation.goalDifficultyLabel")}
         subtitle={difficultySubtitle}
+        open={openSection === "difficulty"}
+        onToggle={() => setOpenSection((current) => current === "difficulty" ? null : "difficulty")}
         disabled={controlsLocked}
       >
         <div className="content-form-section content-setting-block">
@@ -217,6 +226,8 @@ export default function ConversationSetupCard({
       <CollapsibleSection
         title={t("conversation.modeLabel")}
         subtitle={modeSubtitle}
+        open={openSection === "mode"}
+        onToggle={() => setOpenSection((current) => current === "mode" ? null : "mode")}
         disabled={controlsLocked}
       >
         <div className="content-form-section content-setting-block">
