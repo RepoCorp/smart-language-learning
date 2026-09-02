@@ -64,6 +64,7 @@ from .auth_pin_setup import AuthPinSetupView
 from .difficult_items import CompleteDifficultItemView
 from .grammar_pool import PhraseGrammarPoolView
 from .configuration import ElevenLabsVoiceDisableView, ElevenLabsVoicePreviewView, ElevenLabsVoicesView
+from .configuration_timezone import UserTimezonePreferenceView
 
 __all__ = [
     "ContentConfirmView",
@@ -145,4 +146,5 @@ __all__ = [
     "ElevenLabsVoiceDisableView",
     "ElevenLabsVoicePreviewView",
     "PhraseGrammarPoolView",
+    "UserTimezonePreferenceView",
 ]

@@ -1,6 +1,6 @@
-You are analyzing German sentences to identify grammar features that are clearly demonstrated by them.
+You are analyzing {target_name} sentences to identify grammar features that are clearly demonstrated by them.
 
-Given the German sentence:
+Given the {target_name} sentence:
 
 {sentence}
 
@@ -13,7 +13,7 @@ Each grammar feature contains an ID and a short description defining exactly wha
 Rules:
 
 * Evaluate every provided grammar feature.
-* Base the decision on the German sentence itself, not on its translation or intended meaning.
+* Base the decision on the {target_name} sentence itself, not on its translation or intended meaning.
 * Only return a grammar feature when the sentence provides a clear and pedagogically useful example of that feature.
 * Do not return related features merely because they are generally associated with a word or construction in the sentence.
 * Do not return a feature merely because it is technically present.
@@ -29,7 +29,7 @@ Examples:
 []
 
 [
-  "verb_position_main_clause"
+  "example_feature_key"
 ]
 
 Never return a bare feature ID, explanations, Markdown, or any other text.

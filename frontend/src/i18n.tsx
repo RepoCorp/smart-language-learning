@@ -9,6 +9,7 @@ import {
 import { studyLanguageMessages } from "./i18nStudyLanguages";
 import { configurationMessages } from "./i18nConfig";
 import { authMessages } from "./i18nAuth";
+import { englishGrammarMessages } from "./i18nEnglishGrammar";
 
 export type AppLanguage = "en" | "es";
 
@@ -28,6 +29,7 @@ const messages = {
     ...studyLanguageMessages.en,
     ...configurationMessages.en,
     ...authMessages.en,
+    ...englishGrammarMessages.en,
     "stats.ready": "Ready to review: {count}",
     "stats.future": "Future reviews: {count}",
     "stats.futureBothDirections": "Future reviews (both directions): {count}",
@@ -873,6 +875,7 @@ const messages = {
     "lang.label": "Idioma de la app",
     ...configurationMessages.es,
     ...authMessages.es,
+    ...englishGrammarMessages.es,
     "study.label": "Par de estudio",
     "study.source": "De",
     "study.target": "A",
@@ -1736,7 +1739,7 @@ const messages = {
   },
 } as const;
 
-type MessageKey = keyof typeof messages.en;
+export type MessageKey = keyof typeof messages.en;
 
 interface I18nContextValue {
   language: AppLanguage;

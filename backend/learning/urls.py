@@ -80,6 +80,7 @@ from .views import (
     SessionItemPayloadView,
     SessionView,
     SubmitReviewView,
+    UserTimezonePreferenceView,
 )
 
 urlpatterns = [
@@ -102,6 +103,7 @@ urlpatterns = [
     path("config/elevenlabs-voices/disable", ElevenLabsVoiceDisableView.as_view(), name="config-elevenlabs-voices-disable"),
     path("config/elevenlabs-voices/preview", ElevenLabsVoicePreviewView.as_view(), name="config-elevenlabs-voices-preview"),
     path("config/phrase-grammar-pool", PhraseGrammarPoolView.as_view(), name="config-phrase-grammar-pool"),
+    path("config/timezone", UserTimezonePreferenceView.as_view(), name="config-timezone"),
     path("overview-stats", OverviewStatsView.as_view(), name="overview-stats"),
     path("progress", LearningProgressView.as_view(), name="learning-progress"),
     path("progress/study-time", LearningProgressStudyTimeView.as_view(), name="learning-progress-study-time"),

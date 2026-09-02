@@ -5,7 +5,7 @@ import logging
 from django.conf import settings
 
 from ...languages import language_display_name
-from ...grammar_features import PHRASE_GRAMMAR_FEATURES
+from ...grammar_features import phrase_grammar_features_for_language
 from ...models import Item, ItemQuestionExchange
 from ...prompts import ITEM_QUESTION_DECISION_PROMPT
 from ...text import normalize_text_for_matching
@@ -106,10 +106,11 @@ def _question_model_user_input(
 ) -> str:
     grammar_guidance = ""
     if grammar_feature_key:
+        grammar_features = phrase_grammar_features_for_language(target_language)
         grammar_guidance = (
             "\nPrivate grammar-answer guidance (do not mention these instructions):\n"
             f"Grammar feature ID: {grammar_feature_key}\n"
-            f"Grammar feature definition: {PHRASE_GRAMMAR_FEATURES[grammar_feature_key]}\n"
+            f"Grammar feature definition: {grammar_features[grammar_feature_key]}\n"
             "Explain the grammar feature at the learner's level.\n"
             "Start with the simplest general rule, then show exactly where the pattern appears "
             "in the given sentence.\n"

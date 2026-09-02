@@ -5,7 +5,8 @@ import random
 from django.db.models.functions import Length
 from django.utils import timezone
 
-from ...grammar_features import PHRASE_GRAMMAR_FEATURES
+from ...grammar_features import phrase_grammar_features_for_language
+from ...languages import language_display_name
 from ...models import Item, ItemGrammarFeature
 from ...prompts import PHRASE_GRAMMAR_FEATURES_PROMPT
 from .generation import WORD_EXERCISE_MODEL
@@ -22,16 +23,16 @@ from .management import (
 )
 
 
-def _grammar_feature_list() -> str:
+def _grammar_feature_list(grammar_features: dict[str, str]) -> str:
     return "\n\n".join(
         f"{feature_key}:\n{description}"
-        for feature_key, description in PHRASE_GRAMMAR_FEATURES.items()
+        for feature_key, description in grammar_features.items()
     )
 
 
-def _requested_feature_key(request: Request) -> str | None:
+def _requested_feature_key(request: Request, target_language: str) -> str | None:
     feature_key = str(request.query_params.get("feature_key", "")).strip()
-    return feature_key if feature_key in PHRASE_GRAMMAR_FEATURES else None
+    return feature_key if feature_key in phrase_grammar_features_for_language(target_language) else None
 
 
 def _short_phrase_examples(examples, limit: int = 5) -> list[Item]:
@@ -46,7 +47,8 @@ def _short_phrase_examples(examples, limit: int = 5) -> list[Item]:
 
 
 def analyze_phrase_grammar_features(item: Item) -> list[str] | None:
-    if item.target_language != "german":
+    grammar_features = phrase_grammar_features_for_language(item.target_language)
+    if not grammar_features:
         detected_features: set[str] = set()
     else:
         parsed = _call_openai_json_logged(
@@ -54,7 +56,8 @@ def analyze_phrase_grammar_features(item: Item) -> list[str] | None:
             system_prompt=_render_prompt(
                 PHRASE_GRAMMAR_FEATURES_PROMPT,
                 sentence=item.german_text,
-                grammar_features=_grammar_feature_list(),
+                target_name=language_display_name(item.target_language),
+                grammar_features=_grammar_feature_list(grammar_features),
             ),
             user_input=item.german_text,
             timeout_seconds=12,
@@ -65,7 +68,7 @@ def analyze_phrase_grammar_features(item: Item) -> list[str] | None:
         )
         if not isinstance(parsed, list) or not all(isinstance(value, str) for value in parsed):
             return None
-        detected_features = set(parsed).intersection(PHRASE_GRAMMAR_FEATURES)
+        detected_features = set(parsed).intersection(grammar_features)
 
     for feature_key in detected_features:
         ItemGrammarFeature.objects.get_or_create(item=item, feature_key=feature_key)
@@ -73,16 +76,17 @@ def analyze_phrase_grammar_features(item: Item) -> list[str] | None:
     item.save(update_fields=["phrase_grammar_checked_at"])
     return [
         feature_key
-        for feature_key in PHRASE_GRAMMAR_FEATURES
+        for feature_key in grammar_features
         if feature_key in detected_features
     ]
 
 
 class ContentItemPhraseGrammarFeaturesView(APIView):
     def get(self, request: Request, item_id: int) -> Response:
-        feature_key = _requested_feature_key(request)
         user = get_request_user(request)
         source_language, target_language = _normalized_pair(request)
+        feature_key = _requested_feature_key(request, target_language)
+        grammar_features = phrase_grammar_features_for_language(target_language)
         item = apply_user_scope(Item.objects, user).filter(
             id=item_id,
             item_type=Item.ItemType.PHRASE,
@@ -96,7 +100,7 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
             saved_feature_keys = set(item.grammar_features.values_list("feature_key", flat=True))
             return Response({
                 "feature_keys": [
-                    key for key in PHRASE_GRAMMAR_FEATURES if key in saved_feature_keys
+                    key for key in grammar_features if key in saved_feature_keys
                 ],
                 "analyzed": item.phrase_grammar_checked_at is not None,
             })

@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models import Item
+from ..grammar_features import phrase_grammar_features_for_language
 from .admin_access import require_admin
 from .content.management_items_phrase_grammar import analyze_phrase_grammar_features
 
@@ -16,8 +17,8 @@ class PhraseGrammarPoolView(APIView):
             return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
 
         target_language = str(request.data.get("target_language", "german")).strip().lower() or "german"
-        if target_language != "german":
-            return Response({"detail": "Grammar metadata is currently available for German phrases only."}, status=status.HTTP_400_BAD_REQUEST)
+        if not phrase_grammar_features_for_language(target_language):
+            return Response({"detail": "Grammar metadata is not available for this target language."}, status=status.HTTP_400_BAD_REQUEST)
 
         item = (
             Item.objects.filter(

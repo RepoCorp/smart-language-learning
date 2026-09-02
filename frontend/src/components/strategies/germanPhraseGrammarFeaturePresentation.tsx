@@ -1,0 +1,25 @@
+import type { PhraseGrammarFeaturePresentationMap } from "./phraseGrammarFeaturePresentationTypes";
+
+export const GERMAN_PHRASE_GRAMMAR_FEATURE_PRESENTATION = {
+  verb_position_main_clause: { title: "strategies.grammar.verbPositionStatement", present: "strategies.grammar.verbPositionStatementNote", example: <>Ich <strong>komme</strong> heute.</> },
+  verb_position_yes_no_question: { title: "strategies.grammar.verbPositionYesNoQuestion", present: "strategies.grammar.verbPositionYesNoQuestionNote", example: <><strong>Kommst</strong> du heute?</> },
+  verb_position_w_question: { title: "strategies.grammar.verbPositionWQuestion", present: "strategies.grammar.verbPositionWQuestionNote", example: <><strong>Wo</strong> <strong>wohnst</strong> du?</> },
+  verb_position_subordinate_clause: { title: "strategies.grammar.verbPositionSubordinateClause", present: "strategies.grammar.verbPositionSubordinateClauseNote", example: <><strong>weil</strong> ich heute <strong>komme</strong></> },
+  time_expression_position: { title: "strategies.grammar.timeExpressionPosition", present: "strategies.grammar.timeExpressionPositionNote", example: <><span>Ich gehe <strong>heute</strong> zur Arbeit.</span><br /><span><strong>Heute</strong> <strong>gehe</strong> ich zur Arbeit.</span></> },
+  separable_verb_main_clause: { title: "strategies.grammar.separableVerbMainClause", present: "strategies.grammar.separableVerbMainClauseNote", example: <>aufstehen → Ich <strong>stehe</strong> <strong>auf</strong>.</> },
+  modal_verb_with_infinitive: { title: "strategies.grammar.modalVerbWithInfinitive", present: "strategies.grammar.modalVerbWithInfinitiveNote", example: <>Ich <strong>muss</strong> <strong>arbeiten</strong>.</> },
+  reflexive_verb: { title: "strategies.grammar.reflexiveVerb", present: "strategies.grammar.reflexiveVerbNote", example: <>sich freuen → Ich <strong>freue mich</strong>.</> },
+  auxiliary_verb: { title: "strategies.grammar.auxiliaryVerb", present: "strategies.grammar.auxiliaryVerbNote", example: <>haben + gemacht → Ich <strong>habe</strong> das gemacht.</> },
+  past_participle: { title: "strategies.grammar.pastParticiple", present: "strategies.grammar.pastParticipleNote", example: <>machen → <strong>gemacht</strong></> },
+  perfect_with_haben_or_sein: { title: "strategies.grammar.perfectWithHabenOrSein", present: "strategies.grammar.perfectWithHabenOrSeinNote", example: <><span>machen → Ich <strong>habe</strong> das <strong>gemacht</strong>.</span><br /><span>gehen → Ich <strong>bin</strong> nach Hause <strong>gegangen</strong>.</span></> },
+  imperative: { title: "strategies.grammar.imperative", present: "strategies.grammar.imperativeNote", example: <>kommen → <strong>Komm!</strong> (du) · <strong>Kommt!</strong> (ihr) · <strong>Kommen Sie!</strong> (Sie)</> },
+  konjunktiv_ii: { title: "strategies.grammar.konjunktivIi", present: "strategies.grammar.konjunktivIiNote", example: <>können → Ich <strong>könnte</strong> kommen.</> },
+  negation_nicht: { title: "strategies.grammar.negationNicht", present: "strategies.grammar.negationNichtNote", example: <>Ich komme. → Ich komme <strong>nicht</strong>.</> },
+  negation_kein: { title: "strategies.grammar.negationKein", present: "strategies.grammar.negationKeinNote", example: <>Ich habe ein Auto. → Ich habe <strong>kein Auto</strong>.</> },
+  preposition_accusative: { title: "strategies.grammar.prepositionAccusative", present: "strategies.grammar.prepositionAccusativeNote", example: <>für → Das ist <strong>für den Hund</strong>.</> },
+  preposition_dative: { title: "strategies.grammar.prepositionDative", present: "strategies.grammar.prepositionDativeNote", example: <>mit → Ich komme <strong>mit dem Hund</strong>.</> },
+  two_way_preposition_location: { title: "strategies.grammar.twoWayPrepositionLocation", present: "strategies.grammar.twoWayPrepositionLocationNote", example: <>in + Wo? → Ich bin <strong>in der Küche</strong>.</> },
+  two_way_preposition_direction: { title: "strategies.grammar.twoWayPrepositionDirection", present: "strategies.grammar.twoWayPrepositionDirectionNote", example: <>in + Wohin? → Ich gehe <strong>in die Küche</strong>.</> },
+  adjective_ending_gender: { title: "strategies.grammar.adjectiveEndingGender", present: "strategies.grammar.adjectiveEndingGenderNote", example: <><span>gut →</span><br /><span>Masculine: gut<strong>er</strong> Hund</span><br /><span>Feminine: gut<strong>e</strong> Musik</span><br /><span>Neuter: gut<strong>es</strong> Essen</span></> },
+  adjective_ending_case: { title: "strategies.grammar.adjectiveEndingCase", present: "strategies.grammar.adjectiveEndingCaseNote", example: <><span>gut + Hund →</span><br /><span>Nominative: gut<strong>er</strong> Hund</span><br /><span>Accusative: gut<strong>en</strong> Hund</span><br /><span>Dative: gut<strong>em</strong> Hund</span><br /><span>Genitive: gut<strong>en</strong> Hundes</span></> },
+} satisfies PhraseGrammarFeaturePresentationMap;

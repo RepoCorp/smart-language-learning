@@ -6,6 +6,7 @@ import type { OverviewStatsResponse } from "../types";
 import ConfigurationAccountSection from "./ConfigurationAccountSection";
 import ConfigurationDocumentationSection from "./ConfigurationDocumentationSection";
 import ConfigurationPreferencesSection from "./ConfigurationPreferencesSection";
+import ConfigurationTimezoneSection from "./ConfigurationTimezoneSection";
 import GettingStartedGuideModal from "./GettingStartedGuideModal";
 
 interface ConfigurationsPageProps {
@@ -31,6 +32,7 @@ export default function ConfigurationsPage({
     <main className="container">
       <ConfigurationDocumentationSection onOpenGettingStarted={() => setShowGettingStarted(true)} />
       <ConfigurationAccountSection authBusy={authBusy} authUser={authUser} onLogout={onLogout} stats={stats} />
+      <ConfigurationTimezoneSection />
       <ConfigurationPreferencesSection onStatsChange={setStats} />
       {canCreateUsers ? (
         <section className="card settings-card">

@@ -12,7 +12,7 @@ from .management import (
     status,
 )
 from ...models import ItemQuestionExchange
-from ...grammar_features import PHRASE_GRAMMAR_FEATURES
+from ...grammar_features import phrase_grammar_features_for_language
 from .item_questions import (
     item_question_history,
     model_answer_or_reject_item_question,
@@ -49,8 +49,7 @@ class ContentItemQuestionView(APIView):
             return Response({"detail": "question_text is too long"}, status=status.HTTP_400_BAD_REQUEST)
         if grammar_feature_key and (
             item.item_type != Item.ItemType.PHRASE
-            or target_language != "german"
-            or grammar_feature_key not in PHRASE_GRAMMAR_FEATURES
+            or grammar_feature_key not in phrase_grammar_features_for_language(target_language)
         ):
             return Response({"detail": "Invalid grammar feature"}, status=status.HTTP_400_BAD_REQUEST)
 

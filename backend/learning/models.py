@@ -8,6 +8,7 @@ from .models_auth import (
     RegistrationRequest,
     UserAuthToken,
     UserOnboarding,
+    UserTimezonePreference,
     _generate_auth_token_key,
 )
 

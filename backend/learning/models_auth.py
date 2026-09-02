@@ -51,6 +51,16 @@ class UserOnboarding(models.Model):
     getting_started_seen_at = models.DateTimeField(null=True, blank=True)
 
 
+class UserTimezonePreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_timezone_preference",
+    )
+    timezone = models.CharField(max_length=64, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class RegistrationRequest(models.Model):
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)

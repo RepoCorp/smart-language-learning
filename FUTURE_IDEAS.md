@@ -3,6 +3,17 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
+Los objetivos se repiten mucho
+Esconder el texto de la frase que se muestra después de calificar un ítem, pero que permita abrirlo y reproducirlo
+Plural en frase
+Relaxion expresion dialogo
+Estrategia que uno intente escribir la frase y se la corrija
+Que si el error en un articulo el sustantivo no esta guardadi Que no simplemente falle al añadir el ajercicio
+Calienta la palabra muchos sin frase. Ejemplo wirken
+Como bloques pero que sea un slider
+Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que si lo indique, cual es la regla al momento de practicarlo
+
+
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 ### Gramatica
 - Sustantivos:
@@ -38,6 +49,7 @@ Quitar la selección de frase para imagen y cuando esta abierta decir solo la fr
 Problema con palabras que toma como.expresion como.bitte y gleichfalls
 
 ## FUTURE WORK (some important, some not so important)
+Añadir notas pa metas, Como que yo no tengo alergias
 Que en gramar se pueda abrir el ejercicio de bloques, de pronto sin el hint del tamaño del espacio para la palabra. De pronto no con las palabras independientes si no con las partes que estan involucradas en la regla
     Que capturen esas reglas de órdenes y grupos de palabras gramaticales. Que en los bloques uno tenga que armar sub bloques para ayudar con la estructura de la frase, o poner de entrada algunas palabras y solo tenga que ubicar en las que se ha equivocado en el pasado
 Uno escribir su propio goal

@@ -3,6 +3,29 @@ from .noun_gender import (
     GERMAN_NOUN_GENDER_FEATURES,
     sync_item_grammar_features,
 )
+from .english_phrase_features import (
+    BE_CONJUGATION,
+    ADJECTIVE_NOUN_ORDER,
+    ARTICLE_A_AN,
+    COMPARATIVE,
+    COUNTABLE_UNCOUNTABLE,
+    DO_NEGATION,
+    DO_QUESTION,
+    FUTURE_WILL,
+    GERUND_AFTER_VERB,
+    INFINITIVE_WITH_TO,
+    MODAL_BASE_VERB,
+    PAST_CONTINUOUS,
+    PRESENT_CONTINUOUS,
+    PRESENT_PERFECT,
+    SIMPLE_PAST,
+    ENGLISH_PHRASE_GRAMMAR_FEATURES,
+    SUBJECT_VERB_OBJECT,
+    SUBJECT_PRONOUN_REQUIRED,
+    SUPERLATIVE,
+    THIRD_PERSON_S,
+    WH_QUESTION,
+)
 from .phrase_features import (
     ADJECTIVE_ENDING_CASE,
     ADJECTIVE_ENDING_GENDER,
@@ -28,10 +51,34 @@ from .phrase_features import (
     VERB_POSITION_YES_NO_QUESTION,
 )
 
+
+def phrase_grammar_features_for_language(target_language: str) -> dict[str, str]:
+    if target_language == "german":
+        return PHRASE_GRAMMAR_FEATURES
+    if target_language == "english":
+        return ENGLISH_PHRASE_GRAMMAR_FEATURES
+    return {}
+
 __all__ = [
     "ADJECTIVE_ENDING_CASE",
     "ADJECTIVE_ENDING_GENDER",
+    "ADJECTIVE_NOUN_ORDER",
+    "ARTICLE_A_AN",
     "AUXILIARY_VERB",
+    "BE_CONJUGATION",
+    "COMPARATIVE",
+    "COUNTABLE_UNCOUNTABLE",
+    "DO_NEGATION",
+    "DO_QUESTION",
+    "FUTURE_WILL",
+    "GERUND_AFTER_VERB",
+    "INFINITIVE_WITH_TO",
+    "MODAL_BASE_VERB",
+    "PAST_CONTINUOUS",
+    "PRESENT_CONTINUOUS",
+    "PRESENT_PERFECT",
+    "SIMPLE_PAST",
+    "ENGLISH_PHRASE_GRAMMAR_FEATURES",
     "GERMAN_NOUN_GENDER_FEATURE_KEYS",
     "GERMAN_NOUN_GENDER_FEATURES",
     "IMPERATIVE",
@@ -47,11 +94,17 @@ __all__ = [
     "REFLEXIVE_VERB",
     "SEPARABLE_VERB_MAIN_CLAUSE",
     "TIME_EXPRESSION_POSITION",
+    "SUBJECT_VERB_OBJECT",
+    "SUBJECT_PRONOUN_REQUIRED",
+    "SUPERLATIVE",
+    "THIRD_PERSON_S",
+    "WH_QUESTION",
     "TWO_WAY_PREPOSITION_DIRECTION",
     "TWO_WAY_PREPOSITION_LOCATION",
     "VERB_POSITION_MAIN_CLAUSE",
     "VERB_POSITION_SUBORDINATE_CLAUSE",
     "VERB_POSITION_W_QUESTION",
     "VERB_POSITION_YES_NO_QUESTION",
+    "phrase_grammar_features_for_language",
     "sync_item_grammar_features",
 ]

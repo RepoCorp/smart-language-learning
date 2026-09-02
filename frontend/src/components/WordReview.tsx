@@ -10,6 +10,7 @@ import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
 import { useWordChallengeInputFocus } from "./useWordChallengeInputFocus";
+import { warmupContextPairForItem } from "./wordWarmupContext";
 import {
   hintOptionLabel,
   isLetter,
@@ -156,43 +157,6 @@ function completionPhraseForItem(item: SessionItem): { text: string; sourceText:
   }
 
   return { text: "", sourceText: "", audioUrl: "" };
-}
-
-function warmupContextPairForItem(item: SessionItem): { target: string; source: string } {
-  const dialogCandidates = [
-    ...((item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => ({
-      source: turn.source_text,
-      target: turn.target_text,
-    })))),
-    ...((item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => ({
-      source: turn.source_text,
-      target: turn.target_text,
-    })))),
-  ];
-  const exerciseCandidates = [
-    ...((item.exercise_phrases?.phrases || []).map((entry) => ({
-      source: entry.source_text,
-      target: entry.target_text,
-    }))),
-    ...((item.exercise_phrases?.first_section || []).map((entry) => ({
-      source: entry.source_text,
-      target: entry.target_text,
-    }))),
-    ...((item.exercise_phrases?.second_section || []).map((entry) => ({
-      source: entry.source_text,
-      target: entry.target_text,
-    }))),
-    ...(item.exercise_phrases?.funny_image_phrase
-      ? [{
-        source: item.exercise_phrases.funny_image_phrase.source_text,
-        target: item.exercise_phrases.funny_image_phrase.target_text,
-      }]
-      : []),
-  ];
-  const candidates = [...dialogCandidates, ...exerciseCandidates].filter(
-    (candidate) => candidate.target.trim() && candidate.source.trim(),
-  );
-  return candidates.find((candidate) => blankTargetInPhrase(candidate.target, item.german_text)) || { target: "", source: "" };
 }
 
 function splitClozePhrase(phrase: string): { before: string; after: string } | null {
@@ -375,7 +339,9 @@ export default function WordReview({
     : [];
   const warmupRevealedIndexes = new Set(warmupRevealOrder.slice(0, warmupRevealCount));
   const warmupProgressText = useIntroRetry ? warmupProgress(expectedAnswer, warmupRevealedIndexes) : "";
-  const warmupContextPair = useIntroRetry ? warmupContextPairForItem(item) : { target: "", source: "" };
+  const warmupContextPair = useIntroRetry
+    ? warmupContextPairForItem(item, blankTargetInPhrase)
+    : { target: "", source: "" };
   const warmupContextSentence = warmupContextPair.target;
   const warmupContextTranslation = warmupContextPair.source;
   const warmupContextParts = useIntroRetry ? splitClozePhrase(blankTargetInPhrase(warmupContextSentence, expectedAnswer)) : null;

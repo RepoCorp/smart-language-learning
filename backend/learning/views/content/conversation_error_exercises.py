@@ -6,7 +6,7 @@ from django.db.models.functions import Length
 from django.utils import timezone
 
 from ...auth import apply_user_scope
-from ...grammar_features import PHRASE_GRAMMAR_FEATURES
+from ...grammar_features import phrase_grammar_features_for_language
 from ...models import Item
 
 _WORD_PREFIX_RE = re.compile(
@@ -29,7 +29,7 @@ def add_conversation_error_exercises(
         source_language=source_language,
         target_language=target_language,
     )
-    for feature_key in set(grammar_feature_keys).intersection(PHRASE_GRAMMAR_FEATURES):
+    for feature_key in set(grammar_feature_keys).intersection(phrase_grammar_features_for_language(target_language)):
         example = (
             phrases.filter(grammar_features__feature_key=feature_key)
             .annotate(target_length=Length("german_text"))

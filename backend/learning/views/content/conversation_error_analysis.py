@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...grammar_features import PHRASE_GRAMMAR_FEATURES
+from ...grammar_features import phrase_grammar_features_for_language
 from ...languages import language_display_name
 from ...prompts import TOPIC_CONVERSATION_ERROR_ANALYSIS_PROMPT
 from .topic_conversation_model_support import (
@@ -10,6 +10,26 @@ from .topic_conversation_model_support import (
 )
 
 ENGLISH_FEATURE_TITLES = {
+    "english_subject_verb_object": "Subject, verb, object",
+    "english_third_person_s": "Third-person -s",
+    "english_be_conjugation": "Verb be",
+    "english_do_question": "Question with do",
+    "english_do_negation": "Negation with do",
+    "english_wh_question": "Information question",
+    "english_modal_base_verb": "Modal verb + base verb",
+    "english_present_continuous": "Present continuous",
+    "english_simple_past": "Simple past",
+    "english_past_continuous": "Past continuous",
+    "english_present_perfect": "Present perfect",
+    "english_future_will": "Future with will",
+    "english_infinitive_with_to": "Infinitive with to",
+    "english_gerund_after_verb": "Gerund after a verb",
+    "english_article_a_an": "Articles: a and an",
+    "english_subject_pronoun_required": "Explicit subject pronoun",
+    "english_countable_uncountable": "Countable and uncountable nouns",
+    "english_adjective_noun_order": "Adjective before noun",
+    "english_comparative": "Comparative",
+    "english_superlative": "Superlative",
     "adjective_ending_gender": "Adjective ending: gender",
     "adjective_ending_case": "Adjective ending: case",
     "verb_position_main_clause": "Verb position: statement",
@@ -34,6 +54,26 @@ ENGLISH_FEATURE_TITLES = {
 }
 
 SPANISH_FEATURE_TITLES = {
+    "english_subject_verb_object": "Sujeto, verbo, objeto",
+    "english_third_person_s": "Tercera persona: -s",
+    "english_be_conjugation": "Verbo be",
+    "english_do_question": "Pregunta con do",
+    "english_do_negation": "Negación con do",
+    "english_wh_question": "Pregunta de información",
+    "english_modal_base_verb": "Verbo modal + verbo base",
+    "english_present_continuous": "Presente continuo",
+    "english_simple_past": "Pasado simple",
+    "english_past_continuous": "Pasado continuo",
+    "english_present_perfect": "Presente perfecto",
+    "english_future_will": "Futuro con will",
+    "english_infinitive_with_to": "Infinitivo con to",
+    "english_gerund_after_verb": "Gerundio después de un verbo",
+    "english_article_a_an": "Artículos: a y an",
+    "english_subject_pronoun_required": "Pronombre sujeto explícito",
+    "english_countable_uncountable": "Sustantivos contables y no contables",
+    "english_adjective_noun_order": "Adjetivo antes del sustantivo",
+    "english_comparative": "Comparativo",
+    "english_superlative": "Superlativo",
     "adjective_ending_gender": "Terminación del adjetivo: género",
     "adjective_ending_case": "Terminación del adjetivo: caso",
     "verb_position_main_clause": "Posición del verbo: enunciado",
@@ -58,11 +98,11 @@ SPANISH_FEATURE_TITLES = {
 }
 
 
-def _feature_catalog(source_language: str) -> str:
+def _feature_catalog(source_language: str, target_language: str) -> str:
     titles = _feature_titles(source_language)
     return "\n".join(
         f"- ID: {feature_key}\n  Title: {titles[feature_key]}\n  Definition: {description}"
-        for feature_key, description in PHRASE_GRAMMAR_FEATURES.items()
+        for feature_key, description in phrase_grammar_features_for_language(target_language).items()
     )
 
 
@@ -84,7 +124,8 @@ def analyze_conversation_turn_error(
 
     source_name = language_display_name(source_language)
     target_name = language_display_name(target_language)
-    feature_catalog = _feature_catalog(source_language)
+    grammar_features = phrase_grammar_features_for_language(target_language)
+    feature_catalog = _feature_catalog(source_language, target_language)
     parsed = call_openai_json_logged(
         label="analyze_topic_conversation_turn_error",
         system_prompt=render_prompt(
@@ -120,7 +161,7 @@ def analyze_conversation_turn_error(
         explanations.append(explanation)
         feature_key = raw_error.get("grammar_feature_key")
         if feature_key is not None:
-            if not isinstance(feature_key, str) or feature_key not in PHRASE_GRAMMAR_FEATURES:
+            if not isinstance(feature_key, str) or feature_key not in grammar_features:
                 raise RuntimeError("Question model request failed")
             grammar_feature_keys.add(feature_key)
         word_target = raw_error.get("word_item_target")
