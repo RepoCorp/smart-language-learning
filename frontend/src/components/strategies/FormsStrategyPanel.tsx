@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n";
 import type { ExercisePhraseSection, SessionItem, StudyLanguageCode } from "../../types";
+import { germanNounGender, type GermanNounGender } from "../GenderedNounText";
 import NounExerciseSelector from "../NounExerciseSelector";
 import VerbExerciseSelector, { type VerbPersonKey, type VerbTenseKey } from "../VerbExerciseSelector";
 import WordExerciseActions from "../WordExerciseActions";
 import { buildGermanPluralPrimaryEntry, buildWordExercisePrimaryEntry } from "../wordExercisePrimaryEntry";
 import PhraseSelectionList from "./PhraseSelectionList";
 import { germanNounFormsReferences } from "./germanNounFormsReferences";
-import type { NounGender } from "./useGrammarExamples";
 
 type ExerciseEntry = {
   label?: string;
@@ -16,15 +16,7 @@ type ExerciseEntry = {
   target: string;
 };
 
-const NOUN_GENDERS: NounGender[] = ["masculine", "feminine", "neuter"];
-
-function nounGender(targetText: string): NounGender | null {
-  const article = targetText.trim().split(/\s+/, 1)[0]?.toLowerCase();
-  if (article === "der") return "masculine";
-  if (article === "die") return "feminine";
-  if (article === "das") return "neuter";
-  return null;
-}
+const NOUN_GENDERS: GermanNounGender[] = ["masculine", "feminine", "neuter"];
 
 export default function FormsStrategyPanel({
   itemType,
@@ -88,7 +80,7 @@ export default function FormsStrategyPanel({
   exerciseEntryKey: (entry: ExerciseEntry) => string;
 }): JSX.Element {
   const { t } = useI18n();
-  const currentGender = isNounSectionedExercise ? nounGender(targetText) : null;
+  const currentGender = isNounSectionedExercise ? germanNounGender(targetText) : null;
   const comparisonReferences = germanNounFormsReferences(sourceLanguage);
   const [selectedGender, setSelectedGender] = useState<NounGender | null>(currentGender);
   const [comparisonExpanded, setComparisonExpanded] = useState(false);
@@ -115,6 +107,10 @@ export default function FormsStrategyPanel({
     exerciseEntryKey,
     onToggleEntry,
   });
+  const displayedGender = isNounSectionedExercise ? germanNounGender(displayedTargetText) : null;
+  const genderMarkedWordExercisePrimaryEntry = wordExercisePrimaryEntry && displayedGender
+    ? { ...wordExercisePrimaryEntry, className: `gender-word-box gender-word-${displayedGender}` }
+    : wordExercisePrimaryEntry;
   const nounPluralPrimaryEntry = isNounSectionedExercise ? buildGermanPluralPrimaryEntry({
     entry: displayedWordEntry,
     pluralGerman: displayedPluralGerman,
@@ -171,7 +167,7 @@ export default function FormsStrategyPanel({
           ) : isNounSectionedExercise ? (
             <div className="noun-forms-table-content">
               <NounExerciseSelector
-                primaryEntry={wordExercisePrimaryEntry}
+                primaryEntry={genderMarkedWordExercisePrimaryEntry}
                 extraPrimaryEntries={nounPluralPrimaryEntry ? [nounPluralPrimaryEntry] : []}
                 sections={displayedSections}
                 selectedExerciseKeys={selectedExerciseKeys}
@@ -182,6 +178,9 @@ export default function FormsStrategyPanel({
                 onToggleEntry={onToggleEntry}
                 onSelectKeys={onSelectKeys}
                 onGenerateCase={onGenerateCase}
+                gender={displayedGender}
+                targetText={displayedTargetText}
+                pluralText={displayedPluralGerman}
               />
               {currentGender && (
                 <div className={`noun-forms-comparison ${comparisonExpanded ? "noun-forms-comparison-expanded" : ""}`}>
@@ -197,7 +196,9 @@ export default function FormsStrategyPanel({
                         onClick={() => setSelectedGender(gender)}
                         disabled={!example}
                       >
-                        {example?.targetText || t(`strategies.grammar.gender.${gender}`)}
+                        <span className={`gender-word-mark gender-word-${gender}`}>
+                          {example?.targetText || t(`strategies.grammar.gender.${gender}`)}
+                        </span>
                       </button>
                     );
                   })}

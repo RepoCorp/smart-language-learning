@@ -1747,6 +1747,44 @@ button.overview-stats-metric-card:focus-visible {
   line-height: 1.05;
 }
 
+.gender-word-mark {
+  position: relative;
+  display: inline;
+  isolation: isolate;
+  padding: 0 0.06em;
+}
+
+.gender-word-mark::before {
+  position: absolute;
+  right: -0.04em;
+  bottom: 0.06em;
+  left: -0.04em;
+  z-index: -1;
+  height: 0.52em;
+  border-radius: 3px 5px 3px 4px;
+  background: var(--item-gender-mark);
+  content: "";
+  opacity: 0.42;
+  transform: rotate(-0.6deg);
+}
+
+.gender-word-masculine {
+  --item-gender-mark: #79a9d8;
+}
+
+.gender-word-feminine {
+  --item-gender-mark: #e49ab1;
+}
+
+.gender-word-neuter {
+  --item-gender-mark: #e6c969;
+}
+
+.word-exercise-primary-button.gender-word-box {
+  border-color: color-mix(in srgb, var(--item-gender-mark) 74%, var(--color-border-strong));
+  background: color-mix(in srgb, var(--item-gender-mark) 34%, var(--color-bg));
+}
+
 .item-view-subtitle {
   margin: 0;
   color: var(--color-text-muted);

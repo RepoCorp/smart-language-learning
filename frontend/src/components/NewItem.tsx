@@ -32,6 +32,7 @@ import DialogActionIcon from "./DialogActionIcon";
 import ItemActionToolbar from "./ItemActionToolbar";
 import ItemAdminActionsModal from "./ItemAdminActionsModal";
 import ItemQuestionsModal from "./ItemQuestionsModal";
+import ItemViewHeader from "./ItemViewHeader";
 import PhraseReview from "./PhraseReview";
 import WordExerciseActions from "./WordExerciseActions";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
@@ -1298,39 +1299,19 @@ export default function NewItem({
           ×
         </button>
       )}
-      <section className="item-view-header-card">
-        <div className="item-view-title-row">
-          <div className="item-view-title-block">
-            <h2 className="item-view-title">{targetText || sourceText}</h2>
-            <p className="item-view-subtitle">{sourceText}</p>
-          </div>
-        </div>
-        <div className="item-view-meta-grid">
-          {item.item_type === "word" && (
-            <div className="item-view-meta-card">
-              <span className="item-view-meta-label">
-                {t("newItem.wordTypeLabel")}
-              </span>
-              <strong className="item-view-meta-value">
-                {wordType || t("newItem.wordAddTypeUnknown")}
-              </strong>
-            </div>
-          )}
-          <div className="item-view-meta-card">
-            <span className="item-view-meta-label">{t("newItem.notes")}</span>
-            <strong className="item-view-meta-value item-view-meta-value-notes">
-              {item.notes || "-"}
-            </strong>
-          </div>
-        </div>
-      </section>
-      {audioUrl && (
-        <div className="item-view-audio-wrap">
-          <audio controls src={audioUrl}>
-            {t("newItem.noAudioSupport")}
-          </audio>
-        </div>
-      )}
+      <ItemViewHeader
+        itemType={item.item_type}
+        targetText={targetText}
+        sourceText={sourceText}
+        wordType={wordType}
+        notes={item.notes || ""}
+        audioUrl={audioUrl}
+        targetLanguage={targetLanguage}
+        wordTypeLabel={t("newItem.wordTypeLabel")}
+        unknownWordTypeLabel={t("newItem.wordAddTypeUnknown")}
+        notesLabel={t("newItem.notes")}
+        noAudioSupportLabel={t("newItem.noAudioSupport")}
+      />
       {(item.item_type === "word" || item.item_type === "phrase") && (
         <ItemActionToolbar
           itemType={item.item_type}

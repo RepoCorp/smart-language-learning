@@ -3,6 +3,7 @@ import WordExerciseGrid, {
   type WordExerciseGridPrimaryEntry,
   type WordExerciseSelectableEntry,
 } from "./WordExerciseGrid";
+import GenderedNounText, { type GermanNounGender } from "./GenderedNounText";
 
 interface NounExerciseSelectorProps {
   primaryEntry?: WordExerciseGridPrimaryEntry;
@@ -16,6 +17,9 @@ interface NounExerciseSelectorProps {
   onToggleEntry: (entry: WordExerciseGridPrimaryEntry["entry"]) => void;
   onSelectKeys: (keys: string[]) => void;
   onGenerateCase: (caseKey: "nominative" | "accusative" | "dative" | "genitive") => void;
+  gender?: GermanNounGender | null;
+  targetText?: string;
+  pluralText?: string;
 }
 
 const DETERMINER_ROWS = [
@@ -48,6 +52,9 @@ export default function NounExerciseSelector({
   onToggleEntry,
   onSelectKeys,
   onGenerateCase,
+  gender = null,
+  targetText = "",
+  pluralText = "",
 }: NounExerciseSelectorProps): JSX.Element {
   const entriesBySectionAndFamily = new Map<string, WordExerciseSelectableEntry>();
   const selectedKeySet = new Set(selectedExerciseKeys);
@@ -106,6 +113,14 @@ export default function NounExerciseSelector({
       ariaLabel="Noun exercise grid"
       className="noun-exercise-selector"
       targetClassName="noun-exercise-target-text"
+      renderTargetText={(text) => (
+        <GenderedNounText
+          text={text}
+          targetText={targetText}
+          pluralText={pluralText}
+          gender={gender}
+        />
+      )}
       columnMinWidth="180px"
       rowHeaderWidth="22px"
       primaryEntry={primaryEntry}

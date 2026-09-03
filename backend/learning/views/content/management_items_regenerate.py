@@ -4,7 +4,8 @@ from .dialog_click_resolution import resolve_dialog_click_word_pair
 from .generation import WORD_EXERCISE_MODEL
 from .management import APIView, Request, Response, _normalized_pair, apply_user_scope, get_request_user, status
 from .management_items_quick_add import _lookup_german_noun_plural
-from .core import create_audio_file, normalize_word_pair_for_item_save
+from .audio import create_audio_file, create_openai_audio_file
+from .core import normalize_word_pair_for_item_save
 from .word_metadata import normalize_word_metadata as _normalize_word_metadata
 from ...models import Item, ItemDialogOccurrence
 
@@ -114,7 +115,7 @@ class ContentItemRegenerateView(APIView):
             ) or plural_german
 
         audio_text = f"{target_text}. {target_context}".strip() if target_context else target_text
-        audio_url = create_audio_file(audio_text, "word", target_language=target_language)
+        audio_url = create_openai_audio_file(audio_text, "word", target_language=target_language)
         if not audio_url:
             return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 

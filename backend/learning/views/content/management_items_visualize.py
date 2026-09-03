@@ -28,7 +28,11 @@ from .management import (
 )
 from .management_items_listing import _generate_openai_image, _save_exercise_image
 from .exercise_persistence import merge_item_exercise_phrases
-from .word_friends import build_word_friend_prompt_notes
+from .visualize_support import (
+    add_visual_memory_cue,
+    build_visualize_image_prompt_context,
+    merge_visualize_phrase,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,25 +131,6 @@ def _call_openai_text_logged(
     return content
 
 
-def _merge_visualize_phrase(
-    *,
-    exercise_phrases: dict,
-    source_text: str,
-    target_text: str,
-    image_prompt: str = "",
-    image_url: str = "",
-) -> dict:
-    payload = dict(exercise_phrases or {})
-    payload["visualize_phrase"] = {
-        "label": "visualize",
-        "source_text": source_text[:400],
-        "target_text": target_text[:400],
-        "image_prompt": image_prompt[:4000],
-        "image_url": image_url,
-    }
-    return payload
-
-
 class ContentItemVisualizeView(APIView):
     def post(self, request: Request, item_id: int) -> Response:
         request_started_at = time.perf_counter()
@@ -207,7 +192,7 @@ class ContentItemVisualizeView(APIView):
 
             exercise_phrases = merge_item_exercise_phrases(
                 item,
-                lambda existing_payload: _merge_visualize_phrase(
+                lambda existing_payload: merge_visualize_phrase(
                     exercise_phrases=existing_payload,
                     source_text=source_text,
                     target_text=target_text,
@@ -222,10 +207,12 @@ class ContentItemVisualizeView(APIView):
                 )
                 return Response({"exercise_phrases": exercise_phrases})
 
-        word_friend_notes = build_word_friend_prompt_notes(item.german_text)
-        notes_value = str(item.notes or "").strip()
-        if word_friend_notes:
-            notes_value = f"{notes_value}\n\n{word_friend_notes}".strip() if notes_value else word_friend_notes
+        image_prompt_context = build_visualize_image_prompt_context(
+            target_text=item.german_text,
+            target_language=target_language,
+            word_type=item.word_type or "",
+            notes=item.notes or "",
+        )
         image_prompt = _call_openai_text_logged(
             label="content_item_visualize_image_prompt",
             system_prompt=_render_prompt(
@@ -236,24 +223,16 @@ class ContentItemVisualizeView(APIView):
                 target_text=item.german_text,
                 word_type=item.word_type or "",
                 sentence=target_text,
-                notes=notes_value,
-                word_friend_requirement_block=(
-                    "\nIf a Word Friend is provided in the additional notes, it MUST appear in the scene.\n"
-                    if word_friend_notes
-                    else "\n"
-                ),
-                word_friend_guideline_block=(
-                    "- The Word Friend should blend naturally into the scene."
-                    if word_friend_notes
-                    else ""
-                ),
+                notes=image_prompt_context.notes,
+                word_friend_requirement_block=image_prompt_context.word_friend_requirement_block,
+                word_friend_guideline_block=image_prompt_context.word_friend_guideline_block,
             ),
             user_input=(
                 f"Item source text: {item.spanish_text}\n"
                 f"Item target text: {item.german_text}\n"
                 f"Sentence: {target_text}\n"
                 f"Item word type: {item.word_type or ''}\n"
-                f"Item notes: {notes_value}\n"
+                f"Item notes: {image_prompt_context.notes}\n"
             ),
             timeout_seconds=12,
             model=WORD_EXERCISE_MODEL,
@@ -263,6 +242,7 @@ class ContentItemVisualizeView(APIView):
         )
         if not image_prompt:
             return Response({"detail": "Failed to generate visualize image prompt"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        image_prompt = add_visual_memory_cue(image_prompt, image_prompt_context)
 
         image_started_at = time.perf_counter()
         image_bytes = _generate_openai_image(image_prompt)
@@ -288,7 +268,7 @@ class ContentItemVisualizeView(APIView):
 
         exercise_phrases = merge_item_exercise_phrases(
             item,
-            lambda existing_payload: _merge_visualize_phrase(
+            lambda existing_payload: merge_visualize_phrase(
                 exercise_phrases=existing_payload,
                 source_text=source_text,
                 target_text=target_text,

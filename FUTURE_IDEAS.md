@@ -3,6 +3,8 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
+Mas de los word friends. Pensar en añadir de alguna manera que recoja varios pero no sean muchos amigos, por ejemplo simplemente vocal o consonante, si no tiene amigo mas particular
+Ejercicio de escribir una frase con la palabra, pero una qué ya exista y simplemente compara si son iguales
 Los objetivos se repiten mucho
 Esconder el texto de la frase que se muestra después de calificar un ítem, pero que permita abrirlo y reproducirlo
 Plural en frase

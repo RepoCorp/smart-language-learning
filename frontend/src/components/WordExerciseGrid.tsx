@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import DangerousButton from "./DangerousButton";
 
@@ -14,6 +14,9 @@ export interface WordExerciseGridPrimaryEntry {
   onClick: () => void;
   disabled: boolean;
   detailText?: string;
+  targetClassName?: string;
+  className?: string;
+  renderTargetText?: (targetText: string) => ReactNode;
 }
 
 interface WordExerciseGridHeader {
@@ -155,6 +158,7 @@ export default function WordExerciseGrid({
   extraPrimaryEntries = [],
   className = "",
   targetClassName = "",
+  renderTargetText,
   columnMinWidth = "132px",
   rowHeaderWidth = "40px",
 }: WordExerciseGridProps): JSX.Element {
@@ -171,11 +175,13 @@ export default function WordExerciseGrid({
             <button
               key={`${entry.entry.target}-${entry.entry.source}-${entry.detailText || ""}`}
               type="button"
-              className={`word-exercise-cell word-exercise-entry word-exercise-primary-button ${entry.selected ? "word-exercise-selected" : ""}`}
+              className={`word-exercise-cell word-exercise-entry word-exercise-primary-button ${entry.className || ""} ${entry.selected ? "word-exercise-selected" : ""}`.trim()}
               onClick={entry.onClick}
               disabled={entry.disabled}
             >
-              <span className={`word-exercise-target-text ${targetClassName}`.trim()}>{entry.entry.target}</span>
+              <span className={`word-exercise-target-text ${entry.targetClassName || targetClassName}`.trim()}>
+                {renderTargetText ? renderTargetText(entry.entry.target) : entry.entry.target}
+              </span>
               {entry.detailText ? (
                 <span className="word-exercise-detail-text">{entry.detailText}</span>
               ) : null}
@@ -227,7 +233,9 @@ export default function WordExerciseGrid({
                 onClick={cell.onClick}
                 disabled={cell.disabled}
               >
-                <span className={`word-exercise-target-text ${targetClassName}`.trim()}>{cell.entry.target}</span>
+                <span className={`word-exercise-target-text ${targetClassName}`.trim()}>
+                  {renderTargetText ? renderTargetText(cell.entry.target) : cell.entry.target}
+                </span>
                 <small>{cell.entry.source}</small>
               </button>
               );
