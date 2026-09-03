@@ -11,6 +11,7 @@ import RelatedStrategyPanel from "./RelatedStrategyPanel";
 import StrategyLoopContent from "./StrategyLoopContent";
 import VisualizeStrategyPanel from "./VisualizeStrategyPanel";
 import WalkStrategyPanel from "./WalkStrategyPanel";
+import SingStrategyPanel from "./SingStrategyPanel";
 import type { ItemStrategiesModalProps } from "./itemStrategyTypes";
 import {
   ACT_STRATEGY,
@@ -24,6 +25,7 @@ import {
   RELATED_STRATEGY,
   VISUALIZE_STRATEGY,
   WALK_STRATEGY,
+  SING_STRATEGY,
 } from "./strategyConstants";
 
 type Props = ItemStrategiesModalProps;
@@ -118,6 +120,9 @@ export default function StrategyContent(props: Props): JSX.Element {
         <WalkStrategyPanel challenge={props.walkStrategy.entries[0]?.label || ""} targetWord={props.targetText} entries={props.walkStrategy.entries} selectedKeys={props.walkStrategy.selectedKeys} onToggleEntry={props.walkStrategy.toggleEntry} exerciseRunning={props.exerciseRunning} isLoading={props.walkStrategy.isLoading} error={props.walkStrategy.error} />
       } />
     );
+  }
+  if (props.selectedStrategy === SING_STRATEGY) {
+    return <SingStrategyPanel song={props.singStrategy.song} itemType={props.itemType} isCreatingLyrics={props.singStrategy.isCreatingLyrics} isCreatingSong={props.singStrategy.isCreatingSong} isGeneratingImage={props.singStrategy.isGeneratingImage} isRetrying={props.singStrategy.isRetrying} error={props.singStrategy.error} onCreateLyrics={() => void props.singStrategy.createLyrics()} onCreateSong={() => void props.singStrategy.createSong()} onGenerateImage={() => void props.singStrategy.generateImage()} onRetrySameSong={() => void props.singStrategy.retrySameSong()} />;
   }
   if (props.selectedStrategy === DECODE_STRATEGY && props.itemType === "word") {
     return (

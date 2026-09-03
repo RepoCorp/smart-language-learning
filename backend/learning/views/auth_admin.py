@@ -138,7 +138,11 @@ class AuthAIUsageView(APIView):
                 generation_credits=Sum("quota_credits", filter=~Q(provider="elevenlabs")),
                 elevenlabs_characters=Sum(
                     "usage_units",
-                    filter=Q(provider="elevenlabs", category=DailyAIUsage.Category.AUDIO),
+                    filter=Q(provider="elevenlabs", category=DailyAIUsage.Category.AUDIO) & ~Q(feature="sing-strategy"),
+                ),
+                elevenlabs_music_seconds=Sum(
+                    "usage_units",
+                    filter=Q(provider="elevenlabs", feature="sing-strategy"),
                 ),
                 realtime_seconds=Sum("usage_units", filter=Q(feature="realtime-session")),
             )
@@ -149,6 +153,7 @@ class AuthAIUsageView(APIView):
             "defaults": {
                 "weekly_generation_credits": int(getattr(settings, "AI_USAGE_WEEKLY_GENERATION_CREDITS", 200)),
                 "weekly_elevenlabs_characters": int(getattr(settings, "AI_USAGE_WEEKLY_ELEVENLABS_CHARACTERS", 10000)),
+                "weekly_elevenlabs_music_seconds": int(getattr(settings, "AI_USAGE_WEEKLY_ELEVENLABS_MUSIC_SECONDS", 60)),
                 "weekly_realtime_minutes": int(getattr(settings, "AI_USAGE_WEEKLY_REALTIME_MINUTES", 45)),
             },
             "users": [
@@ -157,9 +162,11 @@ class AuthAIUsageView(APIView):
                     "is_blocked": bool(limits.get(user.id) and limits[user.id].is_blocked),
                     "weekly_generation_credits": limits.get(user.id).weekly_generation_credits if user.id in limits else 0,
                     "weekly_elevenlabs_characters": limits.get(user.id).weekly_elevenlabs_characters if user.id in limits else 0,
+                    "weekly_elevenlabs_music_seconds": limits.get(user.id).weekly_elevenlabs_music_seconds if user.id in limits else 0,
                     "weekly_realtime_minutes": limits.get(user.id).weekly_realtime_minutes if user.id in limits else 0,
                     "week_generation_credits": usage_by_user.get(user.id, {}).get("generation_credits") or 0,
                     "week_elevenlabs_characters": usage_by_user.get(user.id, {}).get("elevenlabs_characters") or 0,
+                    "week_elevenlabs_music_seconds": usage_by_user.get(user.id, {}).get("elevenlabs_music_seconds") or 0,
                     "week_realtime_minutes": (
                         ((usage_by_user.get(user.id, {}).get("realtime_seconds") or 0) + 59) // 60
                     ),
@@ -182,7 +189,7 @@ class AuthAIUsageLimitView(APIView):
             return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         limit, _ = UserAIUsageLimit.objects.get_or_create(user=user)
         limit.is_blocked = bool(request.data.get("is_blocked", False))
-        for field in ("weekly_generation_credits", "weekly_elevenlabs_characters", "weekly_realtime_minutes"):
+        for field in ("weekly_generation_credits", "weekly_elevenlabs_characters", "weekly_elevenlabs_music_seconds", "weekly_realtime_minutes"):
             try:
                 value = max(0, int(request.data.get(field, 0)))
             except (TypeError, ValueError):

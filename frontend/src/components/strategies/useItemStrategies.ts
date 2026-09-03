@@ -10,6 +10,7 @@ import {
   VISUALIZE_STRATEGY,
   WALK_STRATEGY,
   GRAMMAR_STRATEGY,
+  SING_STRATEGY,
 } from "./strategyConstants";
 import { useActStrategy } from "./useActStrategy";
 import { useCompareStrategy } from "./useCompareStrategy";
@@ -22,6 +23,7 @@ import { useVisualizeStrategy } from "./useVisualizeStrategy";
 import { useWalkStrategy } from "./useWalkStrategy";
 import { useGrammarExamples } from "./useGrammarExamples";
 import { usePhraseGrammarFeatures } from "./usePhraseGrammarFeatures";
+import { useSingStrategy } from "./useSingStrategy";
 
 type StrategyErrors = {
   create: string;
@@ -33,6 +35,7 @@ type StrategyErrors = {
   decode: string;
   encounter: string;
   compare: string;
+  sing: string;
 };
 
 export function useItemStrategies({
@@ -131,6 +134,10 @@ export function useItemStrategies({
     targetLanguage,
     enabled: modalOpen && selectedStrategy === GRAMMAR_STRATEGY && itemType === "phrase" && targetLanguage === "german",
   });
+  const singStrategy = useSingStrategy({
+    ...common,
+    errorMessage: errors.sing,
+  });
 
   return {
     createStrategy,
@@ -144,5 +151,6 @@ export function useItemStrategies({
     compareStrategy,
     grammarStrategy,
     phraseGrammarStrategy,
+    singStrategy,
   };
 }

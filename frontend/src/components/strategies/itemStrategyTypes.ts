@@ -3,6 +3,7 @@ import type { StudyLanguageCode } from "../../types";
 import type { GermanGrammarNounExample } from "../../types";
 import type { NounGender } from "./useGrammarExamples";
 import type { PhraseGrammarStrategy } from "./phraseGrammarTypes";
+import type { SingSong } from "./useSingStrategy";
 
 export type StrategyEntry = { label?: string; source: string; target: string };
 export type KeyedStrategyEntry = StrategyEntry & { key: string };
@@ -124,6 +125,16 @@ export type ItemStrategiesModalProps = {
       comparisonExample: string;
       comparisonTranslation: string;
     }>;
+  };
+  singStrategy: {
+    song: SingSong | null;
+    isLoading: boolean;
+    isGeneratingImage: boolean;
+    isRetrying: boolean;
+    error: string;
+    generate: (regenerate?: boolean) => Promise<void>;
+    generateImage: () => Promise<void>;
+    retrySameSong: () => Promise<void>;
   };
   onPlayVisualizeWord: () => void;
   grammarStrategy: {

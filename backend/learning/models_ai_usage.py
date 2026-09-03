@@ -15,6 +15,7 @@ class UserAIUsageLimit(models.Model):
     is_blocked = models.BooleanField(default=False)
     weekly_generation_credits = models.PositiveIntegerField(default=0)
     weekly_elevenlabs_characters = models.PositiveIntegerField(default=0)
+    weekly_elevenlabs_music_seconds = models.PositiveIntegerField(default=0)
     weekly_realtime_minutes = models.PositiveIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 

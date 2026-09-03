@@ -48,6 +48,7 @@ import {
   CREATE_STRATEGY,
   EXAMPLES_STRATEGY,
   RELATED_STRATEGY,
+  SING_STRATEGY,
   VISUALIZE_STRATEGY,
   WALK_STRATEGY,
   firstStrategyForItemType,
@@ -617,6 +618,7 @@ export default function NewItem({
     decodeStrategy,
     encounterStrategy,
     compareStrategy,
+    singStrategy,
     grammarStrategy,
     phraseGrammarStrategy,
   } = useItemStrategies({
@@ -641,6 +643,7 @@ export default function NewItem({
       decode: t("newItem.decodeError"),
       encounter: t("newItem.encounterError"),
       compare: t("newItem.compareError"),
+      sing: "Failed to create song",
     },
   });
   const savedExerciseEntries = sanitizeExerciseEntries(
@@ -2049,6 +2052,7 @@ export default function NewItem({
             decodeStrategy={decodeStrategy}
             encounterStrategy={encounterStrategy}
             compareStrategy={compareStrategy}
+            singStrategy={singStrategy}
             grammarStrategy={grammarStrategy}
             phraseGrammarStrategy={phraseGrammarStrategy}
             onAskAboutPhraseGrammarRule={(question, grammarFeatureKey) => openQuestions(question, { grammarFeatureKey })}

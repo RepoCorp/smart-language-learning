@@ -44,6 +44,7 @@ from .views import (
     ContentItemRefreshWordView,
     ContentItemVisualizeView,
     ContentItemWalkView,
+    ContentItemSingView,
     ContentItemsView,
     ContentPhraseQuickAddView,
     ContentPreviewView,
@@ -144,6 +145,7 @@ urlpatterns = [
     path("content/items/<int:item_id>/strategies/practice", ContentItemPracticeView.as_view(), name="content-item-practice"),
     path("content/items/<int:item_id>/strategies/visualize", ContentItemVisualizeView.as_view(), name="content-item-visualize"),
     path("content/items/<int:item_id>/strategies/walk", ContentItemWalkView.as_view(), name="content-item-walk"),
+    path("content/items/<int:item_id>/strategies/sing", ContentItemSingView.as_view(), name="content-item-sing"),
     path(
         "content/items/<int:item_id>/exercises/funny-image",
         ContentItemFunnyImageExerciseView.as_view(),

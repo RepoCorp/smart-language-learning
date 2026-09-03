@@ -113,6 +113,22 @@ This path now has its own deployment script:
 low-cost-deploy/build_and_deploy.sh
 ```
 
+## S3 media CORS
+
+Some browser features, such as smooth Web Audio loops, need to read and decode
+the audio bytes rather than simply stream them through an HTML audio element.
+Apply the checked-in CORS policy once to the S3 bucket used for audio and images:
+
+```bash
+aws s3api put-bucket-cors \
+  --bucket catalinadelacuesta-sll \
+  --cors-configuration file://low-cost-deploy/s3-media-cors.json \
+  --region us-east-1
+```
+
+The policy permits only `GET` and `HEAD` from the production app domains and
+local Vite development. It does not grant any write or listing permissions.
+
 Setup files:
 
 - Copy [low-cost-deploy/deploy.env.example](./deploy.env.example) to `low-cost-deploy/deploy.env`

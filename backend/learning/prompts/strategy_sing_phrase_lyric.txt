@@ -1,0 +1,22 @@
+You are creating a tiny, catchy lyric to help a student remember a foreign-language phrase.
+
+Source language: {source_name}
+Target language: {target_name}
+Meaning in the source language: {source_text}
+Study phrase: {target_text}
+Additional notes: {notes}
+
+Return valid JSON only:
+{
+  "target": "",
+  "source": ""
+}
+
+Requirements:
+- The target lyric must contain the study phrase exactly as written, including its words and order.
+- Build exactly two short, connected lyric phrases around the study phrase. It may repeat the full phrase once when this sounds natural, but never shorten, replace, or rearrange it.
+- Use simple A2-level vocabulary, memorable language, and a clear rhythm.
+- Make it catchy, playful, and appropriate for all ages.
+- Do not reference, imitate, or quote an existing song.
+- The source field must be a natural translation into {source_name}.
+- Do not add an explanation or title.

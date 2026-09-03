@@ -43,12 +43,14 @@ export const WORD_STRATEGIES = [
 
 export const PHRASE_STRATEGIES = [
   DEFAULT_STRATEGY,
+  SING_STRATEGY,
   GRAMMAR_STRATEGY,
 ] as const;
 
 export const PHRASE_STRATEGY_LABELS: Record<(typeof PHRASE_STRATEGIES)[number], string> = {
   [DEFAULT_STRATEGY]: "Repeat",
   [GRAMMAR_STRATEGY]: "Grammar",
+  [SING_STRATEGY]: "Sing",
 };
 
 export function firstStrategyForItemType(itemType: "word" | "phrase"): string {

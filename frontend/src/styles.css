@@ -4333,6 +4333,71 @@ textarea {
   margin: 0 0 6px;
 }
 
+.sing-strategy-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.looping-audio-player {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.looping-audio-player .hint,
+.looping-audio-player .error {
+  margin: 0;
+}
+
+.sing-strategy-controls > span {
+  flex: 1;
+}
+
+.sing-strategy-image {
+  display: block;
+  width: 100%;
+  max-height: min(42vh, 420px);
+  margin-top: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  object-fit: contain;
+  background: var(--color-bg);
+}
+
+.sing-strategy-duration {
+  margin: 4px 0 0;
+}
+
+.sing-strategy-image-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .sing-strategy-controls {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sing-strategy-controls > .secondary-button,
+  .sing-strategy-controls > span {
+    flex: none;
+    width: 100%;
+  }
+
+  .looping-audio-player {
+    flex: none;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+}
+
 .testing-action-description {
   margin: 0;
 }

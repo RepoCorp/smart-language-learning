@@ -120,7 +120,25 @@ def reserve_ai_usage(
             )) * 60
             if realtime_used_seconds >= realtime_limit_seconds:
                 raise AIUsageLimitExceeded("Your weekly live conversation minute limit has been reached. Please try again next week.")
-        if provider == "elevenlabs" and category == DailyAIUsage.Category.AUDIO:
+        if provider == "elevenlabs" and feature_name == "sing-strategy":
+            used_seconds = (
+                DailyAIUsage.objects.select_for_update()
+                .filter(
+                    user=user,
+                    date__gte=week_start,
+                    date__lte=today,
+                    provider="elevenlabs",
+                    feature="sing-strategy",
+                )
+                .aggregate(total=Sum("usage_units"))["total"]
+                or 0
+            )
+            music_limit = limit.weekly_elevenlabs_music_seconds or int(
+                getattr(settings, "AI_USAGE_WEEKLY_ELEVENLABS_MUSIC_SECONDS", 60)
+            )
+            if music_limit > 0 and used_seconds + normalized_units > music_limit:
+                raise AIUsageLimitExceeded("Your weekly Eleven Music limit has been reached. Please try again next week.")
+        elif provider == "elevenlabs" and category == DailyAIUsage.Category.AUDIO:
             used_characters = (
                 DailyAIUsage.objects.select_for_update()
                 .filter(
@@ -129,6 +147,8 @@ def reserve_ai_usage(
                     date__lte=today,
                     provider="elevenlabs",
                     category=DailyAIUsage.Category.AUDIO,
+                ).exclude(
+                    feature="sing-strategy",
                 )
                 .aggregate(total=Sum("usage_units"))["total"]
                 or 0

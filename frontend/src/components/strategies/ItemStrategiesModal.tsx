@@ -13,6 +13,7 @@ import {
   RELATED_STRATEGY,
   VISUALIZE_STRATEGY,
   WALK_STRATEGY,
+  SING_STRATEGY,
 } from "./strategyConstants";
 
 export default function ItemStrategiesModal(props: ItemStrategiesModalProps): JSX.Element {
@@ -50,6 +51,8 @@ function isStrategyLoading(props: ItemStrategiesModalProps): boolean {
       return props.actStrategy.isLoading;
     case WALK_STRATEGY:
       return props.walkStrategy.isLoading;
+    case SING_STRATEGY:
+      return props.singStrategy.isLoading;
     case DECODE_STRATEGY:
       return props.decodeStrategy.isLoading;
     case ENCOUNTER_STRATEGY:

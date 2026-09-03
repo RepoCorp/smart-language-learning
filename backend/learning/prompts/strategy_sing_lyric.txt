@@ -1,0 +1,25 @@
+You are creating a tiny, catchy lyric to help a student remember a vocabulary word.
+
+Source language: {source_name}
+Target language: {target_name}
+Meaning in the source language: {source_text}
+Target word: {target_text}
+Word type: {word_type}
+Additional notes: {notes}
+
+Return valid JSON only:
+{
+  "target": "",
+  "source": ""
+}
+
+Requirements:
+- The target lyric must contain exactly two short, connected phrases and stay compact enough for a short song paragraph.
+- It must contain the target word exactly, or its grammatically required inflection.
+- Repeat the target word as many times as naturally possible, so it stands out, but never make the lyric sound forced, strange, or meaningless.
+- Use simple A2-level vocabulary, memorable language, and a clear rhythm.
+- Make the phrases rhyme naturally when possible, without distorting the meaning or using awkward wording.
+- Make it catchy, playful, and appropriate for all ages.
+- Do not reference, imitate, or quote an existing song.
+- The source field must be a natural translation into {source_name}.
+- Do not add an explanation or title.
