@@ -128,11 +128,14 @@ export type ItemStrategiesModalProps = {
   };
   singStrategy: {
     song: SingSong | null;
-    isLoading: boolean;
+    history: SingSong[];
+    isCreatingLyrics: boolean;
+    isCreatingSong: boolean;
     isGeneratingImage: boolean;
     isRetrying: boolean;
     error: string;
-    generate: (regenerate?: boolean) => Promise<void>;
+    createLyrics: () => Promise<void>;
+    createSong: () => Promise<void>;
     generateImage: () => Promise<void>;
     retrySameSong: () => Promise<void>;
   };

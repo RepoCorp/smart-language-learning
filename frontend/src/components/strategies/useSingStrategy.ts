@@ -4,15 +4,16 @@ import { generateContentItemSong, generateContentItemSongImage, generateContentI
 import type { ItemExercisePhrases, StudyLanguageCode } from "../../types";
 
 export type SingSong = {
-  target: string; source: string; audioUrl: string; imageUrl: string; durationSeconds: number; canRetry: boolean; canChangeLyrics: boolean;
+  id: string; target: string; source: string; audioUrl: string; imageUrl: string; durationSeconds: number;
+  canRetry: boolean; canChangeLyrics: boolean; lyricFocus: "funny" | "a2_clarity" | "";
 };
 
-function songFromPayload(exercisePhrases: ItemExercisePhrases | undefined): SingSong | null {
-  const payload = (exercisePhrases as unknown as { sing_song?: Record<string, unknown> } | undefined)?.sing_song;
+function songFromPayload(payload: Record<string, unknown> | undefined): SingSong | null {
   const target = String(payload?.target_text || "").trim();
   const source = String(payload?.source_text || "").trim();
   if (!target || !source) return null;
   return {
+    id: String(payload?.song_id || payload?.audio_url || "").trim(),
     target,
     source,
     audioUrl: String(payload?.audio_url || "").trim(),
@@ -20,7 +21,17 @@ function songFromPayload(exercisePhrases: ItemExercisePhrases | undefined): Sing
     durationSeconds: Number(payload?.duration_seconds || 0),
     canRetry: Boolean(payload?.composition_plan),
     canChangeLyrics: !Boolean(payload?.lyrics_locked),
+    lyricFocus: payload?.lyric_focus === "funny" || payload?.lyric_focus === "a2_clarity" ? payload.lyric_focus : "",
   };
+}
+
+function songsFromPayload(exercisePhrases: ItemExercisePhrases | undefined): { song: SingSong | null; history: SingSong[] } {
+  const payload = exercisePhrases as unknown as { sing_song?: Record<string, unknown>; sing_song_history?: Record<string, unknown>[] } | undefined;
+  const song = songFromPayload(payload?.sing_song);
+  const history = (Array.isArray(payload?.sing_song_history) ? payload.sing_song_history : [])
+    .map(songFromPayload)
+    .filter((entry): entry is SingSong => Boolean(entry?.audioUrl));
+  return { song, history: history.filter((entry) => entry.id !== song?.id) };
 }
 
 export function useSingStrategy({ itemId, exercisePhrases, sourceLanguage, targetLanguage, setExercisePhrases, errorMessage }: {
@@ -33,7 +44,7 @@ export function useSingStrategy({ itemId, exercisePhrases, sourceLanguage, targe
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState("");
-  const song = useMemo(() => songFromPayload(exercisePhrases), [exercisePhrases]);
+  const { song, history } = useMemo(() => songsFromPayload(exercisePhrases), [exercisePhrases]);
   const createLyrics = async (): Promise<void> => {
     if (itemId <= 0 || isCreatingLyrics) return;
     setIsCreatingLyrics(true); setError("");
@@ -63,5 +74,5 @@ export function useSingStrategy({ itemId, exercisePhrases, sourceLanguage, targe
     finally { setIsRetrying(false); }
   };
   useEffect(() => { setError(""); setIsCreatingSong(false); setIsCreatingLyrics(false); }, [itemId, song?.target]);
-  return { song, isCreatingLyrics, isCreatingSong, isGeneratingImage, isRetrying, error, createLyrics, createSong, generateImage, retrySameSong };
+  return { song, history, isCreatingLyrics, isCreatingSong, isGeneratingImage, isRetrying, error, createLyrics, createSong, generateImage, retrySameSong };
 }

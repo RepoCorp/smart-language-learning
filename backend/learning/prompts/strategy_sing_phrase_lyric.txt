@@ -15,8 +15,11 @@ Return valid JSON only:
 Requirements:
 - The target lyric must contain the study phrase exactly as written, including its words and order.
 - Build exactly two short, connected lyric phrases around the study phrase. It may repeat the full phrase once when this sounds natural, but never shorten, replace, or rearrange it.
-- Use simple A2-level vocabulary, memorable language, and a clear rhythm.
-- Make it catchy, playful, and appropriate for all ages.
+- Use simple A2-level vocabulary, memorable language, and a clear rhythm. Apart from the study phrase, prefer common A1-A2 everyday words and simple verbs; if a comic idea needs harder vocabulary, choose a simpler comic idea instead.
+- Make it catchy and appropriate for all ages. Follow the creative direction supplied with the request: it will either prioritize a playful memory hook or especially clear A2-level language.
+- The study phrase must be central to that situation, not merely inserted into an otherwise generic rhyme.
+- Keep the scene natural enough that it could happen in real life.
+- Avoid generic filler that could fit almost any phrase. Do not use random nonsense or make inanimate things behave like people; the scene must still make the phrase's meaning clear.
 - Do not reference, imitate, or quote an existing song.
 - The source field must be a natural translation into {source_name}.
 - Do not add an explanation or title.

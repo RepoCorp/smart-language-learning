@@ -11,7 +11,29 @@ from .sing_service import create_audio, generate_lyric, retry_audio, song_payloa
 
 
 def _merge_song(exercise_phrases: dict, song: dict) -> dict:
-    return {**(exercise_phrases or {}), "sing_song": song}
+    payload = exercise_phrases or {}
+    history = _song_history(payload)
+    previous = song_payload(payload)
+    for candidate in (previous, song):
+        if candidate and candidate.get("audio_url"):
+            _store_song_version(history, candidate)
+    return {**payload, "sing_song": song, "sing_song_history": history}
+
+
+def _song_history(payload: dict) -> list[dict]:
+    saved = payload.get("sing_song_history") if isinstance(payload, dict) else None
+    return [entry for entry in saved if isinstance(entry, dict)] if isinstance(saved, list) else []
+
+
+def _store_song_version(history: list[dict], song: dict) -> None:
+    identity = str(song.get("song_id") or song.get("audio_url") or "")
+    if not identity:
+        return
+    for index, entry in enumerate(history):
+        if str(entry.get("song_id") or entry.get("audio_url") or "") == identity:
+            history[index] = song
+            return
+    history.append(song)
 
 
 def _song_image_prompt(item: Item, lyric: dict, target_language: str) -> str:

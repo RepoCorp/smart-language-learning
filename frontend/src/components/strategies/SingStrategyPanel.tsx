@@ -2,8 +2,9 @@ import type { SingSong } from "./useSingStrategy";
 import DangerousButton from "../DangerousButton";
 import LoopingAudioPlayer from "../LoopingAudioPlayer";
 
-export default function SingStrategyPanel({ song, itemType, isCreatingLyrics, isCreatingSong, isGeneratingImage, isRetrying, error, onCreateLyrics, onCreateSong, onGenerateImage, onRetrySameSong }: {
+export default function SingStrategyPanel({ song, history, itemType, isCreatingLyrics, isCreatingSong, isGeneratingImage, isRetrying, error, onCreateLyrics, onCreateSong, onGenerateImage, onRetrySameSong }: {
   song: SingSong | null; isCreatingLyrics: boolean; isCreatingSong: boolean; isGeneratingImage: boolean; isRetrying: boolean; error: string;
+  history: SingSong[];
   itemType: "word" | "phrase"; onCreateLyrics: () => void; onCreateSong: () => void; onGenerateImage: () => void; onRetrySameSong: () => void;
 }): JSX.Element {
   return (
@@ -39,6 +40,18 @@ export default function SingStrategyPanel({ song, itemType, isCreatingLyrics, is
             {isGeneratingImage ? "Creating image..." : song.imageUrl ? "Create a new image" : "Create image"}
           </DangerousButton>
         </div>
+      ) : null}
+      {history.length ? (
+        <details className="sing-strategy-history">
+          <summary>Previous songs ({history.length})</summary>
+          {history.slice().reverse().map((entry) => (
+            <div className="sing-strategy-history-entry" key={entry.id}>
+              <strong>{entry.target}</strong>
+              <span>{entry.source}</span>
+              <LoopingAudioPlayer src={entry.audioUrl} />
+            </div>
+          ))}
+        </details>
       ) : null}
     </div>
   );

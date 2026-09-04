@@ -17,9 +17,12 @@ Requirements:
 - The target lyric must contain exactly two short, connected phrases and stay compact enough for a short song paragraph.
 - It must contain the target word exactly, or its grammatically required inflection.
 - Repeat the target word as many times as naturally possible, so it stands out, but never make the lyric sound forced, strange, or meaningless.
-- Use simple A2-level vocabulary, memorable language, and a clear rhythm.
+- Use simple A2-level vocabulary, memorable language, and a clear rhythm. Apart from the target word, prefer common A1-A2 everyday words and simple verbs; if a comic idea needs harder vocabulary, choose a simpler comic idea instead.
 - Make the phrases rhyme naturally when possible, without distorting the meaning or using awkward wording.
-- Make it catchy, playful, and appropriate for all ages.
+- Make it catchy and appropriate for all ages. Follow the creative direction supplied with the request: it will either prioritize a playful memory hook or especially clear A2-level language.
+- The target word must be central to that situation, not merely inserted into an otherwise generic rhyme.
+- Keep the scene natural enough that it could happen in real life.
+- Avoid generic filler that could fit almost any word, such as simply saying that something is small, nice, good, or surprising. Do not use random nonsense or make inanimate things behave like people; the scene must still make the word's meaning clear.
 - Do not reference, imitate, or quote an existing song.
 - The source field must be a natural translation into {source_name}.
 - Do not add an explanation or title.

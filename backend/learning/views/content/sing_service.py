@@ -48,6 +48,7 @@ def song_payload(exercise_phrases: dict) -> dict | None:
         return None
     plan = value.get("composition_plan")
     return {
+        "song_id": str(value.get("song_id", "")).strip(),
         "target_text": target, "source_text": source,
         "audio_url": str(value.get("audio_url", "")).strip(),
         "image_url": str(value.get("image_url", "")).strip(),
@@ -56,6 +57,7 @@ def song_payload(exercise_phrases: dict) -> dict | None:
         "style_key": str(value.get("style_key", "")).strip(),
         "composition_plan": plan if isinstance(plan, dict) else None,
         "lyrics_locked": bool(value.get("lyrics_locked", False)),
+        "lyric_focus": str(value.get("lyric_focus", "")).strip(),
     }
 
 
@@ -67,10 +69,18 @@ def generate_lyric(item: Item, source_language: str, target_language: str, previ
             "source_text": item.spanish_text,
             "audio_url": "",
             "lyrics_locked": True,
+            "lyric_focus": "study_phrase",
         }
+    lyric_focus = _next_lyric_focus(previous)
     previous_instruction = (
         f"\nPrevious lyric: {previous['target_text']}\nCreate a noticeably different lyric. "
         "Do not reuse the same wording or rhythm." if previous else ""
+    )
+    focus_instruction = (
+        "Create a playful memory lyric. Include one gentle, believable comic twist, while keeping the "
+        "supporting vocabulary simple." if lyric_focus == "funny" else
+        "Create an A2 clarity lyric. Prioritize very common A1-A2 vocabulary, a straightforward everyday "
+        "scene, and the clearest possible meaning. Do not force humor or an unusual situation."
     )
     result = _call_openai_json_logged(
         label="content_item_sing_lyric",
@@ -79,14 +89,21 @@ def generate_lyric(item: Item, source_language: str, target_language: str, previ
             source_name=language_display_name(source_language), target_name=language_display_name(target_language),
             source_text=item.spanish_text, target_text=item.german_text, word_type=item.word_type or "", notes=item.notes or "",
         ),
-        user_input=f"Target word: {item.german_text}\nMeaning: {item.spanish_text}{previous_instruction}",
+        user_input=(f"Target word: {item.german_text}\nMeaning: {item.spanish_text}\n"
+                    f"Creative direction: {focus_instruction}{previous_instruction}"),
         timeout_seconds=12, model=WORD_EXERCISE_MODEL, temperature=1.0, top_p=1.0,
     )
     if not isinstance(result, dict):
         return None
     target = str(result.get("target", "")).strip()
     source = str(result.get("source", "")).strip()
-    return {"target_text": target, "source_text": source, "audio_url": ""} if target and source else None
+    return {
+        "target_text": target, "source_text": source, "audio_url": "", "lyric_focus": lyric_focus,
+    } if target and source else None
+
+
+def _next_lyric_focus(previous: dict | None) -> str:
+    return "a2_clarity" if previous and previous.get("lyric_focus") == "funny" else "funny"
 
 
 def create_audio(item: Item, lyric: dict, target_language: str, generation_id: str, previous_style_key: str = "") -> dict | None:
@@ -150,4 +167,12 @@ def _save_audio(song: dict, audio: bytes, plan: dict, style_key: str, planned_se
         return None
     duration = audio_duration_seconds(audio) or 0
     logger.info("content.sing.saved context=%s audio_url=%s measured_duration_seconds=%s", context, url, duration)
-    return {**song, "audio_url": url, "style_key": style_key, "duration_seconds": duration, "loop_duration_seconds": duration or planned_seconds, "composition_plan": plan}
+    return {
+        **song,
+        "song_id": uuid4().hex,
+        "audio_url": url,
+        "style_key": style_key,
+        "duration_seconds": duration,
+        "loop_duration_seconds": duration or planned_seconds,
+        "composition_plan": plan,
+    }
