@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { fetchOverviewStats } from "../api";
 import { getOverviewStatsUpdatedEventName } from "../apiCore";
 import { getSpeechSynthesisVoiceSelectionOptions } from "../browserSpeech";
+import { notifyGuidedTourAction } from "../guides/guidedTourEvents";
 import { useI18n } from "../i18n";
 import { usePromptPreferences } from "../promptPreferences";
 import {
@@ -39,6 +40,8 @@ export default function ConfigurationPreferencesSection({
     setTargetPromptMode,
     showMobileActionLabels,
     setShowMobileActionLabels,
+    showTutorialContinueButton,
+    setShowTutorialContinueButton,
     preferredBrowserVoiceURIByLanguage,
     setPreferredBrowserVoiceURI,
     clearPreferredBrowserVoiceURIs,
@@ -121,6 +124,7 @@ export default function ConfigurationPreferencesSection({
     setTargetLanguage("german");
     setTargetPromptMode("audio");
     setShowMobileActionLabels(true);
+    setShowTutorialContinueButton(true);
     clearPreferredBrowserVoiceURIs();
   };
 
@@ -151,26 +155,26 @@ export default function ConfigurationPreferencesSection({
       <h2 className="settings-title">{t("config.title")}</h2>
       <p className="settings-subtitle">{t("config.subtitle")}</p>
       <div className="settings-grid">
-        <label className="settings-field">
+        <label className="settings-field" data-guide-target="app-language">
           {t("config.appLanguage")}
-          <select value={language} onChange={(event) => setLanguage(event.target.value === "es" ? "es" : "en")}>
+          <select value={language} onChange={(event) => { setLanguage(event.target.value === "es" ? "es" : "en"); notifyGuidedTourAction("app-language-chosen"); }}>
             <option value="en">{t("lang.english")}</option>
             <option value="es">{t("lang.spanish")}</option>
           </select>
         </label>
 
-        <label className="settings-field">
+        <label className="settings-field" data-guide-target="source-language">
           {t("config.studySourceLanguage")}
-          <select value={sourceLanguage} onChange={(event) => setSourceLanguage(event.target.value as StudyLanguageCode)}>
+          <select value={sourceLanguage} onChange={(event) => { setSourceLanguage(event.target.value as StudyLanguageCode); notifyGuidedTourAction("source-language-chosen"); }}>
             {supportedLanguages.map((code) => (
               <option key={code} value={code}>{t(getStudyLanguageMessageKey(code))}</option>
             ))}
           </select>
         </label>
 
-        <label className="settings-field">
+        <label className="settings-field" data-guide-target="target-language">
           {t("config.studyTargetLanguage")}
-          <select value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value as StudyLanguageCode)}>
+          <select value={targetLanguage} onChange={(event) => { setTargetLanguage(event.target.value as StudyLanguageCode); notifyGuidedTourAction("target-language-chosen"); }}>
             {supportedLanguages.map((code) => (
               <option key={code} value={code}>{t(getStudyLanguageMessageKey(code))}</option>
             ))}
@@ -192,6 +196,15 @@ export default function ConfigurationPreferencesSection({
             <button type="button" className={`settings-choice-button ${!showMobileActionLabels ? "settings-choice-button-selected" : ""}`} onClick={() => setShowMobileActionLabels(false)} role="radio" aria-checked={!showMobileActionLabels}>{t("config.mobileActionLabelsOff")}</button>
           </div>
           <span className="hint">{t("config.mobileActionLabelsHint")}</span>
+        </div>
+
+        <div className="settings-field">
+          {t("config.tutorialButton")}
+          <div className="settings-choice-group" role="radiogroup" aria-label={t("config.tutorialButton")}>
+            <button type="button" className={`settings-choice-button ${showTutorialContinueButton ? "settings-choice-button-selected" : ""}`} onClick={() => setShowTutorialContinueButton(true)} role="radio" aria-checked={showTutorialContinueButton}>{t("config.tutorialButtonShown")}</button>
+            <button type="button" className={`settings-choice-button ${!showTutorialContinueButton ? "settings-choice-button-selected" : ""}`} onClick={() => setShowTutorialContinueButton(false)} role="radio" aria-checked={!showTutorialContinueButton}>{t("config.tutorialButtonHidden")}</button>
+          </div>
+          <span className="hint">{t("config.tutorialButtonHint")}</span>
         </div>
 
         <div className="settings-field">

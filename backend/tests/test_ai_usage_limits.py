@@ -1,7 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from learning.ai_usage import AIUsageLimitExceeded, reserve_ai_usage
+from learning.ai_usage import AIUsageLimitExceeded, record_realtime_active_seconds, reserve_ai_usage
 from learning.ai_usage_context import ai_usage_request_context
 from learning.models import UserAIUsageLimit
 
@@ -30,3 +30,17 @@ def test_elevenlabs_usage_does_not_consume_openai_generation_credits(settings):
         reserve_ai_usage(provider="openai", category="text", units=1, model="gpt-5.6-sol", feature="content")
         with pytest.raises(AIUsageLimitExceeded, match="weekly AI usage limit"):
             reserve_ai_usage(provider="openai", category="text", units=1, model="gpt-5.6-sol", feature="content")
+
+
+@pytest.mark.django_db
+def test_superusers_are_exempt_from_numeric_quotas_but_usage_is_recorded(settings):
+    settings.AI_USAGE_WEEKLY_GENERATION_CREDITS = 1
+    settings.AI_USAGE_WEEKLY_ELEVENLABS_CHARACTERS = 1
+    user = get_user_model().objects.create_superuser(username="developer", password="pin", email="developer@example.com")
+
+    with ai_usage_request_context(user):
+        reserve_ai_usage(provider="openai", category="text", units=1, model="gpt-5.6-sol", feature="content")
+        reserve_ai_usage(provider="openai", category="text", units=1, model="gpt-5.6-sol", feature="content")
+        reserve_ai_usage(provider="elevenlabs", category="audio", units=2, model="eleven_multilingual_v2", feature="audio")
+
+    assert record_realtime_active_seconds(user=user, active_seconds=3600) == 3600

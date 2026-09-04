@@ -28,6 +28,7 @@ export default function SavedDialogCard({
   onOpenItem,
   onTokenClick,
   onSavePhrase,
+  onPhraseSaveStart,
 }: {
   savedDialogId: number | null;
   savedDialogTurns: SavedTurn[];
@@ -40,6 +41,7 @@ export default function SavedDialogCard({
   onOpenItem: (itemId: number) => Promise<void>;
   onTokenClick: (statusKey: string, token: string, turnIndex: number, sourceText: string, targetText: string) => void;
   onSavePhrase: (turn: SavedTurn, turnIndex: number) => Promise<void>;
+  onPhraseSaveStart: () => void;
 }): JSX.Element {
   const { t } = useI18n();
   const [open, setOpen] = useState<boolean>(true);
@@ -84,7 +86,7 @@ export default function SavedDialogCard({
   }, [savedDialogTurns]);
 
   return (
-    <section className="card content-create-card">
+    <section className="card content-create-card" data-guide-target="saved-dialog">
       <button
         type="button"
         className="content-collapsible-trigger"
@@ -148,6 +150,7 @@ export default function SavedDialogCard({
                 error: phraseActionError[phraseKey] || "",
               };
             }}
+            onPhraseSaveStart={onPhraseSaveStart}
           />
         </div>
       )}

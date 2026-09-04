@@ -1098,7 +1098,7 @@ export async function quickAddWordFromDialog(
     body: JSON.stringify({
       source_text: sourceText,
       target_text: targetText,
-      notes: "Added from dialog click",
+      notes: "",
       dialog_id: dialogId,
       turn_index: turnIndex,
       check_only: checkOnly,

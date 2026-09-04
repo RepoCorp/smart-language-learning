@@ -24,6 +24,14 @@ class AIUsageReservation:
     daily_usage_id: int
 
 
+UNLIMITED_REALTIME_SECONDS = 2_147_483_647
+
+
+def _is_quota_exempt(user) -> bool:
+    """Superusers can develop and test without consuming user-facing allowances."""
+    return bool(getattr(user, "is_superuser", False))
+
+
 def _user_limit(user) -> UserAIUsageLimit:
     limit, _ = UserAIUsageLimit.objects.get_or_create(user=user)
     return limit
@@ -47,6 +55,8 @@ def _week_start():
 def realtime_seconds_remaining(user) -> int:
     if user is None or not getattr(user, "is_authenticated", True):
         return 0
+    if _is_quota_exempt(user):
+        return UNLIMITED_REALTIME_SECONDS
     today, week_start = _week_start()
     limit = _user_limit(user)
     minute_limit = limit.weekly_realtime_minutes or int(
@@ -68,8 +78,9 @@ def record_realtime_active_seconds(*, user, active_seconds: int) -> int:
     if user is None or not getattr(user, "is_authenticated", True):
         return 0
     with transaction.atomic():
+        requested_seconds = max(0, active_seconds)
         remaining_seconds = realtime_seconds_remaining(user)
-        recorded_seconds = min(max(0, active_seconds), remaining_seconds)
+        recorded_seconds = requested_seconds if _is_quota_exempt(user) else min(requested_seconds, remaining_seconds)
         if recorded_seconds == 0:
             return 0
         today = timezone.localdate()
@@ -108,7 +119,7 @@ def reserve_ai_usage(
         limit = _user_limit(user)
         if limit.is_blocked:
             raise AIUsageLimitExceeded("AI generation is disabled for this account.")
-        if feature_name == "realtime-session":
+        if feature_name == "realtime-session" and not _is_quota_exempt(user):
             realtime_used_seconds = (
                 DailyAIUsage.objects.select_for_update()
                 .filter(user=user, date__gte=week_start, date__lte=today, feature="realtime-session")
@@ -120,7 +131,7 @@ def reserve_ai_usage(
             )) * 60
             if realtime_used_seconds >= realtime_limit_seconds:
                 raise AIUsageLimitExceeded("Your weekly live conversation minute limit has been reached. Please try again next week.")
-        if provider == "elevenlabs" and feature_name == "sing-strategy":
+        if provider == "elevenlabs" and feature_name == "sing-strategy" and not _is_quota_exempt(user):
             used_seconds = (
                 DailyAIUsage.objects.select_for_update()
                 .filter(
@@ -138,7 +149,7 @@ def reserve_ai_usage(
             )
             if music_limit > 0 and used_seconds + normalized_units > music_limit:
                 raise AIUsageLimitExceeded("Your weekly Eleven Music limit has been reached. Please try again next week.")
-        elif provider == "elevenlabs" and category == DailyAIUsage.Category.AUDIO:
+        elif provider == "elevenlabs" and category == DailyAIUsage.Category.AUDIO and not _is_quota_exempt(user):
             used_characters = (
                 DailyAIUsage.objects.select_for_update()
                 .filter(
@@ -158,7 +169,7 @@ def reserve_ai_usage(
             )
             if character_limit > 0 and used_characters + normalized_units > character_limit:
                 raise AIUsageLimitExceeded("Your weekly ElevenLabs character limit has been reached. Please try again next week.")
-        else:
+        elif not _is_quota_exempt(user):
             used_credits = (
                 DailyAIUsage.objects.select_for_update()
                 .filter(user=user, date__gte=week_start, date__lte=today)

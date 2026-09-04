@@ -62,7 +62,7 @@ export default function ContentPreviewCard({
             })}
           </ul>
           <div className="actions">
-            <button onClick={onAccept} disabled={saving || loading}>
+            <button data-guide-target="save-dialog" onClick={onAccept} disabled={saving || loading}>
               {saving ? t("content.saving") : t("content.preview.acceptDialog")}
             </button>
             <button onClick={onDiscard} disabled={saving || loading}>

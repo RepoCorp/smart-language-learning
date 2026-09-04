@@ -6,6 +6,7 @@ import {
   quickAddWordFromDialog,
 } from "../../api";
 import type { SessionItem, StudyLanguageCode } from "../../types";
+import { notifyGuidedTourAction } from "../../guides/guidedTourEvents";
 
 export type SavedDialogTurn = {
   source_text: string;
@@ -132,6 +133,7 @@ export default function useSavedDialogInteractions(
     try {
       const result = await quickAddWordFromDialog(source, target, sourceLanguage, targetLanguage, savedDialogId, turnIndex, false, sourceLine, targetLine, clickedTargetToken);
       setWordActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+      notifyGuidedTourAction("word-saved");
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
     } finally {
@@ -149,6 +151,7 @@ export default function useSavedDialogInteractions(
       const result = await quickAddPhraseFromConversation(turn.source_text, turn.target_text, sourceLanguage, targetLanguage, false, savedDialogId, turnIndex, turn.source_text, turn.target_text);
       if (result.id) await openItem(result.id);
       setPhraseActionStatus((current) => ({ ...current, [key]: result.created ? "added" : "exists" }));
+      notifyGuidedTourAction("phrase-saved");
     } catch (error) {
       setPhraseActionStatus((current) => ({ ...current, [key]: "error" }));
       setPhraseActionError((current) => ({ ...current, [key]: error instanceof Error && error.message ? error.message : sentenceAddError }));

@@ -1,0 +1,23 @@
+.content-topic-select-wrap {
+  position: relative;
+}
+
+.content-topic-select-wrap::after {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--color-accent-strong);
+  content: "▾";
+  font-size: 1.05rem;
+  font-weight: 800;
+  pointer-events: none;
+  transform: translateY(-54%);
+}
+
+.content-topic-select-wrap select {
+  width: 100%;
+  padding-right: 42px;
+  border-color: var(--color-border-strong);
+  appearance: none;
+  background: var(--color-surface);
+}

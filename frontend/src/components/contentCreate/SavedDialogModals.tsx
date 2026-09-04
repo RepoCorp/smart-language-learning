@@ -33,7 +33,6 @@ export default function SavedDialogModals({
             <p className="add-word-modal-word">{pendingWordAdd.target}</p>
             <p className="add-word-modal-meaning">{t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}</p>
             <p className="add-word-modal-type"><strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong></p>
-            {pendingWordAdd.note && <p className="hint">{t("newItem.wordAddNote", { note: pendingWordAdd.note })}</p>}
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={onClosePendingWordAdd} disabled={addingWord}>{t("newItem.wordAddCancel")}</button>

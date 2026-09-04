@@ -2570,6 +2570,59 @@ textarea {
   gap: 0.45rem;
 }
 
+.turn-save-chooser {
+  position: relative;
+}
+
+.turn-save-options {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  display: grid;
+  width: min(270px, calc(100vw - 52px));
+  padding: 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-floating);
+}
+
+.turn-save-option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.turn-save-option strong {
+  font-size: 0.84rem;
+}
+
+.turn-save-option span {
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+
+.turn-save-option-primary {
+  background: var(--color-accent);
+  color: white;
+}
+
+.turn-save-option-primary span {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.turn-save-option-secondary {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
 .grammar-strategy-panel {
   display: flex;
   flex-direction: column;
@@ -2621,7 +2674,7 @@ textarea {
   min-height: 120px;
   padding: 20px;
   border-radius: 0;
-  background: color-mix(in srgb, var(--color-surface) 64%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
   text-align: center;
 }
 

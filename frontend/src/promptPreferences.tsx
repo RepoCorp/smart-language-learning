@@ -5,6 +5,7 @@ export type TargetPromptMode = "text" | "audio";
 
 const TARGET_PROMPT_MODE_STORAGE_KEY = "target_prompt_mode";
 const MOBILE_ACTION_LABELS_STORAGE_KEY = "mobile_action_labels";
+const TUTORIAL_CONTINUE_BUTTON_STORAGE_KEY = "tutorial_continue_button";
 const BROWSER_VOICE_PREFERENCES_STORAGE_KEY = "browser_voice_preferences";
 
 interface PromptPreferencesContextValue {
@@ -12,6 +13,8 @@ interface PromptPreferencesContextValue {
   setTargetPromptMode: (mode: TargetPromptMode) => void;
   showMobileActionLabels: boolean;
   setShowMobileActionLabels: (enabled: boolean) => void;
+  showTutorialContinueButton: boolean;
+  setShowTutorialContinueButton: (enabled: boolean) => void;
   preferredBrowserVoiceURIByLanguage: Partial<Record<StudyLanguageCode, string>>;
   setPreferredBrowserVoiceURI: (language: StudyLanguageCode, voiceURI: string) => void;
   clearPreferredBrowserVoiceURIs: () => void;
@@ -30,6 +33,13 @@ function getInitialShowMobileActionLabels(): boolean {
     return true;
   }
   return window.localStorage.getItem(MOBILE_ACTION_LABELS_STORAGE_KEY) !== "false";
+}
+
+function getInitialShowTutorialContinueButton(): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+  return window.localStorage.getItem(TUTORIAL_CONTINUE_BUTTON_STORAGE_KEY) !== "false";
 }
 
 function getInitialPreferredBrowserVoiceURIByLanguage(): Partial<Record<StudyLanguageCode, string>> {
@@ -53,6 +63,8 @@ const defaultContext: PromptPreferencesContextValue = {
   setTargetPromptMode: () => {},
   showMobileActionLabels: true,
   setShowMobileActionLabels: () => {},
+  showTutorialContinueButton: true,
+  setShowTutorialContinueButton: () => {},
   preferredBrowserVoiceURIByLanguage: {},
   setPreferredBrowserVoiceURI: () => {},
   clearPreferredBrowserVoiceURIs: () => {},
@@ -63,6 +75,7 @@ const PromptPreferencesContext = createContext<PromptPreferencesContextValue>(de
 export function PromptPreferencesProvider({ children }: { children: ReactNode }): JSX.Element {
   const [targetPromptMode, setTargetPromptModeState] = useState<TargetPromptMode>(getInitialTargetPromptMode);
   const [showMobileActionLabels, setShowMobileActionLabelsState] = useState<boolean>(getInitialShowMobileActionLabels);
+  const [showTutorialContinueButton, setShowTutorialContinueButtonState] = useState<boolean>(getInitialShowTutorialContinueButton);
   const [preferredBrowserVoiceURIByLanguage, setPreferredBrowserVoiceURIByLanguage] = useState<Partial<Record<StudyLanguageCode, string>>>(
     getInitialPreferredBrowserVoiceURIByLanguage,
   );
@@ -78,6 +91,13 @@ export function PromptPreferencesProvider({ children }: { children: ReactNode })
     setShowMobileActionLabelsState(enabled);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(MOBILE_ACTION_LABELS_STORAGE_KEY, String(enabled));
+    }
+  };
+
+  const setShowTutorialContinueButton = (enabled: boolean): void => {
+    setShowTutorialContinueButtonState(enabled);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(TUTORIAL_CONTINUE_BUTTON_STORAGE_KEY, String(enabled));
     }
   };
 
@@ -109,11 +129,13 @@ export function PromptPreferencesProvider({ children }: { children: ReactNode })
       setTargetPromptMode,
       showMobileActionLabels,
       setShowMobileActionLabels,
+      showTutorialContinueButton,
+      setShowTutorialContinueButton,
       preferredBrowserVoiceURIByLanguage,
       setPreferredBrowserVoiceURI,
       clearPreferredBrowserVoiceURIs,
     }),
-    [targetPromptMode, showMobileActionLabels, preferredBrowserVoiceURIByLanguage],
+    [targetPromptMode, showMobileActionLabels, showTutorialContinueButton, preferredBrowserVoiceURIByLanguage],
   );
 
   return <PromptPreferencesContext.Provider value={value}>{children}</PromptPreferencesContext.Provider>;

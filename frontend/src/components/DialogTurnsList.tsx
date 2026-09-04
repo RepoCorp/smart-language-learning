@@ -25,6 +25,7 @@ interface DialogTurnsListProps {
   ) => void;
   renderLeadingAction?: (turn: DialogTurnRecord, turnIndex: number) => ReactNode;
   getWholePhraseSaveAction?: (turn: DialogTurnRecord, turnIndex: number) => WholePhraseSaveAction | undefined;
+  onPhraseSaveStart?: (turn: DialogTurnRecord, turnIndex: number) => void;
   getTurnRef?: (turnIndex: number, element: HTMLLIElement | null) => void;
   highlightedTurnIndex?: number | null;
   highlightedTurnIndexes?: Iterable<number>;
@@ -45,6 +46,7 @@ export default function DialogTurnsList({
   onTokenClick,
   renderLeadingAction,
   getWholePhraseSaveAction,
+  onPhraseSaveStart,
   getTurnRef,
   highlightedTurnIndex = null,
   highlightedTurnIndexes,
@@ -83,6 +85,7 @@ export default function DialogTurnsList({
                 onTokenClick={(statusKey, token) => onTokenClick?.(statusKey, token, index, turn.source_text, turn.target_text)}
                 leadingAction={renderLeadingAction?.(turn, index)}
                 wholePhraseSaveAction={getWholePhraseSaveAction?.(turn, index)}
+                onPhraseSaveStart={() => onPhraseSaveStart?.(turn, index)}
                 showSavingOverlay={false}
               />
             </div>

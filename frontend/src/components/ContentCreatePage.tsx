@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { ContentPreviewResponse } from "../types";
 import { FullScreenLoadingOverlay } from "./BlockingLoadingOverlay";
+import { notifyGuidedTourAction } from "../guides/guidedTourEvents";
 import ContentCreateFormCard from "./contentCreate/ContentCreateFormCard";
 import ContentPreviewCard from "./contentCreate/ContentPreviewCard";
 import SavedDialogCard from "./contentCreate/SavedDialogCard";
@@ -151,6 +152,7 @@ export default function ContentCreatePage(): JSX.Element {
         targetLanguage,
       );
       setPreview(data);
+      notifyGuidedTourAction("dialog-preview-created");
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
     } catch {
@@ -179,6 +181,7 @@ export default function ContentCreatePage(): JSX.Element {
       );
       setResult(t("content.result.dialogAccepted"));
       savedDialog.setSavedDialog(response.saved_dialog_id || null, response.saved_dialog_turns || []);
+      notifyGuidedTourAction("dialog-saved");
       setPreview(null);
       const topicsResponse = await fetchContentTopics(sourceLanguage, targetLanguage);
       setPreviousTopics(topicsResponse.topics || []);
@@ -257,9 +260,11 @@ export default function ContentCreatePage(): JSX.Element {
           onUpdateTurnAudio={savedDialog.updateTurnAudio}
           onOpenItem={savedDialog.openItem}
           onTokenClick={(statusKey, token, turnIndex, sourceText, targetText) => {
+            notifyGuidedTourAction("word-selected");
             void savedDialog.requestAddWord(statusKey, token, turnIndex, sourceText, targetText);
           }}
           onSavePhrase={savedDialog.addWholeTurnPhrase}
+          onPhraseSaveStart={() => notifyGuidedTourAction("phrase-save-started")}
         />
       )}
 
@@ -270,7 +275,10 @@ export default function ContentCreatePage(): JSX.Element {
         loadingLinkedWord={savedDialog.loadingLinkedWord}
         onClosePendingWordAdd={savedDialog.closePendingWordAdd}
         onConfirmWordAdd={savedDialog.confirmAddWord}
-        onCloseOpenedLinkedWord={savedDialog.closeOpenedLinkedWord}
+        onCloseOpenedLinkedWord={() => {
+          savedDialog.closeOpenedLinkedWord();
+          notifyGuidedTourAction("phrase-item-closed");
+        }}
       />
       <FullScreenLoadingOverlay
         loading={saving || savedDialog.isSaving}

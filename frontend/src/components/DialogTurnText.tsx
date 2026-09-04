@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import type { StudyLanguageCode } from "../types";
 import { FullScreenLoadingOverlay } from "./BlockingLoadingOverlay";
+import { dialogSaveOptionsCopy } from "./dialogs/dialogSaveOptionsCopy";
 import { useDialogTurnPhraseSelection } from "./dialogs/useDialogTurnPhraseSelection";
 import TargetPhraseText from "./TargetPhraseText";
 
@@ -34,6 +35,7 @@ interface DialogTurnTextProps {
   showSavingOverlay?: boolean;
   leadingAction?: ReactNode;
   wholePhraseSaveAction?: WholePhraseSaveAction;
+  onPhraseSaveStart?: () => void;
 }
 
 const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
@@ -58,8 +60,10 @@ export default function DialogTurnText({
   showSavingOverlay = true,
   leadingAction,
   wholePhraseSaveAction,
+  onPhraseSaveStart,
 }: DialogTurnTextProps): JSX.Element {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
+  const saveCopy = dialogSaveOptionsCopy(language);
   const [showSaveChoices, setShowSaveChoices] = useState(false);
   const prefix = statusKeyPrefix || `${dialogId}-${turnIndex}-target`;
   const tokens = lineTokens(targetText);
@@ -98,6 +102,12 @@ export default function DialogTurnText({
   const choosePhrasePart = (): void => {
     setShowSaveChoices(false);
     startPhraseSelection();
+  };
+  const togglePhraseSaveChoices = (): void => {
+    if (!showSaveChoices) {
+      onPhraseSaveStart?.();
+    }
+    setShowSaveChoices((current) => !current);
   };
 
   return (
@@ -159,18 +169,27 @@ export default function DialogTurnText({
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => setShowSaveChoices((current) => !current)}
+                  onClick={togglePhraseSaveChoices}
                   disabled={wholePhraseSaveAction.disabled || wholePhraseSaveAction.status === "saving"}
                   aria-expanded={showSaveChoices}
                 >
-                  {showSaveChoices ? t("newItem.wordAddCancel") : t("dialogs.save")}
+                  {showSaveChoices ? t("newItem.wordAddCancel") : saveCopy.saveLabel}
                 </button>
                 {showSaveChoices && (
-                  <div className="turn-save-options">
-                    <button type="button" onClick={chooseWholePhrase} disabled={wholePhraseSaveAction.disabled || wholePhraseSaveAction.status === "saving"}>
-                      {wholePhraseSaveAction.status === "saving" ? t("newItem.sentenceAddSaving") : wholePhraseLabel}
+                  <div className="turn-save-options" role="group" aria-label={saveCopy.saveLabel}>
+                    <button
+                      type="button"
+                      className="turn-save-option turn-save-option-primary"
+                      onClick={chooseWholePhrase}
+                      disabled={wholePhraseSaveAction.disabled || wholePhraseSaveAction.status === "saving"}
+                    >
+                      <strong>{wholePhraseSaveAction.status === "saving" ? t("newItem.sentenceAddSaving") : saveCopy.fullLineTitle}</strong>
+                      <span>{saveCopy.fullLineDescription}</span>
                     </button>
-                    <button type="button" className="secondary-button" onClick={choosePhrasePart}>{t("dialogs.savePhrasePart")}</button>
+                    <button type="button" className="turn-save-option turn-save-option-secondary" onClick={choosePhrasePart}>
+                      <strong>{saveCopy.partialLineTitle}</strong>
+                      <span>{saveCopy.partialLineDescription}</span>
+                    </button>
                   </div>
                 )}
               </div>

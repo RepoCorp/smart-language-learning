@@ -15,6 +15,7 @@ interface ConfigurationsPageProps {
   authBusy?: boolean;
   onLogout?: () => Promise<void>;
   onOpenAdmin?: () => void;
+  onStartGuidedSetup: () => void;
 }
 
 export default function ConfigurationsPage({
@@ -23,6 +24,7 @@ export default function ConfigurationsPage({
   authBusy = false,
   onLogout,
   onOpenAdmin,
+  onStartGuidedSetup,
 }: ConfigurationsPageProps): JSX.Element {
   const { t } = useI18n();
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
@@ -43,7 +45,14 @@ export default function ConfigurationsPage({
           </div>
         </section>
       ) : null}
-      <GettingStartedGuideModal open={showGettingStarted} onClose={() => setShowGettingStarted(false)} />
+      <GettingStartedGuideModal
+        open={showGettingStarted}
+        onClose={() => setShowGettingStarted(false)}
+        onStartGuidedSetup={() => {
+          setShowGettingStarted(false);
+          onStartGuidedSetup();
+        }}
+      />
     </main>
   );
 }

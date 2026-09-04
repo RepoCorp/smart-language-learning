@@ -32,7 +32,6 @@ export default function DialogItemSavingModals({
             <p className="add-word-modal-type">
               <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
             </p>
-            {pendingWordAdd.note && <p className="hint">{t("newItem.wordAddNote", { note: pendingWordAdd.note })}</p>}
             <p className="hint">{t("newItem.wordAddPrompt")}</p>
             <div className="actions">
               <button type="button" className="secondary-button" onClick={onCancelWordAdd} disabled={addingWord}>

@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useI18n } from "../../i18n";
+import ContentCreateCollapsibleSection from "./ContentCreateCollapsibleSection";
+import "./ContentCreateFormCard.css";
+import { GUIDED_TOUR_OPEN_SECTION_EVENT, notifyGuidedTourAction } from "../../guides/guidedTourEvents";
 
 const CREATE_NEW_OPTION = "__create_new__";
 const RANDOM_TOPIC_OPTION = "__random_topic__";
@@ -8,42 +11,6 @@ const RANDOM_TOPIC_OPTION = "__random_topic__";
 type DialogLength = "standard" | "short_three";
 type RequiredWordsLanguage = "source" | "target";
 type ProficiencyLevel = "A1" | "A2" | "B1" | "B2";
-
-function CollapsibleSection({
-  title,
-  subtitle,
-  open,
-  onToggle,
-  children,
-  accent = "neutral",
-}: {
-  title: string;
-  subtitle?: string;
-  open: boolean;
-  onToggle: () => void;
-  children: JSX.Element | JSX.Element[];
-  accent?: "neutral" | "required";
-}): JSX.Element {
-  return (
-    <section className={`content-collapsible-section content-collapsible-section-${accent}${open ? " content-collapsible-section-open" : ""}`}>
-      <button
-        type="button"
-        className="content-collapsible-trigger"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        <span className="content-collapsible-trigger-copy">
-          <strong>{title}</strong>
-          {!!subtitle && <span className="content-collapsible-trigger-subtitle">{subtitle}</span>}
-        </span>
-        <span className={`content-collapsible-trigger-icon${open ? " content-collapsible-trigger-icon-open" : ""}`} aria-hidden="true">
-          ▾
-        </span>
-      </button>
-      {open && <div className="content-collapsible-body">{children}</div>}
-    </section>
-  );
-}
 
 export default function ContentCreateFormCard({
   selectedTopic,
@@ -98,64 +65,99 @@ export default function ContentCreateFormCard({
 }): JSX.Element {
   const { t } = useI18n();
   const [openSection, setOpenSection] = useState<"topic" | "context" | "options" | null>(null);
+  const [attemptedGeneration, setAttemptedGeneration] = useState(false);
+  const customTopicInputRef = useRef<HTMLInputElement | null>(null);
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
   const shouldCreateNewContext = selectedContext === CREATE_NEW_OPTION;
   const usingRandomTopic = selectedTopic === RANDOM_TOPIC_OPTION;
   const hasRequiredWords = requiredWords.trim().length > 0;
   const hasCustomTopicText = customTopic.trim().length > 0;
   const needsCustomTopic = shouldCreateNewTopic && !hasCustomTopicText;
+  const showMissingTopic = needsCustomTopic && attemptedGeneration;
+
+  useEffect(() => {
+    const openRequestedSection = (event: Event): void => {
+      if ((event as CustomEvent<{ section?: string }>).detail?.section === "topic") {
+        setOpenSection("topic");
+      }
+    };
+    window.addEventListener(GUIDED_TOUR_OPEN_SECTION_EVENT, openRequestedSection);
+    return () => window.removeEventListener(GUIDED_TOUR_OPEN_SECTION_EVENT, openRequestedSection);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldCreateNewTopic) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => customTopicInputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [shouldCreateNewTopic]);
 
   return (
     <section className="card content-create-form">
-      <CollapsibleSection
+      <ContentCreateCollapsibleSection
         title={t("content.section.topicTitle")}
-        subtitle={needsCustomTopic
+        subtitle={needsCustomTopic && openSection !== "topic"
           ? t("content.topic.requiredBadge")
           : (usingRandomTopic ? t("content.topic.random") : (resolvedTopic ? resolvedTopic : t("content.section.topicSubtitleEmpty")))}
-        accent={needsCustomTopic ? "required" : "neutral"}
+        accent={showMissingTopic ? "required" : "neutral"}
         open={openSection === "topic"}
         onToggle={() => setOpenSection((current) => current === "topic" ? null : "topic")}
       >
         <div className="content-form-section content-topic-section">
-          <select
-            id="topic-select"
-            value={selectedTopic}
-            onChange={(e) => onSelectedTopicChange(e.target.value)}
-            disabled={loading || saving}
-            aria-label={t("content.section.topicTitle")}
-          >
-            <option value={RANDOM_TOPIC_OPTION}>{t("content.topic.random")}</option>
-            {previousTopics.map((savedTopic) => (
-              <option key={savedTopic} value={savedTopic}>
-                {savedTopic}
-              </option>
-            ))}
-            <option value={CREATE_NEW_OPTION}>{t("content.topic.createNew")}</option>
-          </select>
+          <div className="content-topic-select-wrap" data-guide-target={shouldCreateNewTopic ? undefined : "topic-selection"}>
+            <select
+              id="topic-select"
+              value={selectedTopic}
+              onChange={(e) => {
+                setAttemptedGeneration(false);
+                onSelectedTopicChange(e.target.value);
+              }}
+              disabled={loading || saving}
+              aria-label={t("content.section.topicTitle")}
+            >
+              <option value={RANDOM_TOPIC_OPTION}>{t("content.topic.random")}</option>
+              {previousTopics.map((savedTopic) => (
+                <option key={savedTopic} value={savedTopic}>
+                  {savedTopic}
+                </option>
+              ))}
+              <option value={CREATE_NEW_OPTION}>{t("content.topic.createNew")}</option>
+            </select>
+          </div>
           {shouldCreateNewTopic && (
-            <>
+            <div style={{ marginLeft: "16px" }}>
               <label htmlFor="topic-input" className="prompt">{t("content.topic.newLabel")}</label>
               <input
                 id="topic-input"
+                data-guide-target="topic-selection"
+                ref={customTopicInputRef}
                 value={customTopic}
                 onChange={(e) => onCustomTopicChange(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && customTopic.trim()) {
+                    event.preventDefault();
+                    setOpenSection(null);
+                    notifyGuidedTourAction("topic-created");
+                  }
+                }}
                 placeholder={t("content.topic.placeholder")}
                 disabled={loading || saving}
                 required
-                aria-invalid={!hasCustomTopicText}
-                style={needsCustomTopic ? {
+                aria-invalid={showMissingTopic}
+                style={showMissingTopic ? {
                   border: "2px solid #b42318",
                   background: "#fff1f0",
                   boxShadow: "0 0 0 1px rgba(180, 35, 24, 0.16)",
                 } : undefined}
               />
-              <p className="error" hidden={hasCustomTopicText}>{t("content.topic.requiredBadge")}</p>
-            </>
+              <p className="error" hidden={!needsCustomTopic} style={{ marginTop: "2px" }}>{t("content.topic.requiredBadge")}</p>
+            </div>
           )}
         </div>
-      </CollapsibleSection>
+      </ContentCreateCollapsibleSection>
 
-      <CollapsibleSection
+      <ContentCreateCollapsibleSection
         title={t("content.section.contextTitle")}
         subtitle={selectedContext === CREATE_NEW_OPTION ? customContext.trim() || t("content.context.none") : selectedContext || t("content.context.none")}
         open={openSection === "context"}
@@ -189,9 +191,9 @@ export default function ContentCreateFormCard({
             </>
           )}
         </div>
-      </CollapsibleSection>
+      </ContentCreateCollapsibleSection>
 
-      <CollapsibleSection
+      <ContentCreateCollapsibleSection
         title={t("content.section.optionsTitle")}
         open={openSection === "options"}
         onToggle={() => setOpenSection((current) => current === "options" ? null : "options")}
@@ -286,10 +288,20 @@ export default function ContentCreateFormCard({
             <p className="hint">{t("content.details.hint")}</p>
           </div>
         </>
-      </CollapsibleSection>
+      </ContentCreateCollapsibleSection>
 
       <div className="actions">
-        <button onClick={onGeneratePreview} disabled={loading || saving || !resolvedTopic}>
+        <button
+          data-guide-target="generate-dialog"
+          onClick={() => {
+            setAttemptedGeneration(true);
+            if (needsCustomTopic) {
+              setOpenSection("topic");
+            }
+            onGeneratePreview();
+          }}
+          disabled={loading || saving}
+        >
           {loading ? t("content.generating") : t("content.generate")}
         </button>
       </div>

@@ -13,6 +13,7 @@ import AdminPage from "./components/AdminPage";
 import AIQuotaNotice from "./components/AIQuotaNotice";
 import ConfigurationsPage from "./components/ConfigurationsPage";
 import GettingStartedGuideModal from "./components/GettingStartedGuideModal";
+import GuidedTour from "./guides/GuidedTour";
 import PinSetupPage from "./components/PinSetupPage";
 import ContentCreatePage from "./components/ContentCreatePage";
 import ContentManagePage from "./components/ContentManagePage";
@@ -25,14 +26,25 @@ import { DebugToolsPanel } from "./debugTools";
 import ConversationPage from "./features/conversation/ConversationPage";
 import GlobalSessionEndPrompt from "./features/session/GlobalSessionEndPrompt";
 import { useI18n } from "./i18n";
+import { usePromptPreferences } from "./promptPreferences";
+
+const FIRST_GUIDE_COMPLETED_STORAGE_KEY = "first_learning_guide_completed";
+
+function hasCompletedFirstGuide(): boolean {
+  return typeof window !== "undefined" && window.localStorage.getItem(FIRST_GUIDE_COMPLETED_STORAGE_KEY) === "true";
+}
 
 export default function App(): JSX.Element {
   const { t } = useI18n();
+  const { showTutorialContinueButton } = usePromptPreferences();
   const location = useLocation();
   const navigate = useNavigate();
   const [authUser, setAuthUser] = useState<AuthUser | null>(() => getStoredAuthUser());
   const [authBusy, setAuthBusy] = useState(false);
   const [showGettingStarted, setShowGettingStarted] = useState(false);
+  const [showGuidedSetup, setShowGuidedSetup] = useState(false);
+  const [guidedTourStep, setGuidedTourStep] = useState(0);
+  const [firstGuideCompleted, setFirstGuideCompleted] = useState(hasCompletedFirstGuide);
   const [showPageMenu, setShowPageMenu] = useState(false);
   const pageMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -84,6 +96,12 @@ export default function App(): JSX.Element {
     void completeGettingStarted();
   };
 
+  const startGuidedSetup = (): void => {
+    setShowGettingStarted(false);
+    void completeGettingStarted();
+    setShowGuidedSetup(true);
+  };
+
   const configPath = "/configurations";
   const pageOptions = [
     { path: "/session", label: t("menu.session") },
@@ -118,6 +136,7 @@ export default function App(): JSX.Element {
                     <button
                       type="button"
                       className="top-nav-menu-button"
+                      data-guide-target="main-menu"
                       onClick={() => setShowPageMenu((value) => !value)}
                       aria-expanded={showPageMenu}
                       aria-haspopup="menu"
@@ -136,6 +155,7 @@ export default function App(): JSX.Element {
                             key={option.path}
                             type="button"
                             className={`top-nav-menu-item ${selectedPagePath === option.path ? "active" : ""}`}
+                            data-guide-target={option.path === "/content/create" ? "menu-create-content" : undefined}
                             onClick={() => {
                               setShowPageMenu(false);
                               if (selectedPagePath !== option.path) {
@@ -171,6 +191,7 @@ export default function App(): JSX.Element {
                   authBusy={authBusy}
                   onLogout={handleLogout}
                   onOpenAdmin={() => navigate("/admin")}
+                  onStartGuidedSetup={startGuidedSetup}
                 />
               )}
             />
@@ -179,7 +200,23 @@ export default function App(): JSX.Element {
           </Routes>
           <GlobalSessionEndPrompt />
           <AIQuotaNotice />
-          <GettingStartedGuideModal open={showGettingStarted} onClose={closeGettingStarted} />
+          <GettingStartedGuideModal open={showGettingStarted} onClose={closeGettingStarted} onStartGuidedSetup={startGuidedSetup} />
+          {showTutorialContinueButton && !firstGuideCompleted && !showGettingStarted && !showGuidedSetup ? (
+            <button type="button" className="guided-tour-continue-button" onClick={() => setShowGuidedSetup(true)}>
+              {t("config.tutorialStart")}
+            </button>
+          ) : null}
+          <GuidedTour
+            open={showGuidedSetup}
+            onFinish={() => {
+              setShowGuidedSetup(false);
+              setGuidedTourStep(0);
+              setFirstGuideCompleted(true);
+              window.localStorage.setItem(FIRST_GUIDE_COMPLETED_STORAGE_KEY, "true");
+            }}
+            stepIndex={guidedTourStep}
+            onStepChange={setGuidedTourStep}
+          />
           {authUser.is_superuser && <DebugToolsPanel />}
         </>
       ) : null}
