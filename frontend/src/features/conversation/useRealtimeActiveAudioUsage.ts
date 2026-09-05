@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 
 import { recordTopicConversationRealtimeUsage } from "../../apiConversationRealtimeUsage";
 
+const UNLIMITED_REALTIME_ALLOWANCE_SECONDS = 1_000_000_000;
+
 type RealtimeActiveAudioUsageOptions = {
   onLimitReached: () => void;
 };
@@ -44,6 +46,9 @@ export function useRealtimeActiveAudioUsage({ onLimitReached }: RealtimeActiveAu
         return;
       }
       activeStartedAtRef.current = performance.now();
+      if (remainingSecondsRef.current >= UNLIMITED_REALTIME_ALLOWANCE_SECONDS) {
+        return;
+      }
       const millisecondsRemaining = Math.max(0, (remainingSecondsRef.current * 1000) - unsentMillisecondsRef.current);
       limitTimerRef.current = window.setTimeout(() => {
         setAudioActive(false);

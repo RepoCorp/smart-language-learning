@@ -793,6 +793,10 @@ button.overview-stats-metric-card:focus-visible {
   color: var(--color-text-muted);
 }
 
+.configuration-learning-stats-list {
+  margin-top: 16px;
+}
+
 .settings-stat-group {
   display: grid;
   gap: 3px;
@@ -3381,10 +3385,13 @@ textarea {
 }
 
 .getting-started-open-button {
-  width: 100%;
-  min-height: 48px;
-  margin-bottom: 8px;
-  font-size: 1rem;
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 1px solid var(--color-accent-strong);
+  border-radius: 999px;
+  background: var(--color-accent-surface);
+  color: var(--color-accent-strong);
+  font-size: 0.95rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -3392,42 +3399,73 @@ textarea {
   gap: 9px;
 }
 
-.documentation-section {
-  margin-bottom: 14px;
-}
-
-.documentation-topics {
-  display: grid;
-  gap: 12px;
-  margin: 14px 0 18px;
-  justify-items: center;
-}
-
-.documentation-topic-button {
-  width: min(100%, 360px);
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 0;
-  background: var(--color-surface-soft);
-  color: var(--color-text);
-  font-size: 0.95rem;
-  font-weight: 700;
+.guide-library-modal {
+  width: min(520px, 100%);
+  padding: 24px;
   text-align: left;
 }
 
-.documentation-topic-button:hover {
+.guide-library-options {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.guide-library-options > button {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.guide-library-options > button:hover {
+  border-color: var(--color-accent);
   background: var(--color-accent-surface);
+}
+
+.guide-library-options span {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.documentation-section {
+  margin-bottom: 0;
+}
+
+.configuration-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.configuration-page > .card {
+  margin: 0;
+}
+
+.configuration-current-user {
+  margin: 0 0 10px;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.configuration-current-user strong {
+  color: var(--color-text);
+}
+
+.configuration-logout-action {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 10px;
 }
 
 .documentation-section .getting-started-open-button {
   display: flex;
-  width: min(100%, 360px);
-  margin: 0 auto;
+  width: fit-content;
+  margin: 12px auto 0;
 }
 
 .documentation-modal {

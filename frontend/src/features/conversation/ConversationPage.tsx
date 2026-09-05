@@ -973,9 +973,7 @@ export default function ConversationPage(): JSX.Element {
           onRoleChange={setRole}
           onGoalDifficultyChange={setGoalDifficulty}
           onConversationModeChange={setSelectedConversationMode}
-          onGenerateGoal={() => {
-            void generateGoal();
-          }}
+          onGenerateGoal={generateGoal}
           onStart={() => {
             void startConversation();
           }}

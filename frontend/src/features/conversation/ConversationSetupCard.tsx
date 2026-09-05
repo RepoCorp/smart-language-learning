@@ -1,49 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useI18n } from "../../i18n";
 import BlockingLoadingOverlay from "../../components/BlockingLoadingOverlay";
 import type { ConversationTransport, GoalDifficulty } from "./useConversationTransport";
 import { CREATE_NEW_OPTION, RANDOM_TOPIC_OPTION } from "./conversationSetupOptions";
 import type { ConversationSetupGoal } from "./useConversationSetup";
-
-function CollapsibleSection({
-  title,
-  subtitle,
-  open,
-  onToggle,
-  accent = "neutral",
-  disabled = false,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  open: boolean;
-  onToggle: () => void;
-  accent?: "neutral" | "required";
-  disabled?: boolean;
-  children: JSX.Element | JSX.Element[];
-}): JSX.Element {
-  return (
-    <section className={`content-collapsible-section content-collapsible-section-${accent}${open ? " content-collapsible-section-open" : ""}`}>
-      <button
-        type="button"
-        className="content-collapsible-trigger"
-        aria-expanded={open}
-        onClick={onToggle}
-        disabled={disabled}
-      >
-        <span className="content-collapsible-trigger-copy conversation-setup-trigger-copy">
-          <strong>{title}</strong>
-          {!!subtitle && <span className="content-collapsible-trigger-subtitle conversation-setup-trigger-subtitle">{subtitle}</span>}
-        </span>
-        <span className={`content-collapsible-trigger-icon${open ? " content-collapsible-trigger-icon-open" : ""}`} aria-hidden="true">
-          ▾
-        </span>
-      </button>
-      {open && <div className="content-collapsible-body">{children}</div>}
-    </section>
-  );
-}
+import ConversationCollapsibleSection from "./ConversationCollapsibleSection";
+import { GUIDED_TOUR_OPEN_SECTION_EVENT, notifyGuidedTourAction } from "../../guides/guidedTourEvents";
 
 export default function ConversationSetupCard({
   previousTopics,
@@ -91,7 +54,7 @@ export default function ConversationSetupCard({
   onRoleChange: (value: string) => void;
   onGoalDifficultyChange: (value: GoalDifficulty) => void;
   onConversationModeChange: (value: ConversationTransport) => void;
-  onGenerateGoal: () => void;
+  onGenerateGoal: () => Promise<boolean>;
   onStart: () => void;
 }): JSX.Element {
   const { t } = useI18n();
@@ -106,15 +69,26 @@ export default function ConversationSetupCard({
   const difficultySubtitle = t(`conversation.goalDifficulty${goalDifficulty.charAt(0).toUpperCase()}${goalDifficulty.slice(1)}` as const);
   const modeSubtitle = selectedConversationMode === "realtime" ? t("conversation.modeLive") : t("conversation.modeNaturalVoices");
 
+  useEffect(() => {
+    const openGuideSection = (event: Event): void => {
+      if ((event as CustomEvent<{ section?: string }>).detail?.section === "conversation-topic") {
+        setOpenSection("topic");
+      }
+    };
+    window.addEventListener(GUIDED_TOUR_OPEN_SECTION_EVENT, openGuideSection);
+    return () => window.removeEventListener(GUIDED_TOUR_OPEN_SECTION_EVENT, openGuideSection);
+  }, []);
+
   return (
     <div className="content-create-form">
-      <CollapsibleSection
+      <ConversationCollapsibleSection
         title={t("content.section.topicTitle")}
         subtitle={topicSubtitle}
         open={openSection === "topic"}
         onToggle={() => setOpenSection((current) => current === "topic" ? null : "topic")}
         accent={!resolvedTopic ? "required" : "neutral"}
         disabled={controlsLocked}
+        guideTarget="conversation-topic"
       >
         <div className="content-form-section content-topic-section">
           <select
@@ -146,9 +120,9 @@ export default function ConversationSetupCard({
           )}
           {!resolvedTopic && <p className="content-required-hint">{t("content.topic.requiredHint")}</p>}
         </div>
-      </CollapsibleSection>
+      </ConversationCollapsibleSection>
 
-      <CollapsibleSection
+      <ConversationCollapsibleSection
         title={t("conversation.setupTitle")}
         subtitle={setupSubtitle}
         open={openSection === "setup"}
@@ -178,9 +152,9 @@ export default function ConversationSetupCard({
             aria-label={t("conversation.roleLabel")}
           />
         </div>
-      </CollapsibleSection>
+      </ConversationCollapsibleSection>
 
-      <CollapsibleSection
+      <ConversationCollapsibleSection
         title={t("conversation.goalDifficultyLabel")}
         subtitle={difficultySubtitle}
         open={openSection === "difficulty"}
@@ -221,9 +195,9 @@ export default function ConversationSetupCard({
             </label>
           </div>
         </div>
-      </CollapsibleSection>
+      </ConversationCollapsibleSection>
 
-      <CollapsibleSection
+      <ConversationCollapsibleSection
         title={t("conversation.modeLabel")}
         subtitle={modeSubtitle}
         open={openSection === "mode"}
@@ -254,12 +228,12 @@ export default function ConversationSetupCard({
             </label>
           </div>
         </div>
-      </CollapsibleSection>
+      </ConversationCollapsibleSection>
 
       {!started && (
         <div className="actions">
           <BlockingLoadingOverlay loading={goalGenerating} message={t("conversation.goalRegenerating")}>
-            <div className="conversation-setup-goal">
+            <div className="conversation-setup-goal" data-guide-target="conversation-goal">
               <p className="conversation-goal-banner-label">{t("conversation.goalLabel")}</p>
               {goal ? (
                 <>
@@ -273,7 +247,11 @@ export default function ConversationSetupCard({
               <button
                 type="button"
                 className="secondary-button"
-                onClick={onGenerateGoal}
+                onClick={() => {
+                  void onGenerateGoal().then((generated) => {
+                    if (generated) notifyGuidedTourAction("conversation-goal-generated");
+                  });
+                }}
                 disabled={conversationLoading || goalGenerating || loadingTopics || !resolvedTopic}
               >
                 {goalGenerating
@@ -284,7 +262,8 @@ export default function ConversationSetupCard({
           </BlockingLoadingOverlay>
           <button
             type="button"
-            onClick={onStart}
+            data-guide-target="conversation-start"
+            onClick={() => { onStart(); notifyGuidedTourAction("conversation-started"); }}
             disabled={conversationLoading || goalGenerating || loadingTopics || !goal}
           >
             {conversationLoading ? t("conversation.starting") : t("conversation.start")}

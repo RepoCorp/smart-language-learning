@@ -3,11 +3,11 @@ import { useState } from "react";
 import type { AuthUser } from "../authApi";
 import { useI18n } from "../i18n";
 import type { OverviewStatsResponse } from "../types";
-import ConfigurationAccountSection from "./ConfigurationAccountSection";
 import ConfigurationDocumentationSection from "./ConfigurationDocumentationSection";
+import ConfigurationLearningStatsSection from "./ConfigurationLearningStatsSection";
 import ConfigurationPreferencesSection from "./ConfigurationPreferencesSection";
 import ConfigurationTimezoneSection from "./ConfigurationTimezoneSection";
-import GettingStartedGuideModal from "./GettingStartedGuideModal";
+import GuideLibraryModal from "./GuideLibraryModal";
 
 interface ConfigurationsPageProps {
   canCreateUsers?: boolean;
@@ -16,6 +16,7 @@ interface ConfigurationsPageProps {
   onLogout?: () => Promise<void>;
   onOpenAdmin?: () => void;
   onStartGuidedSetup: () => void;
+  onStartConversationGuide: () => void;
 }
 
 export default function ConfigurationsPage({
@@ -25,17 +26,21 @@ export default function ConfigurationsPage({
   onLogout,
   onOpenAdmin,
   onStartGuidedSetup,
+  onStartConversationGuide,
 }: ConfigurationsPageProps): JSX.Element {
   const { t } = useI18n();
   const [stats, setStats] = useState<OverviewStatsResponse | null>(null);
-  const [showGettingStarted, setShowGettingStarted] = useState(false);
+  const [showGuideLibrary, setShowGuideLibrary] = useState(false);
 
   return (
-    <main className="container">
-      <ConfigurationDocumentationSection onOpenGettingStarted={() => setShowGettingStarted(true)} />
-      <ConfigurationAccountSection authBusy={authBusy} authUser={authUser} onLogout={onLogout} stats={stats} />
-      <ConfigurationTimezoneSection />
+    <main className="container configuration-page">
+      <p className="configuration-current-user">
+        {t("config.currentUser")} <strong>{authUser?.email || authUser?.username || t("config.noCurrentUser")}</strong>
+      </p>
+      <ConfigurationDocumentationSection onOpenGuides={() => setShowGuideLibrary(true)} />
+      <ConfigurationLearningStatsSection stats={stats} />
       <ConfigurationPreferencesSection onStatsChange={setStats} />
+      <ConfigurationTimezoneSection />
       {canCreateUsers ? (
         <section className="card settings-card">
           <h2 className="settings-title">{t("config.adminTitle")}</h2>
@@ -45,12 +50,23 @@ export default function ConfigurationsPage({
           </div>
         </section>
       ) : null}
-      <GettingStartedGuideModal
-        open={showGettingStarted}
-        onClose={() => setShowGettingStarted(false)}
-        onStartGuidedSetup={() => {
-          setShowGettingStarted(false);
+      {onLogout ? (
+        <div className="configuration-logout-action">
+          <button type="button" className="secondary-button" onClick={() => void onLogout()} disabled={authBusy}>
+            {authBusy ? t("config.loggingOut") : t("config.logOut")}
+          </button>
+        </div>
+      ) : null}
+      <GuideLibraryModal
+        open={showGuideLibrary}
+        onClose={() => setShowGuideLibrary(false)}
+        onStartBasics={() => {
+          setShowGuideLibrary(false);
           onStartGuidedSetup();
+        }}
+        onStartConversation={() => {
+          setShowGuideLibrary(false);
+          onStartConversationGuide();
         }}
       />
     </main>

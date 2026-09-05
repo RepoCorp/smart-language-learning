@@ -14,7 +14,7 @@ import AIQuotaNotice from "./components/AIQuotaNotice";
 import ConfigurationsPage from "./components/ConfigurationsPage";
 import GettingStartedGuideModal from "./components/GettingStartedGuideModal";
 import GuidedTour from "./guides/GuidedTour";
-import { notifyGuidedTourAction } from "./guides/guidedTourEvents";
+import { GUIDED_TOUR_START_EVENT, notifyGuidedTourAction, type GuidedTourId } from "./guides/guidedTourEvents";
 import PinSetupPage from "./components/PinSetupPage";
 import ContentCreatePage from "./components/ContentCreatePage";
 import ContentManagePage from "./components/ContentManagePage";
@@ -45,6 +45,7 @@ export default function App(): JSX.Element {
   const [showGettingStarted, setShowGettingStarted] = useState(false);
   const [showGuidedSetup, setShowGuidedSetup] = useState(false);
   const [guidedTourStep, setGuidedTourStep] = useState(0);
+  const [guidedTourId, setGuidedTourId] = useState<GuidedTourId>("basics");
   const [firstGuideCompleted, setFirstGuideCompleted] = useState(hasCompletedFirstGuide);
   const [showPageMenu, setShowPageMenu] = useState(false);
   const pageMenuRef = useRef<HTMLDivElement | null>(null);
@@ -52,6 +53,18 @@ export default function App(): JSX.Element {
   useEffect(() => {
     setShowPageMenu(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const startRequestedGuide = (event: Event): void => {
+      const guideId = (event as CustomEvent<{ guideId?: GuidedTourId }>).detail?.guideId;
+      if (!guideId) return;
+      setGuidedTourId(guideId);
+      setGuidedTourStep(0);
+      setShowGuidedSetup(true);
+    };
+    window.addEventListener(GUIDED_TOUR_START_EVENT, startRequestedGuide);
+    return () => window.removeEventListener(GUIDED_TOUR_START_EVENT, startRequestedGuide);
+  }, []);
 
   useEffect(() => {
     if (!showPageMenu) {
@@ -100,6 +113,14 @@ export default function App(): JSX.Element {
   const startGuidedSetup = (): void => {
     setShowGettingStarted(false);
     void completeGettingStarted();
+    setGuidedTourId("basics");
+    setGuidedTourStep(0);
+    setShowGuidedSetup(true);
+  };
+
+  const startConversationGuide = (): void => {
+    setGuidedTourId("conversation");
+    setGuidedTourStep(0);
     setShowGuidedSetup(true);
   };
 
@@ -159,10 +180,10 @@ export default function App(): JSX.Element {
                             key={option.path}
                             type="button"
                             className={`top-nav-menu-item ${selectedPagePath === option.path ? "active" : ""}`}
-                            data-guide-target={option.path === "/content/create" ? "menu-create-content" : option.path === "/session" ? "menu-session" : undefined}
+                            data-guide-target={option.path === "/content/create" ? "menu-create-content" : option.path === "/session" ? "menu-session" : option.path === "/conversation" ? "menu-conversation" : undefined}
                             onClick={() => {
                               setShowPageMenu(false);
-                              if (selectedPagePath !== option.path) {
+                              if (location.pathname !== option.path) {
                                 navigate(option.path);
                               }
                             }}
@@ -196,6 +217,7 @@ export default function App(): JSX.Element {
                   onLogout={handleLogout}
                   onOpenAdmin={() => navigate("/admin")}
                   onStartGuidedSetup={startGuidedSetup}
+                  onStartConversationGuide={startConversationGuide}
                 />
               )}
             />
@@ -206,7 +228,7 @@ export default function App(): JSX.Element {
           <AIQuotaNotice />
           <GettingStartedGuideModal open={showGettingStarted} onClose={closeGettingStarted} onStartGuidedSetup={startGuidedSetup} />
           {showTutorialContinueButton && !firstGuideCompleted && !showGettingStarted && !showGuidedSetup ? (
-            <button type="button" className="guided-tour-continue-button" onClick={() => setShowGuidedSetup(true)}>
+            <button type="button" className="guided-tour-continue-button" onClick={startGuidedSetup}>
               {t("config.tutorialStart")}
             </button>
           ) : null}
@@ -215,11 +237,14 @@ export default function App(): JSX.Element {
             onFinish={() => {
               setShowGuidedSetup(false);
               setGuidedTourStep(0);
-              setFirstGuideCompleted(true);
-              window.localStorage.setItem(FIRST_GUIDE_COMPLETED_STORAGE_KEY, "true");
+              if (guidedTourId === "basics") {
+                setFirstGuideCompleted(true);
+                window.localStorage.setItem(FIRST_GUIDE_COMPLETED_STORAGE_KEY, "true");
+              }
             }}
             stepIndex={guidedTourStep}
             onStepChange={setGuidedTourStep}
+            guideId={guidedTourId}
           />
           {authUser.is_superuser && <DebugToolsPanel />}
         </>

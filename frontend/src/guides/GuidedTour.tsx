@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useI18n } from "../i18n";
+import conversationPanelGuideEn from "./conversation-panel-guide-en.svg";
+import conversationPanelGuideEs from "./conversation-panel-guide-es.svg";
 import { guidedTourCopy } from "./guidedTourCopy";
-import { GUIDED_TOUR_ACTION_EVENT, requestGuidedTourSection } from "./guidedTourEvents";
+import { conversationGuideCopy } from "./conversationGuideCopy";
+import { GUIDED_TOUR_ACTION_EVENT, requestGuidedTourSection, type GuidedTourId } from "./guidedTourEvents";
 import "./guidedTour.css";
 
 interface GuidedTourProps {
@@ -11,6 +14,7 @@ interface GuidedTourProps {
   onFinish: () => void;
   stepIndex: number;
   onStepChange: (stepIndex: number) => void;
+  guideId: GuidedTourId;
 }
 
 type TargetRect = Pick<DOMRect, "top" | "left" | "width" | "height" | "bottom">;
@@ -19,11 +23,11 @@ function findTarget(target: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(`[data-guide-target="${target}"]`);
 }
 
-export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: GuidedTourProps): JSX.Element | null {
+export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, guideId }: GuidedTourProps): JSX.Element | null {
   const { language } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
-  const copy = guidedTourCopy(language);
+  const copy = guideId === "conversation" ? conversationGuideCopy(language) : guidedTourCopy(language);
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const [targetReady, setTargetReady] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
@@ -60,12 +64,16 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
         setNextUnlocked(true);
       }
       if (action === currentStep.advanceOnAction) {
-        onStepChange(Math.min(stepIndex + 1, copy.steps.length - 1));
+        if (stepIndex === copy.steps.length - 1) {
+          onFinish();
+        } else {
+          onStepChange(stepIndex + 1);
+        }
       }
     };
     window.addEventListener(GUIDED_TOUR_ACTION_EVENT, onAction);
     return () => window.removeEventListener(GUIDED_TOUR_ACTION_EVENT, onAction);
-  }, [copy.steps.length, currentStep.advanceOnAction, currentStep.collapseOnAction, currentStep.expandOnAction, currentStep.showNextOnAction, onStepChange, open, stepIndex]);
+  }, [copy.steps.length, currentStep.advanceOnAction, currentStep.collapseOnAction, currentStep.expandOnAction, currentStep.showNextOnAction, onFinish, onStepChange, open, stepIndex]);
 
   useEffect(() => {
     setShowMoreInfo(false);
@@ -83,12 +91,12 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
     let frameId = 0;
     let retryTimer = 0;
     const measureTarget = (): void => {
+      if (currentStep.openSection) {
+        requestGuidedTourSection(currentStep.openSection);
+      }
       const target = findTarget(currentStep.target);
       if (!target) {
         setTargetReady(false);
-        if (currentStep.openSection) {
-          requestGuidedTourSection(currentStep.openSection);
-        }
         retryTimer = window.setTimeout(measureTarget, 80);
         return;
       }
@@ -128,7 +136,7 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
   }, [open]);
 
   useEffect(() => {
-    if (!open || !["open-menu", "open-session"].includes(currentStep.id)) {
+    if (!open || !["open-menu", "open-session", "conversation-open-menu"].includes(currentStep.id)) {
       return;
     }
     const target = findTarget(currentStep.target);
@@ -149,16 +157,23 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
     }
     onStepChange(stepIndex + 1);
   };
-  const keepPopoverClearOfSaveActions = ["save-dialog", "save-word", "save-phrase"].includes(currentStep.id);
-  const isMenuNavigationStep = ["open-menu", "open-session"].includes(currentStep.id);
+  const keepPopoverClearOfTarget = [
+    "save-dialog",
+    "save-word",
+    "save-phrase",
+    "conversation-goal",
+    "conversation-start",
+    "conversation-ready",
+  ].includes(currentStep.id);
+  const isMenuNavigationStep = ["open-menu", "open-session", "conversation-open-menu"].includes(currentStep.id);
   const popoverStyle = targetRect
     ? {
-      top: keepPopoverClearOfSaveActions
+      top: keepPopoverClearOfTarget
         ? 16
         : isMenuNavigationStep && window.innerWidth > 640
           ? Math.max(16, targetRect.top - 4)
         : Math.min(targetRect.bottom + 14, window.innerHeight - 228),
-      left: keepPopoverClearOfSaveActions
+      left: keepPopoverClearOfTarget
         ? 16
         : isMenuNavigationStep && window.innerWidth > 640
           ? Math.max(16, targetRect.left - 334)
@@ -200,12 +215,19 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
           <span aria-hidden="true">i</span>
         </button>
       ) : <section
-        className={`guided-tour-popover${targetRect ? "" : " guided-tour-popover-centered"}${keepPopoverClearOfSaveActions ? " guided-tour-popover-save-dialog" : ""}${isMenuNavigationStep ? " guided-tour-popover-menu" : ""}`}
+        className={`guided-tour-popover${targetRect ? "" : " guided-tour-popover-centered"}${keepPopoverClearOfTarget ? " guided-tour-popover-clear-target" : ""}${isMenuNavigationStep ? " guided-tour-popover-menu" : ""}`}
         style={popoverStyle}
       >
         <>
           <h2>{currentStep.title}</h2>
           <p>{body}</p>
+          {currentStep.image === "conversation-panel" ? (
+            <img
+              className="guided-tour-conversation-image"
+              src={language === "es" ? conversationPanelGuideEs : conversationPanelGuideEn}
+              alt={language === "es" ? "Panel de conversación con controles anotados" : "Conversation panel with annotated controls"}
+            />
+          ) : null}
           {currentStep.moreInfo ? (
             <>
               <button

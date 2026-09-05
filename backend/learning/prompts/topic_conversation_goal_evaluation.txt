@@ -10,6 +10,12 @@ Return strict JSON:
 Rules:
 - Assess strictly against the explicit condition(s) in goal_text_english.
 - Use full history plus latest learner message.
+- Count evidence toward the goal only when the learner expresses the relevant content in {target_name}.
+- A learner message that is wholly or mostly in {source_name} must not advance or complete the goal, even when it communicates the required meaning.
+- Brief {source_name} questions, requests for help, or clarifications are allowed in the conversation, but never count as goal evidence.
+- Evaluate each learner message independently for language eligibility. Earlier {source_name} messages are neutral: ignore them rather than treating them as evidence against success.
+- A later message in {target_name} can complete the goal even if earlier learner messages were in {source_name}.
+- Accept clear target-language evidence despite ordinary learner mistakes when the required meaning is still unambiguous. Do not require exact wording or perfect grammar.
 - If condition is clearly met, set goal_achieved=true and write one short congratulatory message in {source_name}.
 - If condition is clearly met, also provide next_goal_suggestion in {source_name}: one concise concrete follow-up goal for continuing this same conversation.
 - If not clearly met yet, set goal_achieved=false and goal_achievement_message="".

@@ -92,6 +92,14 @@
   line-height: 1.45;
 }
 
+.guided-tour-conversation-image {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  border: 1px solid #bdcfbd;
+  border-radius: 12px;
+}
+
 .guided-tour-progress {
   margin-bottom: 8px !important;
   color: #527058;
@@ -144,9 +152,11 @@
     bottom: 16px;
     left: 16px !important;
     width: auto;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
   }
 
-  .guided-tour-popover-save-dialog {
+  .guided-tour-popover-clear-target {
     top: 16px !important;
     bottom: auto;
   }

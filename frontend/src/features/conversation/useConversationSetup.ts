@@ -93,9 +93,9 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
     setGoalDifficultyValue(value);
   };
 
-  const generateGoal = async (): Promise<void> => {
+  const generateGoal = async (): Promise<boolean> => {
     if (!selectedTopicText || goalGenerating) {
-      return;
+      return false;
     }
     setGoalGenerating(true);
     setGoalError("");
@@ -114,8 +114,10 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
         throw new Error("Could not create a conversation goal. Please try again.");
       }
       setGoal({ text: nextGoal, topic: nextTopic });
+      return true;
     } catch (error) {
       setGoalError(error instanceof Error ? error.message : "Could not create a conversation goal. Please try again.");
+      return false;
     } finally {
       setGoalGenerating(false);
     }

@@ -22,6 +22,7 @@ export type GuidedTourStep = {
   expandOnAction?: string;
   showNextOnAction?: string;
   openSection?: string;
+  image?: "conversation-panel";
 };
 
 type GuidedTourCopy = {
