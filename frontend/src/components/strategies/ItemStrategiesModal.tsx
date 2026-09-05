@@ -27,6 +27,8 @@ export default function ItemStrategiesModal(props: ItemStrategiesModalProps): JS
       itemType={props.itemType}
       sourceText={props.sourceText}
       targetText={props.targetText}
+      targetLanguage={props.targetLanguage}
+      wordType={props.wordType}
       selectedStrategy={props.selectedStrategy}
       onSelectedStrategyChange={props.onSelectedStrategyChange}
       onClose={props.onClose}

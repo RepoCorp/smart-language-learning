@@ -2,27 +2,21 @@ import type { SingSong } from "./useSingStrategy";
 import DangerousButton from "../DangerousButton";
 import LoopingAudioPlayer from "../LoopingAudioPlayer";
 
-export default function SingStrategyPanel({ song, history, itemType, isCreatingLyrics, isCreatingSong, isGeneratingImage, isRetrying, error, onCreateLyrics, onCreateSong, onGenerateImage, onRetrySameSong }: {
-  song: SingSong | null; isCreatingLyrics: boolean; isCreatingSong: boolean; isGeneratingImage: boolean; isRetrying: boolean; error: string;
+export default function SingStrategyPanel({ song, history, itemType, isCreatingLyrics, isCreatingSong, isGeneratingImage, error, onCreateLyrics, onCreateSong, onGenerateImage }: {
+  song: SingSong | null; isCreatingLyrics: boolean; isCreatingSong: boolean; isGeneratingImage: boolean; error: string;
   history: SingSong[];
-  itemType: "word" | "phrase"; onCreateLyrics: () => void; onCreateSong: () => void; onGenerateImage: () => void; onRetrySameSong: () => void;
+  itemType: "word" | "phrase"; onCreateLyrics: () => void; onCreateSong: () => void; onGenerateImage: () => void;
 }): JSX.Element {
   return (
     <div className="word-strategies-placeholder-card">
       {song ? <>
         <p className="dialog-turn-target-text"><strong>{song.target}</strong></p>
         <p className="dialog-turn-source-text">{song.source}</p>
-        {song.durationSeconds > 0 ? <p className="hint sing-strategy-duration">Generated duration: {song.durationSeconds.toFixed(1)}s</p> : null}
         {song.imageUrl ? <img className="sing-strategy-image" src={song.imageUrl} alt={song.target} /> : null}
       </> : <p className="hint">Create lyrics for a short catchy song about this {itemType}.</p>}
       {error ? <p className="error">{error}</p> : null}
       <div className="sing-strategy-controls">
         {song?.audioUrl ? <LoopingAudioPlayer src={song.audioUrl} /> : null}
-        {song?.canRetry ? (
-          <DangerousButton className="secondary-button dangerous-action-button" disabled={isRetrying} onConfirm={onRetrySameSong}>
-            {isRetrying ? "Trying this version..." : "Try this version again"}
-          </DangerousButton>
-        ) : null}
         {song ? <>
           {song.canChangeLyrics ? <button className="secondary-button" type="button" disabled={isCreatingLyrics} onClick={onCreateLyrics}>
             {isCreatingLyrics ? "Creating new lyrics..." : "Try different lyrics"}

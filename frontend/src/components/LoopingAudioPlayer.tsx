@@ -108,6 +108,6 @@ export default function LoopingAudioPlayer({ src }: { src: string }): JSX.Elemen
     <button className="secondary-button" type="button" disabled={isLoading} onClick={isPlaying ? stop : play}>
       {isLoading ? "Loading song..." : isPlaying ? "Stop loop" : "Play loop"}
     </button>
-    {error ? <span className="error">{error}</span> : <span className="hint">Normal start, beat-aligned repeats</span>}
+    {error ? <span className="error">{error}</span> : null}
   </div>;
 }

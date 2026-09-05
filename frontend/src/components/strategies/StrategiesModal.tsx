@@ -1,7 +1,9 @@
 import { useMemo, type ReactNode } from "react";
 
 import BlockingLoadingOverlay from "../BlockingLoadingOverlay";
+import GenderedNounText, { germanNounGender } from "../GenderedNounText";
 import { useI18n } from "../../i18n";
+import type { StudyLanguageCode } from "../../types";
 import {
   PHRASE_STRATEGIES,
   WORD_STRATEGIES,
@@ -11,6 +13,8 @@ export default function StrategiesModal({
   itemType,
   sourceText,
   targetText,
+  targetLanguage,
+  wordType,
   selectedStrategy,
   onSelectedStrategyChange,
   onClose,
@@ -21,6 +25,8 @@ export default function StrategiesModal({
   itemType: "word" | "phrase";
   sourceText: string;
   targetText: string;
+  targetLanguage: StudyLanguageCode;
+  wordType: string;
   selectedStrategy: string;
   onSelectedStrategyChange: (strategy: string) => void;
   onClose: () => void;
@@ -39,6 +45,9 @@ export default function StrategiesModal({
     }
     return t(`strategies.option.${strategy.toLowerCase()}`);
   };
+  const nounGender = itemType === "word" && targetLanguage === "german" && wordType.trim().toLowerCase() === "noun"
+    ? germanNounGender(targetText)
+    : null;
 
   return (
     <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
@@ -51,7 +60,9 @@ export default function StrategiesModal({
         </p>
         <div className="word-strategies-body">
           <div className="word-strategies-item-card">
-            <p className="word-strategies-item-target">{targetText || sourceText}</p>
+            <p className="word-strategies-item-target">
+              {nounGender ? <GenderedNounText text={targetText} targetText={targetText} gender={nounGender} /> : targetText || sourceText}
+            </p>
             <p className="word-strategies-item-source">{sourceText}</p>
           </div>
           <label className="word-strategies-select-group" htmlFor="word-strategy-select">

@@ -14,6 +14,7 @@ import AIQuotaNotice from "./components/AIQuotaNotice";
 import ConfigurationsPage from "./components/ConfigurationsPage";
 import GettingStartedGuideModal from "./components/GettingStartedGuideModal";
 import GuidedTour from "./guides/GuidedTour";
+import { notifyGuidedTourAction } from "./guides/guidedTourEvents";
 import PinSetupPage from "./components/PinSetupPage";
 import ContentCreatePage from "./components/ContentCreatePage";
 import ContentManagePage from "./components/ContentManagePage";
@@ -137,7 +138,10 @@ export default function App(): JSX.Element {
                       type="button"
                       className="top-nav-menu-button"
                       data-guide-target="main-menu"
-                      onClick={() => setShowPageMenu((value) => !value)}
+                      onClick={() => {
+                        setShowPageMenu((value) => !value);
+                        notifyGuidedTourAction("menu-opened");
+                      }}
                       aria-expanded={showPageMenu}
                       aria-haspopup="menu"
                       aria-label={t("menu.open")}
@@ -155,7 +159,7 @@ export default function App(): JSX.Element {
                             key={option.path}
                             type="button"
                             className={`top-nav-menu-item ${selectedPagePath === option.path ? "active" : ""}`}
-                            data-guide-target={option.path === "/content/create" ? "menu-create-content" : undefined}
+                            data-guide-target={option.path === "/content/create" ? "menu-create-content" : option.path === "/session" ? "menu-session" : undefined}
                             onClick={() => {
                               setShowPageMenu(false);
                               if (selectedPagePath !== option.path) {

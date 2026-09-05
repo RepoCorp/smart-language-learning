@@ -50,7 +50,7 @@
   padding: 18px;
   border: 1px solid #b9c8b8;
   border-radius: 16px;
-  background: #f1f5ed;
+  background: #e2ecdf;
   box-shadow: 0 18px 42px rgba(24, 42, 27, 0.32);
   color: #253528;
   pointer-events: auto;
@@ -74,7 +74,7 @@
   border: 1px solid #b9c8b8;
   border-radius: 50%;
   place-items: center;
-  background: #f1f5ed;
+  background: #e2ecdf;
   box-shadow: 0 6px 16px rgba(24, 42, 27, 0.2);
   color: var(--color-accent-strong);
   font-family: Georgia, serif;
@@ -90,10 +90,6 @@
 .guided-tour-popover p {
   margin: 0;
   line-height: 1.45;
-}
-
-.guided-tour-complete-body {
-  white-space: pre-line;
 }
 
 .guided-tour-progress {
@@ -155,13 +151,12 @@
     bottom: auto;
   }
 
-  .guided-tour-popover-complete {
-    top: 50% !important;
+  .guided-tour-popover-menu {
+    top: 54px !important;
     right: 16px;
     bottom: auto;
-    left: 16px !important;
-    max-height: calc(100vh - 32px);
-    overflow-y: auto;
-    transform: translateY(-50%);
+    left: auto !important;
+    width: min(276px, calc(100vw - 56px));
   }
+
 }

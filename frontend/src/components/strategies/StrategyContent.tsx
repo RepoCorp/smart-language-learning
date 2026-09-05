@@ -122,7 +122,7 @@ export default function StrategyContent(props: Props): JSX.Element {
     );
   }
   if (props.selectedStrategy === SING_STRATEGY) {
-    return <SingStrategyPanel song={props.singStrategy.song} history={props.singStrategy.history} itemType={props.itemType} isCreatingLyrics={props.singStrategy.isCreatingLyrics} isCreatingSong={props.singStrategy.isCreatingSong} isGeneratingImage={props.singStrategy.isGeneratingImage} isRetrying={props.singStrategy.isRetrying} error={props.singStrategy.error} onCreateLyrics={() => void props.singStrategy.createLyrics()} onCreateSong={() => void props.singStrategy.createSong()} onGenerateImage={() => void props.singStrategy.generateImage()} onRetrySameSong={() => void props.singStrategy.retrySameSong()} />;
+    return <SingStrategyPanel song={props.singStrategy.song} history={props.singStrategy.history} itemType={props.itemType} isCreatingLyrics={props.singStrategy.isCreatingLyrics} isCreatingSong={props.singStrategy.isCreatingSong} isGeneratingImage={props.singStrategy.isGeneratingImage} error={props.singStrategy.error} onCreateLyrics={() => void props.singStrategy.createLyrics()} onCreateSong={() => void props.singStrategy.createSong()} onGenerateImage={() => void props.singStrategy.generateImage()} />;
   }
   if (props.selectedStrategy === DECODE_STRATEGY && props.itemType === "word") {
     return (

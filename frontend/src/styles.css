@@ -1764,20 +1764,20 @@ button.overview-stats-metric-card:focus-visible {
   border-radius: 3px 5px 3px 4px;
   background: var(--item-gender-mark);
   content: "";
-  opacity: 0.42;
+  opacity: 0.5;
   transform: rotate(-0.6deg);
 }
 
 .gender-word-masculine {
-  --item-gender-mark: #79a9d8;
+  --item-gender-mark: #5f93c3;
 }
 
 .gender-word-feminine {
-  --item-gender-mark: #e49ab1;
+  --item-gender-mark: #c86684;
 }
 
 .gender-word-neuter {
-  --item-gender-mark: #e6c969;
+  --item-gender-mark: #d1b34e;
 }
 
 .word-exercise-primary-button.gender-word-box {
@@ -4466,7 +4466,17 @@ textarea {
 .sing-strategy-image-action {
   display: flex;
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sing-strategy-history {
+  margin-top: 18px;
+}
+
+.sing-strategy-history > summary {
+  margin-bottom: 8px;
 }
 
 @media (max-width: 768px) {
@@ -4485,6 +4495,10 @@ textarea {
   .looping-audio-player {
     flex: none;
     flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .sing-strategy-image-action > .secondary-button {
     width: 100%;
   }
 }

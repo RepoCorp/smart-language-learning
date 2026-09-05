@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useI18n } from "../i18n";
@@ -26,10 +26,11 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
   const copy = guidedTourCopy(language);
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const [targetReady, setTargetReady] = useState(false);
-  const [showComplete, setShowComplete] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [nextUnlocked, setNextUnlocked] = useState(false);
+  const focusedAppLanguageRef = useRef(false);
+  const scrolledTargetRef = useRef("");
   const currentStep = copy.steps[stepIndex];
 
   useEffect(() => {
@@ -67,20 +68,13 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
   }, [copy.steps.length, currentStep.advanceOnAction, currentStep.collapseOnAction, currentStep.expandOnAction, currentStep.showNextOnAction, onStepChange, open, stepIndex]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-    setShowComplete(false);
-  }, [open]);
-
-  useEffect(() => {
     setShowMoreInfo(false);
     setCollapsed(false);
     setNextUnlocked(false);
   }, [stepIndex]);
 
   useEffect(() => {
-    if (!open || showComplete) {
+    if (!open) {
       setTargetRect(null);
       setTargetReady(false);
       return;
@@ -98,8 +92,17 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
         retryTimer = window.setTimeout(measureTarget, 80);
         return;
       }
+      const targetKey = `${stepIndex}:${currentStep.target}`;
+      if (scrolledTargetRef.current !== targetKey) {
+        target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        scrolledTargetRef.current = targetKey;
+      }
       setTargetReady(!currentStep.requiredTargetAttribute || target.getAttribute(currentStep.requiredTargetAttribute) === "true");
       frameId = window.requestAnimationFrame(() => setTargetRect(target.getBoundingClientRect()));
+      if (currentStep.id === "app-language" && !focusedAppLanguageRef.current) {
+        target.querySelector<HTMLSelectElement>("select")?.focus({ preventScroll: true });
+        focusedAppLanguageRef.current = true;
+      }
     };
     const target = findTarget(currentStep.target);
     target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
@@ -115,7 +118,14 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
       window.removeEventListener("scroll", measureTarget, true);
       observer.disconnect();
     };
-  }, [currentStep.openSection, currentStep.requiredTargetAttribute, currentStep.target, open, showComplete]);
+  }, [currentStep.openSection, currentStep.requiredTargetAttribute, currentStep.target, open]);
+
+  useEffect(() => {
+    if (!open) {
+      focusedAppLanguageRef.current = false;
+      scrolledTargetRef.current = "";
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open || !["open-menu", "open-session"].includes(currentStep.id)) {
@@ -123,32 +133,35 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
     }
     const target = findTarget(currentStep.target);
     target?.classList.add("guided-tour-source-highlight");
-    return () => target?.classList.remove("guided-tour-source-highlight");
+    return () => {
+      target?.classList.remove("guided-tour-source-highlight");
+    };
   }, [currentStep.id, currentStep.target, open]);
 
   if (!open) {
     return null;
   }
 
-  const finish = (): void => {
-    setShowComplete(true);
-    setTargetRect(null);
-  };
   const next = (): void => {
     if (stepIndex === copy.steps.length - 1) {
-      finish();
+      onFinish();
       return;
     }
     onStepChange(stepIndex + 1);
   };
   const keepPopoverClearOfSaveActions = ["save-dialog", "save-word", "save-phrase"].includes(currentStep.id);
+  const isMenuNavigationStep = ["open-menu", "open-session"].includes(currentStep.id);
   const popoverStyle = targetRect
     ? {
       top: keepPopoverClearOfSaveActions
         ? 16
+        : isMenuNavigationStep && window.innerWidth > 640
+          ? Math.max(16, targetRect.top - 4)
         : Math.min(targetRect.bottom + 14, window.innerHeight - 228),
       left: keepPopoverClearOfSaveActions
         ? 16
+        : isMenuNavigationStep && window.innerWidth > 640
+          ? Math.max(16, targetRect.left - 334)
         : Math.max(16, Math.min(targetRect.left, window.innerWidth - 336)),
     }
     : undefined;
@@ -187,43 +200,35 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange }: 
           <span aria-hidden="true">i</span>
         </button>
       ) : <section
-        className={`guided-tour-popover${targetRect ? "" : " guided-tour-popover-centered"}${keepPopoverClearOfSaveActions ? " guided-tour-popover-save-dialog" : ""}${showComplete ? " guided-tour-popover-complete" : ""}`}
+        className={`guided-tour-popover${targetRect ? "" : " guided-tour-popover-centered"}${keepPopoverClearOfSaveActions ? " guided-tour-popover-save-dialog" : ""}${isMenuNavigationStep ? " guided-tour-popover-menu" : ""}`}
         style={popoverStyle}
       >
-        {showComplete ? (
-          <>
-            <h2>{copy.completeTitle}</h2>
-            <p className="guided-tour-complete-body">{copy.completeBody}</p>
-            <button type="button" className="primary-button" onClick={onFinish}>{copy.finish}</button>
-          </>
-        ) : (
-          <>
-            <h2>{currentStep.title}</h2>
-            <p>{body}</p>
-            {currentStep.moreInfo ? (
-              <>
-                <button
-                  type="button"
-                  className="guided-tour-more-info-button"
-                  onClick={() => setShowMoreInfo((visible) => !visible)}
-                  aria-expanded={showMoreInfo}
-                  aria-label={currentStep.moreInfoLabel}
-                  title={currentStep.moreInfoLabel}
-                >
-                  <span aria-hidden="true">i</span>
-                </button>
-                {showMoreInfo ? <p className="guided-tour-more-info">{currentStep.moreInfo}</p> : null}
-              </>
-            ) : null}
-            {!currentStep.hideNext && (!currentStep.showNextOnAction || nextUnlocked) ? (
-              <div className="guided-tour-actions">
-                <button type="button" className="primary-button" onClick={next} disabled={!canAdvance}>
-                  {stepIndex === copy.steps.length - 1 ? copy.finish : (currentStep.nextLabel || copy.next)}
-                </button>
-              </div>
-            ) : null}
-          </>
-        )}
+        <>
+          <h2>{currentStep.title}</h2>
+          <p>{body}</p>
+          {currentStep.moreInfo ? (
+            <>
+              <button
+                type="button"
+                className="guided-tour-more-info-button"
+                onClick={() => setShowMoreInfo((visible) => !visible)}
+                aria-expanded={showMoreInfo}
+                aria-label={currentStep.moreInfoLabel}
+                title={currentStep.moreInfoLabel}
+              >
+                <span aria-hidden="true">i</span>
+              </button>
+              {showMoreInfo ? <p className="guided-tour-more-info">{currentStep.moreInfo}</p> : null}
+            </>
+          ) : null}
+          {!currentStep.hideNext && (!currentStep.showNextOnAction || nextUnlocked) ? (
+            <div className="guided-tour-actions">
+              <button type="button" className="primary-button" onClick={next} disabled={!canAdvance}>
+                {currentStep.nextLabel || (stepIndex === copy.steps.length - 1 ? copy.finish : copy.next)}
+              </button>
+            </div>
+          ) : null}
+        </>
       </section>}
     </div>
   );
