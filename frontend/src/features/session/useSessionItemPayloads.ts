@@ -19,12 +19,14 @@ export function useSessionItemPayloads({
   sourceLanguage,
   targetLanguage,
   planToken,
+  onItemUnavailable,
 }: {
   entries: SessionPlanItem[];
   index: number;
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
   planToken: number | null;
+  onItemUnavailable: (entry: SessionPlanItem) => void;
 }): {
   currentItem: SessionItem | null;
   currentItemLoading: boolean;
@@ -104,6 +106,10 @@ export function useSessionItemPayloads({
       })
       .catch((error: unknown) => {
         if (!active) return;
+        if ((error as { status?: number }).status === 404) {
+          onItemUnavailable(currentEntry);
+          return;
+        }
         setCurrentItemError(error instanceof Error ? error.message : "Failed to load session item");
       })
       .finally(() => {
@@ -113,7 +119,7 @@ export function useSessionItemPayloads({
     return () => {
       active = false;
     };
-  }, [currentEntry, currentEntryKey, loadPayload]);
+  }, [currentEntry, currentEntryKey, loadPayload, onItemUnavailable]);
 
   useEffect(() => {
     const nextEntry = entries[index + 1];

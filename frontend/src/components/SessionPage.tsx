@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
@@ -43,6 +43,20 @@ export default function SessionPage(): JSX.Element {
     sessionPlanToken,
     loadSession,
   } = useSessionLifecycle({ sourceLanguage, targetLanguage });
+  const removeUnavailableItem = useCallback((unavailableItem: typeof items[number]): void => {
+    setItems((currentItems) => currentItems.filter((entry) => (
+      entry.id !== unavailableItem.id
+      || entry.mode !== unavailableItem.mode
+      || entry.direction !== unavailableItem.direction
+      || entry.repeatPracticeStep !== unavailableItem.repeatPracticeStep
+      || Boolean(entry.repeatedAfterFailure) !== Boolean(unavailableItem.repeatedAfterFailure)
+    )));
+    setIndex((currentIndex) => (
+      currentIndex >= items.length - 1 ? Math.max(0, currentIndex - 1) : currentIndex
+    ));
+    setShowPostReviewItem(false);
+    setCurrentReviewCorrect(null);
+  }, [items.length, setCurrentReviewCorrect, setIndex, setItems, setShowPostReviewItem]);
   const {
     showNewItemCelebration,
     registerConfirmedNewItem,
@@ -58,6 +72,7 @@ export default function SessionPage(): JSX.Element {
     sourceLanguage,
     targetLanguage,
     planToken: sessionPlanToken,
+    onItemUnavailable: removeUnavailableItem,
   });
 
   useSessionStudyActivity(
@@ -188,7 +203,14 @@ export default function SessionPage(): JSX.Element {
   if (error || currentItemError) {
     return (
       <>
-        <main className="container error">{t("session.error", { message: error || currentItemError })}</main>
+        <main className="container">
+          <p className="error">{t("session.error", { message: error || currentItemError })}</p>
+          <div className="actions">
+            <DangerousButton className="secondary-button dangerous-action-button" onConfirm={resetToSessionStart}>
+              {t("session.restart")}
+            </DangerousButton>
+          </div>
+        </main>
         {overlays}
       </>
     );
@@ -199,6 +221,11 @@ export default function SessionPage(): JSX.Element {
       <>
         <main className="container">
           <p>{t("session.empty")}</p>
+          <div className="actions">
+            <DangerousButton className="secondary-button dangerous-action-button" onConfirm={resetToSessionStart}>
+              {t("session.restart")}
+            </DangerousButton>
+          </div>
         </main>
         {overlays}
       </>

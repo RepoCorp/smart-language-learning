@@ -1005,6 +1005,38 @@ button.overview-stats-metric-card:focus-visible {
   margin: 0 0 10px 0;
 }
 
+.revealed-answer-phrase-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.revealed-answer-icon-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.revealed-answer-icon-button .item-action-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.revealed-answer-phrase-row > .revealed-answer-phrase {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.revealed-answer-audio-placeholder {
+  flex: 1 1 auto;
+  margin: 5px 0 0;
+}
+
 .prompt-audio-placeholder {
   color: var(--color-text-muted);
   font-style: italic;
@@ -5392,6 +5424,30 @@ button.verb-exercise-entry:disabled {
   border-color: var(--color-accent);
   background: var(--color-accent-surface);
   box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.18);
+}
+
+.word-exercise-primary-button.gender-word-box.word-exercise-selected {
+  position: relative;
+  border: 3px solid var(--color-accent);
+  background: color-mix(in srgb, var(--item-gender-mark) 34%, var(--color-bg));
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.18);
+}
+
+.word-exercise-primary-button.gender-word-box.word-exercise-selected::after {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #ffffff;
+  content: "✓";
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .exercise-audio-mode {

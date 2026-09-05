@@ -13,7 +13,8 @@ import {
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
-import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
+import DialogActionIcon from "./DialogActionIcon";
+import RevealedReviewSummary from "./RevealedReviewSummary";
 
 interface PhraseReviewProps {
   item: SessionItem;
@@ -21,30 +22,6 @@ interface PhraseReviewProps {
   reviewComplete?: boolean;
   onNextItem?: () => Promise<void>;
   postReviewActions?: ReactNode;
-}
-
-function RevealedReviewSummary({
-  itemId,
-  answer,
-  phrase,
-  phraseTranslation,
-}: {
-  itemId: number;
-  answer: string;
-  phrase: string;
-  phraseTranslation: string;
-}): JSX.Element {
-  return (
-    <div className="revealed-answer">
-      <p className="revealed-answer-main">{answer}</p>
-      <InteractiveTargetPhrase
-        className="conversation-line conversation-line-translation revealed-answer-phrase"
-        sourceText={phraseTranslation || ""}
-        targetText={phrase}
-        statusKeyPrefix={`review-${itemId}-phrase`}
-      />
-    </div>
-  );
 }
 
 const FEEDBACK_DELAY_MS = 2000;
@@ -1078,6 +1055,17 @@ export default function PhraseReview({
         {phraseBuilderComplete && <p className="phrase-builder-success">{t("phrase.builderComplete")}</p>}
         {reviewComplete && (
           <div className="actions">
+            {promptAudioUrl && (
+              <button
+                type="button"
+                className="secondary-button exercise-action-icon-button"
+                onClick={() => void playPhraseAudio()}
+                aria-label={t("prompt.replayAudio")}
+                title={t("prompt.replayAudio")}
+              >
+                <DialogActionIcon name="play" />
+              </button>
+            )}
             <button type="button" onClick={() => void onNextItem?.()} disabled={isSubmitting}>
               {t("session.nextItem")}
             </button>
@@ -1119,12 +1107,24 @@ export default function PhraseReview({
           answer={expectedAnswer}
           phrase={item.german_text}
           phraseTranslation={item.spanish_text}
+          audioOnly={targetPromptMode === "audio" && allowPromptAudio}
+          showReplayAudio={isSpanishToGerman}
+          onReplayAudio={promptAudioUrl ? playPhraseAudio : undefined}
         />
       )}
       <div className="actions">
         {!answerRevealed ? (
           <>
-            <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
+            <button
+              type="button"
+              onClick={() => {
+                setAnswerRevealed(true);
+                if (targetPromptMode === "audio" && allowPromptAudio) {
+                  void playPhraseAudio();
+                }
+              }}
+              disabled={isSubmitting}
+            >
               {t("review.revealAnswer")}
             </button>
           </>

@@ -143,7 +143,9 @@ export async function fetchSessionItem(
     } catch {
       // Keep the default message.
     }
-    throw new Error(detail);
+    const error = new Error(detail) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
   return (await response.json()) as SessionItem;
 }

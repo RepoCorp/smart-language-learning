@@ -8,7 +8,7 @@ import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../studyLanguageMetadata";
 import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
-import InteractiveTargetPhrase from "./InteractiveTargetPhrase";
+import RevealedReviewSummary from "./RevealedReviewSummary";
 import { useWordChallengeInputFocus } from "./useWordChallengeInputFocus";
 import { warmupContextPairForItem } from "./wordWarmupContext";
 import {
@@ -229,32 +229,6 @@ interface WordReviewProps {
   postReviewActions?: ReactNode;
 }
 
-function RevealedReviewSummary({
-  itemId,
-  answer,
-  phrase,
-  phraseTranslation,
-  fallbackPhrase,
-}: {
-  itemId: number;
-  answer: string;
-  phrase?: string;
-  phraseTranslation?: string;
-  fallbackPhrase?: string;
-}): JSX.Element {
-  return (
-    <div className="revealed-answer">
-      <p className="revealed-answer-main">{answer}</p>
-      <InteractiveTargetPhrase
-        className="conversation-line conversation-line-translation revealed-answer-phrase"
-        sourceText={phraseTranslation || ""}
-        targetText={phrase || fallbackPhrase || answer}
-        statusKeyPrefix={`review-${itemId}-phrase`}
-      />
-    </div>
-  );
-}
-
 function HighlightedRewriteWord({
   value,
   highlightedIndexes,
@@ -302,7 +276,12 @@ export default function WordReview({
   const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
   const [letterSuggestions, setLetterSuggestions] = useState<string[]>([]);
   const [warmupRevealCount, setWarmupRevealCount] = useState<number>(0);
-  const [completionPreview, setCompletionPreview] = useState<{ word: string; phrase: string; phraseTranslation: string } | null>(null);
+  const [completionPreview, setCompletionPreview] = useState<{
+    word: string;
+    phrase: string;
+    phraseTranslation: string;
+    phraseAudioUrl: string;
+  } | null>(null);
   const [rewriteAttemptHadMistake, setRewriteAttemptHadMistake] = useState<boolean>(false);
   const [rewriteAttemptMistakeIndexes, setRewriteAttemptMistakeIndexes] = useState<number[]>([]);
   const [rewriteStatusTone, setRewriteStatusTone] = useState<RewriteStatusTone>("neutral");
@@ -426,6 +405,7 @@ export default function WordReview({
       word: targetWordText,
       phrase: completionPhrase.text,
       phraseTranslation: completionPhrase.sourceText,
+      phraseAudioUrl: completionPhrase.audioUrl || item.audio_url || "",
     });
     return true;
   };
@@ -461,6 +441,13 @@ export default function WordReview({
       return;
     }
     await submitWithFeedback(correct, correct ? t("word.feedback.correct") : "");
+  };
+
+  const revealSelfGradedAnswer = (): void => {
+    setAnswerRevealed(true);
+    if (targetPromptMode === "audio" && allowPromptAudio) {
+      void playAudioUrl(completionPhrase.audioUrl || item.audio_url || "");
+    }
   };
 
   const failWrittenAnswer = async (): Promise<void> => {
@@ -875,15 +862,20 @@ export default function WordReview({
           <RevealedReviewSummary
             itemId={item.id}
             answer={expectedAnswer}
-            phrase={completionPreview?.phrase}
-            phraseTranslation={completionPreview?.phraseTranslation}
+            phrase={completionPreview?.phrase || completionPhrase.text}
+            phraseTranslation={completionPreview?.phraseTranslation || completionPhrase.sourceText}
             fallbackPhrase={targetWordText}
+            audioOnly={targetPromptMode === "audio" && allowPromptAudio}
+            showReplayAudio={isSpanishToGerman && reviewComplete}
+            onReplayAudio={(completionPreview?.phraseAudioUrl || completionPhrase.audioUrl || item.audio_url)
+              ? () => playAudioUrl(completionPreview?.phraseAudioUrl || completionPhrase.audioUrl || item.audio_url || "")
+              : undefined}
           />
         )}
         <div className="actions">
           {!answerRevealed ? (
             <>
-              <button type="button" onClick={() => setAnswerRevealed(true)} disabled={isSubmitting}>
+              <button type="button" onClick={revealSelfGradedAnswer} disabled={isSubmitting}>
                 {t("review.revealAnswer")}
               </button>
             </>
@@ -994,6 +986,9 @@ export default function WordReview({
             phrase={completionPreview.phrase}
             phraseTranslation={completionPreview.phraseTranslation}
             fallbackPhrase={targetWordText}
+            audioOnly={targetPromptMode === "audio" && allowPromptAudio}
+            showReplayAudio={isSpanishToGerman && reviewComplete}
+            onReplayAudio={completionPreview.phraseAudioUrl ? () => playAudioUrl(completionPreview.phraseAudioUrl) : undefined}
           />
         )}
         <div className="actions">
@@ -1072,6 +1067,9 @@ export default function WordReview({
             phrase={completionPreview.phrase}
             phraseTranslation={completionPreview.phraseTranslation}
             fallbackPhrase={targetWordText}
+            audioOnly={targetPromptMode === "audio" && allowPromptAudio}
+            showReplayAudio={isSpanishToGerman && reviewComplete}
+            onReplayAudio={completionPreview.phraseAudioUrl ? () => playAudioUrl(completionPreview.phraseAudioUrl) : undefined}
           />
         )}
         <div className="actions">
@@ -1180,6 +1178,9 @@ export default function WordReview({
           phrase={completionPreview.phrase}
           phraseTranslation={completionPreview.phraseTranslation}
           fallbackPhrase={targetWordText}
+          audioOnly={targetPromptMode === "audio" && allowPromptAudio}
+          showReplayAudio={isSpanishToGerman && reviewComplete}
+          onReplayAudio={completionPreview.phraseAudioUrl ? () => playAudioUrl(completionPreview.phraseAudioUrl) : undefined}
         />
       )}
       {letterSuggestions.length > 0 && (

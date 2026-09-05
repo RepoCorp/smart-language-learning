@@ -3,6 +3,9 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
+Arreglar las descripciones y visual de la gramatica de palabras y frases
+Input para que la gente de feedback
+Escribir la palabra a mano y que la tinta sea del color
 Mas de los word friends. Pensar en añadir de alguna manera que recoja varios pero no sean muchos amigos, por ejemplo simplemente vocal o consonante, si no tiene amigo mas particular
 Ejercicio de escribir una frase con la palabra, pero una qué ya exista y simplemente compara si son iguales
 Los objetivos se repiten mucho

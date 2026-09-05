@@ -101,6 +101,7 @@ def _question_model_user_input(
     question_text: str,
     source_name: str,
     target_name: str,
+    target_language: str,
     history_text: str,
     grammar_feature_key: str = "",
 ) -> str:
@@ -139,6 +140,7 @@ def _call_question_decision_model(
     question_text: str,
     source_name: str,
     target_name: str,
+    target_language: str,
     history_text: str,
     grammar_feature_key: str = "",
 ) -> dict | None:
@@ -154,6 +156,7 @@ def _call_question_decision_model(
             question_text=question_text,
             source_name=source_name,
             target_name=target_name,
+            target_language=target_language,
             history_text=history_text,
             grammar_feature_key=grammar_feature_key,
         ),
@@ -211,6 +214,7 @@ def model_answer_or_reject_item_question(
         question_text=question_text,
         source_name=source_name,
         target_name=target_name,
+        target_language=target_language,
         history_text=history_text,
         grammar_feature_key=grammar_feature_key,
     )
