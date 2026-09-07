@@ -901,6 +901,10 @@ export default function NewItem({
     dialog_phrase_turns: dialogPhraseTurns,
     dialog_phrase_odd_index: dialogPhraseOddIndex,
   };
+  const phraseProgressiveBlocksItem: SessionItem = {
+    ...phraseBuilderItem,
+    repeatPracticeStep: "phrase_progressive_blocks",
+  };
   const directTestItem: SessionItem = {
     ...item,
     spanish_text: sourceText,
@@ -1730,6 +1734,7 @@ export default function NewItem({
           wordLetterPracticeItem={wordLetterPracticeItem}
           wordPartsPracticeItem={wordPartsPracticeItem}
           phraseBuilderItem={phraseBuilderItem}
+          phraseProgressiveBlocksItem={phraseProgressiveBlocksItem}
           directTestItem={directTestItem}
           controller={itemTesting}
         />

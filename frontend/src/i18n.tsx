@@ -604,6 +604,7 @@ const messages = {
     "newItem.actionGroupMaintenance": "Maintenance actions",
     "newItem.actionGroupDanger": "Dangerous actions",
     "newItem.phraseBuilderTitle": "Phrase builder",
+    "newItem.phraseProgressiveBlocksTitle": "Next-word blocks",
     "newItem.wordIntroPracticeTitle": "Word warm-up",
     "newItem.wordLetterPracticeTitle": "Letter practice",
     "newItem.wordPartsPracticeTitle": "Word parts",
@@ -625,6 +626,8 @@ const messages = {
       "Rebuild the word from small local chunks.",
     "newItem.testingPhraseBuilderDescription":
       "Rebuild the phrase before taking the test.",
+    "newItem.testingPhraseProgressiveBlocksDescription":
+      "Recall the next word, then choose from a few phrase blocks.",
     "newItem.strategiesPlaceholder": "Placeholder for {strategy}.",
     "newItem.createDescription":
       "Write a source-language sentence that feels personal, then turn it into a target-language phrase that keeps this word.",
@@ -794,11 +797,19 @@ const messages = {
     "phrase.builderPrompt": "Build the {language} phrase for:",
     "phrase.builderAnswerLabel": "Phrase in progress",
     "phrase.builderBankLabel": "Phrase parts",
+    "phrase.builderChoiceLabel": "Choose the next word",
+    "phrase.builderShowChoices": "Show choices",
     "phrase.builderComplete": "Great, the phrase is in the right order.",
     "phrase.builderEnableAudio": "Enable block audio",
     "phrase.builderAudioEnabling": "Enabling audio...",
     "phrase.builderEnableAudioHint":
       "iPhone Safari needs one tap before block audio can play.",
+    "phrase.progressiveBlocksPrompt": "Build the {language} phrase one word at a time:",
+    "phrase.progressiveBlocksAnswerLabel": "Phrase in progress",
+    "phrase.progressiveBlocksChoiceLabel": "Choose the next word",
+    "phrase.progressiveBlocksShowChoices": "Show choices",
+    "phrase.progressiveBlocksShowNextLetter": "Show next letter",
+    "phrase.progressiveBlocksComplete": "Great, the phrase is in the right order.",
     "phrase.situationPrompt":
       "Select the line that does not fit this target-language dialog.",
     "phrase.situationChoice": "{text}",
@@ -1470,6 +1481,7 @@ const messages = {
     "newItem.actionGroupMaintenance": "Acciones de mantenimiento",
     "newItem.actionGroupDanger": "Acciones peligrosas",
     "newItem.phraseBuilderTitle": "Constructor de frase",
+    "newItem.phraseProgressiveBlocksTitle": "Bloques de siguiente palabra",
     "newItem.wordIntroPracticeTitle": "Calentamiento de palabra",
     "newItem.wordLetterPracticeTitle": "Práctica de letras",
     "newItem.wordPartsPracticeTitle": "Partes de la palabra",
@@ -1491,6 +1503,8 @@ const messages = {
       "Reconstruye la palabra a partir de pequeños fragmentos locales.",
     "newItem.testingPhraseBuilderDescription":
       "Reconstruye la frase antes de hacer la prueba.",
+    "newItem.testingPhraseProgressiveBlocksDescription":
+      "Piensa la siguiente palabra y luego elige entre algunos bloques de la frase.",
     "newItem.strategiesPlaceholder": "Placeholder para {strategy}.",
     "newItem.createDescription":
       "Escribe una frase en el idioma de origen que te resuene y conviértela en una frase del idioma objetivo que conserve esta palabra.",
@@ -1665,11 +1679,19 @@ const messages = {
     "phrase.builderPrompt": "Construye la frase en {language} para:",
     "phrase.builderAnswerLabel": "Frase en progreso",
     "phrase.builderBankLabel": "Partes de la frase",
+    "phrase.builderChoiceLabel": "Elige la siguiente palabra",
+    "phrase.builderShowChoices": "Mostrar opciones",
     "phrase.builderComplete": "Muy bien, la frase está en el orden correcto.",
     "phrase.builderEnableAudio": "Activar audio de bloques",
     "phrase.builderAudioEnabling": "Activando audio...",
     "phrase.builderEnableAudioHint":
       "Safari en iPhone necesita un toque antes de reproducir audio de bloques.",
+    "phrase.progressiveBlocksPrompt": "Construye la frase en {language} palabra por palabra:",
+    "phrase.progressiveBlocksAnswerLabel": "Frase en progreso",
+    "phrase.progressiveBlocksChoiceLabel": "Elige la siguiente palabra",
+    "phrase.progressiveBlocksShowChoices": "Mostrar opciones",
+    "phrase.progressiveBlocksShowNextLetter": "Mostrar siguiente letra",
+    "phrase.progressiveBlocksComplete": "Muy bien, la frase está en el orden correcto.",
     "phrase.situationPrompt":
       "Selecciona la línea que no encaja en este diálogo del idioma objetivo.",
     "phrase.situationChoice": "{text}",

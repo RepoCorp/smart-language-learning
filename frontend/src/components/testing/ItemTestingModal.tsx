@@ -27,9 +27,9 @@ export default function ItemTestingModal({
     if (itemType === "phrase") {
       return [
         {
-          key: "test",
-          label: t("newItem.openItemTest"),
-          description: t("newItem.testingDirectTestDescription"),
+          key: "progressive-blocks",
+          label: t("newItem.phraseProgressiveBlocksTitle"),
+          description: t("newItem.testingPhraseProgressiveBlocksDescription"),
         },
         {
           key: "builder",

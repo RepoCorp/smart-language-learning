@@ -227,7 +227,7 @@ def estimated_seconds_for_entry(entry: SessionEntry) -> int:
             return DIFFICULT_WORD_INTRO_SECONDS
         if entry.repeat_practice_step == "word_cloze":
             return DIFFICULT_WORD_CLOZE_SECONDS
-        if entry.repeat_practice_step == "phrase_builder":
+        if entry.repeat_practice_step in {"phrase_builder", "phrase_progressive_blocks"}:
             return DIFFICULT_PHRASE_BUILDER_SECONDS
         if entry.item.item_type == Item.ItemType.PHRASE:
             return DIFFICULT_PHRASE_REVIEW_SECONDS
@@ -388,7 +388,7 @@ def build_difficult_practice_entries(
                 mode="review",
                 direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
                 repeated_after_failure=True,
-                repeat_practice_step="phrase_builder",
+                repeat_practice_step="phrase_progressive_blocks",
             )
         )
 

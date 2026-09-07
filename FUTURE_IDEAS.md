@@ -3,6 +3,7 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
+filtrar por tipo de palabra
 Arreglar las descripciones y visual de la gramatica de palabras y frases
 Input para que la gente de feedback
 Escribir la palabra a mano y que la tinta sea del color

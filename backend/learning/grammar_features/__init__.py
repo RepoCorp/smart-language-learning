@@ -26,7 +26,7 @@ from .english_phrase_features import (
     THIRD_PERSON_S,
     WH_QUESTION,
 )
-from .phrase_features import (
+from .german_phrase_features import (
     ADJECTIVE_ENDING_CASE,
     ADJECTIVE_ENDING_GENDER,
     AUXILIARY_VERB,

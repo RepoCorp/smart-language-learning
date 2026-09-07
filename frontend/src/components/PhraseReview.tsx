@@ -14,6 +14,7 @@ import { useStudyLanguages } from "../studyLanguages";
 import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import DialogActionIcon from "./DialogActionIcon";
+import ProgressivePhraseBlocksReview from "./phraseBuilder/ProgressivePhraseBlocksReview";
 import RevealedReviewSummary from "./RevealedReviewSummary";
 
 interface PhraseReviewProps {
@@ -324,6 +325,7 @@ export default function PhraseReview({
   const hidePromptText = targetPromptMode === "audio" && allowPromptAudio && !showPromptText;
   const useRepeatPlaceholder = Boolean(item.repeatedAfterFailure);
   const usePhraseBuilder = useRepeatPlaceholder && (item.repeatPracticeStep === "phrase_builder" || (!item.repeatPracticeStep && isSpanishToGerman));
+  const useProgressivePhraseBlocks = useRepeatPlaceholder && item.repeatPracticeStep === "phrase_progressive_blocks";
   const shouldOfferPhraseBuilderSpeechPrime = usePhraseBuilder && phraseBuilderSpeechPrimeAvailable && !phraseBuilderSpeechPrimed;
   const shouldSuppressPromptAudio = false;
 
@@ -1073,6 +1075,26 @@ export default function PhraseReview({
           </div>
         )}
       </div>
+    );
+  }
+
+  if (useProgressivePhraseBlocks) {
+    return (
+      <ProgressivePhraseBlocksReview
+        promptText={promptText}
+        expectedAnswer={expectedAnswer}
+        languageLabel={languageLabel}
+        targetLanguage={targetLanguage}
+        phraseKey={`${item.item_type}:${item.spanish_text}=>${item.german_text}`}
+        distractorTexts={item.options}
+        isSubmitting={isSubmitting}
+        reviewComplete={reviewComplete}
+        hasAudio={Boolean(promptAudioUrl)}
+        onComplete={() => completePhraseBuilder(expectedAnswer, { skipPlacedAudio: true })}
+        onReplayAudio={playPhraseAudio}
+        onNextItem={onNextItem}
+        postReviewActions={postReviewActions}
+      />
     );
   }
 

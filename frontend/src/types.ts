@@ -165,7 +165,7 @@ export interface SessionItem {
   mode: SessionMode;
   direction?: ReviewDirection | null;
   repeatedAfterFailure?: boolean;
-  repeatPracticeStep?: "word_intro" | "word_cloze" | "word_parts" | "phrase_builder";
+  repeatPracticeStep?: "word_intro" | "word_cloze" | "word_parts" | "phrase_builder" | "phrase_progressive_blocks";
   options: string[];
   option_items?: Array<{
     id: number;
@@ -211,7 +211,7 @@ export interface SessionPlanItem {
   mode: SessionMode;
   direction?: ReviewDirection | null;
   repeatedAfterFailure?: boolean;
-  repeatPracticeStep?: "word_intro" | "word_cloze" | "word_parts" | "phrase_builder";
+  repeatPracticeStep?: "word_intro" | "word_cloze" | "word_parts" | "phrase_builder" | "phrase_progressive_blocks";
 }
 
 export type ItemQuestionType =

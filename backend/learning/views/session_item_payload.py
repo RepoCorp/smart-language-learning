@@ -9,7 +9,7 @@ from ..serializers import SessionItemSerializer
 from .session import SessionEntry, serialize_entries
 
 
-_REPEAT_STEPS = {"word_intro", "word_cloze", "word_parts", "phrase_builder"}
+_REPEAT_STEPS = {"word_intro", "word_cloze", "word_parts", "phrase_builder", "phrase_progressive_blocks"}
 
 
 def _is_true(value: object) -> bool:

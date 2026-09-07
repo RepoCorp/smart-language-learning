@@ -1321,6 +1321,14 @@ button.overview-stats-metric-card:focus-visible {
   padding: 2px 0 4px;
 }
 
+.phrase-builder-choice-area {
+  min-height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .phrase-builder-slot,
 .phrase-builder-token {
   flex: 0 1 auto;
@@ -1394,19 +1402,19 @@ button.overview-stats-metric-card:focus-visible {
   text-align: center;
 }
 
+.phrase-builder-slot-filled {
+  border-style: solid;
+  border-color: #22c55e;
+  background: #ecfdf5;
+  color: #166534;
+}
+
 .phrase-builder-slot-latching {
   border-style: solid;
   border-color: var(--color-accent);
   background: var(--color-accent-surface);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
   transform: scale(1.02);
-}
-
-.phrase-builder-slot-filled {
-  border-style: solid;
-  border-color: #22c55e;
-  background: #ecfdf5;
-  color: #166534;
 }
 
 .phrase-builder-bank {
@@ -1434,6 +1442,27 @@ button.overview-stats-metric-card:focus-visible {
   overflow: hidden;
   padding: 8px 12px;
   cursor: grab;
+}
+
+.phrase-builder-choice-area .phrase-builder-token {
+  min-width: 3.5rem;
+}
+
+.phrase-builder-progressive-review .phrase-builder-slot,
+.phrase-builder-progressive-review .phrase-builder-token {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-variant-ligatures: none;
+}
+
+.phrase-builder-progressive-review .phrase-builder-slot:not(.phrase-builder-slot-filled) {
+  min-width: 6.5rem;
+  min-height: 2.75rem;
+}
+
+@media (pointer: fine) {
+  .phrase-builder-progressive-review .phrase-builder-token:not(:disabled) {
+    cursor: url("/cursors/phrase-block-grab.svg") 15 1, grab;
+  }
 }
 
 .phrase-builder-token-text {

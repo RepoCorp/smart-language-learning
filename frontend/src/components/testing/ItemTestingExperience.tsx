@@ -15,6 +15,7 @@ type ItemTestingExperienceProps = {
   wordLetterPracticeItem: SessionItem;
   wordPartsPracticeItem: SessionItem;
   phraseBuilderItem: SessionItem;
+  phraseProgressiveBlocksItem: SessionItem;
   directTestItem: SessionItem;
   controller: ItemTestingModalController;
 };
@@ -29,6 +30,7 @@ export default function ItemTestingExperience({
   wordLetterPracticeItem,
   wordPartsPracticeItem,
   phraseBuilderItem,
+  phraseProgressiveBlocksItem,
   directTestItem,
   controller,
 }: ItemTestingExperienceProps): JSX.Element | null {
@@ -36,7 +38,9 @@ export default function ItemTestingExperience({
     return null;
   }
 
-  const actionKey = controller.selectedActionKey;
+  const actionKey = itemType === "phrase" && controller.selectedActionKey === "test"
+    ? "progressive-blocks"
+    : controller.selectedActionKey;
   const practiceKey = `${itemId}-${sourceText}-${targetText}-${actionKey}`;
 
   return (
@@ -68,6 +72,12 @@ export default function ItemTestingExperience({
           <PhraseReview
             key={`testing-phrase-builder-${practiceKey}`}
             item={phraseBuilderItem}
+            onAnswered={async () => controller.completePractice()}
+          />
+        ) : actionKey === "progressive-blocks" && itemType === "phrase" ? (
+          <PhraseReview
+            key={`testing-phrase-progressive-blocks-${practiceKey}`}
+            item={phraseProgressiveBlocksItem}
             onAnswered={async () => controller.completePractice()}
           />
         ) : itemType === "word" ? (

@@ -40,7 +40,7 @@ class SessionItemSerializer(serializers.Serializer):
     )
     repeatedAfterFailure = serializers.BooleanField(required=False)
     repeatPracticeStep = serializers.ChoiceField(
-        choices=["word_intro", "word_cloze", "word_parts", "phrase_builder"],
+        choices=["word_intro", "word_cloze", "word_parts", "phrase_builder", "phrase_progressive_blocks"],
         required=False,
         allow_null=True,
     )
@@ -69,7 +69,7 @@ class SessionPlanEntrySerializer(serializers.Serializer):
     )
     repeatedAfterFailure = serializers.BooleanField(required=False)
     repeatPracticeStep = serializers.ChoiceField(
-        choices=["word_intro", "word_cloze", "word_parts", "phrase_builder"],
+        choices=["word_intro", "word_cloze", "word_parts", "phrase_builder", "phrase_progressive_blocks"],
         required=False,
         allow_null=True,
     )
