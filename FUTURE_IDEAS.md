@@ -3,16 +3,14 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
-filtrar por tipo de palabra
 Arreglar las descripciones y visual de la gramatica de palabras y frases
 Input para que la gente de feedback
 Escribir la palabra a mano y que la tinta sea del color
 Mas de los word friends. Pensar en añadir de alguna manera que recoja varios pero no sean muchos amigos, por ejemplo simplemente vocal o consonante, si no tiene amigo mas particular
 Ejercicio de escribir una frase con la palabra, pero una qué ya exista y simplemente compara si son iguales
 Los objetivos se repiten mucho
-Esconder el texto de la frase que se muestra después de calificar un ítem, pero que permita abrirlo y reproducirlo
 Plural en frase
-Relaxion expresion dialogo
+Relacion expresion dialogo
 Estrategia que uno intente escribir la frase y se la corrija
 Que si el error en un articulo el sustantivo no esta guardadi Que no simplemente falle al añadir el ajercicio
 Calienta la palabra muchos sin frase. Ejemplo wirken

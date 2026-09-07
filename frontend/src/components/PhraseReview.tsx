@@ -278,6 +278,7 @@ export default function PhraseReview({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showPromptText, setShowPromptText] = useState<boolean>(targetPromptMode === "text");
   const [answerRevealed, setAnswerRevealed] = useState<boolean>(false);
+  const [answerGraded, setAnswerGraded] = useState<boolean>(false);
   const [placedPhraseTokens, setPlacedPhraseTokens] = useState<PhraseToken[]>([]);
   const [wrongPhraseTokenId, setWrongPhraseTokenId] = useState<string>("");
   const [draggingPhraseTokenId, setDraggingPhraseTokenId] = useState<string>("");
@@ -569,8 +570,13 @@ export default function PhraseReview({
       return;
     }
     setIsSubmitting(true);
+    setAnswerGraded(true);
     setFeedback(message);
     try {
+      if (isSpanishToGerman) {
+        await onAnswered(correct);
+        return;
+      }
       const played = await playPhraseAudio();
       if (!played) {
         await new Promise((resolve) => setTimeout(resolve, FEEDBACK_DELAY_MS));
@@ -887,6 +893,7 @@ export default function PhraseReview({
   useEffect(() => {
     setFeedback("");
     setAnswerRevealed(false);
+    setAnswerGraded(false);
     setPlacedPhraseTokens([]);
     setWrongPhraseTokenId("");
     setPhraseBuilderComplete(false);
@@ -1123,14 +1130,19 @@ export default function PhraseReview({
           <p className="test-source-phrase">{promptText}</p>
         </>
       )}
-      {answerRevealed && (
+      {answerRevealed && !answerGraded && (
+        <div className="revealed-answer">
+          <p className="revealed-answer-main">{expectedAnswer}</p>
+        </div>
+      )}
+      {answerRevealed && answerGraded && (
         <RevealedReviewSummary
           itemId={item.id}
           answer={expectedAnswer}
           phrase={item.german_text}
           phraseTranslation={item.spanish_text}
-          audioOnly={targetPromptMode === "audio" && allowPromptAudio}
-          showReplayAudio={isSpanishToGerman}
+          audioOnly={false}
+          showReplayAudio={reviewComplete}
           onReplayAudio={promptAudioUrl ? playPhraseAudio : undefined}
         />
       )}
@@ -1141,7 +1153,7 @@ export default function PhraseReview({
               type="button"
               onClick={() => {
                 setAnswerRevealed(true);
-                if (targetPromptMode === "audio" && allowPromptAudio) {
+                if (isSpanishToGerman) {
                   void playPhraseAudio();
                 }
               }}

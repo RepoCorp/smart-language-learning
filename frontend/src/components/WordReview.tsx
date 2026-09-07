@@ -445,9 +445,6 @@ export default function WordReview({
 
   const revealSelfGradedAnswer = (): void => {
     setAnswerRevealed(true);
-    if (targetPromptMode === "audio" && allowPromptAudio) {
-      void playAudioUrl(completionPhrase.audioUrl || item.audio_url || "");
-    }
   };
 
   const failWrittenAnswer = async (): Promise<void> => {
@@ -778,12 +775,13 @@ export default function WordReview({
     }
     setPendingRewriteTakeover(false);
     clearAnswerAndRefocus();
+    focusInput();
     setHintLetter("");
     setLetterSuggestions([]);
     setFeedback(t("word.feedback.rewritePrompt"));
     setFeedbackTone("neutral");
     setRewriteStatusTone(submittedResultTone === "success" ? "warning" : "error");
-  }, [reviewComplete, pendingRewriteTakeover, submittedResultTone, t]);
+  }, [focusInput, reviewComplete, pendingRewriteTakeover, submittedResultTone, t]);
 
   useEffect(() => {
     setShowPromptText(targetPromptMode === "text");
@@ -858,15 +856,20 @@ export default function WordReview({
             <p className="test-source-phrase">{promptText}</p>
           </>
         )}
-        {answerRevealed && (
+        {answerRevealed && !completionPreview && (
+          <div className="revealed-answer">
+            <p className="revealed-answer-main">{expectedAnswer}</p>
+          </div>
+        )}
+        {answerRevealed && completionPreview && (
           <RevealedReviewSummary
             itemId={item.id}
             answer={expectedAnswer}
             phrase={completionPreview?.phrase || completionPhrase.text}
             phraseTranslation={completionPreview?.phraseTranslation || completionPhrase.sourceText}
             fallbackPhrase={targetWordText}
-            audioOnly={targetPromptMode === "audio" && allowPromptAudio}
-            showReplayAudio={isSpanishToGerman && reviewComplete}
+            audioOnly={false}
+            showReplayAudio={reviewComplete}
             onReplayAudio={(completionPreview?.phraseAudioUrl || completionPhrase.audioUrl || item.audio_url)
               ? () => playAudioUrl(completionPreview?.phraseAudioUrl || completionPhrase.audioUrl || item.audio_url || "")
               : undefined}

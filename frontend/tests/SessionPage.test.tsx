@@ -15,13 +15,19 @@ vi.mock("../src/api", () => ({
   fetchContentItemDetail: vi.fn(),
   fetchOverviewStats: vi.fn().mockResolvedValue({ ready_to_review: 0, future_reviews: 0, word_items: 0, not_started: 0, difficult_items: 0 }),
   fetchSession: vi.fn(),
+  fetchSessionItem: vi.fn((entry) => Promise.resolve({
+    ...entry,
+    spanish_text: entry.spanish_text || "",
+    german_text: entry.german_text || "",
+    options: entry.options || [],
+  })),
   markSeen: vi.fn().mockResolvedValue(undefined),
   restoreSessionItemState: vi.fn().mockResolvedValue(undefined),
   setContentItemLearned: vi.fn().mockResolvedValue(undefined),
   submitReview: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { completeDifficultItem, fetchContentItemDetail, fetchOverviewStats, fetchSession, markSeen, restoreSessionItemState, submitReview } from "../src/api";
+import { completeDifficultItem, fetchContentItemDetail, fetchOverviewStats, fetchSession, fetchSessionItem, markSeen, restoreSessionItemState, submitReview } from "../src/api";
 
 async function renderSessionPageAndStart(): Promise<void> {
   render(
@@ -50,6 +56,16 @@ describe("SessionPage", () => {
       not_started: 0,
       difficult_items: 0,
     });
+    vi.mocked(fetchSessionItem).mockImplementation((entry) => Promise.resolve({
+      ...entry,
+      spanish_text: entry.spanish_text || "",
+      german_text: entry.german_text || "",
+      options: entry.options || [],
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders new item details", async () => {
@@ -513,6 +529,70 @@ describe("SessionPage", () => {
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(15, true, "es_to_de"));
   });
 
+  it("shows the word and its example after a source-to-target word answer", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 151,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "casa",
+          german_text: "Haus",
+          direction: "es_to_de",
+          options: [],
+          related_dialogs: [{
+            dialog_id: 1,
+            topic: "home",
+            context: "",
+            audio_url: "",
+            created_at: "2026-01-01T00:00:00Z",
+            turns: [{
+              source_text: "La casa es pequeña.",
+              target_text: "Das Haus ist klein.",
+            }],
+            matched_turns: [],
+          }],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    expect(await screen.findByText(/Write in German/)).toBeInTheDocument();
+    await userEvent.type(screen.getByTestId("word-input"), "Haus");
+
+    expect(await screen.findByText("Haus", { selector: ".revealed-answer-main" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Das" })).toBeInTheDocument();
+    await waitFor(() => expect(submitReview).toHaveBeenCalledWith(151, true, "es_to_de"));
+    expect(await screen.findByRole("button", { name: "Next" })).toBeInTheDocument();
+  });
+
+  it("focuses the input for a clean rewrite after a completed word answer with mistakes", async () => {
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 152,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "gracias",
+          german_text: "danke",
+          direction: "es_to_de",
+          options: [],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    const input = await screen.findByTestId("word-input");
+    await userEvent.type(input, "x");
+    await userEvent.type(input, "danke");
+
+    await screen.findByText("Write the word again.");
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+  });
+
   it("does not mark wrong when only one hint is used after typing most letters", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
@@ -713,6 +793,66 @@ describe("SessionPage", () => {
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(12, true, "de_to_es"));
   });
 
+  it("keeps the example phrase hidden until a target-to-source answer is graded in audio mode", async () => {
+    class PendingAudio {
+      currentTime = 0;
+      src = "";
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onabort: (() => void) | null = null;
+      addEventListener(): void {}
+      removeEventListener(): void {}
+      pause(): void {}
+      load(): void {}
+      play(): Promise<void> {
+        return new Promise(() => {});
+      }
+    }
+    vi.stubGlobal("Audio", PendingAudio);
+    vi.mocked(fetchSession).mockResolvedValue({
+      items: [
+        {
+          id: 121,
+          mode: "review",
+          item_type: "word",
+          spanish_text: "casa",
+          german_text: "Haus",
+          direction: "de_to_es",
+          audio_url: "https://example.com/haus.mp3",
+          options: [],
+          related_dialogs: [{
+            dialog_id: 1,
+            topic: "home",
+            context: "",
+            audio_url: "",
+            created_at: "2026-01-01T00:00:00Z",
+            turns: [{
+              source_text: "La casa es pequeña.",
+              target_text: "Das Haus ist klein.",
+              phrase_audio_url: "https://example.com/haus-phrase.mp3",
+            }],
+            matched_turns: [],
+          }],
+        },
+      ],
+    });
+
+    await renderSessionPageAndStart();
+
+    expect(await screen.findByText("Audio prompt mode is active. Use play to listen.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show text" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play audio" })).toBeInTheDocument();
+    expect(screen.queryByText("Haus")).not.toBeInTheDocument();
+    expect(screen.queryByText("Das Haus ist klein.")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    expect(screen.getByText("casa")).toBeInTheDocument();
+    expect(screen.queryByText("Das Haus ist klein.")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Passed" }));
+    expect(await screen.findByRole("button", { name: "Das" })).toBeInTheDocument();
+  });
+
   it("allows marking self-graded word reviews as failed", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
@@ -818,13 +958,15 @@ describe("SessionPage", () => {
 
     await renderSessionPageAndStart();
 
-    expect(await screen.findByText(/What is the correct Spanish translation\?/)).toBeInTheDocument();
-    expect(screen.getByText("Ich verstehe nicht")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "No entiendo" })).not.toBeInTheDocument();
+    expect(await screen.findByText("Audio prompt mode is active. Use play to listen.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show text" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play audio" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ich" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
-    expect(screen.getByText(/Answer:/)).toBeInTheDocument();
     expect(screen.getByText(/No entiendo/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ich" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Passed" }));
+    expect(await screen.findByRole("button", { name: "Ich" })).toBeInTheDocument();
     await waitFor(() => expect(submitReview).toHaveBeenCalledWith(30, true, "de_to_es"));
   });
 
