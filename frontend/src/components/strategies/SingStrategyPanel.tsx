@@ -22,20 +22,30 @@ export default function SingStrategyPanel({ song, history, itemType, isCreatingL
         {song.imageUrl ? <img className="sing-strategy-image" src={song.imageUrl} alt={song.target} /> : null}
       </> : <p className="hint">Create lyrics for a short catchy song about this {itemType}.</p>}
       {error ? <p className="error">{error}</p> : null}
-      {song?.canChangeLyrics === false ? null : (
-        <label className="sing-strategy-lyric-option">
-          <input type="checkbox" checked={longerFunnyLyrics} onChange={(event) => setLongerFunnyLyrics(event.target.checked)} />
-          <span>Create longer lyrics with a funny twist</span>
-        </label>
-      )}
       <div className="sing-strategy-controls">
         {song?.audioUrl ? <LoopingAudioPlayer src={song.audioUrl} /> : null}
         {song ? <>
-          {song.canChangeLyrics ? lyricButton("Try different lyrics") : null}
+          {song.canChangeLyrics ? (
+            <div className="sing-strategy-lyric-actions">
+              <label className="sing-strategy-lyric-option">
+                <input type="checkbox" checked={longerFunnyLyrics} onChange={(event) => setLongerFunnyLyrics(event.target.checked)} />
+                <span>Longer lyrics</span>
+              </label>
+              {lyricButton("Try different lyrics")}
+            </div>
+          ) : null}
           <DangerousButton className="secondary-button dangerous-action-button" disabled={isCreatingSong} onConfirm={onCreateSong}>
             {isCreatingSong ? "Creating song..." : song.audioUrl ? "Create a new song" : "Create song"}
           </DangerousButton>
-        </> : lyricButton("Create lyrics")}
+        </> : (
+          <div className="sing-strategy-lyric-actions">
+            <label className="sing-strategy-lyric-option">
+              <input type="checkbox" checked={longerFunnyLyrics} onChange={(event) => setLongerFunnyLyrics(event.target.checked)} />
+              <span>Longer lyrics</span>
+            </label>
+            {lyricButton("Create lyrics")}
+          </div>
+        )}
       </div>
       {song?.audioUrl ? (
         <div className="sing-strategy-image-action">

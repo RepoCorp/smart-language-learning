@@ -4531,16 +4531,33 @@ textarea {
 }
 
 .sing-strategy-lyric-option {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-alt);
   color: var(--color-text-muted);
   font-size: 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .sing-strategy-lyric-option input {
   margin: 0;
+}
+
+.sing-strategy-lyric-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sing-strategy-lyric-actions .secondary-button {
+  flex: 1;
 }
 
 .looping-audio-player {
@@ -4601,6 +4618,10 @@ textarea {
   .sing-strategy-controls > .secondary-button,
   .sing-strategy-controls > span {
     flex: none;
+    width: 100%;
+  }
+
+  .sing-strategy-lyric-actions {
     width: 100%;
   }
 
