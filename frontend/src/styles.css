@@ -4530,6 +4530,19 @@ textarea {
   margin-top: 12px;
 }
 
+.sing-strategy-lyric-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.sing-strategy-lyric-option input {
+  margin: 0;
+}
+
 .looping-audio-player {
   align-items: center;
   display: flex;

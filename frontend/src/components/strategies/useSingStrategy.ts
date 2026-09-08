@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { generateContentItemSong, generateContentItemSongImage, generateContentItemSongLyrics, retryContentItemSong } from "../../apiSingStrategy";
+import { generateContentItemSong, generateContentItemSongImage, generateContentItemSongLyrics } from "../../apiSingStrategy";
 import type { ItemExercisePhrases, StudyLanguageCode } from "../../types";
 
 export type SingSong = {
   id: string; target: string; source: string; audioUrl: string; imageUrl: string; durationSeconds: number;
-  canRetry: boolean; canChangeLyrics: boolean; lyricFocus: "funny" | "a2_clarity" | "";
+  canChangeLyrics: boolean; lyricFocus: "funny" | "a2_clarity" | "";
 };
 
 function songFromPayload(payload: Record<string, unknown> | undefined): SingSong | null {
@@ -19,7 +19,6 @@ function songFromPayload(payload: Record<string, unknown> | undefined): SingSong
     audioUrl: String(payload?.audio_url || "").trim(),
     imageUrl: String(payload?.image_url || "").trim(),
     durationSeconds: Number(payload?.duration_seconds || 0),
-    canRetry: Boolean(payload?.composition_plan),
     canChangeLyrics: !Boolean(payload?.lyrics_locked),
     lyricFocus: payload?.lyric_focus === "funny" || payload?.lyric_focus === "a2_clarity" ? payload.lyric_focus : "",
   };
@@ -42,13 +41,12 @@ export function useSingStrategy({ itemId, exercisePhrases, sourceLanguage, targe
   const [isCreatingSong, setIsCreatingSong] = useState(false);
   const [isCreatingLyrics, setIsCreatingLyrics] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState("");
   const { song, history } = useMemo(() => songsFromPayload(exercisePhrases), [exercisePhrases]);
-  const createLyrics = async (): Promise<void> => {
+  const createLyrics = async (longerFunnyLyrics = false): Promise<void> => {
     if (itemId <= 0 || isCreatingLyrics) return;
     setIsCreatingLyrics(true); setError("");
-    try { setExercisePhrases((await generateContentItemSongLyrics(itemId, sourceLanguage, targetLanguage)).exercise_phrases || {}); }
+    try { setExercisePhrases((await generateContentItemSongLyrics(itemId, sourceLanguage, targetLanguage, longerFunnyLyrics)).exercise_phrases || {}); }
     catch (value) { setError(value instanceof Error ? value.message : errorMessage); }
     finally { setIsCreatingLyrics(false); }
   };
@@ -66,13 +64,6 @@ export function useSingStrategy({ itemId, exercisePhrases, sourceLanguage, targe
     catch (value) { setError(value instanceof Error ? value.message : errorMessage); }
     finally { setIsGeneratingImage(false); }
   };
-  const retrySameSong = async (): Promise<void> => {
-    if (itemId <= 0 || isRetrying) return;
-    setIsRetrying(true); setError("");
-    try { setExercisePhrases((await retryContentItemSong(itemId, sourceLanguage, targetLanguage)).exercise_phrases || {}); }
-    catch (value) { setError(value instanceof Error ? value.message : errorMessage); }
-    finally { setIsRetrying(false); }
-  };
   useEffect(() => { setError(""); setIsCreatingSong(false); setIsCreatingLyrics(false); }, [itemId, song?.target]);
-  return { song, history, isCreatingLyrics, isCreatingSong, isGeneratingImage, isRetrying, error, createLyrics, createSong, generateImage, retrySameSong };
+  return { song, history, isCreatingLyrics, isCreatingSong, isGeneratingImage, error, createLyrics, createSong, generateImage };
 }

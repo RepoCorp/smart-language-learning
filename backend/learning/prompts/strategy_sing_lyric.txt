@@ -14,7 +14,7 @@ Return valid JSON only:
 }
 
 Requirements:
-- The target lyric must contain exactly two short, connected phrases and stay compact enough for a short song paragraph.
+- The target lyric must contain {lyric_length_requirement} and stay compact enough for a short song paragraph.
 - It must contain the target word exactly, or its grammatically required inflection.
 - Repeat the target word as many times as naturally possible, so it stands out, but never make the lyric sound forced, strange, or meaningless.
 - Use simple A2-level vocabulary, memorable language, and a clear rhythm. Apart from the target word, prefer common A1-A2 everyday words and simple verbs; if a comic idea needs harder vocabulary, choose a simpler comic idea instead.

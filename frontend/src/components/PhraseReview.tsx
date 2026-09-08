@@ -1090,7 +1090,6 @@ export default function PhraseReview({
       <ProgressivePhraseBlocksReview
         promptText={promptText}
         expectedAnswer={expectedAnswer}
-        languageLabel={languageLabel}
         targetLanguage={targetLanguage}
         phraseKey={`${item.item_type}:${item.spanish_text}=>${item.german_text}`}
         distractorTexts={item.options}

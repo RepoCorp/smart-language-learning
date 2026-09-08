@@ -12,11 +12,11 @@ Los objetivos se repiten mucho
 Plural en frase
 Relacion expresion dialogo
 Estrategia que uno intente escribir la frase y se la corrija
-Que si el error en un articulo el sustantivo no esta guardadi Que no simplemente falle al añadir el ajercicio
-Calienta la palabra muchos sin frase. Ejemplo wirken
-Como bloques pero que sea un slider
+Que si el error en un articulo el sustantivo no esta guardadi Que no simplemente falle al añadir el ajercicio: que ponga un ejercicio al otro dia, pero que no afecte el SRS si no fallo la palabra, que sea de escoger el color correspondiente 
 Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que si lo indique, cual es la regla al momento de practicarlo
-
+Sing con pattern
+Silencios en las frases de Chat
+Mejorar prompt pregunta de gramatica
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 ### Gramatica

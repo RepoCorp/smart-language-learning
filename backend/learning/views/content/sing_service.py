@@ -19,19 +19,37 @@ from .management import _call_openai_json_logged, _render_prompt
 
 logger = logging.getLogger(__name__)
 
-MUSIC_STYLES = (
-    ("acoustic-pop", "bright acoustic pop with strummed guitar, handclaps, light drums, and warm bass"),
-    ("synth-pop", "playful synth-pop with soft electronic drums, bouncy bass, and bright keyboard hooks"),
-    ("ukulele", "cheerful ukulele pop with hand percussion, gentle bass, and light claps"),
-    ("funk", "light upbeat funk with clean rhythm guitar, a bouncy bassline, and crisp drums"),
-    ("marimba", "playful marimba and piano pop with light percussion, soft bass, and a bright groove"),
-    ("indie-rock", "bright indie rock with jangly electric guitar, driving bass, and energetic live drums"),
-    ("hard-rock", "upbeat hard rock with crunchy electric guitar, punchy bass, and powerful clean drums"),
-    ("blues", "upbeat electric blues with expressive guitar riffs, walking bass, and a swinging drum groove"),
-    ("jazz", "lively jazz combo with piano, upright bass, brushed drums, and playful brass accents"),
-    ("reggae", "sunny reggae with offbeat guitar chops, round bass, light percussion, and a relaxed bounce"),
-    ("folk", "warm folk with acoustic guitar, hand percussion, simple bass, and an intimate campfire groove"),
-    ("electronic", "bright electronic dance pop with a pulsing synth bass, crisp drum machine, and sparkling arpeggios"),
+MUSIC_RHYTHMS = (
+    ("funk", "an upbeat funk groove"),
+    ("reggae", "a sunny reggae rhythm"),
+    ("indie-rock", "an energetic indie-rock beat"),
+    ("jazz", "a lively jazz rhythm"),
+    ("electronic", "an upbeat electronic dance groove"),
+    ("blues", "a swinging electric-blues groove"),
+    ("folk", "a steady campfire-folk rhythm"),
+)
+MUSIC_MAIN_INSTRUMENTS = (
+    ("guitar", "bright guitar"),
+    ("marimba", "playful marimba"),
+    ("piano", "warm piano"),
+    ("synth", "sparkling synth"),
+    ("ukulele", "cheerful ukulele"),
+    ("brass", "playful brass hooks"),
+)
+MUSIC_SUPPORTING_ELEMENTS = (
+    ("handclaps", "handclaps"),
+    ("brass", "light brass accents"),
+    ("bass", "a bouncy bassline"),
+    ("percussion", "crisp percussion"),
+    ("drums", "tight live drums"),
+    ("arpeggios", "gentle arpeggios"),
+)
+MUSIC_MOODS = (
+    ("warm", "warm and inviting"),
+    ("playful", "playful and bright"),
+    ("energetic", "energetic and punchy"),
+    ("relaxed", "relaxed but rhythmic"),
+    ("quirky", "quirky and colorful"),
 )
 VOWEL_GROUP_PATTERN = re.compile(r"[aeiouyáéíóúàèìòùâêîôûäëïöüøåæœ]+", re.IGNORECASE)
 PICKUP_SECONDS = 3
@@ -46,7 +64,6 @@ def song_payload(exercise_phrases: dict) -> dict | None:
     source = str(value.get("source_text", "")).strip()
     if not target or not source:
         return None
-    plan = value.get("composition_plan")
     return {
         "song_id": str(value.get("song_id", "")).strip(),
         "target_text": target, "source_text": source,
@@ -55,13 +72,19 @@ def song_payload(exercise_phrases: dict) -> dict | None:
         "duration_seconds": float(value.get("duration_seconds", 0) or 0),
         "loop_duration_seconds": float(value.get("loop_duration_seconds", 0) or 0),
         "style_key": str(value.get("style_key", "")).strip(),
-        "composition_plan": plan if isinstance(plan, dict) else None,
         "lyrics_locked": bool(value.get("lyrics_locked", False)),
         "lyric_focus": str(value.get("lyric_focus", "")).strip(),
     }
 
 
-def generate_lyric(item: Item, source_language: str, target_language: str, previous: dict | None) -> dict | None:
+def generate_lyric(
+    item: Item,
+    source_language: str,
+    target_language: str,
+    previous: dict | None,
+    *,
+    longer_funny_lyrics: bool = False,
+) -> dict | None:
     if item.item_type == Item.ItemType.PHRASE and _sentence_count(item.german_text) > 2:
         logger.info("content.sing.lyric_uses_study_phrase item_id=%s", item.id)
         return {
@@ -71,16 +94,16 @@ def generate_lyric(item: Item, source_language: str, target_language: str, previ
             "lyrics_locked": True,
             "lyric_focus": "study_phrase",
         }
-    lyric_focus = _next_lyric_focus(previous)
+    lyric_focus = "funny" if longer_funny_lyrics else "a2_clarity"
     previous_instruction = (
         f"\nPrevious lyric: {previous['target_text']}\nCreate a noticeably different lyric. "
         "Do not reuse the same wording or rhythm." if previous else ""
     )
     focus_instruction = (
-        "Create a playful memory lyric. Include one gentle, believable comic twist, while keeping the "
+        "Create four short, connected lyric phrases. Include one gentle, believable comic twist, while keeping the "
         "supporting vocabulary simple." if lyric_focus == "funny" else
         "Create an A2 clarity lyric. Prioritize very common A1-A2 vocabulary, a straightforward everyday "
-        "scene, and the clearest possible meaning. Do not force humor or an unusual situation."
+        "scene, and the clearest possible meaning. Create exactly two short, connected phrases. Do not force humor or an unusual situation."
     )
     result = _call_openai_json_logged(
         label="content_item_sing_lyric",
@@ -88,6 +111,7 @@ def generate_lyric(item: Item, source_language: str, target_language: str, previ
             STRATEGY_SING_PHRASE_LYRIC_PROMPT if item.item_type == Item.ItemType.PHRASE else STRATEGY_SING_LYRIC_PROMPT,
             source_name=language_display_name(source_language), target_name=language_display_name(target_language),
             source_text=item.spanish_text, target_text=item.german_text, word_type=item.word_type or "", notes=item.notes or "",
+            lyric_length_requirement=("exactly four short, connected lyric phrases" if longer_funny_lyrics else "exactly two short, connected lyric phrases"),
         ),
         user_input=(f"Target word: {item.german_text}\nMeaning: {item.spanish_text}\n"
                     f"Creative direction: {focus_instruction}{previous_instruction}"),
@@ -100,10 +124,6 @@ def generate_lyric(item: Item, source_language: str, target_language: str, previ
     return {
         "target_text": target, "source_text": source, "audio_url": "", "lyric_focus": lyric_focus,
     } if target and source else None
-
-
-def _next_lyric_focus(previous: dict | None) -> str:
-    return "a2_clarity" if previous and previous.get("lyric_focus") == "funny" else "funny"
 
 
 def create_audio(item: Item, lyric: dict, target_language: str, generation_id: str, previous_style_key: str = "") -> dict | None:
@@ -122,16 +142,6 @@ def create_audio(item: Item, lyric: dict, target_language: str, generation_id: s
     return _save_audio(lyric, result.audio_bytes, plan, style_key, total_seconds, context) if result else None
 
 
-def retry_audio(item: Item, song: dict, generation_id: str) -> dict | None:
-    plan = song.get("composition_plan")
-    total_seconds = _plan_duration(plan)
-    if not isinstance(plan, dict) or not total_seconds:
-        return None
-    context = f"sing:{generation_id}:item:{item.id}:retry"
-    result = elevenlabs_music_generation(composition_plan=plan, quota_seconds=total_seconds, log_context=context)
-    return _save_audio(song, result.audio_bytes, plan, song.get("style_key", ""), total_seconds, context) if result else None
-
-
 def _lyric_duration(lyric: str) -> int:
     syllables = sum(max(1, len(VOWEL_GROUP_PATTERN.findall(word))) for word in re.findall(r"[^\W\d_]+", lyric, flags=re.UNICODE))
     return min(10, ceil(max(5, min(10, ceil(syllables / 3 + 0.5))) / 2) * 2)
@@ -142,17 +152,16 @@ def _sentence_count(text: str) -> int:
 
 
 def _select_style(previous: str) -> tuple[str, str]:
-    candidates = [style for style in MUSIC_STYLES if style[0] != previous]
-    return choice(candidates or list(MUSIC_STYLES))
+    for _ in range(4):
+        rhythm = choice(MUSIC_RHYTHMS)
+        instrument = choice(MUSIC_MAIN_INSTRUMENTS)
+        support = choice(MUSIC_SUPPORTING_ELEMENTS)
+        mood = choice(MUSIC_MOODS)
+        style_key = ":".join((rhythm[0], instrument[0], support[0], mood[0]))
+        if style_key != previous:
+            return style_key, f"{rhythm[1]}, led by {instrument[1]}, with {support}, {mood[1]}"
 
-
-def _plan_duration(plan: dict | None) -> int:
-    chunks = plan.get("chunks") if isinstance(plan, dict) else None
-    milliseconds = sum(chunk.get("duration_ms", 0) for chunk in chunks if isinstance(chunk, dict)) if isinstance(chunks, list) else 0
-    try:
-        return max(3, min(600, ceil(float(milliseconds) / 1000)))
-    except (TypeError, ValueError):
-        return 0
+    return style_key, f"{rhythm[1]}, led by {instrument[1]}, with {support}, {mood[1]}"
 
 
 def _chunk(text: str, seconds: int, positive: list[str], negative: list[str]) -> dict:
@@ -174,5 +183,4 @@ def _save_audio(song: dict, audio: bytes, plan: dict, style_key: str, planned_se
         "style_key": style_key,
         "duration_seconds": duration,
         "loop_duration_seconds": duration or planned_seconds,
-        "composition_plan": plan,
     }

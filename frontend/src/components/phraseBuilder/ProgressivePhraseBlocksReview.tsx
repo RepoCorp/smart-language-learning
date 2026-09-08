@@ -11,7 +11,6 @@ import {
 interface ProgressivePhraseBlocksReviewProps {
   promptText: string;
   expectedAnswer: string;
-  languageLabel: string;
   targetLanguage: string;
   phraseKey: string;
   distractorTexts: string[];
@@ -103,7 +102,6 @@ function choicesForNextToken(
 export default function ProgressivePhraseBlocksReview({
   promptText,
   expectedAnswer,
-  languageLabel,
   targetLanguage,
   phraseKey,
   distractorTexts,
@@ -262,7 +260,6 @@ export default function ProgressivePhraseBlocksReview({
 
   return (
     <div className="phrase-builder-review phrase-builder-progressive-review">
-      <p className="prompt prompt-light test-instruction">{t("phrase.progressiveBlocksPrompt", { language: languageLabel })}</p>
       <p className="test-source-phrase">{promptText}</p>
       <div className="phrase-builder-target-zone">
         <div className="phrase-builder-slots" aria-label={t("phrase.progressiveBlocksAnswerLabel")}>
@@ -308,14 +305,20 @@ export default function ProgressivePhraseBlocksReview({
                       }
                       event.currentTarget.setPointerCapture(event.pointerId);
                       const rect = event.currentTarget.getBoundingClientRect();
-                      const touchLift = window.matchMedia("(pointer: coarse)").matches ? 18 : 0;
+                      const isTouchDrag = window.matchMedia("(pointer: coarse)").matches;
+                      const touchLift = isTouchDrag ? 28 : 0;
                       activePointerIdRef.current = event.pointerId;
                       draggingTokenRef.current = token;
                       draggingElementRef.current = event.currentTarget;
                       // Keep the pointer at the lower edge so it does not hide the letters while dragging.
                       pointerOffsetRef.current = { x: event.clientX - rect.left, y: rect.height - 5 + touchLift };
                       setDraggingTokenId(token.id);
-                      setDraggingPosition({ left: rect.left, top: rect.top });
+                      setDraggingPosition(isTouchDrag
+                        ? {
+                          left: event.clientX - pointerOffsetRef.current.x,
+                          top: event.clientY - pointerOffsetRef.current.y,
+                        }
+                        : { left: rect.left, top: rect.top });
                     }}
                     onPointerMove={(event) => {
                       if (activePointerIdRef.current !== event.pointerId) {

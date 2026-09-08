@@ -132,12 +132,10 @@ export type ItemStrategiesModalProps = {
     isCreatingLyrics: boolean;
     isCreatingSong: boolean;
     isGeneratingImage: boolean;
-    isRetrying: boolean;
     error: string;
-    createLyrics: () => Promise<void>;
+    createLyrics: (longerFunnyLyrics?: boolean) => Promise<void>;
     createSong: () => Promise<void>;
     generateImage: () => Promise<void>;
-    retrySameSong: () => Promise<void>;
   };
   onPlayVisualizeWord: () => void;
   grammarStrategy: {

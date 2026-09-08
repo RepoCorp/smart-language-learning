@@ -7,7 +7,7 @@ from ...models import Item
 from .exercise_persistence import merge_item_exercise_phrases
 from .management import APIView, Request, Response, _normalized_pair, apply_user_scope, get_request_user, status
 from .management_items_listing import _generate_openai_image, _save_exercise_image
-from .sing_service import create_audio, generate_lyric, retry_audio, song_payload
+from .sing_service import create_audio, generate_lyric, song_payload
 
 
 def _merge_song(exercise_phrases: dict, song: dict) -> dict:
@@ -62,10 +62,14 @@ class ContentItemSingView(APIView):
         song = song_payload(item.exercise_phrases or {})
         if _flag(request, "image"):
             return self._create_image(item, song, target_language)
-        if _flag(request, "retry"):
-            return self._retry(item, song)
         if _flag(request, "lyrics"):
-            lyric = generate_lyric(item, source_language, target_language, song)
+            lyric = generate_lyric(
+                item,
+                source_language,
+                target_language,
+                song,
+                longer_funny_lyrics=_flag(request, "longer_funny"),
+            )
             if not lyric:
                 return Response({"detail": "Failed to generate song lyrics"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
             return self._save(item, lyric)
@@ -85,14 +89,6 @@ class ContentItemSingView(APIView):
         if not image_url:
             return Response({"detail": "Failed to generate song image"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return self._save(item, {**song, "image_url": image_url})
-
-    def _retry(self, item: Item, song: dict | None) -> Response:
-        if not song:
-            return Response({"detail": "This song has no saved plan to retry"}, status=status.HTTP_409_CONFLICT)
-        created = retry_audio(item, song, uuid4().hex[:10])
-        if not created:
-            return Response({"detail": "Failed to retry song audio"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        return self._save(item, created)
 
     def _save(self, item: Item, song: dict) -> Response:
         phrases = merge_item_exercise_phrases(item, lambda payload: _merge_song(payload, song))

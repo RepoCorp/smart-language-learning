@@ -1,12 +1,19 @@
 import type { SingSong } from "./useSingStrategy";
+import { useState } from "react";
 import DangerousButton from "../DangerousButton";
 import LoopingAudioPlayer from "../LoopingAudioPlayer";
 
 export default function SingStrategyPanel({ song, history, itemType, isCreatingLyrics, isCreatingSong, isGeneratingImage, error, onCreateLyrics, onCreateSong, onGenerateImage }: {
   song: SingSong | null; isCreatingLyrics: boolean; isCreatingSong: boolean; isGeneratingImage: boolean; error: string;
   history: SingSong[];
-  itemType: "word" | "phrase"; onCreateLyrics: () => void; onCreateSong: () => void; onGenerateImage: () => void;
+  itemType: "word" | "phrase"; onCreateLyrics: (longerFunnyLyrics: boolean) => void; onCreateSong: () => void; onGenerateImage: () => void;
 }): JSX.Element {
+  const [longerFunnyLyrics, setLongerFunnyLyrics] = useState(false);
+  const lyricButton = (label: string): JSX.Element => (
+    <button className="secondary-button" type="button" disabled={isCreatingLyrics} onClick={() => onCreateLyrics(longerFunnyLyrics)}>
+      {isCreatingLyrics ? "Creating lyrics..." : label}
+    </button>
+  );
   return (
     <div className="word-strategies-placeholder-card">
       {song ? <>
@@ -15,18 +22,20 @@ export default function SingStrategyPanel({ song, history, itemType, isCreatingL
         {song.imageUrl ? <img className="sing-strategy-image" src={song.imageUrl} alt={song.target} /> : null}
       </> : <p className="hint">Create lyrics for a short catchy song about this {itemType}.</p>}
       {error ? <p className="error">{error}</p> : null}
+      {song?.canChangeLyrics === false ? null : (
+        <label className="sing-strategy-lyric-option">
+          <input type="checkbox" checked={longerFunnyLyrics} onChange={(event) => setLongerFunnyLyrics(event.target.checked)} />
+          <span>Create longer lyrics with a funny twist</span>
+        </label>
+      )}
       <div className="sing-strategy-controls">
         {song?.audioUrl ? <LoopingAudioPlayer src={song.audioUrl} /> : null}
         {song ? <>
-          {song.canChangeLyrics ? <button className="secondary-button" type="button" disabled={isCreatingLyrics} onClick={onCreateLyrics}>
-            {isCreatingLyrics ? "Creating new lyrics..." : "Try different lyrics"}
-          </button> : null}
+          {song.canChangeLyrics ? lyricButton("Try different lyrics") : null}
           <DangerousButton className="secondary-button dangerous-action-button" disabled={isCreatingSong} onConfirm={onCreateSong}>
             {isCreatingSong ? "Creating song..." : song.audioUrl ? "Create a new song" : "Create song"}
           </DangerousButton>
-        </> : <button className="secondary-button" type="button" disabled={isCreatingLyrics} onClick={onCreateLyrics}>
-          {isCreatingLyrics ? "Creating lyrics..." : "Create lyrics"}
-        </button>}
+        </> : lyricButton("Create lyrics")}
       </div>
       {song?.audioUrl ? (
         <div className="sing-strategy-image-action">

@@ -5,7 +5,6 @@ import { useI18n } from "../../i18n";
 type TestingAction = {
   key: string;
   label: string;
-  description: string;
 };
 
 export default function ItemTestingModal({
@@ -29,12 +28,10 @@ export default function ItemTestingModal({
         {
           key: "progressive-blocks",
           label: t("newItem.phraseProgressiveBlocksTitle"),
-          description: t("newItem.testingPhraseProgressiveBlocksDescription"),
         },
         {
           key: "builder",
           label: t("newItem.phraseBuilderTitle"),
-          description: t("newItem.testingPhraseBuilderDescription"),
         },
       ];
     }
@@ -43,22 +40,18 @@ export default function ItemTestingModal({
       {
         key: "test",
         label: t("newItem.openItemTest"),
-        description: t("newItem.testingDirectTestDescription"),
       },
       {
         key: "warmup",
         label: t("newItem.wordIntroPracticeTitle"),
-        description: t("newItem.testingWarmupDescription"),
       },
       {
         key: "letters",
         label: t("newItem.wordLetterPracticeTitle"),
-        description: t("newItem.testingLetterPracticeDescription"),
       },
       {
         key: "parts",
         label: t("newItem.wordPartsPracticeTitle"),
-        description: t("newItem.testingWordPartsDescription"),
       },
     ];
   }, [itemType, t]);
@@ -77,7 +70,6 @@ export default function ItemTestingModal({
         <p className="hint exercise-modal-description">{t("newItem.testingDescription")}</p>
         <div className="word-strategies-body">
           <label className="word-strategies-select-group" htmlFor="item-testing-select">
-            <span className="word-strategies-select-label">{t("newItem.testingSelectLabel")}</span>
             <select
               id="item-testing-select"
               className="word-strategies-select"
@@ -93,10 +85,6 @@ export default function ItemTestingModal({
           </label>
           {selectedAction && (
             <div className="word-strategies-placeholder-card">
-              <p className="word-strategies-placeholder-title">
-                <strong>{selectedAction.label}</strong>
-              </p>
-              <p className="hint testing-action-description">{selectedAction.description}</p>
               <div className="testing-action-content">
                 {testingContent}
               </div>
