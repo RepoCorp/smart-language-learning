@@ -31,8 +31,8 @@ class ContentItemGrammarExamplesView(APIView):
             ).exclude(id=item.id).order_by("-updated_at", "-id").first()
             if candidate:
                 examples[gender] = {
-                "target_text": candidate.german_text,
-                "source_text": candidate.spanish_text,
-                "plural_german": candidate.plural_german or "",
-            }
+                    "target_text": candidate.german_text,
+                    "source_text": candidate.spanish_text,
+                    "plural_german": candidate.plural_german or "",
+                }
         return Response({"examples": examples})

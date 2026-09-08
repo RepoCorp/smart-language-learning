@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from .noun_gender import (
     GERMAN_NOUN_GENDER_FEATURE_KEYS,
     GERMAN_NOUN_GENDER_FEATURES,
@@ -37,7 +40,7 @@ from .german_phrase_features import (
     NEGATION_NICHT,
     PAST_PARTICIPLE,
     PERFECT_WITH_HABEN_OR_SEIN,
-    PHRASE_GRAMMAR_FEATURES,
+    GERMAN_PHRASE_GRAMMAR_FEATURES,
     PREPOSITION_ACCUSATIVE,
     PREPOSITION_DATIVE,
     REFLEXIVE_VERB,
@@ -50,18 +53,52 @@ from .german_phrase_features import (
     VERB_POSITION_W_QUESTION,
     VERB_POSITION_YES_NO_QUESTION,
 )
+from .spanish_phrase_features import (
+    ADJECTIVE_AFTER_NOUN,
+    ADJECTIVE_GENDER_AGREEMENT,
+    ADJECTIVE_NUMBER_AGREEMENT,
+    DIRECT_OBJECT_PRONOUN,
+    ESTAR_USAGE,
+    ESTAR_WITH_GERUND,
+    HAY_USAGE,
+    INDIRECT_OBJECT_PRONOUN,
+    GUSTAR_TYPE_CONSTRUCTION,
+    NEGATION_NO,
+    OMITTED_SUBJECT,
+    OBJECT_PRONOUN_BEFORE_VERB,
+    PERSONAL_A,
+    PARA_USAGE,
+    POR_USAGE,
+    PREPOSITION_A_DESTINATION,
+    REFLEXIVE_VERB as SPANISH_REFLEXIVE_VERB,
+    SER_USAGE,
+    SPANISH_PHRASE_GRAMMAR_FEATURES,
+    SUBJECT_VERB_AGREEMENT,
+)
 
 
 def phrase_grammar_features_for_language(target_language: str) -> dict[str, str]:
     if target_language == "german":
-        return PHRASE_GRAMMAR_FEATURES
+        return GERMAN_PHRASE_GRAMMAR_FEATURES
     if target_language == "english":
         return ENGLISH_PHRASE_GRAMMAR_FEATURES
+    if target_language == "spanish":
+        return SPANISH_PHRASE_GRAMMAR_FEATURES
     return {}
+
+
+def phrase_grammar_feature_catalog_version(target_language: str) -> str:
+    """Fingerprint the active detection catalog so changed rules invalidate old analyses."""
+    catalog = phrase_grammar_features_for_language(target_language)
+    serialized_catalog = json.dumps(catalog, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized_catalog.encode("utf-8")).hexdigest()
 
 __all__ = [
     "ADJECTIVE_ENDING_CASE",
     "ADJECTIVE_ENDING_GENDER",
+    "ADJECTIVE_AFTER_NOUN",
+    "ADJECTIVE_GENDER_AGREEMENT",
+    "ADJECTIVE_NUMBER_AGREEMENT",
     "ADJECTIVE_NOUN_ORDER",
     "ARTICLE_A_AN",
     "AUXILIARY_VERB",
@@ -70,14 +107,25 @@ __all__ = [
     "COUNTABLE_UNCOUNTABLE",
     "DO_NEGATION",
     "DO_QUESTION",
+    "DIRECT_OBJECT_PRONOUN",
+    "ESTAR_USAGE",
+    "ESTAR_WITH_GERUND",
     "FUTURE_WILL",
     "GERUND_AFTER_VERB",
+    "HAY_USAGE",
+    "GUSTAR_TYPE_CONSTRUCTION",
     "INFINITIVE_WITH_TO",
+    "INDIRECT_OBJECT_PRONOUN",
     "MODAL_BASE_VERB",
+    "NEGATION_NO",
+    "OMITTED_SUBJECT",
+    "OBJECT_PRONOUN_BEFORE_VERB",
     "PAST_CONTINUOUS",
+    "PARA_USAGE",
     "PRESENT_CONTINUOUS",
     "PRESENT_PERFECT",
     "SIMPLE_PAST",
+    "SPANISH_PHRASE_GRAMMAR_FEATURES",
     "ENGLISH_PHRASE_GRAMMAR_FEATURES",
     "GERMAN_NOUN_GENDER_FEATURE_KEYS",
     "GERMAN_NOUN_GENDER_FEATURES",
@@ -88,14 +136,20 @@ __all__ = [
     "NEGATION_NICHT",
     "PAST_PARTICIPLE",
     "PERFECT_WITH_HABEN_OR_SEIN",
-    "PHRASE_GRAMMAR_FEATURES",
+    "GERMAN_PHRASE_GRAMMAR_FEATURES",
     "PREPOSITION_ACCUSATIVE",
     "PREPOSITION_DATIVE",
+    "PERSONAL_A",
+    "POR_USAGE",
+    "PREPOSITION_A_DESTINATION",
     "REFLEXIVE_VERB",
+    "SPANISH_REFLEXIVE_VERB",
+    "SER_USAGE",
     "SEPARABLE_VERB_MAIN_CLAUSE",
     "TIME_EXPRESSION_POSITION",
     "SUBJECT_VERB_OBJECT",
     "SUBJECT_PRONOUN_REQUIRED",
+    "SUBJECT_VERB_AGREEMENT",
     "SUPERLATIVE",
     "THIRD_PERSON_S",
     "WH_QUESTION",
@@ -106,5 +160,8 @@ __all__ = [
     "VERB_POSITION_W_QUESTION",
     "VERB_POSITION_YES_NO_QUESTION",
     "phrase_grammar_features_for_language",
+    "phrase_grammar_feature_catalog_version",
     "sync_item_grammar_features",
 ]
+import hashlib
+import json

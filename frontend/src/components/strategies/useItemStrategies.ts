@@ -24,6 +24,7 @@ import { useWalkStrategy } from "./useWalkStrategy";
 import { useGrammarExamples } from "./useGrammarExamples";
 import { usePhraseGrammarFeatures } from "./usePhraseGrammarFeatures";
 import { useSingStrategy } from "./useSingStrategy";
+import { supportsPhraseGrammar } from "./phraseGrammarFeatureCatalog";
 
 type StrategyErrors = {
   create: string;
@@ -132,7 +133,7 @@ export function useItemStrategies({
     itemId,
     sourceLanguage,
     targetLanguage,
-    enabled: modalOpen && selectedStrategy === GRAMMAR_STRATEGY && itemType === "phrase" && targetLanguage === "german",
+    enabled: modalOpen && selectedStrategy === GRAMMAR_STRATEGY && itemType === "phrase" && supportsPhraseGrammar(targetLanguage),
   });
   const singStrategy = useSingStrategy({
     ...common,

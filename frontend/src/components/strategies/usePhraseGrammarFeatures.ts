@@ -46,20 +46,18 @@ export function usePhraseGrammarFeatures({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const analyze = (force = false): void => {
+  const analyze = (): void => {
     const analysisKey = `${itemId}:${sourceLanguage}:${targetLanguage}`;
     if (itemId <= 0 || isLoading) {
       return;
     }
-    if (!force && analysisCache.has(analysisKey)) {
+    if (analysisCache.has(analysisKey)) {
       setFeatureKeys(analysisCache.get(analysisKey) || []);
       return;
     }
     setIsLoading(true);
     setError("");
-    const pendingAnalysis = force
-      ? createAnalysis(itemId, sourceLanguage, targetLanguage)
-      : pendingAnalyses.get(analysisKey) || fetchContentItemPhraseGrammarFeatures(
+    const pendingAnalysis = pendingAnalyses.get(analysisKey) || fetchContentItemPhraseGrammarFeatures(
         itemId,
         sourceLanguage,
         targetLanguage,
@@ -71,7 +69,7 @@ export function usePhraseGrammarFeatures({
           ? savedFeatureKeys
           : createAnalysis(itemId, sourceLanguage, targetLanguage);
       });
-    if (!force && !pendingAnalyses.has(analysisKey)) {
+    if (!pendingAnalyses.has(analysisKey)) {
       pendingAnalyses.set(analysisKey, pendingAnalysis);
     }
     void pendingAnalysis
@@ -124,13 +122,17 @@ export function usePhraseGrammarFeatures({
   const toggleFeature = (featureKey: PhraseGrammarFeatureKey): void => {
     const willOpen = !features[featureKey].isOpen;
     setFeatures((current) => ({
-      ...current,
-      [featureKey]: { ...current[featureKey], isOpen: willOpen },
+      ...Object.fromEntries(
+        Object.entries(current).map(([key, feature]) => [
+          key,
+          { ...feature, isOpen: key === featureKey ? willOpen : false },
+        ]),
+      ),
     }));
     if (willOpen) loadExamples(featureKey);
   };
 
-  return { featureKeys, features, isLoading, error, refresh: () => analyze(true), toggleFeature };
+  return { featureKeys, features, isLoading, error, toggleFeature };
 }
 
 function createAnalysis(

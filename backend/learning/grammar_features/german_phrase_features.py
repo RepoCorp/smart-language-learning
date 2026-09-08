@@ -20,7 +20,7 @@ TWO_WAY_PREPOSITION_DIRECTION = "two_way_preposition_direction"
 ADJECTIVE_ENDING_GENDER = "adjective_ending_gender"
 ADJECTIVE_ENDING_CASE = "adjective_ending_case"
 
-PHRASE_GRAMMAR_FEATURES = {
+GERMAN_PHRASE_GRAMMAR_FEATURES = {
     VERB_POSITION_MAIN_CLAUSE: (
         "Finite/conjugated verb is in the second syntactic position of a German main declarative clause."
     ),

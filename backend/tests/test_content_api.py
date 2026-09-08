@@ -2002,7 +2002,7 @@ def test_content_item_regenerate_keeps_a_selected_subphrase(monkeypatch):
 
 @pytest.mark.django_db
 def test_phrase_grammar_features_are_persisted_and_returned_together(monkeypatch):
-    from learning.grammar_features import PHRASE_GRAMMAR_FEATURES
+    from learning.grammar_features import GERMAN_PHRASE_GRAMMAR_FEATURES
     from learning.views.content import management_items_phrase_grammar as phrase_grammar_views
 
     phrase = Item.objects.create(
@@ -2015,7 +2015,7 @@ def test_phrase_grammar_features_are_persisted_and_returned_together(monkeypatch
     monkeypatch.setattr(
         phrase_grammar_views,
         "_call_openai_json_logged",
-        lambda **kwargs: list(PHRASE_GRAMMAR_FEATURES),
+        lambda **kwargs: list(GERMAN_PHRASE_GRAMMAR_FEATURES),
     )
 
     client = APIClient()
@@ -2025,8 +2025,11 @@ def test_phrase_grammar_features_are_persisted_and_returned_together(monkeypatch
     )
 
     assert response.status_code == 200
-    assert response.json() == {"feature_keys": list(PHRASE_GRAMMAR_FEATURES)}
-    for feature_key in PHRASE_GRAMMAR_FEATURES:
+    assert response.json() == {
+        "feature_keys": list(GERMAN_PHRASE_GRAMMAR_FEATURES),
+        "analyzed": True,
+    }
+    for feature_key in GERMAN_PHRASE_GRAMMAR_FEATURES:
         assert phrase.grammar_features.filter(feature_key=feature_key).exists()
 
 
@@ -2099,8 +2102,36 @@ def test_phrase_grammar_feature_does_not_store_an_absent_feature(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json() == {"feature_keys": []}
+    assert response.json() == {"feature_keys": [], "analyzed": True}
     assert not phrase.grammar_features.filter(feature_key=VERB_POSITION_MAIN_CLAUSE).exists()
+
+
+@pytest.mark.django_db
+def test_phrase_grammar_features_are_stale_when_the_catalog_changes():
+    from learning.grammar_features import (
+        GERMAN_PHRASE_GRAMMAR_FEATURES,
+        VERB_POSITION_MAIN_CLAUSE,
+    )
+
+    phrase = Item.objects.create(
+        item_type=Item.ItemType.PHRASE,
+        spanish_text="Vivo aquí.",
+        german_text="Ich wohne hier.",
+        source_language="spanish",
+        target_language="german",
+        phrase_grammar_checked_at=timezone.now(),
+        phrase_grammar_catalog_version="outdated-catalog",
+    )
+    ItemGrammarFeature.objects.create(item=phrase, feature_key=VERB_POSITION_MAIN_CLAUSE)
+
+    client = APIClient()
+    response = client.get(
+        f"/api/content/items/{phrase.id}/strategies/grammar-features?source_language=spanish&target_language=german",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"feature_keys": [], "analyzed": False}
+    assert GERMAN_PHRASE_GRAMMAR_FEATURES
 
 
 @pytest.mark.django_db
@@ -2119,7 +2150,14 @@ def test_phrase_grammar_examples_return_other_phrases_with_the_feature():
     )
 
     assert response.status_code == 200
-    assert response.json()["examples"] == [{"target_text": matching.german_text, "source_text": matching.spanish_text}]
+    assert response.json()["examples"] == [
+        {
+            "item_id": matching.id,
+            "target_text": matching.german_text,
+            "source_text": matching.spanish_text,
+            "audio_url": "",
+        }
+    ]
     assert nonmatching.german_text not in str(response.json())
 
 

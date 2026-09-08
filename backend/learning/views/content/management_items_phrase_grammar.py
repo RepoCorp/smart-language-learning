@@ -5,7 +5,10 @@ import random
 from django.db.models.functions import Length
 from django.utils import timezone
 
-from ...grammar_features import phrase_grammar_features_for_language
+from ...grammar_features import (
+    phrase_grammar_feature_catalog_version,
+    phrase_grammar_features_for_language,
+)
 from ...languages import language_display_name
 from ...models import Item, ItemGrammarFeature
 from ...prompts import PHRASE_GRAMMAR_FEATURES_PROMPT
@@ -48,6 +51,7 @@ def _short_phrase_examples(examples, limit: int = 5) -> list[Item]:
 
 def analyze_phrase_grammar_features(item: Item) -> list[str] | None:
     grammar_features = phrase_grammar_features_for_language(item.target_language)
+    catalog_version = phrase_grammar_feature_catalog_version(item.target_language)
     if not grammar_features:
         detected_features: set[str] = set()
     else:
@@ -70,10 +74,14 @@ def analyze_phrase_grammar_features(item: Item) -> list[str] | None:
             return None
         detected_features = set(parsed).intersection(grammar_features)
 
+    item.grammar_features.filter(feature_key__in=grammar_features).exclude(
+        feature_key__in=detected_features,
+    ).delete()
     for feature_key in detected_features:
         ItemGrammarFeature.objects.get_or_create(item=item, feature_key=feature_key)
     item.phrase_grammar_checked_at = timezone.now()
-    item.save(update_fields=["phrase_grammar_checked_at"])
+    item.phrase_grammar_catalog_version = catalog_version
+    item.save(update_fields=["phrase_grammar_checked_at", "phrase_grammar_catalog_version"])
     return [
         feature_key
         for feature_key in grammar_features
@@ -97,12 +105,16 @@ class ContentItemPhraseGrammarFeaturesView(APIView):
             return Response({"detail": "Phrase not found"}, status=status.HTTP_404_NOT_FOUND)
 
         if not feature_key:
-            saved_feature_keys = set(item.grammar_features.values_list("feature_key", flat=True))
+            is_current = (
+                item.phrase_grammar_checked_at is not None
+                and item.phrase_grammar_catalog_version == phrase_grammar_feature_catalog_version(target_language)
+            )
+            saved_feature_keys = set(item.grammar_features.values_list("feature_key", flat=True)) if is_current else set()
             return Response({
                 "feature_keys": [
                     key for key in grammar_features if key in saved_feature_keys
                 ],
-                "analyzed": item.phrase_grammar_checked_at is not None,
+                "analyzed": is_current,
             })
 
         examples = (

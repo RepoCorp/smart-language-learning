@@ -40,6 +40,25 @@ export const PHRASE_GRAMMAR_FEATURE_KEYS = [
   "english_adjective_noun_order",
   "english_comparative",
   "english_superlative",
+  "spanish_subject_verb_agreement",
+  "spanish_omitted_subject",
+  "spanish_adjective_gender_agreement",
+  "spanish_adjective_number_agreement",
+  "spanish_adjective_after_noun",
+  "spanish_ser_usage",
+  "spanish_estar_usage",
+  "spanish_hay_usage",
+  "spanish_direct_object_pronoun",
+  "spanish_indirect_object_pronoun",
+  "spanish_object_pronoun_before_verb",
+  "spanish_reflexive_verb",
+  "spanish_gustar_type_construction",
+  "spanish_negation_no",
+  "spanish_personal_a",
+  "spanish_preposition_a_destination",
+  "spanish_por_usage",
+  "spanish_para_usage",
+  "spanish_estar_with_gerund",
 ] as const;
 
 export type PhraseGrammarFeatureKey = (typeof PHRASE_GRAMMAR_FEATURE_KEYS)[number];
@@ -56,6 +75,5 @@ export type PhraseGrammarStrategy = {
   features: Record<PhraseGrammarFeatureKey, PhraseGrammarFeatureState>;
   isLoading: boolean;
   error: string;
-  refresh: () => void;
   toggleFeature: (featureKey: PhraseGrammarFeatureKey) => void;
 };

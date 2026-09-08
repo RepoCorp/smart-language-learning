@@ -63,11 +63,6 @@ export default function PhraseGrammarPanel({
     <StrategyLoopPanel
       body={(
         <div className="grammar-strategy-panel">
-          <div className="actions">
-            <button type="button" className="secondary-button" onClick={phraseGrammar.refresh} disabled={phraseGrammar.isLoading}>
-              {t("strategies.grammar.refresh")}
-            </button>
-          </div>
           {phraseGrammar.isLoading && <p className="hint">{t("strategies.grammar.checking")}</p>}
           {phraseGrammar.error && <p className="error">{phraseGrammar.error}</p>}
           <div className="grammar-phrase-features">

@@ -2,11 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 
 import {
   createUserWithPinSetup,
-  deleteUserAccount,
   fetchRegistrationRequests,
-  fetchRegisteredUsers,
   type RegistrationRequestRecord,
-  type AuthUser,
 } from "../authApi";
 import { useI18n } from "../i18n";
 import ConfigurationAdminAIUsageSection from "./ConfigurationAdminAIUsageSection";
@@ -25,29 +22,18 @@ export default function ConfigurationAdminUsersSection({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
-  const [users, setUsers] = useState<AuthUser[]>([]);
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequestRecord[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [usersError, setUsersError] = useState("");
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [requestsError, setRequestsError] = useState("");
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
 
   const loadAdminData = async (): Promise<void> => {
-    setLoadingUsers(true);
-    setUsersError("");
     setLoadingRequests(true);
     setRequestsError("");
     try {
-      const [registeredUsers, pendingRequests] = await Promise.all([
-        fetchRegisteredUsers(),
-        fetchRegistrationRequests(),
-      ]);
-      setUsers(registeredUsers);
-      setRegistrationRequests(pendingRequests);
+      setRegistrationRequests(await fetchRegistrationRequests());
     } catch (error) {
       const message = error instanceof Error ? error.message : t("config.registeredUsersLoadFailed");
-      setUsersError(message);
       setRequestsError(message);
     } finally {
       setLoadingUsers(false);
@@ -77,6 +63,7 @@ export default function ConfigurationAdminUsersSection({
       setPinSetupLink(`${window.location.origin}/set-pin?token=${encodeURIComponent(created.pin_setup_token)}`);
       setUsername("");
       setEmail("");
+      setUsersRefreshKey((current) => current + 1);
       void loadAdminData();
     } catch (error) {
       const message = error instanceof Error ? error.message : t("config.createUserFailed");
@@ -86,25 +73,9 @@ export default function ConfigurationAdminUsersSection({
     }
   };
 
-  const handleDeleteUser = async (user: AuthUser): Promise<void> => {
-    if (!window.confirm(t("config.deleteUserConfirm", { username: user.username }))) {
-      return;
-    }
-    setDeletingUserId(user.id);
-    setUsersError("");
-    try {
-      await deleteUserAccount(user.id);
-      await loadAdminData();
-    } catch (error) {
-      setUsersError(error instanceof Error ? error.message : t("config.deleteUserFailed"));
-    } finally {
-      setDeletingUserId(null);
-    }
-  };
-
   return (
     <>
-      <ConfigurationAdminAIUsageSection canManage={canCreateUsers} />
+      <ConfigurationAdminAIUsageSection canManage={canCreateUsers} refreshKey={usersRefreshKey} />
       <section className="card settings-card">
         <h2 className="settings-title">{t("config.registrationRequestsTitle")}</h2>
         <p className="settings-subtitle">{t("config.registrationRequestsSubtitle")}</p>
@@ -133,37 +104,6 @@ export default function ConfigurationAdminUsersSection({
                   >
                     {t("config.registrationRequestsUse")}
                   </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </section>
-      <section className="card settings-card">
-        <h2 className="settings-title">{t("config.registeredUsersTitle")}</h2>
-        <p className="settings-subtitle">{t("config.registeredUsersSubtitle")}</p>
-        {loadingUsers ? <p className="hint">{t("config.registeredUsersLoading")}</p> : null}
-        {usersError ? <p className="error">{usersError}</p> : null}
-        {!loadingUsers && !usersError ? (
-          <div className="elevenlabs-voice-list">
-            {users.map((user) => (
-              <div key={user.id} className="elevenlabs-voice-row">
-                <div className="elevenlabs-voice-main">
-                  <strong>{user.username}</strong>
-                  <span className="hint">{user.email}</span>
-                </div>
-                <div className="elevenlabs-voice-actions">
-                  {user.is_superuser ? <span className="hint">{t("config.registeredUsersAdmin")}</span> : null}
-                  {!user.is_superuser ? (
-                    <button
-                      type="button"
-                      className="dangerous-button"
-                      disabled={deletingUserId === user.id}
-                      onClick={() => void handleDeleteUser(user)}
-                    >
-                      {deletingUserId === user.id ? t("config.deletingUser") : t("config.deleteUser")}
-                    </button>
-                  ) : null}
                 </div>
               </div>
             ))}

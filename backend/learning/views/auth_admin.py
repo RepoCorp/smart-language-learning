@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import Q, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework import status
@@ -86,7 +87,11 @@ class AuthUsersView(APIView):
             return Response({"detail": "Admin only"}, status=status.HTTP_403_FORBIDDEN)
 
         User = get_user_model()
-        users = User.objects.order_by("username", "id").values("id", "username", "email", "is_superuser")
+        users = (
+            User.objects.annotate(total_ai_request_count=Coalesce(Sum("daily_ai_usage__request_count"), 0))
+            .order_by("-total_ai_request_count", "username", "id")
+            .values("id", "username", "email", "is_superuser")
+        )
         return Response({"users": list(users)})
 
 
@@ -148,6 +153,30 @@ class AuthAIUsageView(APIView):
             )
         }
         limits = {limit.user_id: limit for limit in UserAIUsageLimit.objects.filter(user__in=users)}
+        all_time_request_counts = {
+            row["user_id"]: row["request_count"] or 0
+            for row in DailyAIUsage.objects.values("user_id").annotate(request_count=Sum("request_count"))
+        }
+        user_payloads = [
+            {
+                **_user_payload(user),
+                "is_blocked": bool(limits.get(user.id) and limits[user.id].is_blocked),
+                "weekly_generation_credits": limits.get(user.id).weekly_generation_credits if user.id in limits else 0,
+                "weekly_elevenlabs_characters": limits.get(user.id).weekly_elevenlabs_characters if user.id in limits else 0,
+                "weekly_elevenlabs_music_seconds": limits.get(user.id).weekly_elevenlabs_music_seconds if user.id in limits else 0,
+                "weekly_realtime_minutes": limits.get(user.id).weekly_realtime_minutes if user.id in limits else 0,
+                "week_generation_credits": usage_by_user.get(user.id, {}).get("generation_credits") or 0,
+                "week_elevenlabs_characters": usage_by_user.get(user.id, {}).get("elevenlabs_characters") or 0,
+                "week_elevenlabs_music_seconds": usage_by_user.get(user.id, {}).get("elevenlabs_music_seconds") or 0,
+                "week_realtime_minutes": (
+                    ((usage_by_user.get(user.id, {}).get("realtime_seconds") or 0) + 59) // 60
+                ),
+            }
+            for user in users
+        ]
+        user_payloads.sort(
+            key=lambda user: (-all_time_request_counts.get(user["id"], 0), user["username"].lower(), user["id"])
+        )
         return Response({
             "week_start": week_start.isoformat(),
             "defaults": {
@@ -156,23 +185,7 @@ class AuthAIUsageView(APIView):
                 "weekly_elevenlabs_music_seconds": int(getattr(settings, "AI_USAGE_WEEKLY_ELEVENLABS_MUSIC_SECONDS", 60)),
                 "weekly_realtime_minutes": int(getattr(settings, "AI_USAGE_WEEKLY_REALTIME_MINUTES", 45)),
             },
-            "users": [
-                {
-                    **_user_payload(user),
-                    "is_blocked": bool(limits.get(user.id) and limits[user.id].is_blocked),
-                    "weekly_generation_credits": limits.get(user.id).weekly_generation_credits if user.id in limits else 0,
-                    "weekly_elevenlabs_characters": limits.get(user.id).weekly_elevenlabs_characters if user.id in limits else 0,
-                    "weekly_elevenlabs_music_seconds": limits.get(user.id).weekly_elevenlabs_music_seconds if user.id in limits else 0,
-                    "weekly_realtime_minutes": limits.get(user.id).weekly_realtime_minutes if user.id in limits else 0,
-                    "week_generation_credits": usage_by_user.get(user.id, {}).get("generation_credits") or 0,
-                    "week_elevenlabs_characters": usage_by_user.get(user.id, {}).get("elevenlabs_characters") or 0,
-                    "week_elevenlabs_music_seconds": usage_by_user.get(user.id, {}).get("elevenlabs_music_seconds") or 0,
-                    "week_realtime_minutes": (
-                        ((usage_by_user.get(user.id, {}).get("realtime_seconds") or 0) + 59) // 60
-                    ),
-                }
-                for user in users
-            ],
+            "users": user_payloads,
         })
 
 
