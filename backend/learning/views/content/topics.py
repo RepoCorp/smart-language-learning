@@ -86,7 +86,7 @@ class ContentTopicsView(APIView):
         if query:
             queryset = queryset.filter(topic__icontains=query)
         rows = list(
-            queryset.order_by("-last_used_at", "-id").values_list("topic", flat=True)[offset : offset + page_size + 1]
+            queryset.order_by("-used_count", "-last_used_at", "-id").values_list("topic", flat=True)[offset : offset + page_size + 1]
         )
         has_more = len(rows) > page_size
         topics = rows[:page_size]

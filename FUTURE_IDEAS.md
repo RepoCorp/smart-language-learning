@@ -3,6 +3,11 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
+Mejor info en los seguro que quiere continuar?
+Guardando elemento cuando se clicka la palabra es falso
+Ejercicio de escribir frase de pronto sea escriba cualquiera de las frases de las estrategias
+Palabras para comparar también muestre la palabra
+Oír todas las canciones
 Arreglar las descripciones y visual de la gramatica de palabras y frases
 Input para que la gente de feedback
 Escribir la palabra a mano y que la tinta sea del color

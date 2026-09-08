@@ -342,7 +342,9 @@ export default function WordReview({
   const regularWordInputDisabled = isSubmitting && !pendingRewriteTakeover;
   const submittedInputClassName = reviewComplete
     ? rewriteStatusTone === "warning"
-      ? "word-input-warning-progress"
+      ? answer
+        ? ""
+        : "word-input-warning-progress"
       : rewriteInputIsCorrectSoFar
         ? "word-input-correct-progress"
         : "word-input-error-progress"

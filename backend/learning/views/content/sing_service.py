@@ -133,7 +133,7 @@ def create_audio(item: Item, lyric: dict, target_language: str, generation_id: s
     base_styles = ["120 BPM", "C major key", style, "steady repetitive groove", "warm organic production"]
     plan = {"chunks": [
         _chunk("[Instrumental pickup]", PICKUP_SECONDS, [*base_styles, "instrumental pickup"], ["fade-in", "fade-out", "silence", "ending cadence"]),
-        _chunk(f"[Verse]\n{lyric['target_text']}", lyric_seconds, [*base_styles, "clear neutral lead vocals", "gentle conversational vocals", "continuous vocals across the verse", "full vocal energy through the final lyric"], ["instrumental-only section", "instrumental breaks between lyric phrases", "vocal fade before or during the final lyric", "fade-out", "silence", "ending cadence"]),
+        _chunk(f"[Verse]\n{lyric['target_text']}", lyric_seconds, [*base_styles, "clear neutral lead vocals", "very melodic vocal delivery", "unhurried singing pace", "gentle conversational vocals", "continuous vocals across the verse", "full vocal energy through the final lyric"], ["instrumental-only section", "instrumental breaks between lyric phrases", "vocal fade before or during the final lyric", "fade-out", "silence", "ending cadence"]),
         _chunk("[Instrumental continuation]", OUTRO_SECONDS, [*base_styles, "steady instrumental continuation after vocals"], ["fade-out", "silence", "ending cadence"]),
     ]}
     context = f"sing:{generation_id}:item:{item.id}"
