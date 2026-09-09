@@ -60,12 +60,12 @@ import { useRepeatExerciseLoop } from "./useRepeatExerciseLoop";
 import { useItemStrategies } from "./strategies/useItemStrategies";
 import { useItemAdminActions } from "./useItemAdminActions";
 import useRelatedDialogsFocus from "./useRelatedDialogsFocus";
-import DialogTurnAudioModeButton from "./dialogs/DialogTurnAudioModeButton";
-import RelatedDialogTurns from "./dialogs/RelatedDialogTurns";
-import DialogItemSavingModals from "./dialogs/DialogItemSavingModals";
-import { useDialogItemSaving } from "./dialogs/useDialogItemSaving";
-import useRelatedDialogPlayback from "./dialogs/useRelatedDialogPlayback";
-import type { DialogTurnAudioMode } from "./dialogs/useDialogTurnPlayback";
+import DialogTurnAudioModeButton from "../features/dialogs/components/DialogTurnAudioModeButton";
+import RelatedDialogTurns from "../features/dialogs/components/RelatedDialogTurns";
+import DialogItemSavingModals from "../features/dialogs/components/DialogItemSavingModals";
+import { useDialogItemSaving } from "../features/dialogs/components/useDialogItemSaving";
+import useRelatedDialogPlayback from "../features/dialogs/components/useRelatedDialogPlayback";
+import type { DialogTurnAudioMode } from "../features/dialogs/components/useDialogTurnPlayback";
 import VerbExerciseSelector, {
   buildVerbExerciseGridEntries,
   getVerbExerciseKeysForPerson,
@@ -691,7 +691,7 @@ export default function NewItem({
     String(wordType || "")
       .trim()
       .toLowerCase() === "verb";
-  const { nounExerciseSections, isNounSectionedExercise } =
+  const { nounExerciseSections, isNounSectionedExercise, nounFormsGenerationMode } =
     useNounExerciseModal({
       itemType: item.item_type,
       wordType,
@@ -1860,7 +1860,6 @@ export default function NewItem({
                 itemType={item.item_type}
                 targetText={targetText}
                 sourceText={sourceText}
-                sourceLanguage={sourceLanguage}
                 sourceLanguageLabel={sourceLanguageLabel}
                 loadingExercises={loadingExercises}
                 exerciseError={exerciseError}
@@ -1872,21 +1871,30 @@ export default function NewItem({
                 }
                 funnyImageExerciseImageUrl={funnyImageExerciseEntry?.image_url}
                 isVerbExerciseGrid={isVerbExerciseGrid}
-                isNounSectionedExercise={isNounSectionedExercise}
-                pluralGerman={pluralGerman}
-                notes={notes}
-                wordOnlyExerciseEntry={wordOnlyExerciseEntry}
                 verbExerciseGridEntries={verbExerciseGridEntries}
-                nounExerciseSections={nounExerciseSections}
-                generatingNounCaseKey={generatingNounCaseKey}
+                nounForms={nounFormsGenerationMode ? {
+                  generationMode: nounFormsGenerationMode,
+                  targetText,
+                  sourceText,
+                  sourceLanguage,
+                  pluralText: pluralGerman,
+                  notes,
+                  wordOnlyExerciseEntry,
+                  nounExerciseSections,
+                  selectedExerciseKeys,
+                  exerciseRunning,
+                  generatingNounCaseKey,
+                  onToggleEntry: toggleExerciseEntry,
+                  onSelectKeys: setSelectedExerciseKeys,
+                  onGenerateCase: (caseKey) => {
+                    void generateNounExerciseCase(caseKey);
+                  },
+                  exerciseEntryKey,
+                } : undefined}
                 compareExerciseEntries={compareExerciseEntries}
                 onToggleEntry={toggleExerciseEntry}
                 onSelectPerson={selectVerbExercisePerson}
                 onSelectTense={selectVerbExerciseTense}
-                onSelectKeys={setSelectedExerciseKeys}
-                onGenerateCase={(caseKey) => {
-                  void generateNounExerciseCase(caseKey);
-                }}
                 onOpenFunnyImage={() => setShowFunnyImageModal(true)}
                 openImageIcon={<ItemActionIcon name="openImage" />}
                 exerciseEntryKey={exerciseEntryKey}

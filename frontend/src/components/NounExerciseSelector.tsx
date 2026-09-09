@@ -3,7 +3,7 @@ import WordExerciseGrid, {
   type WordExerciseGridPrimaryEntry,
   type WordExerciseSelectableEntry,
 } from "./WordExerciseGrid";
-import GenderedNounText, { type GermanNounGender } from "./GenderedNounText";
+import GenderedNounText, { type NounGender } from "./GenderedNounText";
 
 interface NounExerciseSelectorProps {
   primaryEntry?: WordExerciseGridPrimaryEntry;
@@ -17,7 +17,7 @@ interface NounExerciseSelectorProps {
   onToggleEntry: (entry: WordExerciseGridPrimaryEntry["entry"]) => void;
   onSelectKeys: (keys: string[]) => void;
   onGenerateCase: (caseKey: "nominative" | "accusative" | "dative" | "genitive") => void;
-  gender?: GermanNounGender | null;
+  gender?: NounGender | null;
   targetText?: string;
   pluralText?: string;
 }
@@ -29,6 +29,12 @@ const DETERMINER_ROWS = [
   { key: "possessive", label: "Possessive (mein)" },
   { key: "demonstrative", label: "Demonstrative (dieser)" },
 ] as const;
+
+type GermanNounCase = "nominative" | "accusative" | "dative" | "genitive";
+
+function isGermanNounCase(value: string): value is GermanNounCase {
+  return ["nominative", "accusative", "dative", "genitive"].includes(value);
+}
 
 function sectionExerciseEntries(section: ExercisePhraseSection): WordExerciseSelectableEntry[] {
   return (section.phrases || [])
@@ -117,6 +123,7 @@ export default function NounExerciseSelector({
         <GenderedNounText
           text={text}
           targetText={targetText}
+          targetLanguage="german"
           pluralText={pluralText}
           gender={gender}
         />
@@ -125,22 +132,25 @@ export default function NounExerciseSelector({
       rowHeaderWidth="22px"
       primaryEntry={primaryEntry}
       extraPrimaryEntries={extraPrimaryEntries}
-      columns={sections.map((section) => ({
-        key: section.key,
-        label: keysForSection(section.key).length === 0
-          ? `+ ${section.question_target_text || section.key}`
-          : (section.question_target_text || section.key),
-        sublabel: section.question_source_text || "",
-        selected: isExactSelection(keysForSection(section.key)),
-        onClick: () => selectColumn(section.key),
-        disabled: exerciseRunning || generatingCaseKey === section.key,
-        secondaryActionLabel: allowCaseRegeneration && keysForSection(section.key).length > 0 ? "Regenerate case" : undefined,
-        secondaryActionDisabled: generatingCaseKey === section.key || exerciseRunning,
-        secondaryActionRequiresConfirm: allowCaseRegeneration && keysForSection(section.key).length > 0,
-        onSecondaryActionClick: allowCaseRegeneration && keysForSection(section.key).length > 0 && (section.key === "nominative" || section.key === "accusative" || section.key === "dative" || section.key === "genitive")
-          ? () => onGenerateCase(section.key)
-          : undefined,
-      }))}
+      columns={sections.map((section) => {
+        const sectionKey = section.key;
+        const sectionKeys = keysForSection(sectionKey);
+        const canRegenerate = allowCaseRegeneration && sectionKeys.length > 0 && isGermanNounCase(sectionKey);
+        return {
+          key: sectionKey,
+          label: sectionKeys.length === 0
+            ? `+ ${section.question_target_text || sectionKey}`
+            : (section.question_target_text || sectionKey),
+          sublabel: section.question_source_text || "",
+          selected: isExactSelection(sectionKeys),
+          onClick: () => selectColumn(sectionKey),
+          disabled: exerciseRunning || generatingCaseKey === sectionKey,
+          secondaryActionLabel: canRegenerate ? "Regenerate case" : undefined,
+          secondaryActionDisabled: generatingCaseKey === sectionKey || exerciseRunning,
+          secondaryActionRequiresConfirm: canRegenerate,
+          onSecondaryActionClick: canRegenerate ? () => onGenerateCase(sectionKey) : undefined,
+        };
+      })}
       rows={DETERMINER_ROWS.map((row) => ({
         key: row.key,
         label: row.label,

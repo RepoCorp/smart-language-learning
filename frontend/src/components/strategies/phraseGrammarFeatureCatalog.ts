@@ -9,9 +9,15 @@ export function phraseGrammarFeaturePresentationFor(
   targetLanguage: StudyLanguageCode,
   featureKey: PhraseGrammarFeatureKey,
 ): PhraseGrammarFeaturePresentation | undefined {
-  if (targetLanguage === "german") return GERMAN_PHRASE_GRAMMAR_FEATURE_PRESENTATION[featureKey];
-  if (targetLanguage === "english") return ENGLISH_PHRASE_GRAMMAR_FEATURE_PRESENTATION[featureKey];
-  if (targetLanguage === "spanish") return SPANISH_PHRASE_GRAMMAR_FEATURE_PRESENTATION[featureKey];
+  if (targetLanguage === "german") {
+    return (GERMAN_PHRASE_GRAMMAR_FEATURE_PRESENTATION as Partial<Record<PhraseGrammarFeatureKey, PhraseGrammarFeaturePresentation>>)[featureKey];
+  }
+  if (targetLanguage === "english") {
+    return (ENGLISH_PHRASE_GRAMMAR_FEATURE_PRESENTATION as Partial<Record<PhraseGrammarFeatureKey, PhraseGrammarFeaturePresentation>>)[featureKey];
+  }
+  if (targetLanguage === "spanish") {
+    return (SPANISH_PHRASE_GRAMMAR_FEATURE_PRESENTATION as Partial<Record<PhraseGrammarFeatureKey, PhraseGrammarFeaturePresentation>>)[featureKey];
+  }
   return undefined;
 }
 

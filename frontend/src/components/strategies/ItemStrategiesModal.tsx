@@ -54,7 +54,9 @@ function isStrategyLoading(props: ItemStrategiesModalProps): boolean {
     case WALK_STRATEGY:
       return props.walkStrategy.isLoading;
     case SING_STRATEGY:
-      return props.singStrategy.isLoading;
+      return props.singStrategy.isCreatingLyrics
+        || props.singStrategy.isCreatingSong
+        || props.singStrategy.isGeneratingImage;
     case DECODE_STRATEGY:
       return props.decodeStrategy.isLoading;
     case ENCOUNTER_STRATEGY:

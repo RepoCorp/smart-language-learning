@@ -1,28 +1,20 @@
-import { useEffect, useState } from "react";
-
 import { useI18n } from "../../i18n";
-import type { ExercisePhraseSection, SessionItem, StudyLanguageCode } from "../../types";
-import { germanNounGender, type GermanNounGender } from "../GenderedNounText";
-import NounExerciseSelector from "../NounExerciseSelector";
-import VerbExerciseSelector, { type VerbPersonKey, type VerbTenseKey } from "../VerbExerciseSelector";
+import type { SessionItem } from "../../types";
+import VerbExerciseSelector, {
+  type ParsedVerbExerciseGridEntry,
+  type VerbPersonKey,
+  type VerbTenseKey,
+} from "../VerbExerciseSelector";
 import WordExerciseActions from "../WordExerciseActions";
-import { buildGermanPluralPrimaryEntry, buildWordExercisePrimaryEntry } from "../wordExercisePrimaryEntry";
+import { buildWordExercisePrimaryEntry } from "../wordExercisePrimaryEntry";
 import PhraseSelectionList from "./PhraseSelectionList";
-import { germanNounFormsReferences } from "./germanNounFormsReferences";
-
-type ExerciseEntry = {
-  label?: string;
-  source: string;
-  target: string;
-};
-
-const NOUN_GENDERS: GermanNounGender[] = ["masculine", "feminine", "neuter"];
+import NounFormsStrategyContent from "./forms/NounFormsStrategyContent";
+import type { FormsExerciseEntry, NounFormsStrategyContentProps } from "./forms/nounFormsTypes";
 
 export default function FormsStrategyPanel({
   itemType,
   targetText,
   sourceText,
-  sourceLanguage,
   sourceLanguageLabel,
   loadingExercises,
   exerciseError,
@@ -32,19 +24,12 @@ export default function FormsStrategyPanel({
   funnyImageExerciseSelectionEntry,
   funnyImageExerciseImageUrl,
   isVerbExerciseGrid,
-  isNounSectionedExercise,
-  pluralGerman,
-  notes,
-  wordOnlyExerciseEntry,
   verbExerciseGridEntries,
-  nounExerciseSections,
-  generatingNounCaseKey,
+  nounForms,
   compareExerciseEntries,
   onToggleEntry,
   onSelectPerson,
   onSelectTense,
-  onSelectKeys,
-  onGenerateCase,
   onOpenFunnyImage,
   openImageIcon,
   exerciseEntryKey,
@@ -52,74 +37,33 @@ export default function FormsStrategyPanel({
   itemType: SessionItem["item_type"];
   targetText: string;
   sourceText: string;
-  sourceLanguage: StudyLanguageCode;
   sourceLanguageLabel: string;
   loadingExercises: boolean;
   exerciseError: string;
   exerciseRunning: boolean;
-  wordExerciseEntries: ExerciseEntry[];
+  wordExerciseEntries: FormsExerciseEntry[];
   selectedExerciseKeys: string[];
-  funnyImageExerciseSelectionEntry?: ExerciseEntry;
+  funnyImageExerciseSelectionEntry?: FormsExerciseEntry;
   funnyImageExerciseImageUrl?: string;
   isVerbExerciseGrid: boolean;
-  isNounSectionedExercise: boolean;
-  pluralGerman: string;
-  notes: string;
-  wordOnlyExerciseEntry?: ExerciseEntry;
-  verbExerciseGridEntries: Array<{ person: string; tense: string; entry: ExerciseEntry }>;
-  nounExerciseSections: ExercisePhraseSection[];
-  generatingNounCaseKey?: "" | "nominative" | "accusative" | "dative" | "genitive";
-  compareExerciseEntries: ExerciseEntry[];
-  onToggleEntry: (entry: ExerciseEntry) => void;
+  verbExerciseGridEntries: ParsedVerbExerciseGridEntry[];
+  nounForms?: NounFormsStrategyContentProps & { generationMode: string };
+  compareExerciseEntries: FormsExerciseEntry[];
+  onToggleEntry: (entry: FormsExerciseEntry) => void;
   onSelectPerson: (person: VerbPersonKey) => void;
   onSelectTense: (tense: VerbTenseKey) => void;
-  onSelectKeys: (keys: string[]) => void;
-  onGenerateCase: (caseKey: "nominative" | "accusative" | "dative" | "genitive") => void;
   onOpenFunnyImage: () => void;
   openImageIcon: JSX.Element;
-  exerciseEntryKey: (entry: ExerciseEntry) => string;
+  exerciseEntryKey: (entry: FormsExerciseEntry) => string;
 }): JSX.Element {
   const { t } = useI18n();
-  const currentGender = isNounSectionedExercise ? germanNounGender(targetText) : null;
-  const comparisonReferences = germanNounFormsReferences(sourceLanguage);
-  const [selectedGender, setSelectedGender] = useState<NounGender | null>(currentGender);
-  const [comparisonExpanded, setComparisonExpanded] = useState(false);
-  useEffect(() => {
-    setSelectedGender(currentGender);
-    setComparisonExpanded(false);
-  }, [currentGender, targetText]);
-  const selectedComparison = selectedGender && selectedGender !== currentGender
-    ? comparisonReferences[selectedGender]
-    : undefined;
-  const displayedTargetText = selectedComparison?.targetText || targetText;
-  const displayedSourceText = selectedComparison?.sourceText || sourceText;
-  const displayedPluralGerman = selectedComparison?.pluralGerman || pluralGerman;
-  const displayedSections = selectedComparison?.sections || nounExerciseSections;
-  const displayedWordEntry = selectedComparison
-    ? { source: displayedSourceText, target: displayedTargetText }
-    : wordOnlyExerciseEntry;
   const wordExercisePrimaryEntry = buildWordExercisePrimaryEntry({
-    entry: displayedWordEntry,
-    pluralGerman: isNounSectionedExercise ? "" : displayedPluralGerman,
-    notes: isNounSectionedExercise ? "" : notes,
+    entry: wordExerciseEntries.find((entry) => entry.label === "word"),
     selectedExerciseKeys,
     exerciseRunning,
     exerciseEntryKey,
     onToggleEntry,
   });
-  const displayedGender = isNounSectionedExercise ? germanNounGender(displayedTargetText) : null;
-  const genderMarkedWordExercisePrimaryEntry = wordExercisePrimaryEntry && displayedGender
-    ? { ...wordExercisePrimaryEntry, className: `gender-word-box gender-word-${displayedGender}` }
-    : wordExercisePrimaryEntry;
-  const nounPluralPrimaryEntry = isNounSectionedExercise ? buildGermanPluralPrimaryEntry({
-    entry: displayedWordEntry,
-    pluralGerman: displayedPluralGerman,
-    notes,
-    selectedExerciseKeys,
-    exerciseRunning,
-    exerciseEntryKey,
-    onToggleEntry,
-  }) : undefined;
 
   return (
     <div className={isVerbExerciseGrid ? "verb-exercise-modal" : "noun-forms-strategy-panel"}>
@@ -164,57 +108,8 @@ export default function FormsStrategyPanel({
               onSelectPerson={onSelectPerson}
               onSelectTense={onSelectTense}
             />
-          ) : isNounSectionedExercise ? (
-            <div className="noun-forms-table-content">
-              <NounExerciseSelector
-                primaryEntry={genderMarkedWordExercisePrimaryEntry}
-                extraPrimaryEntries={nounPluralPrimaryEntry ? [nounPluralPrimaryEntry] : []}
-                sections={displayedSections}
-                selectedExerciseKeys={selectedExerciseKeys}
-                exerciseRunning={exerciseRunning}
-                generatingCaseKey={generatingNounCaseKey || undefined}
-                allowCaseRegeneration={!selectedComparison}
-                exerciseEntryKey={exerciseEntryKey}
-                onToggleEntry={onToggleEntry}
-                onSelectKeys={onSelectKeys}
-                onGenerateCase={onGenerateCase}
-                gender={displayedGender}
-                targetText={displayedTargetText}
-                pluralText={displayedPluralGerman}
-              />
-              {currentGender && (
-                <div className={`noun-forms-comparison ${comparisonExpanded ? "noun-forms-comparison-expanded" : ""}`}>
-                  {comparisonExpanded && NOUN_GENDERS.map((gender) => {
-                    const example = gender === currentGender
-                      ? { targetText }
-                      : comparisonReferences[gender];
-                    return (
-                      <button
-                        key={gender}
-                        type="button"
-                        className={`${selectedGender === gender ? "noun-forms-comparison-option noun-forms-comparison-option-active" : "noun-forms-comparison-option"} ${!example ? "noun-forms-comparison-option-unavailable" : ""}`}
-                        onClick={() => setSelectedGender(gender)}
-                        disabled={!example}
-                      >
-                        <span className={`gender-word-mark gender-word-${gender}`}>
-                          {example?.targetText || t(`strategies.grammar.gender.${gender}`)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    className="noun-forms-comparison-toggle"
-                    onClick={() => setComparisonExpanded((expanded) => !expanded)}
-                    aria-label={t("strategies.forms.compare")}
-                    aria-expanded={comparisonExpanded}
-                    title={t("strategies.forms.compare")}
-                  >
-                    ⇄
-                  </button>
-                </div>
-              )}
-            </div>
+          ) : nounForms ? (
+            <NounFormsStrategyContent {...nounForms} />
           ) : (
             <PhraseSelectionList
               entries={wordExerciseEntries.map((entry) => ({ ...entry, key: exerciseEntryKey(entry) }))}

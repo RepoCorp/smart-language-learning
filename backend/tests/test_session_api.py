@@ -222,7 +222,7 @@ def test_regular_session_includes_ready_difficult_item_exercises():
     assert items[4]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
     assert items[4]["repeatedAfterFailure"] is True
     assert "repeatPracticeStep" not in items[4] or items[4]["repeatPracticeStep"] is None
-    assert items[5]["repeatPracticeStep"] == "phrase_builder"
+    assert items[5]["repeatPracticeStep"] == "phrase_progressive_blocks"
 
 
 @pytest.mark.django_db

@@ -2,6 +2,13 @@
   position: fixed;
   z-index: 2000;
   inset: 0;
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.guided-tour-scroll-content {
+  position: relative;
+  width: 100%;
   pointer-events: none;
 }
 
@@ -44,7 +51,7 @@
 }
 
 .guided-tour-popover {
-  position: fixed;
+  position: absolute;
   z-index: 2002;
   width: min(320px, calc(100vw - 32px));
   padding: 18px;
@@ -147,6 +154,7 @@
 
 @media (max-width: 640px) {
   .guided-tour-popover {
+    position: fixed;
     top: auto !important;
     right: 16px;
     bottom: 16px;

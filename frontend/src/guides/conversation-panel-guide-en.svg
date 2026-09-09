@@ -1,46 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 510" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 930 600" role="img" aria-labelledby="title desc">
   <title id="title">Conversation controls walkthrough</title>
-  <desc id="desc">An annotated Smart Learn conversation panel showing the assistant message, listening state, send button, pause, end conversation, and more controls.</desc>
+  <desc id="desc">An annotated Smart Learn conversation panel showing the goal, listening and send controls, pause, end conversation, and more controls.</desc>
   <defs>
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#203526" flood-opacity=".16"/></filter>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 8 4 0 8Z" fill="#6a806d"/></marker>
   </defs>
-  <rect width="720" height="510" rx="24" fill="#f7faf5"/>
-  <rect x="166" y="24" width="388" height="455" rx="20" fill="#fff" stroke="#cbd8c9" stroke-width="2" filter="url(#shadow)"/>
-  <text x="194" y="59" font-family="Georgia, serif" font-size="20" font-weight="700" fill="#26382a">Conversation practice</text>
-  <rect x="194" y="84" width="194" height="52" rx="15" fill="#edf4ea"/>
-  <text x="211" y="106" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#395a40">ASSISTANT</text>
-  <text x="211" y="125" font-family="Arial, sans-serif" font-size="14" fill="#253528">Hallo! Wie geht es dir?</text>
-  <rect x="194" y="155" width="332" height="96" rx="14" fill="#f7faf5" stroke="#d8e2d6"/>
-  <circle cx="215" cy="181" r="6" fill="#4f9a61"/>
-  <text x="231" y="186" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#314b36">Listening · 08s</text>
-  <rect x="464" y="170" width="42" height="42" rx="12" fill="#47965b"/>
-  <path d="M476 191h14m-6-6 6 6-6 6" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="194" y="268" width="332" height="42" rx="10" fill="#eef4ed" stroke="#9fb99f"/>
-  <text x="215" y="294" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#36533a">Pause</text>
-  <rect x="194" y="320" width="332" height="42" rx="10" fill="#fff4f3" stroke="#d9aaa5"/>
-  <text x="215" y="346" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#9a423a">End conversation</text>
-  <rect x="194" y="380" width="332" height="72" rx="12" fill="#f5f8f4" stroke="#d8e2d6"/>
-  <text x="214" y="407" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#304d36">▾  More controls</text>
-  <text x="214" y="432" font-family="Arial, sans-serif" font-size="12" fill="#5b705f">Ask help · Speed · Level</text>
+  <rect width="930" height="600" rx="24" fill="#f7faf5"/>
+  <rect x="180" y="24" width="430" height="548" rx="20" fill="#fff" stroke="#cbd8c9" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="202" y="46" width="386" height="106" rx="14" fill="#fbfcfa" stroke="#8aaeb0" stroke-width="1.5"/>
+  <text x="222" y="72" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#4d596a">GOAL</text>
+  <rect x="510" y="57" width="59" height="26" rx="9" fill="#fff" stroke="#ccd4dc"/>
+  <text x="520" y="75" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#536071">New goal</text>
+  <text x="222" y="98" font-family="Arial, sans-serif" font-size="13" fill="#202938">Order medicine and check</text>
+  <text x="222" y="117" font-family="Arial, sans-serif" font-size="13" fill="#202938">whether it is suitable for you.</text>
+  <rect x="202" y="178" width="386" height="354" rx="16" fill="#fcfefd" stroke="#8de0d3" stroke-width="1.5"/>
+  <circle cx="223" cy="210" r="7" fill="#eb3b39"/><circle cx="223" cy="210" r="11" fill="#eb3b39" opacity=".2"/>
+  <text x="240" y="216" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#107f74">Listening… 8s</text>
+  <rect x="536" y="192" width="40" height="40" rx="11" fill="#118477"/>
+  <path d="M547 213l18-8-6 18-4-7z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
+  <rect x="218" y="244" width="354" height="50" rx="11" fill="#fff" stroke="#ccd3dc" stroke-width="1.3"/>
+  <text x="374" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#566173">Pause</text>
+  <rect x="218" y="307" width="354" height="50" rx="11" fill="#fff4f4" stroke="#ff9b9c" stroke-width="1.3"/>
+  <text x="395" y="338" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ab2529">End conversation</text>
+  <rect x="218" y="373" width="354" height="62" rx="12" fill="#fff" stroke="#8aaeb0" stroke-width="1.3"/>
+  <text x="234" y="410" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#4d596a">More controls</text>
+  <path d="M550 399l9 9 9-9" fill="none" stroke="#536071" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   <g font-family="Arial, sans-serif" fill="#3b5440">
-    <circle cx="55" cy="108" r="15" fill="#dbead7"/><text x="50" y="114" font-size="15" font-weight="700">1</text>
-    <text x="77" y="104" font-size="14" font-weight="700">The assistant speaks</text>
-    <text x="77" y="123" font-size="12">Listen first; there is no rush.</text>
-    <circle cx="568" cy="185" r="15" fill="#dbead7"/><text x="563" y="191" font-size="15" font-weight="700">2</text>
-    <text x="590" y="181" font-size="14" font-weight="700">Listening starts</text>
-    <text x="590" y="200" font-size="12">automatically.</text>
-    <circle cx="58" cy="224" r="15" fill="#dbead7"/><text x="53" y="230" font-size="15" font-weight="700">3</text>
-    <text x="80" y="220" font-size="14" font-weight="700">Speak, then send</text>
-    <text x="80" y="239" font-size="12">your message when ready.</text>
-    <circle cx="566" cy="340" r="15" fill="#dbead7"/><text x="561" y="346" font-size="15" font-weight="700">4</text>
-    <text x="588" y="336" font-size="14" font-weight="700">Pause or end</text>
-    <text x="588" y="355" font-size="12">whenever you need.</text>
-    <circle cx="55" cy="414" r="15" fill="#dbead7"/><text x="50" y="420" font-size="15" font-weight="700">5</text>
-    <text x="77" y="410" font-size="14" font-weight="700">Need support?</text>
-    <text x="77" y="429" font-size="12">Open More controls.</text>
+    <circle cx="56" cy="90" r="15" fill="#dbead7"/><text x="51" y="96" font-size="15" font-weight="700">1</text>
+    <text x="78" y="86" font-size="14" font-weight="700">Your goal</text>
+    <text x="78" y="105" font-size="12">gives the chat direction.</text>
+    <circle cx="624" cy="211" r="15" fill="#dbead7"/><text x="619" y="217" font-size="15" font-weight="700">3</text>
+    <text x="646" y="207" font-size="14" font-weight="700">Send your message</text>
+    <text x="646" y="226" font-size="12">when you finish speaking.</text>
+    <circle cx="55" cy="238" r="15" fill="#dbead7"/><text x="50" y="244" font-size="15" font-weight="700">2</text>
+    <text x="77" y="234" font-size="14" font-weight="700">Listening</text>
+    <text x="77" y="253" font-size="12">Speak when the red dot is on.</text>
+    <circle cx="624" cy="300" r="15" fill="#dbead7"/><text x="619" y="306" font-size="15" font-weight="700">4</text>
+    <text x="646" y="296" font-size="14" font-weight="700">Pause</text>
+    <text x="646" y="315" font-size="12">Take a break, then resume.</text>
+    <circle cx="56" cy="405" r="15" fill="#dbead7"/><text x="51" y="411" font-size="15" font-weight="700">5</text>
+    <text x="78" y="401" font-size="14" font-weight="700">More controls</text>
+    <text x="78" y="420" font-size="12">Ask for help or adjust speed.</text>
+    <circle cx="624" cy="365" r="15" fill="#dbead7"/><text x="619" y="371" font-size="15" font-weight="700">6</text>
+    <text x="646" y="361" font-size="14" font-weight="700">End conversation</text>
+    <text x="646" y="380" font-size="12">Finish when you are done.</text>
   </g>
   <g fill="none" stroke="#6a806d" stroke-width="1.8" marker-end="url(#arrow)">
-    <path d="M142 112h44"/><path d="M566 207h-52l-10-17"/><path d="M144 228h49l17-33"/><path d="M564 350h-37"/><path d="M143 418h49"/>
+    <path d="M144 94h58"/><path d="M621 228h-31l-15-16"/><path d="M145 242h58l40-27"/><path d="M621 305h-41l-9-32"/><path d="M145 409h73"/><path d="M621 370h-49v-37"/>
   </g>
 </svg>

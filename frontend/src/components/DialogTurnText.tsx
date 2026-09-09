@@ -3,8 +3,8 @@ import { useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import type { StudyLanguageCode } from "../types";
 import { FullScreenLoadingOverlay } from "./BlockingLoadingOverlay";
-import { dialogSaveOptionsCopy } from "./dialogs/dialogSaveOptionsCopy";
-import { useDialogTurnPhraseSelection } from "./dialogs/useDialogTurnPhraseSelection";
+import { dialogSaveOptionsCopy } from "../features/dialogs/components/dialogSaveOptionsCopy";
+import { useDialogTurnPhraseSelection } from "../features/dialogs/components/useDialogTurnPhraseSelection";
 import TargetPhraseText from "./TargetPhraseText";
 
 export type ActionStatus = "idle" | "saving" | "added" | "exists" | "error";

@@ -3,36 +3,24 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
-Mejor info en los seguro que quiere continuar?
-Guardando elemento cuando se clicka la palabra es falso
-Ejercicio de escribir frase de pronto sea escriba cualquiera de las frases de las estrategias
-Palabras para comparar también muestre la palabra
-Oír todas las canciones
+Custom para español
+Patterns
+Revolver ejercicios de frases y palabras
+Que no haya cajón visible en nuevo bloque
+Letras de canciones con frases muy largas
+Palabras para comparar también muestre la palabra
 Arreglar las descripciones y visual de la gramatica de palabras y frases
-Input para que la gente de feedback
-Escribir la palabra a mano y que la tinta sea del color
-Mas de los word friends. Pensar en añadir de alguna manera que recoja varios pero no sean muchos amigos, por ejemplo simplemente vocal o consonante, si no tiene amigo mas particular
-Ejercicio de escribir una frase con la palabra, pero una qué ya exista y simplemente compara si son iguales
-Los objetivos se repiten mucho
-Plural en frase
 Relacion expresion dialogo
-Estrategia que uno intente escribir la frase y se la corrija
-Que si el error en un articulo el sustantivo no esta guardadi Que no simplemente falle al añadir el ajercicio: que ponga un ejercicio al otro dia, pero que no afecte el SRS si no fallo la palabra, que sea de escoger el color correspondiente 
 Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que si lo indique, cual es la regla al momento de practicarlo
-Sing con pattern
 Silencios en las frases de Chat
 Mejorar prompt pregunta de gramatica
+Pasar por todo con despacio arreglando cositas que sean muy obvias
+Code Tests
+Revisar grammar for words
+En Forms en español usar ustedes, no vosotros
+en gramatica de frases el titulo del feature es mas pequeño que el contenido y eso lo hace confuso
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
-### Gramatica
-- Sustantivos:
-  - Case declinations para plural
-- Verbos:
-  - Indicar si son separables, reflexivos..
-  - De pronto lo de helpers lo puedo meter aqui (o donde corresponda) sin que sea un tipo aparte
-- Palabras en general: Añadir tambien a las reglas cosas como conjugacion, caso, genero... para que detecte errores en la conversacion 
-- Añadir más Metadata a las palabras (desde la gramática) y usarla en ejercicios
-
 
 ## New functionalities 
 
@@ -46,8 +34,24 @@ Los audios de partes de frases, y no se si tambien cuando el modelo saca mas que
 Muchas veces saca error al guardar pero si parece que guardo 
 
 ### Tier 1
-Hacer estrategia sing
-Que un modelo tambien sirva de manual de usuario, y pueda ir dando instrucciones empezando con la forma mas simple de usar la aplicacion
+Añadir mas guias
+- Añadir más Metadata a las palabras (desde la gramática) y usarla en ejercicios
+Que arme formas de a columna tambien
+Comparar incluya opuestos
+Algunas voces de ElevenLabs tienen un dejo de acento gringo
+Mejor info en los seguro que quiere continuar?
+Guardando elemento cuando se clicka la palabra es falso
+Ejercicio de escribir frase de pronto sea escriba cualquiera de las frases de las estrategias
+Oír todas las canciones
+Input para que la gente de feedback
+Escribir la palabra a mano y que la tinta sea del color
+Mas de los word friends. Pensar en añadir de alguna manera que recoja varios pero no sean muchos amigos, por ejemplo simplemente vocal o consonante, si no tiene amigo mas particular
+Ejercicio de escribir una frase con la palabra, pero una qué ya exista y simplemente compara si son iguales
+Los objetivos se repiten mucho
+Plural en frase
+Estrategia que uno intente escribir la frase y se la corrija
+Que si el error en un articulo el sustantivo no esta guardadi Que no simplemente falle al añadir el ajercicio: que ponga un ejercicio al otro dia, pero que no afecte el SRS si no fallo la palabra, que sea de escoger el color correspondiente 
+Sing con pattern
 Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?

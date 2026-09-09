@@ -4,8 +4,8 @@ from learning.views.content.conversation_goal_phase import conversation_phase_in
 def test_active_goal_phase_gently_keeps_the_conversation_going():
     instruction = conversation_phase_instruction("active")
 
-    assert "at most one relevant, open follow-up question" in instruction
-    assert "clear goodbye" in instruction
+    assert "one relevant, open follow-up question or invitation" in instruction
+    assert "clear refusal" in instruction
     assert "reveal the goal" in instruction
 
 

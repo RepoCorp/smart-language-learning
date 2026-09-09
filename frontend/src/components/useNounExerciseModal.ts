@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type { ItemExercisePhrases, ItemType } from "../types";
+import { supportsNounFormsGenerationMode } from "./strategies/forms/nounFormsStrategyRegistry";
 
 interface UseNounExerciseModalArgs {
   itemType: ItemType;
@@ -15,6 +16,7 @@ export function useNounExerciseModal({
 }: UseNounExerciseModalArgs): {
   nounExerciseSections: NonNullable<ItemExercisePhrases["sections"]>;
   isNounSectionedExercise: boolean;
+  nounFormsGenerationMode?: string;
 } {
   const nounExerciseSections = useMemo(
     () => (exercisePhrases?.sections || []).filter((section) => (
@@ -31,9 +33,14 @@ export function useNounExerciseModal({
   const isNounSectionedExercise = itemType === "word"
     && String(wordType || "").trim().toLowerCase() === "noun"
     && nounExerciseSections.length > 0;
+  const nounFormsGenerationMode = isNounSectionedExercise
+    && supportsNounFormsGenerationMode(exercisePhrases?.generation_mode)
+    ? exercisePhrases?.generation_mode
+    : undefined;
 
   return {
     nounExerciseSections,
     isNounSectionedExercise,
+    nounFormsGenerationMode,
   };
 }

@@ -1,0 +1,99 @@
+You are generating educational content for students learning Spanish.
+
+Generate Spanish noun-form examples for the noun "{word}".
+
+Generate these determiner families in this exact order:
+
+1. definite
+2. indefinite
+3. negative
+4. this
+5. that
+6. possessive
+
+Use these determiner families:
+
+- definite: el / la / los / las
+- indefinite: un / una / unos / unas
+- negative: ningun / ninguna
+- this: este / esta / estos / estas
+- that: ese / esa / esos / esas
+- possessive: mi / mis
+
+Requirements:
+
+- Every target-language sentence must contain the target noun.
+- Use the actual singular and plural forms of the noun. Do not assume that the plural is formed simply by adding "s".
+- For every family except negative, generate both singular and plural forms.
+- For negative, generate only the singular form. Set all negative plural fields to null.
+- Each target-language sentence must begin with the requested determiner plus noun form, except where Spanish grammar makes that impossible.
+- Use the correct gender and number for the noun and its determiner.
+- Keep every sentence very short, natural, and beginner-friendly.
+- Prefer one simple verb or construction that works naturally across as many forms as possible.
+- Keep the sentences as similar to each other as possible so the changing noun form and determiner are easy to notice.
+- Change the surrounding sentence only when necessary to keep the Spanish natural.
+- Do not add adjectives or other modifiers unless necessary for a natural sentence.
+- For "this", use only forms of este. For "that", use only forms of ese. For possessive, use only mi or mis.
+- For negative, use ningun or ninguna as appropriate for the noun.
+- Translate every sentence naturally into {source_language}.
+- Do not explain grammar.
+
+Return JSON only with this exact shape:
+{
+  "forms": [
+    {
+      "family": "definite",
+      "singular_form": "string",
+      "singular_target_text": "string",
+      "singular_source_text": "string",
+      "plural_form": "string",
+      "plural_target_text": "string",
+      "plural_source_text": "string"
+    },
+    {
+      "family": "indefinite",
+      "singular_form": "string",
+      "singular_target_text": "string",
+      "singular_source_text": "string",
+      "plural_form": "string",
+      "plural_target_text": "string",
+      "plural_source_text": "string"
+    },
+    {
+      "family": "negative",
+      "singular_form": "string",
+      "singular_target_text": "string",
+      "singular_source_text": "string",
+      "plural_form": null,
+      "plural_target_text": null,
+      "plural_source_text": null
+    },
+    {
+      "family": "this",
+      "singular_form": "string",
+      "singular_target_text": "string",
+      "singular_source_text": "string",
+      "plural_form": "string",
+      "plural_target_text": "string",
+      "plural_source_text": "string"
+    },
+    {
+      "family": "that",
+      "singular_form": "string",
+      "singular_target_text": "string",
+      "singular_source_text": "string",
+      "plural_form": "string",
+      "plural_target_text": "string",
+      "plural_source_text": "string"
+    },
+    {
+      "family": "possessive",
+      "singular_form": "string",
+      "singular_target_text": "string",
+      "singular_source_text": "string",
+      "plural_form": "string",
+      "plural_target_text": "string",
+      "plural_source_text": "string"
+    }
+  ]
+}

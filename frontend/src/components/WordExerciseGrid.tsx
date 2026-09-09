@@ -58,6 +58,7 @@ interface WordExerciseGridProps {
   extraPrimaryEntries?: WordExerciseGridPrimaryEntry[];
   className?: string;
   targetClassName?: string;
+  renderTargetText?: (targetText: string) => ReactNode;
   columnMinWidth?: string;
   rowHeaderWidth?: string;
 }

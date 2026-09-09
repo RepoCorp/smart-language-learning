@@ -3,8 +3,8 @@ import { useStudyLanguages } from "../studyLanguages";
 import { FullScreenLoadingOverlay } from "./BlockingLoadingOverlay";
 import DialogTurnText from "./DialogTurnText";
 import NewItem from "./NewItem";
-import DialogItemSavingModals from "./dialogs/DialogItemSavingModals";
-import { useDialogItemSaving } from "./dialogs/useDialogItemSaving";
+import DialogItemSavingModals from "../features/dialogs/components/DialogItemSavingModals";
+import { useDialogItemSaving } from "../features/dialogs/components/useDialogItemSaving";
 
 interface InteractiveTargetPhraseProps {
   className?: string;

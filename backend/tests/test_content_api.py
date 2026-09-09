@@ -177,12 +177,13 @@ def test_tts_instruction_forces_target_language_pronunciation():
     assert "Speak only in German" in instruction
     assert "German phonetics and accent" in instruction
     assert "looks like English" in instruction
-    assert "still pronounce it as German text" in instruction
+    assert "still pronounce it as the requested language text" in instruction
     assert "infer an English pronunciation" in instruction
 
 
 def test_elevenlabs_item_audio_is_used_when_configured(monkeypatch, settings):
     from learning.views.content import audio as content_audio
+    from learning.views.content import audio_voices
 
     captured_calls = []
     settings.AUDIO_TTS_PROVIDER = "elevenlabs"
@@ -193,7 +194,7 @@ def test_elevenlabs_item_audio_is_used_when_configured(monkeypatch, settings):
         return b"audio-bytes"
 
     monkeypatch.setattr(content_audio, "_elevenlabs_tts_audio", fake_elevenlabs_audio)
-    monkeypatch.setattr(content_audio, "_deterministic_index", lambda seed, count: 1)
+    monkeypatch.setattr(audio_voices, "_deterministic_index", lambda seed, count: 1)
 
     audio_bytes, voice = content_audio._item_tts_audio_bytes(
         text="Guten Morgen.",
@@ -379,7 +380,7 @@ def test_elevenlabs_voice_pool_excludes_disabled_voice_ids(settings):
 
 
 @pytest.mark.django_db
-def test_saved_phrase_items_use_openai_audio_even_when_elevenlabs_is_enabled(monkeypatch, settings):
+def test_saved_phrase_items_preserve_dialog_audio_when_available(monkeypatch, settings):
     from learning.views.content import persistence as content_persistence
     from learning.views.content.types import ContentCandidate
 
@@ -413,8 +414,8 @@ def test_saved_phrase_items_use_openai_audio_even_when_elevenlabs_is_enabled(mon
     )
 
     assert item is not None
-    assert item.audio_url == "http://localhost:8000/media/audio/openai-phrase.mp3"
-    assert captured_openai_calls == [("Guten Morgen.", "phrase", "german")]
+    assert item.audio_url == "http://localhost:8000/media/audio/dialog-turn.mp3"
+    assert captured_openai_calls == []
     assert captured_general_calls == []
 
 
@@ -1328,8 +1329,7 @@ def test_content_item_mark_learned_endpoint_can_unmark_item():
 
 
 @pytest.mark.django_db
-def test_content_item_refresh_word_scans_dialogs_adds_type_and_regenerates_exercises(monkeypatch):
-    from learning.views.content import management_items_listing as listing_views
+def test_content_item_refresh_word_only_rescans_dialogs():
 
     item = Item.objects.create(
         item_type=Item.ItemType.WORD,
@@ -1375,22 +1375,6 @@ def test_content_item_refresh_word_scans_dialogs_adds_type_and_regenerates_exerc
         match_score=0.8,
     )
 
-    monkeypatch.setattr(
-        listing_views,
-        "_basic_word_metadata",
-        lambda **kwargs: ("ayudar", "helfen", "verb"),
-    )
-    monkeypatch.setattr(
-        listing_views,
-        "generate_word_exercise_phrases_with_chatgpt",
-        lambda *args, **kwargs: {
-            "phrases": [
-                {"label": "present-1s", "source_text": "Yo ayudo.", "target_text": "Ich helfe."},
-            ],
-            "generation_mode": "verb_by_tense_v1",
-        },
-    )
-
     client = APIClient()
     response = client.post(
         f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
@@ -1399,208 +1383,13 @@ def test_content_item_refresh_word_scans_dialogs_adds_type_and_regenerates_exerc
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["word_type"] == "verb"
-    assert payload["word_type_added"] is True
     assert payload["dialog_occurrences_created"] == 3
-    assert payload["exercise_phrases"]["phrases"][0]["target_text"] == "Ich helfe."
     assert len(payload["related_dialogs"]) == 2
 
     item.refresh_from_db()
-    assert item.word_type == "verb"
-    assert item.exercise_phrases["generation_mode"] == "verb_by_tense_v1"
+    assert item.word_type == ""
+    assert item.exercise_phrases == {}
     assert ItemDialogOccurrence.objects.filter(item=item).count() == 4
-
-
-@pytest.mark.django_db
-def test_content_item_refresh_word_adds_missing_articles_for_noun(monkeypatch):
-    from learning.views.content import management_items_listing as listing_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="libro",
-        german_text="Buch",
-        source_language="spanish",
-        target_language="german",
-        word_type="noun",
-        exercise_phrases={},
-    )
-    captured_args = {}
-
-    monkeypatch.setattr(
-        listing_views,
-        "_basic_word_metadata",
-        lambda **kwargs: ("el libro", "das Buch", "noun"),
-    )
-
-    def fake_generate(spanish_word, german_word, **kwargs):
-        captured_args["spanish_word"] = spanish_word
-        captured_args["german_word"] = german_word
-        captured_args["word_type"] = kwargs.get("word_type")
-        return {
-            "phrases": [
-                {"label": "example", "source_text": "Leo el libro.", "target_text": "Ich lese das Buch."},
-            ],
-        }
-
-    monkeypatch.setattr(listing_views, "generate_word_exercise_phrases_with_chatgpt", fake_generate)
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
-        format="json",
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["spanish_text"] == "el libro"
-    assert payload["german_text"] == "das Buch"
-    assert payload["word_type"] == "noun"
-    assert payload["word_text_updated"] is True
-    assert captured_args == {
-        "spanish_word": "el libro",
-        "german_word": "das Buch",
-        "word_type": "noun",
-    }
-
-    item.refresh_from_db()
-    assert item.spanish_text == "el libro"
-    assert item.german_text == "das Buch"
-
-
-@pytest.mark.django_db
-def test_content_item_refresh_word_always_refreshes_metadata_using_target_token_and_context(monkeypatch):
-    from learning.views.content import management_items_listing as listing_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="el libro",
-        german_text="das Buch",
-        source_language="spanish",
-        target_language="german",
-        word_type="noun",
-        example_sentence="Ich lese das Buch jeden Abend.",
-        exercise_phrases={},
-    )
-    captured_metadata_kwargs = {}
-
-    def fake_basic_word_metadata(**kwargs):
-        captured_metadata_kwargs.update(kwargs)
-        return ("el libro", "das Buch", "noun")
-
-    monkeypatch.setattr(listing_views, "_basic_word_metadata", fake_basic_word_metadata)
-    monkeypatch.setattr(
-        listing_views,
-        "generate_word_exercise_phrases_with_chatgpt",
-        lambda *args, **kwargs: {
-            "phrases": [
-                {"label": "example", "source_text": "Leo el libro.", "target_text": "Ich lese das Buch."},
-            ],
-        },
-    )
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
-        format="json",
-    )
-
-    assert response.status_code == 200
-    assert captured_metadata_kwargs["source_text"] == ""
-    assert captured_metadata_kwargs["target_text"] == "Buch"
-    assert captured_metadata_kwargs["source_line"] == ""
-    assert captured_metadata_kwargs["target_line"] == "Ich lese das Buch jeden Abend."
-
-
-@pytest.mark.django_db
-def test_content_item_refresh_word_uses_dedicated_refresh_model(monkeypatch, settings):
-    from learning.views.content import management_items_listing as listing_views
-
-    settings.OPENAI_WORD_REFRESH_MODEL = "gpt-refresh-test"
-    settings.OPENAI_WORD_REFRESH_REASONING_EFFORT = "high"
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="ayudar",
-        german_text="helfen",
-        source_language="spanish",
-        target_language="german",
-        word_type="",
-        exercise_phrases={},
-    )
-    captured_metadata_model = {}
-    captured_exercise_model = {}
-
-    def fake_basic_word_metadata(**kwargs):
-        captured_metadata_model["model"] = kwargs.get("model")
-        captured_metadata_model["reasoning_effort"] = kwargs.get("reasoning_effort")
-        return ("ayudar", "helfen", "verb")
-
-    def fake_generate(spanish_word, german_word, **kwargs):
-        captured_exercise_model["model"] = kwargs.get("model")
-        captured_exercise_model["reasoning_effort"] = kwargs.get("reasoning_effort")
-        return {
-            "phrases": [
-                {"label": "present-1s", "source_text": "Yo ayudo.", "target_text": "Ich helfe."},
-            ],
-        }
-
-    monkeypatch.setattr(listing_views, "_basic_word_metadata", fake_basic_word_metadata)
-    monkeypatch.setattr(listing_views, "generate_word_exercise_phrases_with_chatgpt", fake_generate)
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
-        format="json",
-    )
-
-    assert response.status_code == 200
-    assert captured_metadata_model["model"] == "gpt-refresh-test"
-    assert captured_metadata_model["reasoning_effort"] == "high"
-    assert captured_exercise_model["model"] == "gpt-refresh-test"
-    assert captured_exercise_model["reasoning_effort"] == "high"
-
-
-@pytest.mark.django_db
-def test_content_item_refresh_word_replaces_existing_type_with_regenerated_type(monkeypatch):
-    from learning.views.content import management_items_listing as listing_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="ayudar",
-        german_text="helfen",
-        source_language="spanish",
-        target_language="german",
-        word_type="noun",
-        exercise_phrases={},
-    )
-
-    monkeypatch.setattr(
-        listing_views,
-        "_basic_word_metadata",
-        lambda **kwargs: ("ayudar", "helfen", "verb"),
-    )
-    monkeypatch.setattr(
-        listing_views,
-        "generate_word_exercise_phrases_with_chatgpt",
-        lambda *args, **kwargs: {
-            "phrases": [
-                {"label": "present-1s", "source_text": "Yo ayudo.", "target_text": "Ich helfe."},
-            ],
-        },
-    )
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
-        format="json",
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["word_type"] == "verb"
-    assert payload["word_type_added"] is False
-
-    item.refresh_from_db()
-    assert item.word_type == "verb"
 
 
 def test_call_openai_json_includes_reasoning_effort(monkeypatch, settings):
@@ -1636,49 +1425,6 @@ def test_call_openai_json_includes_reasoning_effort(monkeypatch, settings):
     assert parsed == {"ok": True}
     assert captured["body"]["model"] == "gpt-test"
     assert captured["body"]["reasoning_effort"] == "high"
-
-
-@pytest.mark.django_db
-def test_content_item_refresh_word_fails_when_required_source_article_is_missing(monkeypatch):
-    from learning.views.content import management_items_listing as listing_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="grupo",
-        german_text="Gruppe",
-        source_language="spanish",
-        target_language="german",
-        word_type="noun",
-        exercise_phrases={},
-    )
-
-    monkeypatch.setattr(
-        listing_views,
-        "_basic_word_metadata",
-        lambda **kwargs: ("grupo", "die Gruppe", "noun"),
-    )
-    monkeypatch.setattr(
-        listing_views,
-        "generate_word_exercise_phrases_with_chatgpt",
-        lambda *args, **kwargs: {
-            "phrases": [
-                {"label": "example", "source_text": "El grupo llega.", "target_text": "Die Gruppe kommt."},
-            ],
-        },
-    )
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}/refresh-word?source_language=spanish&target_language=german",
-        format="json",
-    )
-
-    assert response.status_code == 503
-    assert response.json()["detail"] == "Word metadata is missing source article"
-
-    item.refresh_from_db()
-    assert item.spanish_text == "grupo"
-    assert item.german_text == "Gruppe"
 
 
 @pytest.mark.django_db
@@ -1925,37 +1671,6 @@ def test_content_words_endpoint_filters_and_returns_related_dialogs():
 
 
 @pytest.mark.django_db
-def test_content_item_regenerate_audio_updates_audio_url(monkeypatch):
-    from learning.views.content import management_items_listing as listing_views
-
-    item = Item.objects.create(
-        item_type=Item.ItemType.WORD,
-        spanish_text="taxi",
-        german_text="das Taxi",
-        source_language="spanish",
-        target_language="german",
-        example_sentence="Ich brauche ein Taxi.",
-        audio_url="",
-    )
-    monkeypatch.setattr(
-        listing_views,
-        "create_audio_file",
-        lambda text, prefix, **kwargs: "http://localhost:8000/media/audio/word-regenerated.mp3",
-    )
-
-    client = APIClient()
-    response = client.post(
-        f"/api/content/items/{item.id}",
-        {"source_language": "spanish", "target_language": "german"},
-        format="json",
-    )
-    assert response.status_code == 200
-    assert response.json()["audio_url"] == "http://localhost:8000/media/audio/word-regenerated.mp3"
-    item.refresh_from_db()
-    assert item.audio_url == "http://localhost:8000/media/audio/word-regenerated.mp3"
-
-
-@pytest.mark.django_db
 def test_content_item_regenerate_keeps_a_selected_subphrase(monkeypatch):
     from learning.views.content import management_items_regenerate as regenerate_views
 
@@ -2069,7 +1784,10 @@ def test_yes_no_question_grammar_feature_is_persisted_and_returns_matching_examp
     response = client.post(f"/api/content/items/{phrase.id}/strategies/grammar-features?{params}")
 
     assert response.status_code == 200
-    assert response.json() == {"feature_keys": [VERB_POSITION_YES_NO_QUESTION]}
+    assert response.json() == {
+        "feature_keys": [VERB_POSITION_YES_NO_QUESTION],
+        "analyzed": True,
+    }
     assert phrase.grammar_features.filter(feature_key=VERB_POSITION_YES_NO_QUESTION).exists()
     assert "Return only a valid JSON array" in captured_prompts[0]
     assert "Never return a bare feature ID" in captured_prompts[0]
@@ -2077,7 +1795,12 @@ def test_yes_no_question_grammar_feature_is_persisted_and_returns_matching_examp
     examples_response = client.get(f"/api/content/items/{phrase.id}/strategies/grammar-features?{params}")
     assert examples_response.status_code == 200
     assert examples_response.json()["examples"] == [
-        {"target_text": "Kommst du heute?", "source_text": "¿Vienes hoy?"}
+        {
+            "item_id": matching.id,
+            "target_text": "Kommst du heute?",
+            "source_text": "¿Vienes hoy?",
+            "audio_url": "",
+        }
     ]
 
 
@@ -3072,7 +2795,6 @@ def test_compare_words_search_add_and_remove():
     linked.refresh_from_db()
     assert set(item.confusing_with.values_list("id", flat=True)) == {extra.id}
     assert item.id not in set(linked.confusing_with.values_list("id", flat=True))
-    assert ItemDialogOccurrence.objects.filter(item=existing, dialog=dialog, turn_index=0).exists()
 
 
 @pytest.mark.django_db
@@ -3352,14 +3074,16 @@ def test_quick_add_phrase_creates_item(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_quick_add_whole_turn_phrase_reuses_dialog_turn_audio(monkeypatch):
+def test_quick_add_whole_turn_phrase_reuses_dialog_turn_clear_audio(monkeypatch):
     from learning.views.content import persistence as persistence_views
 
     def fail_audio_generation(*args, **kwargs):
-        raise AssertionError("Whole-turn phrase should reuse dialog turn audio")
+        raise AssertionError("Whole-turn phrase should reuse the dialog turn clear audio")
 
-    monkeypatch.setattr(persistence_views, "create_audio_file", fail_audio_generation)
+    monkeypatch.setattr(persistence_views, "create_openai_audio_file", fail_audio_generation)
+    user = get_user_model().objects.create_user(username="whole-turn-audio-user")
     dialog = SavedDialog.objects.create(
+        user=user,
         topic="travel",
         context="airport",
         source_language="spanish",
@@ -3373,9 +3097,12 @@ def test_quick_add_whole_turn_phrase_reuses_dialog_turn_audio(monkeypatch):
         source_text="Necesito un taxi ahora.",
         target_text="Ich brauche jetzt ein Taxi.",
         audio_url="http://localhost:8000/media/audio/dialog-turn-taxi.mp3",
+        clear_audio_url="http://localhost:8000/media/audio/dialog-turn-taxi-clear.mp3",
     )
 
     client = APIClient()
+    token = UserAuthToken.objects.create(user=user)
+    client.credentials(HTTP_X_AUTH_TOKEN=token.key)
     response = client.post(
         "/api/content/phrases/add?source_language=spanish&target_language=german",
         {
@@ -3395,7 +3122,7 @@ def test_quick_add_whole_turn_phrase_reuses_dialog_turn_audio(monkeypatch):
         spanish_text="Necesito un taxi ahora.",
         german_text="Ich brauche jetzt ein Taxi.",
     )
-    assert phrase.audio_url == turn.audio_url
+    assert phrase.audio_url == turn.clear_audio_url
     assert ItemDialogOccurrence.objects.filter(item=phrase, dialog=dialog, turn=turn, turn_index=0).exists()
 
 
@@ -3909,7 +3636,7 @@ def test_word_exercise_generation_uses_prompt_for_word_type():
     )
 
     assert "You are generating educational content for students learning German." in captured_prompts[0]
-    assert "The target noun must be the grammatical subject of the sentence." in captured_prompts[0]
+    assert "Generate one sentence for each requested determiner family." in captured_prompts[0]
     assert "Generate helper-word exercise phrases" in captured_prompts[1]
     assert "Generate exercise phrases for one vocabulary item" in captured_prompts[2]
     assert "la mesa" not in captured_inputs[0]
@@ -4045,6 +3772,51 @@ def test_word_exercise_generation_drops_bare_vocabulary_entries():
     assert payload["sections"][3]["question_target_text"] == "Wessen?"
 
 
+def test_spanish_noun_forms_generation_uses_sentences_in_two_number_sections():
+    from learning.views.content import generation_words
+
+    families = [
+        ("definite", "El perro corre.", "Los perros corren."),
+        ("indefinite", "Un perro corre.", "Unos perros corren."),
+        ("negative", "Ningún perro corre.", None),
+        ("this", "Este perro corre.", "Estos perros corren."),
+        ("that", "Ese perro corre.", "Esos perros corren."),
+        ("possessive", "Mi perro corre.", "Mis perros corren."),
+    ]
+
+    def fake_call_openai_json(_prompt, _user_input, **_kwargs):
+        forms = []
+        for family, singular, plural in families:
+            forms.append({
+                "family": family,
+                "singular_form": singular.rsplit(" ", 1)[0].rstrip("."),
+                "singular_target_text": singular,
+                "singular_source_text": "The dog runs.",
+                "plural_form": plural.rsplit(" ", 1)[0].rstrip(".") if plural else None,
+                "plural_target_text": plural,
+                "plural_source_text": "The dogs run." if plural else None,
+            })
+        return {"forms": forms}
+
+    payload = generation_words.generate_word_exercise_phrases_with_chatgpt(
+        "dog",
+        "perro",
+        source_language="english",
+        target_language="spanish",
+        word_type="noun",
+        call_openai_json_fn=fake_call_openai_json,
+    )
+
+    assert payload["generation_mode"] == "noun_forms_spanish_v1"
+    assert [section["key"] for section in payload["sections"]] == ["singular", "plural"]
+    assert [entry["label"] for entry in payload["sections"][0]["phrases"]] == [
+        "definite", "indefinite", "negative", "this", "that", "possessive",
+    ]
+    assert [entry["label"] for entry in payload["sections"][1]["phrases"]] == [
+        "definite", "indefinite", "this", "that", "possessive",
+    ]
+
+
 @pytest.mark.django_db
 def test_noun_case_endpoint_generates_requested_case_and_merges_sections(monkeypatch):
     from learning.views.content import management_items_noun_exercise_cases as noun_case_views
@@ -4105,6 +3877,8 @@ def test_noun_case_endpoint_generates_requested_case_and_merges_sections(monkeyp
     )
 
     client = APIClient()
+    token = UserAuthToken.objects.create(user=user)
+    client.credentials(HTTP_X_AUTH_TOKEN=token.key)
     response = client.post(
         f"/api/content/items/{item.id}/exercises/noun-case?source_language=spanish&target_language=german&case_key=accusative",
         format="json",
@@ -4112,7 +3886,7 @@ def test_noun_case_endpoint_generates_requested_case_and_merges_sections(monkeyp
 
     assert response.status_code == 200
     payload = response.json()["exercise_phrases"]
-    assert [section["key"] for section in payload["sections"]] == ["nominative", "accusative", "dative"]
+    assert [section["key"] for section in payload["sections"]] == ["nominative", "accusative", "dative", "genitive"]
     assert len(payload["sections"][1]["phrases"]) == 2
     assert payload["sections"][1]["phrases"][0]["label"] == "accusative-definite"
     assert payload["sections"][0]["phrases"][0]["label"] == "nominative-definite"

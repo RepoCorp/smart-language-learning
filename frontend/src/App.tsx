@@ -9,16 +9,16 @@ import {
   type AuthUser,
 } from "./authApi";
 import AuthLanding from "./components/AuthLanding";
-import AdminPage from "./components/AdminPage";
+import AdminPage from "./features/admin/AdminPage";
 import AIQuotaNotice from "./components/AIQuotaNotice";
-import ConfigurationsPage from "./components/ConfigurationsPage";
+import ConfigurationsPage from "./features/configuration/ConfigurationsPage";
 import GettingStartedGuideModal from "./components/GettingStartedGuideModal";
 import GuidedTour from "./guides/GuidedTour";
 import { GUIDED_TOUR_START_EVENT, notifyGuidedTourAction, type GuidedTourId } from "./guides/guidedTourEvents";
 import PinSetupPage from "./components/PinSetupPage";
-import ContentCreatePage from "./components/ContentCreatePage";
-import ContentManagePage from "./components/ContentManagePage";
-import DialogsPage from "./components/DialogsPage";
+import ContentCreatePage from "./features/content/ContentCreatePage";
+import ContentManagePage from "./features/content/ContentManagePage";
+import DialogsPage from "./features/dialogs/DialogsPage";
 import OverviewStatsBar from "./components/OverviewStatsBar";
 import LearningStreakControl from "./components/LearningStreakControl";
 import ProgressPage from "./components/ProgressPage";

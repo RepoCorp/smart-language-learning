@@ -1,9 +1,13 @@
 import { useState } from "react";
 
 import { fetchContentItemDetail } from "../../api";
-import type { SessionItem } from "../../types";
+import type { SessionItem, StudyLanguageCode } from "../../types";
 
-export default function useSessionItemModal(sourceLanguage: string, targetLanguage: string, loadError: string) {
+export default function useSessionItemModal(
+  sourceLanguage: StudyLanguageCode,
+  targetLanguage: StudyLanguageCode,
+  loadError: string,
+) {
   const [openedItem, setOpenedItem] = useState<SessionItem | null>(null);
   const [loadingOpenedItem, setLoadingOpenedItem] = useState(false);
   const [openedItemError, setOpenedItemError] = useState("");

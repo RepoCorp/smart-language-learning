@@ -1,27 +1,27 @@
 import type { ItemType, StudyLanguageCode } from "../types";
-import GenderedNounText, { germanNounGender } from "./GenderedNounText";
+import GenderedNounText, { nounGenderForLanguage, type NounGender } from "./GenderedNounText";
 
-function germanNounTitle(
+function nounTitleForLanguage(
   targetText: string,
   itemType: ItemType,
   wordType: string,
   targetLanguage: StudyLanguageCode,
-): { article: string; noun: string; gender: NonNullable<ReturnType<typeof germanNounGender>> } | null {
+): { article: string; noun: string; gender: NounGender } | null {
   if (
     itemType !== "word" ||
-    targetLanguage !== "german" ||
+    !["german", "spanish"].includes(targetLanguage) ||
     wordType.trim().toLowerCase() !== "noun"
   ) {
     return null;
   }
 
-  const match = targetText.trim().match(/^(der|die|das)\s+(.+)$/i);
+  const match = targetText.trim().match(/^(der|die|das|el|la|los|las)\s+(.+)$/i);
   if (!match) {
     return null;
   }
 
   const article = match[1];
-  const gender = germanNounGender(targetText);
+  const gender = nounGenderForLanguage(targetText, targetLanguage);
   if (!gender) {
     return null;
   }
@@ -59,7 +59,7 @@ export default function ItemViewHeader({
   notesLabel,
   noAudioSupportLabel,
 }: ItemViewHeaderProps): JSX.Element {
-  const nounTitle = germanNounTitle(targetText, itemType, wordType, targetLanguage);
+  const nounTitle = nounTitleForLanguage(targetText, itemType, wordType, targetLanguage);
 
   return (
     <>
@@ -68,7 +68,7 @@ export default function ItemViewHeader({
           <div className="item-view-title-block">
             <h2 className="item-view-title">
               {nounTitle ? (
-                <GenderedNounText text={`${nounTitle.article} ${nounTitle.noun}`} targetText={targetText} gender={nounTitle.gender} />
+                <GenderedNounText text={`${nounTitle.article} ${nounTitle.noun}`} targetText={targetText} targetLanguage={targetLanguage} gender={nounTitle.gender} />
               ) : (
                 targetText || sourceText
               )}

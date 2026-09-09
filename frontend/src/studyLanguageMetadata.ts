@@ -1,4 +1,5 @@
 import type { StudyLanguageCode } from "./types";
+import type { MessageKey } from "./i18n";
 
 export const SUPPORTED_STUDY_LANGUAGES: StudyLanguageCode[] = [
   "spanish",
@@ -10,7 +11,7 @@ export const SUPPORTED_STUDY_LANGUAGES: StudyLanguageCode[] = [
   "dutch",
 ];
 
-export const STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE: Record<StudyLanguageCode, string> = {
+export const STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE: Record<StudyLanguageCode, MessageKey> = {
   spanish: "study.language.spanish",
   english: "study.language.english",
   german: "study.language.german",
@@ -21,7 +22,7 @@ export const STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE: Record<StudyLanguageCode, strin
 };
 
 export const STUDY_LANGUAGE_SPEECH_LOCALE_BY_CODE: Record<StudyLanguageCode, string> = {
-  spanish: "es-ES",
+  spanish: "es-CO",
   english: "en-US",
   german: "de-DE",
   french: "fr-FR",

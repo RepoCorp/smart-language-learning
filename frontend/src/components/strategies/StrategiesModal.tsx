@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 
 import BlockingLoadingOverlay from "../BlockingLoadingOverlay";
-import GenderedNounText, { germanNounGender } from "../GenderedNounText";
+import GenderedNounText, { nounGenderForLanguage } from "../GenderedNounText";
 import { useI18n } from "../../i18n";
 import type { StudyLanguageCode } from "../../types";
 import {
@@ -45,8 +45,8 @@ export default function StrategiesModal({
     }
     return t(`strategies.option.${strategy.toLowerCase()}`);
   };
-  const nounGender = itemType === "word" && targetLanguage === "german" && wordType.trim().toLowerCase() === "noun"
-    ? germanNounGender(targetText)
+  const nounGender = itemType === "word" && ["german", "spanish"].includes(targetLanguage) && wordType.trim().toLowerCase() === "noun"
+    ? nounGenderForLanguage(targetText, targetLanguage)
     : null;
 
   return (
@@ -61,7 +61,7 @@ export default function StrategiesModal({
         <div className="word-strategies-body">
           <div className="word-strategies-item-card">
             <p className="word-strategies-item-target">
-              {nounGender ? <GenderedNounText text={targetText} targetText={targetText} gender={nounGender} /> : targetText || sourceText}
+              {nounGender ? <GenderedNounText text={targetText} targetText={targetText} targetLanguage={targetLanguage} gender={nounGender} /> : targetText || sourceText}
             </p>
             <p className="word-strategies-item-source">{sourceText}</p>
           </div>

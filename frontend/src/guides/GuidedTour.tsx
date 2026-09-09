@@ -33,8 +33,10 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [nextUnlocked, setNextUnlocked] = useState(false);
+  const [popoverHeight, setPopoverHeight] = useState(0);
   const focusedAppLanguageRef = useRef(false);
   const scrolledTargetRef = useRef("");
+  const popoverRef = useRef<HTMLElement | null>(null);
   const currentStep = copy.steps[stepIndex];
 
   useEffect(() => {
@@ -146,6 +148,20 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
     };
   }, [currentStep.id, currentStep.target, open]);
 
+  useEffect(() => {
+    const popover = popoverRef.current;
+    if (!open || collapsed || !popover) {
+      setPopoverHeight(0);
+      return;
+    }
+
+    const measure = (): void => setPopoverHeight(Math.ceil(popover.getBoundingClientRect().height));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(popover);
+    return () => observer.disconnect();
+  }, [collapsed, currentStep.id, open, showMoreInfo]);
+
   if (!open) {
     return null;
   }
@@ -189,6 +205,8 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
   const body = nextUnlocked && currentStep.completedBody
     ? currentStep.completedBody
     : (targetRect && targetReadyForStep ? currentStep.body : (currentStep.waitingBody || currentStep.body));
+  const popoverTop = typeof popoverStyle?.top === "number" ? popoverStyle.top : 16;
+  const guideScrollHeight = Math.max(window.innerHeight, popoverTop + popoverHeight + 16);
 
   return (
     <div className="guided-tour-overlay" role="dialog" aria-modal="true" aria-label={copy.title}>
@@ -204,21 +222,22 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
           aria-hidden="true"
         />
       ) : null}
-      {collapsed ? (
-        <button
-          type="button"
-          className="guided-tour-collapsed-card"
-          onClick={() => setCollapsed(false)}
-          aria-label={currentStep.title}
-          title={currentStep.title}
+      <div className="guided-tour-scroll-content" style={{ minHeight: guideScrollHeight }}>
+        {collapsed ? (
+          <button
+            type="button"
+            className="guided-tour-collapsed-card"
+            onClick={() => setCollapsed(false)}
+            aria-label={currentStep.title}
+            title={currentStep.title}
+          >
+            <span aria-hidden="true">i</span>
+          </button>
+        ) : <section
+          ref={popoverRef}
+          className={`guided-tour-popover${targetRect ? "" : " guided-tour-popover-centered"}${keepPopoverClearOfTarget ? " guided-tour-popover-clear-target" : ""}${isMenuNavigationStep ? " guided-tour-popover-menu" : ""}`}
+          style={popoverStyle}
         >
-          <span aria-hidden="true">i</span>
-        </button>
-      ) : <section
-        className={`guided-tour-popover${targetRect ? "" : " guided-tour-popover-centered"}${keepPopoverClearOfTarget ? " guided-tour-popover-clear-target" : ""}${isMenuNavigationStep ? " guided-tour-popover-menu" : ""}`}
-        style={popoverStyle}
-      >
-        <>
           <h2>{currentStep.title}</h2>
           <p>{body}</p>
           {currentStep.image === "conversation-panel" ? (
@@ -250,8 +269,8 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
               </button>
             </div>
           ) : null}
-        </>
-      </section>}
+        </section>}
+      </div>
     </div>
   );
 }

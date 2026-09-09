@@ -34,6 +34,7 @@ WORD_EXERCISES_ADVERB_PROMPT = _load("word_exercises/general/word_exercises_adve
 WORD_EXERCISES_EXPRESSION_PROMPT = _load("word_exercises/general/word_exercises_expression.txt")
 WORD_EXERCISES_HELPER_PROMPT = _load("word_exercises/general/word_exercises_helper.txt")
 WORD_EXERCISES_NOUN_PROMPT = _load("word_exercises/general/word_exercises_noun.txt")
+WORD_EXERCISES_NOUN_SPANISH_FORMS_PROMPT = _load("word_exercises/spanish/word_exercises_noun_spanish_forms.txt")
 WORD_EXERCISES_NOUN_GERMAN_COMMON_PROMPT = _load("word_exercises/german/word_exercises_noun_german_common.txt")
 WORD_EXERCISES_NOUN_GERMAN_NOMINATIVE_PROMPT = _load("word_exercises/german/word_exercises_noun_german_nominative.txt")
 WORD_EXERCISES_NOUN_GERMAN_ACCUSATIVE_PROMPT = _load("word_exercises/german/word_exercises_noun_german_accusative.txt")

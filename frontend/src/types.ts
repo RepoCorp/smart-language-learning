@@ -14,6 +14,7 @@ export interface ExercisePhrase {
   label?: string;
   source_text: string;
   target_text: string;
+  audio_url?: string;
   image_url?: string;
   image_prompt?: string;
 }
@@ -161,6 +162,7 @@ export interface SessionItem {
   word_type?: string;
   plural_german?: string;
   audio_url?: string;
+  prompt_audio_url?: string;
   exercise_phrases?: ItemExercisePhrases;
   mode: SessionMode;
   direction?: ReviewDirection | null;

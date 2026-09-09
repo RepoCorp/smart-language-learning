@@ -17,6 +17,7 @@ from .audio_clients import (
     openai_tts_audio as _openai_tts_audio,
 )
 from .audio_voices import (
+    _voice_ids as _elevenlabs_voice_ids,
     configured_elevenlabs_voice_ids,
     elevenlabs_voice_id as _elevenlabs_voice_id,
     select_dialog_speaker_voice_ids,
@@ -24,6 +25,10 @@ from .audio_voices import (
 
 logger = logging.getLogger(__name__)
 _s3_identity_logged = False
+
+# Kept as a private compatibility alias for callers that imported this helper
+# before TTS instructions were moved to their dedicated module.
+_tts_language_instruction = openai_tts_language_instruction
 
 def _build_local_audio_url(filename: str) -> str:
     relative_url = f"{settings.MEDIA_URL.rstrip('/')}/audio/{filename}"

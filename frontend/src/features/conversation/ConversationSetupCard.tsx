@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 
-import { useI18n } from "../../i18n";
+import { useI18n, type MessageKey } from "../../i18n";
 import BlockingLoadingOverlay from "../../components/BlockingLoadingOverlay";
 import type { ConversationTransport, GoalDifficulty } from "./useConversationTransport";
 import { CREATE_NEW_OPTION, RANDOM_TOPIC_OPTION } from "./conversationSetupOptions";
 import type { ConversationSetupGoal } from "./useConversationSetup";
 import ConversationCollapsibleSection from "./ConversationCollapsibleSection";
 import { GUIDED_TOUR_OPEN_SECTION_EVENT, notifyGuidedTourAction } from "../../guides/guidedTourEvents";
+
+const GOAL_DIFFICULTY_MESSAGE_KEY: Record<GoalDifficulty, MessageKey> = {
+  easy: "conversation.goalDifficultyEasy",
+  medium: "conversation.goalDifficultyMedium",
+  hard: "conversation.goalDifficultyHard",
+};
 
 export default function ConversationSetupCard({
   previousTopics,
@@ -66,7 +72,7 @@ export default function ConversationSetupCard({
     notes.trim() ? t("conversation.notesLabel") : "",
     role.trim() ? t("conversation.roleLabel") : "",
   ].filter(Boolean).join(" + ");
-  const difficultySubtitle = t(`conversation.goalDifficulty${goalDifficulty.charAt(0).toUpperCase()}${goalDifficulty.slice(1)}` as const);
+  const difficultySubtitle = t(GOAL_DIFFICULTY_MESSAGE_KEY[goalDifficulty]);
   const modeSubtitle = selectedConversationMode === "realtime" ? t("conversation.modeLive") : t("conversation.modeNaturalVoices");
 
   useEffect(() => {

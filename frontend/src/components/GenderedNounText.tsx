@@ -1,33 +1,20 @@
 import type { ReactNode } from "react";
 
-export type GermanNounGender = "masculine" | "feminine" | "neuter";
+import { nounLanguageFeatureFor, type NounGender } from "../languageFeatures/nouns";
+import type { StudyLanguageCode } from "../types";
 
-const DETERMINER_PATTERN = [
-  "der", "die", "das", "den", "dem", "des",
-  "ein", "eine", "einen", "einem", "eines",
-  "kein", "keine", "keinen", "keinem", "keines",
-  "mein", "meine", "meinen", "meinem", "meines",
-  "dein", "deine", "deinen", "deinem", "deines",
-  "sein", "seine", "seinen", "seinem", "seines",
-  "ihr", "ihre", "ihren", "ihrem", "ihres",
-  "unser", "unsere", "unseren", "unserem", "unseres",
-  "euer", "eure", "euren", "eurem", "eures",
-  "dieser", "diese", "dieses", "diesen", "diesem",
-].join("|");
-
-function nounWithoutArticle(text: string): string {
-  return text.trim().replace(/^(?:der|die|das)\s+/i, "");
+export function nounGenderForLanguage(
+  targetText: string,
+  targetLanguage: StudyLanguageCode,
+): NounGender | null {
+  return nounLanguageFeatureFor(targetLanguage)?.genderForText(targetText) || null;
 }
 
-export function germanNounGender(targetText: string): GermanNounGender | null {
-  const article = targetText.trim().split(/\s+/, 1)[0]?.toLowerCase();
-  if (article === "der") return "masculine";
-  if (article === "die") return "feminine";
-  if (article === "das") return "neuter";
-  return null;
-}
-
-function nounForms(targetText: string, pluralText: string): string[] {
+function nounForms(targetText: string, pluralText: string, articles: string[]): string[] {
+  const articlePattern = articles.map(escapeForRegex).join("|");
+  const nounWithoutArticle = (text: string): string => (
+    text.trim().replace(new RegExp(`^(?:${articlePattern})\\s+`, "i"), "")
+  );
   const singular = nounWithoutArticle(targetText);
   const plural = nounWithoutArticle(pluralText);
   const forms = new Set([singular, plural].filter(Boolean));
@@ -52,25 +39,29 @@ function escapeForRegex(value: string): string {
 export default function GenderedNounText({
   text,
   targetText,
+  targetLanguage,
   pluralText = "",
   gender,
 }: {
   text: string;
   targetText: string;
+  targetLanguage: StudyLanguageCode;
   pluralText?: string;
-  gender: GermanNounGender | null;
+  gender: NounGender | null;
 }): ReactNode {
-  if (!gender || !text.trim()) {
+  const languageFeature = nounLanguageFeatureFor(targetLanguage);
+  if (!gender || !text.trim() || !languageFeature) {
     return text;
   }
 
-  const forms = nounForms(targetText, pluralText);
+  const forms = nounForms(targetText, pluralText, languageFeature.articles);
+  const { determiners } = languageFeature;
   if (!forms.length) {
     return text;
   }
 
   const pattern = new RegExp(
-    `(?<![\\p{L}])(?:(?:${DETERMINER_PATTERN})\\s+)?(?:${forms.map(escapeForRegex).join("|")})(?![\\p{L}])`,
+    `(?<![\\p{L}])(?:(?:${determiners.map(escapeForRegex).join("|")})\\s+)?(?:${forms.map(escapeForRegex).join("|")})(?![\\p{L}])`,
     "giu",
   );
   const parts: ReactNode[] = [];
@@ -97,3 +88,5 @@ export default function GenderedNounText({
   }
   return parts;
 }
+
+export type { NounGender } from "../languageFeatures/nouns";

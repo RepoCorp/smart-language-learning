@@ -7,7 +7,7 @@ from .exercise_payloads import sanitize_exercise_payload
 from .exercise_persistence import merge_item_exercise_phrases, replace_forms_exercise_payload
 from .generation import WORD_EXERCISE_MODEL, call_openai_json
 from .generation_words import _clean_exercise_section, _exercise_generation_input
-from .generation_word_noun_exercises import (
+from ...language_features.german.noun_forms import (
     GERMAN_NOUN_CASE_ORDER,
     GERMAN_NOUN_GENERATION_MODE,
     generate_german_noun_case_section,
