@@ -511,6 +511,7 @@ export interface OverviewStatsResponse {
 }
 
 export interface LearningProgressResponse {
+  current_history_month: string;
   current_streak: number;
   longest_streak: number;
   flex_days: number;

@@ -98,7 +98,13 @@ def resume_streak(user, *, source_language: str = "spanish", target_language: st
     return progress_payload(user, source_language=source_language, target_language=target_language)
 
 
-def progress_payload(user, *, source_language: str = "spanish", target_language: str = "german") -> dict:
+def progress_payload(
+    user,
+    *,
+    source_language: str = "spanish",
+    target_language: str = "german",
+    history_month: date | None = None,
+) -> dict:
     today = timezone.localdate()
     profile = _reconcile_profile(user, today)
     today_progress = _today_progress(user)
@@ -111,22 +117,26 @@ def progress_payload(user, *, source_language: str = "spanish", target_language:
     qualifies_by_pool = completed_items >= DAILY_POOL_ITEMS_REQUIRED and due_remaining == 0
     qualified_today = qualifies_by_time or qualifies_by_pool
     active_pause = LearningStreakPause.objects.filter(user=user, start_date__lte=today, end_date__gte=today).first()
+    history_start = history_month.replace(day=1) if history_month else today.replace(day=1)
+    next_month = (history_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+    history_end = min(today, next_month - timedelta(days=1))
     recent_progress = {
         entry.date: entry
         for entry in DailyLearningProgress.objects.filter(
             user=user,
-            date__gte=today - timedelta(days=29),
-            date__lte=today,
+            date__gte=history_start,
+            date__lte=history_end,
         )
     }
     history = []
-    for offset in range(29, -1, -1):
-        date = today - timedelta(days=offset)
-        entry = recent_progress.get(date)
+    history_date = history_start
+    while history_date <= history_end:
+        entry = recent_progress.get(history_date)
         history.append({
-            "date": date.isoformat(),
+            "date": history_date.isoformat(),
             "status": entry.status if entry else DailyLearningProgress.Status.MISSED,
         })
+        history_date += timedelta(days=1)
     latest_pause = LearningStreakPause.objects.filter(user=user).order_by("-end_date").first()
     next_pause_available_on = (
         latest_pause.end_date + timedelta(days=PAUSE_COOLDOWN_DAYS)
@@ -134,6 +144,7 @@ def progress_payload(user, *, source_language: str = "spanish", target_language:
         else None
     )
     return {
+        "current_history_month": today.strftime("%Y-%m"),
         "current_streak": profile.current_streak,
         "longest_streak": profile.longest_streak,
         "flex_days": profile.flex_days,

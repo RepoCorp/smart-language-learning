@@ -211,18 +211,19 @@ def test_regular_session_includes_ready_difficult_item_exercises():
     assert response.status_code == 200
     items = response.json()["items"]
     first_word_batch = [item["id"] for item in items[:2]]
-    second_word_batch = [item["id"] for item in items[2:4]]
+    word_blocks_batch = [item["id"] for item in items[3:5]]
     assert set(first_word_batch) == {second_word.id, word.id}
-    assert second_word_batch == first_word_batch
-    assert [item["id"] for item in items[4:6]] == [phrase.id, phrase.id]
+    assert word_blocks_batch == first_word_batch
+    assert [item["id"] for item in items[2:3]] == [phrase.id]
+    assert [item["id"] for item in items[5:6]] == [phrase.id]
     assert items[0]["repeatPracticeStep"] == "word_intro"
     assert items[1]["repeatPracticeStep"] == "word_intro"
-    assert items[2]["repeatPracticeStep"] == "word_parts"
+    assert items[2]["repeatPracticeStep"] == "phrase_progressive_blocks"
     assert items[3]["repeatPracticeStep"] == "word_parts"
-    assert items[4]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
-    assert items[4]["repeatedAfterFailure"] is True
-    assert "repeatPracticeStep" not in items[4] or items[4]["repeatPracticeStep"] is None
-    assert items[5]["repeatPracticeStep"] == "phrase_progressive_blocks"
+    assert items[4]["repeatPracticeStep"] == "word_parts"
+    assert items[5]["direction"] == Item.ReviewDirection.SPANISH_TO_GERMAN
+    assert items[5]["repeatedAfterFailure"] is True
+    assert items[5]["repeatPracticeStep"] == "phrase_builder"
 
 
 @pytest.mark.django_db

@@ -18,8 +18,13 @@ async function parseProgress(response: Response): Promise<LearningProgressRespon
 export async function fetchLearningProgress(
   sourceLanguage: StudyLanguageCode,
   targetLanguage: StudyLanguageCode,
+  historyMonth?: string,
 ): Promise<LearningProgressResponse> {
-  const response = await apiFetch(`${API_BASE}/progress?${languageParams(sourceLanguage, targetLanguage)}`);
+  const params = new URLSearchParams(languageParams(sourceLanguage, targetLanguage));
+  if (historyMonth) {
+    params.set("history_month", historyMonth);
+  }
+  const response = await apiFetch(`${API_BASE}/progress?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to load learning progress");
   }

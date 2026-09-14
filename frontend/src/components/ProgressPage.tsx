@@ -5,12 +5,19 @@ import { getLearningProgressUpdatedEventName } from "../apiCore";
 import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import type { LearningProgressResponse } from "../types";
+import ProgressCalendar from "../features/progress/ProgressCalendar";
 
 function localDateInputValue(): string {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function shiftMonth(month: string, direction: -1 | 1): string {
+  const [year, monthIndex] = month.split("-").map(Number);
+  const next = new Date(year, monthIndex - 1 + direction, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export default function ProgressPage(): JSX.Element {
@@ -22,12 +29,15 @@ export default function ProgressPage(): JSX.Element {
   const [savingPause, setSavingPause] = useState<boolean>(false);
   const [pauseStartDate, setPauseStartDate] = useState<string>(localDateInputValue());
   const [pauseEndDate, setPauseEndDate] = useState<string>(localDateInputValue());
+  const [historyMonth, setHistoryMonth] = useState<string | null>(null);
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
 
   useEffect(() => {
     let active = true;
     const load = async (): Promise<void> => {
+      setLoadingCalendar(true);
       try {
-        const nextProgress = await fetchLearningProgress(sourceLanguage, targetLanguage);
+        const nextProgress = await fetchLearningProgress(sourceLanguage, targetLanguage, historyMonth || undefined);
         if (active) {
           setProgress(nextProgress);
           setError("");
@@ -39,6 +49,7 @@ export default function ProgressPage(): JSX.Element {
       } finally {
         if (active) {
           setLoading(false);
+          setLoadingCalendar(false);
         }
       }
     };
@@ -49,7 +60,7 @@ export default function ProgressPage(): JSX.Element {
       active = false;
       window.removeEventListener(eventName, load);
     };
-  }, [sourceLanguage, t, targetLanguage]);
+  }, [historyMonth, sourceLanguage, t, targetLanguage]);
 
   const savePause = async (): Promise<void> => {
     setSavingPause(true);
@@ -85,6 +96,8 @@ export default function ProgressPage(): JSX.Element {
   const remainingSeconds = Math.max(0, (30 * 60) - progress.active_seconds_today);
   const remainingMinutes = Math.ceil(remainingSeconds / 60);
   const poolReady = progress.completed_items_today >= 5 && progress.due_reviews_remaining === 0;
+  const displayedHistoryMonth = historyMonth || progress.history.at(-1)?.date.slice(0, 7) || localDateInputValue().slice(0, 7);
+  const currentHistoryMonth = progress.current_history_month;
 
   return (
     <main className="container progress-page">
@@ -117,13 +130,16 @@ export default function ProgressPage(): JSX.Element {
         <p className="hint">{t("progress.flexEarnedAfter", { count: Math.max(0, 7 - progress.qualifying_days_toward_flex) })}</p>
       </section>
 
-      <section className="card progress-history-card">
-        <h2>{t("progress.recentActivity")}</h2>
-        <div className="progress-history-grid" aria-label={t("progress.recentActivity")}>
-          {progress.history.map((day) => <span key={day.date} className={`progress-history-day progress-history-${day.status}`} title={day.date} />)}
-        </div>
-        <p className="hint">{t("progress.historyLegend")}</p>
-      </section>
+      <ProgressCalendar
+        history={progress.history}
+        loading={loadingCalendar}
+        canViewNextMonth={displayedHistoryMonth < currentHistoryMonth}
+        onPreviousMonth={() => setHistoryMonth((month) => shiftMonth(month || currentHistoryMonth, -1))}
+        onNextMonth={() => setHistoryMonth((month) => {
+          const nextMonth = shiftMonth(month || currentHistoryMonth, 1);
+          return nextMonth >= currentHistoryMonth ? null : nextMonth;
+        })}
+      />
 
       <section className="card progress-pause-card">
         <h2>{t("progress.pauseTitle")}</h2>

@@ -362,6 +362,17 @@ def build_difficult_practice_entries(
             )
         )
 
+    for item in difficult_phrase_items:
+        entries.append(
+            SessionEntry(
+                item=item,
+                mode="review",
+                direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
+                repeated_after_failure=True,
+                repeat_practice_step="phrase_progressive_blocks",
+            )
+        )
+
     for item in difficult_word_items:
         entries.append(
             SessionEntry(
@@ -380,15 +391,7 @@ def build_difficult_practice_entries(
                 mode="review",
                 direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
                 repeated_after_failure=True,
-            )
-        )
-        entries.append(
-            SessionEntry(
-                item=item,
-                mode="review",
-                direction=Item.ReviewDirection.SPANISH_TO_GERMAN,
-                repeated_after_failure=True,
-                repeat_practice_step="phrase_progressive_blocks",
+                repeat_practice_step="phrase_builder",
             )
         )
 

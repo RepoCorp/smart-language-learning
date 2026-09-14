@@ -3,22 +3,12 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
-Custom para español
 Patterns
-Revolver ejercicios de frases y palabras
-Que no haya cajón visible en nuevo bloque
+Refactor y tests.
 Letras de canciones con frases muy largas
-Palabras para comparar también muestre la palabra
-Arreglar las descripciones y visual de la gramatica de palabras y frases
-Relacion expresion dialogo
 Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que si lo indique, cual es la regla al momento de practicarlo
-Silencios en las frases de Chat
-Mejorar prompt pregunta de gramatica
-Pasar por todo con despacio arreglando cositas que sean muy obvias
-Code Tests
-Revisar grammar for words
-En Forms en español usar ustedes, no vosotros
-en gramatica de frases el titulo del feature es mas pequeño que el contenido y eso lo hace confuso
+
+
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 
@@ -34,8 +24,10 @@ Los audios de partes de frases, y no se si tambien cuando el modelo saca mas que
 Muchas veces saca error al guardar pero si parece que guardo 
 
 ### Tier 1
+Mejorar prompt pregunta de gramatica
 Añadir mas guias
 - Añadir más Metadata a las palabras (desde la gramática) y usarla en ejercicios
+Silencios en las frases de Chat
 Que arme formas de a columna tambien
 Comparar incluya opuestos
 Algunas voces de ElevenLabs tienen un dejo de acento gringo
@@ -56,7 +48,30 @@ Mirar los ultimos dos temas con el chato que son mejoras a algunas estrategias
 Añadir amigo emp
 Remove phrase from image. De pronto solo la primera letra?
 Quitar la selección de frase para imagen y cuando esta abierta decir solo la frase al presionar reproducir
-
+Earn another flex day after 4 qualifying study day(s). (Falso cuando ya se tienen tres)
+Que frases también puedan tener lo de añadir los que confundo o relaciono?
+Color peligroso a cerrar sesión
+Más espacio pa arriba en el bloque arrastrado
+Ihn ihm... En confusing
+Errores en bloque generen ejercicio al otro dia
+Tabla palabras/errores para el otro dia
+En create pueda tratar de escribir en target language y corrija
+Audio en actuar más lento
+Correcto en rojo en ejercicio bloques y puede que otros
+Um y otros confusores
+confusas tengan mismo case
+De pronto las actuaciones más complejas?
+Nuevo de bloques que vaya pronunciando la palabra y al final pronuncie todo
+Confusores son de la misma familia, por ejemplo preposiciones
+Añadir ventana intro al guide
+Custom para español
+Palabras para comparar también muestre la palabra
+Arreglar las descripciones y visual de la gramatica de palabras y frases
+Relacion expresion dialogo
+Pasar por todo con despacio arreglando cositas que sean muy obvias
+Code Tests
+Revisar grammar for words
+En Forms en español usar ustedes, no vosotros
 
 #### PROMPTS/MODEL WORK
 Problema con palabras que toma como.expresion como.bitte y gleichfalls

@@ -305,29 +305,156 @@ button.overview-stats-metric-card:focus-visible {
   align-items: center;
 }
 
-.progress-history-grid {
+.progress-calendar-card {
+  overflow: hidden;
+}
+
+.progress-calendar-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.progress-calendar-heading h2 {
+  margin: 0;
+}
+
+.progress-calendar-heading span {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.progress-calendar-month-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.progress-calendar-month-controls button {
+  width: 28px;
+  height: 28px;
+  padding: 0 0 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.progress-calendar-month-controls button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.progress-calendar {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
 }
 
-.progress-history-day {
-  aspect-ratio: 1;
-  border-radius: 5px;
-  background: #e5e7eb;
+.progress-calendar-weekday {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-overflow: clip;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.progress-history-studied {
-  background: var(--color-accent);
+.progress-calendar-day,
+.progress-calendar-empty {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 10px;
 }
-.progress-history-flex {
-  background: #efb35c;
+
+.progress-calendar-day {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 7px;
+  background: var(--color-surface-soft);
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
-.progress-history-paused {
-  background: #82b8df;
+
+.progress-calendar-day i,
+.progress-calendar-legend i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
 }
-.progress-history-pending {
-  background: #d9e7df;
+
+.progress-calendar-studied {
+  background: #e3f7ef;
+  color: #117c69;
+}
+
+.progress-calendar-flex {
+  background: #fff1d6;
+  color: #a8690b;
+}
+
+.progress-calendar-paused {
+  background: #e3f0fb;
+  color: #377ba8;
+}
+
+.progress-calendar-pending {
+  background: #eff5f0;
+  color: #59806b;
+}
+
+.progress-calendar-missed {
+  background: #f7f3f0;
+  color: #9a8071;
+}
+
+.progress-calendar-today {
+  border-color: var(--color-accent-strong);
+  box-shadow: inset 0 0 0 1px var(--color-accent-strong);
+}
+
+.progress-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 13px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.progress-calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.progress-calendar-legend i {
+  background: currentColor;
+}
+
+.progress-calendar-legend .progress-calendar-studied {
+  color: #117c69;
+}
+
+.progress-calendar-legend .progress-calendar-flex {
+  color: #a8690b;
+}
+
+.progress-calendar-legend .progress-calendar-paused {
+  color: #377ba8;
 }
 
 .progress-pause-form {
@@ -2868,6 +2995,12 @@ textarea {
   gap: 6px;
   padding: 0 12px 12px;
   text-align: left;
+}
+
+.grammar-phrase-feature-title {
+  color: var(--color-text);
+  font-size: 1.05rem;
+  line-height: 1.25;
 }
 
 .grammar-phrase-feature-definition,

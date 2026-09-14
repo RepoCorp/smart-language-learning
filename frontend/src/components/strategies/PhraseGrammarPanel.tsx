@@ -73,7 +73,7 @@ export default function PhraseGrammarPanel({
               return (
                 <section key={featureKey} className="content-collapsible-card">
                   <button type="button" className="content-collapsible-trigger" aria-expanded={feature.isOpen} onClick={() => phraseGrammar.toggleFeature(featureKey)}>
-                    <span className="content-collapsible-trigger-copy"><strong>{t(presentation.title)}</strong></span>
+                    <span className="content-collapsible-trigger-copy grammar-phrase-feature-title"><strong>{t(presentation.title)}</strong></span>
                     <span className={`content-collapsible-trigger-icon${feature.isOpen ? " content-collapsible-trigger-icon-open" : ""}`} aria-hidden="true">▾</span>
                   </button>
                   {feature.isOpen && (

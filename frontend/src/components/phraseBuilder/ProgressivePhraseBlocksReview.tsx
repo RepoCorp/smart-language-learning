@@ -54,7 +54,7 @@ function initialLetter(value: string): string {
   return choiceWord(value).toLocaleLowerCase().slice(0, 1);
 }
 
-function choicesForNextToken(
+export function choicesForNextToken(
   tokens: PhraseToken[],
   placedCount: number,
   phraseKey: string,
@@ -86,6 +86,12 @@ function choicesForNextToken(
     ...fallbackInitialWords.filter(
       (word) => !matchingInitialWords.some((matchingWord) => sameGrammarForm(matchingWord, word)),
     ),
+    // When no word shares a useful phrase initial, keep three choices rather than
+    // making the answer obvious. These remain deterministic and never reuse phrase words.
+    ...availableWords.filter((word) => ![
+      ...matchingInitialWords,
+      ...fallbackInitialWords,
+    ].some((initialWord) => sameGrammarForm(initialWord, word))),
   ];
   const randomChoices = deterministicSort(randomPool, `${phraseKey}:${placedCount}:random`, (word) => word)
     .filter((word, index, words) =>
@@ -261,6 +267,88 @@ export default function ProgressivePhraseBlocksReview({
   return (
     <div className="phrase-builder-review phrase-builder-progressive-review">
       <p className="test-source-phrase">{promptText}</p>
+      {!complete && (
+        <div className="phrase-builder-choice-area phrase-builder-choice-area-top">
+          <div className="phrase-builder-bank" aria-label={t("phrase.progressiveBlocksChoiceLabel")}>
+            {choices.map((token) => (
+              <button
+                key={token.id}
+                type="button"
+                className={`phrase-builder-token${wrongTokenId === token.id ? " phrase-builder-token-wrong" : ""}${draggingTokenId === token.id ? " phrase-builder-token-dragging" : ""}`}
+                style={draggingTokenId === token.id && draggingPosition ? draggingPosition : undefined}
+                onClick={(event) => {
+                  if (event.detail === 0) {
+                    void chooseToken(token);
+                  }
+                }}
+                onPointerDown={(event) => {
+                  if (isSubmitting || isCompleting) {
+                    return;
+                  }
+                  event.preventDefault();
+                  if (token.id === tokens[placedCount]?.id) {
+                    setRevealedTokenId(token.id);
+                  }
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const isTouchDrag = window.matchMedia("(pointer: coarse)").matches;
+                  const touchLift = isTouchDrag ? 28 : 0;
+                  activePointerIdRef.current = event.pointerId;
+                  draggingTokenRef.current = token;
+                  draggingElementRef.current = event.currentTarget;
+                  // Keep the pointer at the lower edge so it does not hide the letters while dragging.
+                  pointerOffsetRef.current = { x: event.clientX - rect.left, y: rect.height - 5 + touchLift };
+                  setDraggingTokenId(token.id);
+                  setDraggingPosition(isTouchDrag
+                    ? {
+                      left: event.clientX - pointerOffsetRef.current.x,
+                      top: event.clientY - pointerOffsetRef.current.y,
+                    }
+                    : { left: rect.left, top: rect.top });
+                }}
+                onPointerMove={(event) => {
+                  if (activePointerIdRef.current !== event.pointerId) {
+                    return;
+                  }
+                  event.preventDefault();
+                  setDraggingPosition({
+                    left: event.clientX - pointerOffsetRef.current.x,
+                    top: event.clientY - pointerOffsetRef.current.y,
+                  });
+                  if (isOverActiveSlot(event.clientX, event.clientY)) {
+                    settleDrag(token, event.pointerId, event.clientX, event.clientY);
+                  }
+                }}
+                onPointerUp={(event) => {
+                  event.preventDefault();
+                  settleDrag(token, event.pointerId, event.clientX, event.clientY);
+                }}
+                onPointerCancel={(event) => {
+                  if (activePointerIdRef.current === event.pointerId) {
+                    clearDrag();
+                  }
+                }}
+                onLostPointerCapture={() => clearDrag()}
+                disabled={isSubmitting || isCompleting}
+                aria-label={token.text}
+              >
+                <span aria-hidden="true">{token.id === revealedTokenId ? token.text : token.text.slice(0, revealedLetterCount)}</span>
+              </button>
+            ))}
+          </div>
+          {revealedLetterCount < Math.max(...choices.map((token) => token.text.length)) && (
+            <button
+              type="button"
+              className="secondary-button"
+              ref={showNextLetterButtonRef}
+              onClick={revealNextLetter}
+              disabled={isSubmitting || isCompleting}
+            >
+              {t("phrase.progressiveBlocksShowNextLetter")}
+            </button>
+          )}
+        </div>
+      )}
       <div className="phrase-builder-target-zone">
         <div className="phrase-builder-slots" aria-label={t("phrase.progressiveBlocksAnswerLabel")}>
           {tokens.slice(0, placedCount).map((token) => (
@@ -281,88 +369,6 @@ export default function ProgressivePhraseBlocksReview({
           )}
         </div>
       </div>
-      {!complete && (
-        <div className="phrase-builder-choice-area">
-          <div className="phrase-builder-bank" aria-label={t("phrase.progressiveBlocksChoiceLabel")}>
-            {choices.map((token) => (
-                  <button
-                    key={token.id}
-                    type="button"
-                    className={`phrase-builder-token${wrongTokenId === token.id ? " phrase-builder-token-wrong" : ""}${draggingTokenId === token.id ? " phrase-builder-token-dragging" : ""}`}
-                    style={draggingTokenId === token.id && draggingPosition ? draggingPosition : undefined}
-                    onClick={(event) => {
-                      if (event.detail === 0) {
-                        void chooseToken(token);
-                      }
-                    }}
-                    onPointerDown={(event) => {
-                      if (isSubmitting || isCompleting) {
-                        return;
-                      }
-                      event.preventDefault();
-                      if (token.id === tokens[placedCount]?.id) {
-                        setRevealedTokenId(token.id);
-                      }
-                      event.currentTarget.setPointerCapture(event.pointerId);
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      const isTouchDrag = window.matchMedia("(pointer: coarse)").matches;
-                      const touchLift = isTouchDrag ? 28 : 0;
-                      activePointerIdRef.current = event.pointerId;
-                      draggingTokenRef.current = token;
-                      draggingElementRef.current = event.currentTarget;
-                      // Keep the pointer at the lower edge so it does not hide the letters while dragging.
-                      pointerOffsetRef.current = { x: event.clientX - rect.left, y: rect.height - 5 + touchLift };
-                      setDraggingTokenId(token.id);
-                      setDraggingPosition(isTouchDrag
-                        ? {
-                          left: event.clientX - pointerOffsetRef.current.x,
-                          top: event.clientY - pointerOffsetRef.current.y,
-                        }
-                        : { left: rect.left, top: rect.top });
-                    }}
-                    onPointerMove={(event) => {
-                      if (activePointerIdRef.current !== event.pointerId) {
-                        return;
-                      }
-                      event.preventDefault();
-                      setDraggingPosition({
-                        left: event.clientX - pointerOffsetRef.current.x,
-                        top: event.clientY - pointerOffsetRef.current.y,
-                      });
-                      if (isOverActiveSlot(event.clientX, event.clientY)) {
-                        settleDrag(token, event.pointerId, event.clientX, event.clientY);
-                      }
-                    }}
-                    onPointerUp={(event) => {
-                      event.preventDefault();
-                      settleDrag(token, event.pointerId, event.clientX, event.clientY);
-                    }}
-                    onPointerCancel={(event) => {
-                      if (activePointerIdRef.current === event.pointerId) {
-                        clearDrag();
-                      }
-                    }}
-                    onLostPointerCapture={() => clearDrag()}
-                    disabled={isSubmitting || isCompleting}
-                    aria-label={token.text}
-                  >
-                    <span aria-hidden="true">{token.id === revealedTokenId ? token.text : token.text.slice(0, revealedLetterCount)}</span>
-                  </button>
-            ))}
-          </div>
-          {revealedLetterCount < Math.max(...choices.map((token) => token.text.length)) && (
-            <button
-              type="button"
-              className="secondary-button"
-              ref={showNextLetterButtonRef}
-              onClick={revealNextLetter}
-              disabled={isSubmitting || isCompleting}
-            >
-              {t("phrase.progressiveBlocksShowNextLetter")}
-            </button>
-          )}
-        </div>
-      )}
       {complete && <p className="phrase-builder-success">{t("phrase.progressiveBlocksComplete")}</p>}
       {reviewComplete && (
         <div className="actions">

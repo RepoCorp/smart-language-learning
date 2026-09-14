@@ -85,6 +85,15 @@ const messages = {
     "progress.recentActivity": "Recent activity",
     "progress.historyLegend":
       "Green: study day. Amber: flex day. Blue: paused day.",
+    "progress.calendarTitle": "Learning calendar",
+    "progress.calendarStudied": "Studied",
+    "progress.calendarFlex": "Flex day",
+    "progress.calendarPaused": "Paused",
+    "progress.calendarPending": "In progress",
+    "progress.calendarMissed": "Missed",
+    "progress.calendarNoActivity": "No activity",
+    "progress.calendarPreviousMonth": "Previous month",
+    "progress.calendarNextMonth": "Next month",
     "progress.pauseTitle": "Protect an interruption",
     "progress.pauseHint":
       "Pause up to seven days for travel, illness, or an unexpected interruption. A pause holds your streak but does not increase it.",
@@ -993,6 +1002,15 @@ const messages = {
     "progress.recentActivity": "Actividad reciente",
     "progress.historyLegend":
       "Verde: día de estudio. Ámbar: día flexible. Azul: día en pausa.",
+    "progress.calendarTitle": "Calendario de aprendizaje",
+    "progress.calendarStudied": "Estudiado",
+    "progress.calendarFlex": "Día flexible",
+    "progress.calendarPaused": "En pausa",
+    "progress.calendarPending": "En progreso",
+    "progress.calendarMissed": "No cumplido",
+    "progress.calendarNoActivity": "Sin actividad",
+    "progress.calendarPreviousMonth": "Mes anterior",
+    "progress.calendarNextMonth": "Mes siguiente",
     "progress.pauseTitle": "Proteger una interrupción",
     "progress.pauseHint":
       "Pausa hasta siete días por viaje, enfermedad o una interrupción inesperada. La pausa conserva tu racha, pero no la aumenta.",

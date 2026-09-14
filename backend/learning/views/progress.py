@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -24,13 +25,34 @@ def _language_pair(request: Request) -> tuple[str, str]:
     return source_language, target_language
 
 
+def _history_month(request: Request) -> date | None:
+    raw_month = str(request.query_params.get("history_month", "")).strip()
+    if not raw_month:
+        return None
+    try:
+        return date.fromisoformat(f"{raw_month}-01")
+    except ValueError as exc:
+        raise ValueError("history_month must use YYYY-MM") from exc
+
+
 class LearningProgressView(APIView):
     def get(self, request: Request) -> Response:
         user = _require_user(request)
         if user is None:
             return Response({"detail": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         source_language, target_language = _language_pair(request)
-        return Response(progress_payload(user, source_language=source_language, target_language=target_language))
+        try:
+            history_month = _history_month(request)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if history_month and history_month > timezone.localdate().replace(day=1):
+            return Response({"detail": "history_month cannot be in the future"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(progress_payload(
+            user,
+            source_language=source_language,
+            target_language=target_language,
+            history_month=history_month,
+        ))
 
 
 class LearningProgressStudyTimeView(APIView):
