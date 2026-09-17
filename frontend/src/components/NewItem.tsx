@@ -36,6 +36,7 @@ import ItemViewHeader from "./ItemViewHeader";
 import PhraseReview from "./PhraseReview";
 import WordExerciseActions from "./WordExerciseActions";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
+import { buildFormsExerciseEntries, compareWordExerciseEntries } from "./strategies/forms/formsExerciseEntries";
 import ItemStrategiesModal from "./strategies/ItemStrategiesModal";
 import ItemTestingExperience from "./testing/ItemTestingExperience";
 import { useItemTestingModal } from "./testing/useItemTestingModal";
@@ -86,8 +87,6 @@ interface NewItemProps {
   readOnly?: boolean;
   onClose?: () => void;
 }
-
-const MAX_EXERCISE_ENTRIES = 30;
 
 function ItemActionIcon({
   name,
@@ -584,26 +583,6 @@ export default function NewItem({
     setShowCompareWordsModal(true);
   };
 
-  const sanitizeExerciseEntries = (
-    entries?: Array<{
-      label?: string;
-      source_text?: string;
-      target_text?: string;
-    }>,
-  ): Array<{ label: string; source: string; target: string }> => {
-    if (!entries || !entries.length) {
-      return [];
-    }
-    return entries
-      .map((entry) => ({
-        label: String(entry.label || "").trim(),
-        source: String(entry.source_text || "").trim(),
-        target: String(entry.target_text || "").trim(),
-      }))
-      .filter((entry) => entry.source && entry.target)
-      .slice(0, MAX_EXERCISE_ENTRIES);
-  };
-
   const exerciseEntryKey = (entry: {
     label?: string;
     source: string;
@@ -647,45 +626,17 @@ export default function NewItem({
       sing: "Failed to create song",
     },
   });
-  const savedExerciseEntries = sanitizeExerciseEntries(
-    exercisePhrases?.phrases,
-  );
-  const legacyExerciseEntries = [
-    ...sanitizeExerciseEntries(exercisePhrases?.first_section),
-    ...sanitizeExerciseEntries(exercisePhrases?.second_section),
-  ];
-  const generatedWordExerciseEntries = savedExerciseEntries.length
-    ? savedExerciseEntries
-    : legacyExerciseEntries;
-  const funnyImageExerciseEntry = exercisePhrases?.funny_image_phrase;
-  const funnyImageExerciseSelectionEntry =
-    funnyImageExerciseEntry?.source_text && funnyImageExerciseEntry?.target_text
-      ? {
-          label: funnyImageExerciseEntry.label || "funny image",
-          source: funnyImageExerciseEntry.source_text,
-          target: funnyImageExerciseEntry.target_text,
-        }
-      : undefined;
-  const regularWordExerciseEntries =
-    item.item_type === "word"
-      ? [
-          {
-            label: "word",
-            source: sourceText,
-            target: targetText,
-          },
-          ...generatedWordExerciseEntries,
-        ]
-      : generatedWordExerciseEntries;
-  const wordExerciseEntries =
-    item.item_type === "word"
-      ? [
-          ...regularWordExerciseEntries,
-          ...(funnyImageExerciseSelectionEntry
-            ? [funnyImageExerciseSelectionEntry]
-            : []),
-        ]
-      : regularWordExerciseEntries;
+  const {
+    generatedWordExerciseEntries,
+    funnyImageExerciseEntry,
+    funnyImageExerciseSelectionEntry,
+    wordExerciseEntries,
+  } = buildFormsExerciseEntries({
+    itemType: item.item_type,
+    sourceText,
+    targetText,
+    exercisePhrases,
+  });
   const isVerbWord =
     item.item_type === "word" &&
     String(wordType || "")
@@ -714,49 +665,6 @@ export default function NewItem({
     : undefined;
 
   const compareExerciseWords = item.item_type === "word" ? compareWords : [];
-  const compareWordExerciseEntries = (
-    word: NonNullable<SessionItem["compare_words"]>[number],
-    exercisePhrasePayload?: SessionItem["exercise_phrases"],
-  ): Array<{ source: string; target: string; label: string }> => {
-    const wordLabel = word.german_text;
-    const compareWordEntry = {
-      label: wordLabel ? `${wordLabel} - word` : "word",
-      source: word.spanish_text,
-      target: word.german_text,
-    };
-    const compareSavedEntries = sanitizeExerciseEntries(
-      exercisePhrasePayload?.phrases,
-    );
-    const compareLegacyEntries = [
-      ...sanitizeExerciseEntries(exercisePhrasePayload?.first_section),
-      ...sanitizeExerciseEntries(exercisePhrasePayload?.second_section),
-    ];
-    const compareGeneratedEntries = compareSavedEntries.length
-      ? compareSavedEntries
-      : compareLegacyEntries;
-    const compareFunnyImageEntry = exercisePhrasePayload?.funny_image_phrase;
-    const compareFunnyImageSelectionEntry =
-      compareFunnyImageEntry?.source_text && compareFunnyImageEntry?.target_text
-        ? [
-            {
-              label: wordLabel
-                ? `${wordLabel} - ${compareFunnyImageEntry.label || "funny image"}`
-                : compareFunnyImageEntry.label || "funny image",
-              source: compareFunnyImageEntry.source_text,
-              target: compareFunnyImageEntry.target_text,
-            },
-          ]
-        : [];
-    const labeledGeneratedEntries = compareGeneratedEntries.map((entry) => ({
-      ...entry,
-      label: wordLabel ? `${wordLabel} - ${entry.label}` : entry.label,
-    }));
-    return [
-      compareWordEntry,
-      ...labeledGeneratedEntries,
-      ...compareFunnyImageSelectionEntry,
-    ];
-  };
   const compareExerciseEntries =
     item.item_type === "word"
       ? compareExerciseWords.flatMap((word) =>

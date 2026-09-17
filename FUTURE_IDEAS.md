@@ -3,12 +3,13 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
-Patterns
+Patterns, wäre
 Refactor y tests.
 Letras de canciones con frases muy largas
 Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que si lo indique, cual es la regla al momento de practicarlo
-
-
+Por que passen no tiene frase?
+Traduccion de la palabra en calentamiento
+ejemplo de expresion es la frase de donde salio
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 
@@ -23,7 +24,8 @@ Los audios de partes de frases, y no se si tambien cuando el modelo saca mas que
  Soll ich ihn einpacken? ihn la guardo er 
 Muchas veces saca error al guardar pero si parece que guardo 
 
-### Tier 1
+### Tier 1 (trabajarle de a poquitos, timeboxed)
+Que no repita la regla gramatical en pregunta
 Mejorar prompt pregunta de gramatica
 Añadir mas guias
 - Añadir más Metadata a las palabras (desde la gramática) y usarla en ejercicios
