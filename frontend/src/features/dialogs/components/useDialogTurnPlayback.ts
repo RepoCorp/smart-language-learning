@@ -18,6 +18,8 @@ type Params = {
   setDialogs: Dispatch<SetStateAction<ContentDialogRecord[]>>;
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
+  audioMode?: DialogTurnAudioMode;
+  clearPlaybackRate?: number;
   loadError: string;
   setError: (value: string) => void;
   ensureDialogDetail: (dialogId: number, initialDialog?: ContentDialogRecord | null) => Promise<ContentDialogRecord | null>;
@@ -32,6 +34,8 @@ export default function useDialogTurnPlayback({
   setDialogs,
   sourceLanguage,
   targetLanguage,
+  audioMode = "natural",
+  clearPlaybackRate = 1,
   loadError,
   setError,
   ensureDialogDetail,
@@ -47,14 +51,28 @@ export default function useDialogTurnPlayback({
   const [loadingTurnAudioKey, setLoadingTurnAudioKey] = useState<string>("");
   const playbackRunRef = useRef<number>(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const activeAudioModeRef = useRef<DialogTurnAudioMode>("natural");
+  const clearPlaybackRateRef = useRef(clearPlaybackRate);
+  const pausedRef = useRef(false);
+  const finishAudioRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    clearPlaybackRateRef.current = clearPlaybackRate;
+    if (activeAudioRef.current && activeAudioModeRef.current === "clear") {
+      activeAudioRef.current.playbackRate = clearPlaybackRate;
+    }
+  }, [clearPlaybackRate]);
 
   const stopCurrentPlayback = (): void => {
     playbackRunRef.current += 1;
+    pausedRef.current = false;
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
       activeAudioRef.current.currentTime = 0;
       activeAudioRef.current = null;
     }
+    finishAudioRef.current?.();
+    setLoadingTurnAudioKey("");
     setPlayingAll(false);
     setPlayingDialogId(null);
     setPlayingTurn(null);
@@ -63,43 +81,56 @@ export default function useDialogTurnPlayback({
 
   const togglePlaybackPause = (): void => {
     const audio = activeAudioRef.current;
-    if (!audio) {
-      return;
+    pausedRef.current = !pausedRef.current;
+    setIsPlaybackPaused(pausedRef.current);
+    if (pausedRef.current) audio?.pause();
+    else if (audio) {
+      const runId = playbackRunRef.current;
+      void audio.play().catch(() => {
+        if (runId !== playbackRunRef.current) return;
+        setError(loadError);
+        stopCurrentPlayback();
+      });
     }
-    if (audio.paused) {
-      void audio.play();
-      setIsPlaybackPaused(false);
-      return;
-    }
-    audio.pause();
-    setIsPlaybackPaused(true);
   };
+
+  useEffect(() => { stopCurrentPlayback(); }, [audioMode, sourceLanguage, targetLanguage]);
 
   useEffect(() => () => {
     playbackRunRef.current += 1;
     activeAudioRef.current?.pause();
+    finishAudioRef.current?.();
   }, []);
 
-  const playAudioUrl = (audioUrl: string, runId: number): Promise<void> =>
-    new Promise((resolve) => {
+  const playAudioUrl = (audioUrl: string, runId: number, mode: DialogTurnAudioMode): Promise<void> =>
+    new Promise((resolve, reject) => {
       if (!audioUrl || runId !== playbackRunRef.current) {
         resolve();
         return;
       }
 
       const audio = new Audio(audioUrl);
+      audio.preservesPitch = true;
+      audio.playbackRate = mode === "clear" ? clearPlaybackRateRef.current : 1;
       activeAudioRef.current = audio;
+      activeAudioModeRef.current = mode;
       const done = (): void => {
         audio.removeEventListener("ended", done);
-        audio.removeEventListener("error", done);
+        audio.removeEventListener("error", failed);
         if (activeAudioRef.current === audio) {
           activeAudioRef.current = null;
         }
+        if (finishAudioRef.current === done) finishAudioRef.current = null;
         resolve();
       };
+      const failed = (): void => {
+        reject(new Error(loadError));
+        done();
+      };
+      finishAudioRef.current = done;
       audio.addEventListener("ended", done);
-      audio.addEventListener("error", done);
-      void audio.play().catch(done);
+      audio.addEventListener("error", failed);
+      if (!pausedRef.current) void audio.play().catch(failed);
     });
 
   const updateTurnAudioUrl = (
@@ -126,7 +157,9 @@ export default function useDialogTurnPlayback({
     turnIndex: number,
     currentAudioUrl: string,
     mode: DialogTurnAudioMode,
+    runId: number,
   ): Promise<string> => {
+    if (runId !== playbackRunRef.current) return "";
     if (currentAudioUrl) {
       return currentAudioUrl;
     }
@@ -136,15 +169,17 @@ export default function useDialogTurnPlayback({
       const audioUrl = mode === "clear"
         ? await generateContentDialogTurnClearAudio(dialogId, turnIndex, sourceLanguage, targetLanguage)
         : await generateContentDialogTurnAudio(dialogId, turnIndex, sourceLanguage, targetLanguage);
+      if (runId !== playbackRunRef.current) return "";
       if (audioUrl) {
         updateTurnAudioUrl(dialogId, turnIndex, audioUrl, mode);
       }
+      else setError(loadError);
       return audioUrl;
     } catch {
-      setError(loadError);
+      if (runId === playbackRunRef.current) setError(loadError);
       return "";
     } finally {
-      setLoadingTurnAudioKey((current) => (current === key ? "" : current));
+      if (runId === playbackRunRef.current) setLoadingTurnAudioKey("");
     }
   };
 
@@ -155,19 +190,17 @@ export default function useDialogTurnPlayback({
     mode: DialogTurnAudioMode,
   ): Promise<void> => {
     stopCurrentPlayback();
-    const audioUrl = await ensureTurnAudioUrl(dialogId, turnIndex, currentAudioUrl, mode);
-    if (!audioUrl) {
-      return;
-    }
-    playbackRunRef.current += 1;
     const runId = playbackRunRef.current;
+    setError("");
     setPlayingDialogId(dialogId);
     setPlayingTurn({ dialogId, turnIndex });
-    setIsPlaybackPaused(false);
-    await playAudioUrl(audioUrl, runId);
-    if (runId === playbackRunRef.current) {
-      setPlayingDialogId(null);
-      setPlayingTurn(null);
+    try {
+      const audioUrl = await ensureTurnAudioUrl(dialogId, turnIndex, currentAudioUrl, mode, runId);
+      if (audioUrl) await playAudioUrl(audioUrl, runId, mode);
+    } catch {
+      if (runId === playbackRunRef.current) setError(loadError);
+    } finally {
+      if (runId === playbackRunRef.current) stopCurrentPlayback();
     }
   };
 
@@ -180,7 +213,6 @@ export default function useDialogTurnPlayback({
       return;
     }
     setPlayingDialogId(detailedDialog.dialog_id);
-    setIsPlaybackPaused(false);
     for (let index = 0; index < detailedDialog.turns.length; index += 1) {
       if (runId !== playbackRunRef.current) {
         break;
@@ -190,10 +222,15 @@ export default function useDialogTurnPlayback({
       const audioUrl = await ensureTurnAudioUrl(
         detailedDialog.dialog_id,
         index,
-        detailedDialog.turns[index].phrase_audio_url || "",
-        "natural",
+        (audioMode === "clear" ? detailedDialog.turns[index].clear_audio_url : detailedDialog.turns[index].phrase_audio_url) || "",
+        audioMode,
+        runId,
       );
-      await playAudioUrl(audioUrl, runId);
+      if (!audioUrl) {
+        if (runId === playbackRunRef.current) throw new Error(loadError);
+        return;
+      }
+      await playAudioUrl(audioUrl, runId, audioMode);
     }
   };
 
@@ -204,10 +241,13 @@ export default function useDialogTurnPlayback({
     stopCurrentPlayback();
     playbackRunRef.current += 1;
     const runId = playbackRunRef.current;
-    await playDialogWithFocusedTurns(dialog, runId);
-    if (runId === playbackRunRef.current) {
-      setPlayingDialogId(null);
-      setPlayingTurn(null);
+    setError("");
+    try {
+      await playDialogWithFocusedTurns(dialog, runId);
+    } catch {
+      if (runId === playbackRunRef.current) setError(loadError);
+    } finally {
+      if (runId === playbackRunRef.current) stopCurrentPlayback();
     }
   };
 
@@ -230,12 +270,10 @@ export default function useDialogTurnPlayback({
         await playDialogWithFocusedTurns(dialog, runId);
       }
     } catch {
-      setError(loadError);
+      if (runId === playbackRunRef.current) setError(loadError);
     } finally {
       if (runId === playbackRunRef.current) {
-        setPlayingAll(false);
-        setPlayingDialogId(null);
-        setPlayingTurn(null);
+        stopCurrentPlayback();
       }
     }
   };

@@ -64,6 +64,7 @@ export default function DialogsCatalogList({ state, actions }: Props): JSX.Eleme
             <strong className="dialog-list-topic">{activeDialog.topic}</strong>
             <span className="dialog-list-context">{activeDialog.context || t("dialogs.noContext")}</span>
             {state.playingDialogId === activeDialog.dialog_id && <span className="manage-item-meta">{t("dialogs.nowPlaying")}</span>}
+            {state.playingDialogId === activeDialog.dialog_id && state.loadingTurnAudioKey && <span role="status" className="manage-item-meta">{t("dialogs.preparingAudio")}</span>}
           </div>
           <div className="dialog-list-controls dialog-global-controls-row">
             {actions.renderDialogActionButtons(activeDialog)}

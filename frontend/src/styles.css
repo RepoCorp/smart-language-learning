@@ -4382,6 +4382,26 @@ textarea {
   flex: 0 0 auto;
 }
 
+.dialog-playback-options,
+.dialog-playback-speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dialog-playback-speed {
+  margin: 0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.dialog-playback-speed select {
+  width: auto;
+  min-height: 40px;
+  margin: 0;
+}
+
 .dialog-list-action-button.dialog-turn-audio-mode-selected[aria-pressed="true"] {
   border-color: #f3b45b;
   background: #fff4df;

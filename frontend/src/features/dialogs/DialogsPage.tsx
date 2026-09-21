@@ -8,6 +8,7 @@ import {
 import BlockingLoadingOverlay from "../../components/BlockingLoadingOverlay";
 import DialogsCatalogList from "./components/DialogsCatalogList";
 import DialogGlobalControls from "./components/DialogGlobalControls";
+import DialogPlaybackOptions from "./components/DialogPlaybackOptions";
 import DialogItemSavingModals from "./components/DialogItemSavingModals";
 import DialogsFilterBar from "./components/DialogsFilterBar";
 import { useDialogItemSaving } from "./components/useDialogItemSaving";
@@ -47,6 +48,7 @@ export default function DialogsPage(): JSX.Element {
   } = useDialogsCatalog(sourceLanguage, targetLanguage);
   const [showDialogText, setShowDialogText] = useState<boolean>(targetPromptMode === "text");
   const [turnAudioMode, setTurnAudioMode] = useState<DialogTurnAudioMode>("natural");
+  const [clearPlaybackRate, setClearPlaybackRate] = useState(1);
   const [expandedDialogId, setExpandedDialogId] = useState<number | null>(null);
   const [loadingDialogId, setLoadingDialogId] = useState<number | null>(null);
   const [regeneratingAudioDialogId, setRegeneratingAudioDialogId] = useState<number | null>(null);
@@ -134,6 +136,8 @@ export default function DialogsPage(): JSX.Element {
     sourceLanguage,
     targetLanguage,
     loadError: t("dialogs.error.load"),
+    audioMode: turnAudioMode,
+    clearPlaybackRate,
     setError,
     ensureDialogDetail,
     upsertVisibleDialog,
@@ -158,7 +162,12 @@ export default function DialogsPage(): JSX.Element {
     setExpandedDialogId(null);
     resetItemSaving();
     stopCurrentPlayback();
-  }, [search, topic, context, page]);
+  }, [search, topic, context, level, page]);
+
+  const toggleAudioMode = (): void => {
+    stopCurrentPlayback();
+    setTurnAudioMode((current) => current === "natural" ? "clear" : "natural");
+  };
 
   const regenerateDialogAudio = async (dialog: ContentDialogRecord): Promise<void> => {
     if (regeneratingAudioDialogId !== null) {
@@ -212,12 +221,14 @@ export default function DialogsPage(): JSX.Element {
       showText={showDialogText}
       targetPromptMode={targetPromptMode}
       turnAudioMode={turnAudioMode}
+      clearPlaybackRate={clearPlaybackRate}
+      onClearPlaybackRateChange={setClearPlaybackRate}
       regenerating={regeneratingAudioDialogId === dialog.dialog_id}
       deleting={deletingDialogId === dialog.dialog_id}
       onPlay={() => void playSingleDialog(dialog)}
       onTogglePause={togglePlaybackPause}
       onToggleText={() => setShowDialogText((value) => !value)}
-      onToggleTurnAudioMode={() => setTurnAudioMode((current) => current === "natural" ? "clear" : "natural")}
+      onToggleTurnAudioMode={toggleAudioMode}
       onCollapse={() => setExpandedDialogId(null)}
       onRegenerate={() => regenerateDialogAudio(dialog)}
       onDelete={() => deleteDialog(dialog)}
@@ -244,6 +255,7 @@ export default function DialogsPage(): JSX.Element {
             onLevelChange={setLevel}
           />
           <div className="actions">
+            <DialogPlaybackOptions mode={turnAudioMode} speed={clearPlaybackRate} onToggleMode={toggleAudioMode} onSpeedChange={setClearPlaybackRate} />
             {!playingAll ? (
               <button type="button" onClick={() => void playAllDialogs()} disabled={loading || !hasPlayableDialogs}>
                 {t("dialogs.playAll")}
@@ -254,6 +266,7 @@ export default function DialogsPage(): JSX.Element {
               </button>
             )}
           </div>
+          {turnAudioMode === "clear" && <p className="hint">{t("dialogs.clearAudioOnDemand")}</p>}
         </section>
         <div className={showMobileActionLabels ? "mobile-action-labels-expanded" : undefined}>
           <DialogsCatalogList

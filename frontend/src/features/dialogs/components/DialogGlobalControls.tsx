@@ -2,7 +2,7 @@ import { useI18n } from "../../../i18n";
 import type { ContentDialogRecord } from "../../../types";
 import DangerousButton from "../../../components/DangerousButton";
 import DialogActionIcon from "../../../components/DialogActionIcon";
-import DialogTurnAudioModeButton from "./DialogTurnAudioModeButton";
+import DialogPlaybackOptions from "./DialogPlaybackOptions";
 import type { DialogTurnAudioMode } from "./useDialogTurnPlayback";
 
 type Props = {
@@ -14,6 +14,8 @@ type Props = {
   showText: boolean;
   targetPromptMode: "audio" | "text";
   turnAudioMode: DialogTurnAudioMode;
+  clearPlaybackRate: number;
+  onClearPlaybackRateChange: (speed: number) => void;
   regenerating: boolean;
   deleting: boolean;
   onPlay: () => void;
@@ -34,6 +36,8 @@ export default function DialogGlobalControls({
   showText,
   targetPromptMode,
   turnAudioMode,
+  clearPlaybackRate,
+  onClearPlaybackRateChange,
   regenerating,
   deleting,
   onPlay,
@@ -80,7 +84,7 @@ export default function DialogGlobalControls({
             <DialogActionIcon name="text" />
           </button>
         )}
-        {hasTurns && <DialogTurnAudioModeButton mode={turnAudioMode} onToggle={onToggleTurnAudioMode} />}
+        {hasTurns && <DialogPlaybackOptions mode={turnAudioMode} speed={clearPlaybackRate} onToggleMode={onToggleTurnAudioMode} onSpeedChange={onClearPlaybackRateChange} />}
         <button type="button" className="secondary-button exercise-action-icon-button dialog-list-action-button" onClick={onCollapse} aria-label={t("dialogs.hideDialog")} title={t("dialogs.hideDialog")} data-mobile-label={t("dialogs.hideDialog")}>
           <DialogActionIcon name="collapse" />
         </button>

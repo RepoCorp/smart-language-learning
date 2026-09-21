@@ -5,12 +5,16 @@ import type { DialogTurnAudioMode } from "./useDialogTurnPlayback";
 export default function DialogTurnAudioModeButton({
   mode,
   onToggle,
+  scope = "turn",
 }: {
   mode: DialogTurnAudioMode;
   onToggle: () => void;
+  scope?: "turn" | "dialog";
 }): JSX.Element {
   const { t } = useI18n();
-  const label = mode === "natural" ? t("dialogs.turnAudioNaturalSelected") : t("dialogs.turnAudioClearSelected");
+  const label = scope === "dialog"
+    ? (mode === "natural" ? t("dialogs.audioNaturalSelected") : t("dialogs.audioClearSelected"))
+    : (mode === "natural" ? t("dialogs.turnAudioNaturalSelected") : t("dialogs.turnAudioClearSelected"));
 
   return (
     <button
