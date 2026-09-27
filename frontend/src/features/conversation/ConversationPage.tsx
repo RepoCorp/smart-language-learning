@@ -454,7 +454,7 @@ export default function ConversationPage(): JSX.Element {
       );
       const nextGoal = (response.goal_text || "").trim();
       if (!nextGoal) {
-        throw new Error("Could not create a conversation goal. Please try again.");
+        throw new Error(t("conversation.goalFailed"));
       }
       setConversationGoal(nextGoal);
       setConversationGoals([nextGoal]);

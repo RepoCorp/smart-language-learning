@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "../i18n";
 import type { SessionItem } from "../types";
 import { buildWordPartUnits, shuffleWordPartTokens } from "./wordParts";
+import { blockDragStart, isPointerOverBlockTarget } from "./phraseBuilder/blockDrag";
 
 interface WordPartsReviewProps {
   item: SessionItem;
@@ -19,22 +20,6 @@ type DragPosition = {
   top: number;
 };
 
-type DragRect = DragPosition & {
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-};
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function smoothstep(value: number): number {
-  const clamped = clamp(value, 0, 1);
-  return clamped * clamped * (3 - 2 * clamped);
-}
-
 export default function WordPartsReview({
   item,
   onAnswered,
@@ -49,7 +34,6 @@ export default function WordPartsReview({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [draggingTokenId, setDraggingTokenId] = useState<string>("");
   const [draggingTokenPosition, setDraggingTokenPosition] = useState<DragPosition | null>(null);
-  const [activeLatchSlotIndex, setActiveLatchSlotIndex] = useState<number | null>(null);
 
   const tokenSeed = `${item.id}:${item.german_text}:${item.direction || ""}:word-parts`;
   const { units, tokens } = useMemo(
@@ -66,11 +50,12 @@ export default function WordPartsReview({
   );
   const slotsRef = useRef<HTMLDivElement | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
+  const touchDragRef = useRef(false);
   const draggingTokenIdRef = useRef<string>("");
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const draggingTokenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
-  const activeLatchSlotIndexRef = useRef<number | null>(null);
   const placedCount = placedTokenIds.length;
+  const activeLatchSlotIndex = draggingTokenId && draggingTokenId === tokens[placedCount]?.id
+    ? placedCount : null;
 
   const markWrongToken = (tokenId: string): void => {
     setWrongTokenId(tokenId);
@@ -84,8 +69,6 @@ export default function WordPartsReview({
     activePointerIdRef.current = null;
     setDraggingTokenId("");
     setDraggingTokenPosition(null);
-    activeLatchSlotIndexRef.current = null;
-    setActiveLatchSlotIndex(null);
   };
 
   const completeReview = async (): Promise<void> => {
@@ -130,96 +113,33 @@ export default function WordPartsReview({
     return true;
   };
 
-  const updateActiveLatchIndex = (nextSlotIndex: number | null): void => {
-    if (activeLatchSlotIndexRef.current === nextSlotIndex) {
-      return;
-    }
-    activeLatchSlotIndexRef.current = nextSlotIndex;
-    setActiveLatchSlotIndex(nextSlotIndex);
-  };
-
-  const getDragState = (draggedRect: DragRect): { position: DragPosition; shouldLatch: boolean; slotIndex: number | null } => {
-    const basePosition = { left: draggedRect.left, top: draggedRect.top };
-    if (!draggingTokenIdRef.current || submitting) {
-      updateActiveLatchIndex(null);
-      return { position: basePosition, shouldLatch: false, slotIndex: null };
-    }
-    const nextSlot = slotsRef.current?.querySelector(`[data-slot-index="${placedCount}"]`);
-    if (!(nextSlot instanceof HTMLElement)) {
-      updateActiveLatchIndex(null);
-      return { position: basePosition, shouldLatch: false, slotIndex: null };
-    }
-    const rect = nextSlot.getBoundingClientRect();
-    const draggedCenterX = draggedRect.left + (draggedRect.width / 2);
-    const draggedCenterY = draggedRect.top + (draggedRect.height / 2);
-    const slotCenterX = rect.left + (rect.width / 2);
-    const slotCenterY = rect.top + (rect.height / 2);
-    const deltaX = slotCenterX - draggedCenterX;
-    const deltaY = slotCenterY - draggedCenterY;
-    const distance = Math.hypot(deltaX, deltaY);
-    const captureRadius = Math.max(draggedRect.width, draggedRect.height, rect.width, rect.height) * 1.9;
-    if (distance > captureRadius) {
-      updateActiveLatchIndex(null);
-      return { position: basePosition, shouldLatch: false, slotIndex: null };
-    }
-
-    updateActiveLatchIndex(placedCount);
-    const attractionProgress = 1 - (distance / captureRadius);
-    const attractionStrength = smoothstep(attractionProgress) * 0.68;
-    const targetLeft = rect.left + ((rect.width - draggedRect.width) / 2);
-    const targetTop = rect.top + ((rect.height - draggedRect.height) / 2);
-    const adjustedPosition = {
-      left: basePosition.left + ((targetLeft - basePosition.left) * attractionStrength),
-      top: basePosition.top + ((targetTop - basePosition.top) * attractionStrength),
-    };
-    const slotMiddleBandWidth = rect.width * 0.36;
-    const slotMiddleBandHeight = rect.height * 0.36;
-    const slotMiddleLeft = slotCenterX - (slotMiddleBandWidth / 2);
-    const slotMiddleRight = slotCenterX + (slotMiddleBandWidth / 2);
-    const slotMiddleTop = slotCenterY - (slotMiddleBandHeight / 2);
-    const slotMiddleBottom = slotCenterY + (slotMiddleBandHeight / 2);
-    const coversMiddleHorizontally = draggedRect.right >= slotMiddleLeft && draggedRect.left <= slotMiddleRight;
-    const coversMiddleVertically = draggedRect.bottom >= slotMiddleTop && draggedRect.top <= slotMiddleBottom;
-    const latchRadius = Math.max(20, Math.min(draggedRect.width, draggedRect.height, rect.width, rect.height) * 0.22);
-    return {
-      position: adjustedPosition,
-      shouldLatch: (coversMiddleHorizontally && coversMiddleVertically) || distance <= latchRadius,
-      slotIndex: placedCount,
-    };
-  };
-
-  const startPointerDrag = (tokenId: string, pointerId: number, clientX: number, clientY: number, rect: DOMRect): void => {
+  const startPointerDrag = (tokenId: string, pointerId: number, clientX: number, clientY: number, rect: DOMRect, pointerType: string): void => {
     if (submitting || placedTokenIds.includes(tokenId)) {
       return;
     }
     activePointerIdRef.current = pointerId;
     draggingTokenIdRef.current = tokenId;
-    pointerDragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
-    draggingTokenSizeRef.current = { width: rect.width, height: rect.height };
+    const drag = blockDragStart(rect, clientX, clientY, pointerType);
+    touchDragRef.current = drag.isTouch;
+    pointerDragOffsetRef.current = drag.offset;
     setDraggingTokenId(tokenId);
-    setDraggingTokenPosition({ left: rect.left, top: rect.top });
+    setDraggingTokenPosition(drag.position);
   };
 
   const movePointerDrag = (pointerId: number, clientX: number, clientY: number): void => {
     if (activePointerIdRef.current !== pointerId) {
       return;
     }
-    const nextPosition = {
+    const slot = slotsRef.current?.querySelector(`[data-slot-index="${placedCount}"]`);
+    if (slot instanceof HTMLElement && isPointerOverBlockTarget(slot.getBoundingClientRect(), clientX, clientY, touchDragRef.current)) {
+      handleDrop(draggingTokenIdRef.current, placedCount);
+      clearDrag();
+      return;
+    }
+    setDraggingTokenPosition({
       left: clientX - pointerDragOffsetRef.current.x,
       top: clientY - pointerDragOffsetRef.current.y,
-    };
-    const draggedRect: DragRect = {
-      ...nextPosition,
-      right: nextPosition.left + draggingTokenSizeRef.current.width,
-      bottom: nextPosition.top + draggingTokenSizeRef.current.height,
-      width: draggingTokenSizeRef.current.width,
-      height: draggingTokenSizeRef.current.height,
-    };
-    const { position, shouldLatch, slotIndex } = getDragState(draggedRect);
-    setDraggingTokenPosition(position);
-    if (shouldLatch && slotIndex !== null && handleDrop(draggingTokenIdRef.current, slotIndex, slotIndex)) {
-      clearDrag();
-    }
+    });
   };
 
   const endPointerDrag = (pointerId: number): void => {
@@ -246,40 +166,6 @@ export default function WordPartsReview({
     <div className="phrase-builder-review word-parts-review">
       <p className="prompt prompt-light test-instruction">{t("word.partsPromptInstruction")}</p>
       <p className="test-source-phrase">{item.spanish_text}</p>
-      <div className="phrase-builder-target-zone word-parts-target-zone">
-        <div
-          ref={slotsRef}
-          className="phrase-builder-slots word-parts-slots"
-          aria-label={t("word.partsSlotsLabel")}
-        >
-          {units.map((unit, index) => {
-            if (unit.type === "separator") {
-              return (
-                <span key={`separator-${index}`} className="word-parts-separator">
-                  {unit.text}
-                </span>
-              );
-            }
-            const tokenIndex = unit.token.originalIndex;
-            const placedTokenId = placedTokenIds[tokenIndex];
-            const placedToken = placedTokenId ? placedTokenMap.get(placedTokenId) : null;
-            return (
-              <div
-                key={unit.token.id}
-                data-slot-index={tokenIndex}
-                className={`phrase-builder-slot word-parts-slot${placedToken ? " phrase-builder-slot-filled" : ""}${!placedToken && activeLatchSlotIndex === tokenIndex ? " phrase-builder-slot-latching" : ""}`}
-              >
-                <span className="phrase-builder-slot-size" aria-hidden="true">
-                  {unit.token.text}
-                </span>
-                <span className="phrase-builder-slot-value">
-                  {placedToken?.text || ""}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
       <div className="phrase-builder-bank-scroll">
         <div className="phrase-builder-bank word-parts-bank" aria-label={t("word.partsBankLabel")}>
           {shuffledTokens.map((token) => {
@@ -310,7 +196,7 @@ export default function WordPartsReview({
                     }
                     event.preventDefault();
                     event.currentTarget.setPointerCapture(event.pointerId);
-                    startPointerDrag(token.id, event.pointerId, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+                    startPointerDrag(token.id, event.pointerId, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), event.pointerType);
                   }}
                   onPointerMove={(event) => {
                     if (activePointerIdRef.current !== event.pointerId) {
@@ -321,6 +207,7 @@ export default function WordPartsReview({
                   }}
                   onPointerUp={(event) => {
                     event.preventDefault();
+                    movePointerDrag(event.pointerId, event.clientX, event.clientY);
                     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                       event.currentTarget.releasePointerCapture(event.pointerId);
                     }
@@ -332,12 +219,47 @@ export default function WordPartsReview({
                     }
                     endPointerDrag(event.pointerId);
                   }}
+                  onLostPointerCapture={() => clearDrag()}
                   disabled={isPlaced || submitting || reviewComplete}
                   tabIndex={isPlaced ? -1 : undefined}
                 >
                   <span className="phrase-builder-token-text">{token.text}</span>
                 </button>
               </span>
+            );
+          })}
+        </div>
+      </div>
+      <div className="phrase-builder-target-zone word-parts-target-zone">
+        <div
+          ref={slotsRef}
+          className="phrase-builder-slots word-parts-slots"
+          aria-label={t("word.partsSlotsLabel")}
+        >
+          {units.map((unit, index) => {
+            if (unit.type === "separator") {
+              return (
+                <span key={`separator-${index}`} className="word-parts-separator">
+                  {unit.text}
+                </span>
+              );
+            }
+            const tokenIndex = unit.token.originalIndex;
+            const placedTokenId = placedTokenIds[tokenIndex];
+            const placedToken = placedTokenId ? placedTokenMap.get(placedTokenId) : null;
+            return (
+              <div
+                key={unit.token.id}
+                data-slot-index={tokenIndex}
+                className={`phrase-builder-slot word-parts-slot${placedToken ? " phrase-builder-slot-filled" : ""}${!placedToken && activeLatchSlotIndex === tokenIndex ? " phrase-builder-slot-latching" : ""}`}
+              >
+                <span className="phrase-builder-slot-size" aria-hidden="true">
+                  {unit.token.text}
+                </span>
+                <span className="phrase-builder-slot-value">
+                  {placedToken?.text || ""}
+                </span>
+              </div>
             );
           })}
         </div>

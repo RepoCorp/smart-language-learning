@@ -10,6 +10,7 @@ import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import RevealedReviewSummary from "./RevealedReviewSummary";
 import { useWordChallengeInputFocus } from "./useWordChallengeInputFocus";
+import { useTypingMistakeSound } from "./useTypingMistakeSound";
 import { warmupContextPairForItem } from "./wordWarmupContext";
 import {
   hintOptionLabel,
@@ -292,6 +293,9 @@ export default function WordReview({
   const pendingCompositionValidationRef = useRef<boolean>(false);
   const provisionalBaseAnswerRef = useRef<string | null>(null);
   const pendingCaseMismatchRef = useRef<PendingCaseMismatch | null>(null);
+  const playTypingMistake = useTypingMistakeSound(
+    JSON.stringify([item.id, item.direction, item.repeatPracticeStep, item.german_text]),
+  );
   const {
     inputRef,
     focusInput,
@@ -533,6 +537,7 @@ export default function WordReview({
       } else {
         pendingCaseMismatchRef.current = null;
         const wrongText = value.slice(acceptedAnswer.length) || pendingCaseMismatch.typedLetter;
+        playTypingMistake(pendingCaseMismatch.mismatchIndex);
         if (reviewComplete) {
           setRewriteAttemptHadMistake(true);
           setRewriteAttemptMistakeIndexes((current) => (
@@ -587,6 +592,7 @@ export default function WordReview({
           return;
         }
         setRewriteAttemptHadMistake(true);
+        playTypingMistake(decision.mismatchIndex);
         setRewriteAttemptMistakeIndexes((current) => (
           current.includes(decision.mismatchIndex) ? current : [...current, decision.mismatchIndex]
         ));
@@ -654,6 +660,7 @@ export default function WordReview({
         return;
       }
       setAnswer(decision.fallbackAnswer);
+      playTypingMistake(decision.mismatchIndex);
       setFeedback(t("word.feedback.wrongLetter", { letter: decision.wrongText }));
       setFeedbackTone("error");
       setLetterSuggestions([]);
@@ -720,9 +727,17 @@ export default function WordReview({
     });
   };
 
-  const handleWarmupAnswerChange = (value: string): void => {
+  const handleWarmupAnswerChange = (value: string, acceptedAnswer = answer): void => {
     if (!useIntroRetry || isSubmitting) {
       return;
+    }
+    if (value && !acceptedAnswer.startsWith(value)) {
+      const decision = resolveWordInputChange({
+        value, acceptedAnswer, expectedAnswer, provisionalBaseAnswer: null,
+      });
+      if (decision.kind === "reject" && decision.mismatchIndex < expectedAnswer.length) {
+        playTypingMistake(decision.mismatchIndex);
+      }
     }
     setAnswer(value);
     if (warmupAllLettersRevealed && normalize(value) !== normalize(expectedAnswer)) {
@@ -959,7 +974,7 @@ export default function WordReview({
                 return;
               }
               pendingCompositionValidationRef.current = false;
-              handleWarmupAnswerChange(compositionEndValue || inputRef.current?.value || "");
+              handleWarmupAnswerChange(compositionEndValue || inputRef.current?.value || "", answerBeforeCompositionRef.current);
             }, 0);
           }}
           onChange={(event) => {
@@ -970,7 +985,7 @@ export default function WordReview({
             }
             if (pendingCompositionValidationRef.current) {
               pendingCompositionValidationRef.current = false;
-              handleWarmupAnswerChange(event.target.value);
+              handleWarmupAnswerChange(event.target.value, answerBeforeCompositionRef.current);
               return;
             }
             handleWarmupAnswerChange(event.target.value);

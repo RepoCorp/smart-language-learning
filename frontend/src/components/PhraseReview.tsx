@@ -15,6 +15,7 @@ import type { SessionItem } from "../types";
 import DangerousButton from "./DangerousButton";
 import DialogActionIcon from "./DialogActionIcon";
 import ProgressivePhraseBlocksReview from "./phraseBuilder/ProgressivePhraseBlocksReview";
+import { blockDragStart, isPointerOverBlockTarget } from "./phraseBuilder/blockDrag";
 import RevealedReviewSummary from "./RevealedReviewSummary";
 
 interface PhraseReviewProps {
@@ -32,18 +33,6 @@ type PhraseToken = {
   id: string;
   text: string;
   originalIndex: number;
-};
-
-type DragPosition = {
-  left: number;
-  top: number;
-};
-
-type DragRect = DragPosition & {
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
 };
 
 type SpeechDebugLog = (event: string, details?: Record<string, unknown>) => void;
@@ -67,15 +56,6 @@ function shufflePhraseTokens(tokens: PhraseToken[], seed: string): PhraseToken[]
   const shuffled = deterministicSort(tokens, seed, (token) => `${token.id}:${token.text}`);
   const keptOriginalOrder = shuffled.every((token, index) => token.originalIndex === index);
   return keptOriginalOrder ? [...shuffled].reverse() : shuffled;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function smoothstep(value: number): number {
-  const clamped = clamp(value, 0, 1);
-  return clamped * clamped * (3 - 2 * clamped);
 }
 
 function isLikelyIOSDevice(): boolean {
@@ -283,7 +263,6 @@ export default function PhraseReview({
   const [wrongPhraseTokenId, setWrongPhraseTokenId] = useState<string>("");
   const [draggingPhraseTokenId, setDraggingPhraseTokenId] = useState<string>("");
   const [draggingPhraseTokenPosition, setDraggingPhraseTokenPosition] = useState<{ left: number; top: number } | null>(null);
-  const [activeLatchSlotIndex, setActiveLatchSlotIndex] = useState<number | null>(null);
   const [phraseBuilderComplete, setPhraseBuilderComplete] = useState<boolean>(false);
   const [phraseBuilderSpeechPrimed, setPhraseBuilderSpeechPrimed] = useState<boolean>(false);
   const [phraseBuilderSpeechPriming, setPhraseBuilderSpeechPriming] = useState<boolean>(false);
@@ -295,7 +274,6 @@ export default function PhraseReview({
   const isSubmittingRef = useRef<boolean>(false);
   const phraseBuilderCompletionAudioPlayedRef = useRef<boolean>(false);
   const activePointerIdRef = useRef<number | null>(null);
-  const activeLatchSlotIndexRef = useRef<number | null>(null);
   const placedTokenVoiceRef = useRef<string>("");
   const placedTokenAudioActiveRef = useRef<boolean>(false);
   const completedPhraseShouldReadRef = useRef<boolean>(true);
@@ -307,7 +285,7 @@ export default function PhraseReview({
   const pendingPlacedTokenAudioTimeoutRef = useRef<number | null>(null);
   const pendingPlacedTokenAudioResolveRef = useRef<((played: boolean) => void) | null>(null);
   const pointerDragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const draggingPhraseTokenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+  const touchDragRef = useRef(false);
   const isSpanishToGerman = item.direction !== "de_to_es";
   const allowPromptAudio = !isSpanishToGerman;
   const promptAudioUrl = item.prompt_audio_url || item.audio_url || "";
@@ -319,6 +297,9 @@ export default function PhraseReview({
     () => shufflePhraseTokens(expectedPhraseTokens, `phrase-builder:${itemDeterministicKey}`),
     [expectedPhraseTokens, itemDeterministicKey],
   );
+  const draggedPhraseToken = phraseBuilderTokens.find((token) => token.id === draggingPhraseTokenId);
+  const activeLatchSlotIndex = draggedPhraseToken && draggedPhraseToken.text === expectedPhraseTokens[placedPhraseTokens.length]?.text
+    ? placedPhraseTokens.length : null;
   const languageLabel = isSpanishToGerman
     ? t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage])
     : t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
@@ -603,11 +584,8 @@ export default function PhraseReview({
     activePointerIdRef.current = null;
     draggingPhraseTokenIdRef.current = "";
     pointerDragOffsetRef.current = { x: 0, y: 0 };
-    draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     setDraggingPhraseTokenId("");
     setDraggingPhraseTokenPosition(null);
-    activeLatchSlotIndexRef.current = null;
-    setActiveLatchSlotIndex(null);
   };
 
   const handlePhraseBuilderDrop = (tokenId: string, slotIndex: number, placedCount = placedPhraseTokenCountRef.current): boolean => {
@@ -679,98 +657,35 @@ export default function PhraseReview({
     return true;
   };
 
-  const updateActiveLatchSlotIndex = (nextSlotIndex: number | null): void => {
-    if (activeLatchSlotIndexRef.current === nextSlotIndex) {
-      return;
-    }
-    activeLatchSlotIndexRef.current = nextSlotIndex;
-    setActiveLatchSlotIndex(nextSlotIndex);
-  };
-
-  const getPhraseBuilderDragState = (draggedRect: DragRect): { position: DragPosition; shouldLatch: boolean; slotIndex: number | null } => {
-    const basePosition = { left: draggedRect.left, top: draggedRect.top };
-    if (!draggingPhraseTokenIdRef.current || isSubmittingRef.current || phraseBuilderCompleteRef.current) {
-      updateActiveLatchSlotIndex(null);
-      return { position: basePosition, shouldLatch: false, slotIndex: null };
-    }
-    const placedCount = placedPhraseTokenCountRef.current;
-    const nextSlot = phraseSlotsRef.current?.querySelector(`[data-slot-index="${placedCount}"]`);
-    if (!(nextSlot instanceof HTMLElement)) {
-      updateActiveLatchSlotIndex(null);
-      return { position: basePosition, shouldLatch: false, slotIndex: null };
-    }
-    const rect = nextSlot.getBoundingClientRect();
-    const draggedCenterX = draggedRect.left + (draggedRect.width / 2);
-    const draggedCenterY = draggedRect.top + (draggedRect.height / 2);
-    const slotCenterX = rect.left + (rect.width / 2);
-    const slotCenterY = rect.top + (rect.height / 2);
-    const deltaX = slotCenterX - draggedCenterX;
-    const deltaY = slotCenterY - draggedCenterY;
-    const distance = Math.hypot(deltaX, deltaY);
-    const captureRadius = Math.max(draggedRect.width, draggedRect.height, rect.width, rect.height) * 1.9;
-    if (distance > captureRadius) {
-      updateActiveLatchSlotIndex(null);
-      return { position: basePosition, shouldLatch: false, slotIndex: null };
-    }
-
-    updateActiveLatchSlotIndex(placedCount);
-    const attractionProgress = 1 - (distance / captureRadius);
-    const attractionStrength = smoothstep(attractionProgress) * 0.68;
-    const targetLeft = rect.left + ((rect.width - draggedRect.width) / 2);
-    const targetTop = rect.top + ((rect.height - draggedRect.height) / 2);
-    const adjustedPosition = {
-      left: basePosition.left + ((targetLeft - basePosition.left) * attractionStrength),
-      top: basePosition.top + ((targetTop - basePosition.top) * attractionStrength),
-    };
-    const slotMiddleBandWidth = rect.width * 0.36;
-    const slotMiddleBandHeight = rect.height * 0.36;
-    const slotMiddleLeft = slotCenterX - (slotMiddleBandWidth / 2);
-    const slotMiddleRight = slotCenterX + (slotMiddleBandWidth / 2);
-    const slotMiddleTop = slotCenterY - (slotMiddleBandHeight / 2);
-    const slotMiddleBottom = slotCenterY + (slotMiddleBandHeight / 2);
-    const coversMiddleHorizontally = draggedRect.right >= slotMiddleLeft && draggedRect.left <= slotMiddleRight;
-    const coversMiddleVertically = draggedRect.bottom >= slotMiddleTop && draggedRect.top <= slotMiddleBottom;
-    const latchRadius = Math.max(20, Math.min(draggedRect.width, draggedRect.height, rect.width, rect.height) * 0.22);
-    return {
-      position: adjustedPosition,
-      shouldLatch: (coversMiddleHorizontally && coversMiddleVertically) || distance <= latchRadius,
-      slotIndex: placedCount,
-    };
-  };
-
-  const startPointerPhraseDrag = (tokenId: string, pointerId: number, clientX: number, clientY: number, rect: DOMRect): void => {
+  const startPointerPhraseDrag = (tokenId: string, pointerId: number, clientX: number, clientY: number, rect: DOMRect, pointerType: string): void => {
     if (isSubmittingRef.current || phraseBuilderCompleteRef.current) {
       return;
     }
     warmSpeechSynthesis(logSpeechDebug);
     activePointerIdRef.current = pointerId;
     draggingPhraseTokenIdRef.current = tokenId;
-    pointerDragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
-    draggingPhraseTokenSizeRef.current = { width: rect.width, height: rect.height };
+    const drag = blockDragStart(rect, clientX, clientY, pointerType);
+    touchDragRef.current = drag.isTouch;
+    pointerDragOffsetRef.current = drag.offset;
     setDraggingPhraseTokenId(tokenId);
-    setDraggingPhraseTokenPosition({ left: rect.left, top: rect.top });
+    setDraggingPhraseTokenPosition(drag.position);
   };
 
   const movePointerPhraseDrag = (pointerId: number, clientX: number, clientY: number): void => {
     if (activePointerIdRef.current !== pointerId) {
       return;
     }
-    const nextPosition: DragPosition = {
+    const placedCount = placedPhraseTokenCountRef.current;
+    const slot = phraseSlotsRef.current?.querySelector(`[data-slot-index="${placedCount}"]`);
+    if (slot instanceof HTMLElement && isPointerOverBlockTarget(slot.getBoundingClientRect(), clientX, clientY, touchDragRef.current)) {
+      handlePhraseBuilderDrop(draggingPhraseTokenIdRef.current, placedCount);
+      clearPhraseDrag();
+      return;
+    }
+    setDraggingPhraseTokenPosition({
       left: clientX - pointerDragOffsetRef.current.x,
       top: clientY - pointerDragOffsetRef.current.y,
-    };
-    const draggedRect: DragRect = {
-      ...nextPosition,
-      right: nextPosition.left + draggingPhraseTokenSizeRef.current.width,
-      bottom: nextPosition.top + draggingPhraseTokenSizeRef.current.height,
-      width: draggingPhraseTokenSizeRef.current.width,
-      height: draggingPhraseTokenSizeRef.current.height,
-    };
-    const { position, shouldLatch, slotIndex } = getPhraseBuilderDragState(draggedRect);
-    setDraggingPhraseTokenPosition(position);
-    if (shouldLatch && slotIndex !== null && handlePhraseBuilderDrop(draggingPhraseTokenIdRef.current, slotIndex, slotIndex)) {
-      clearPhraseDrag();
-    }
+    });
   };
 
   const endPointerPhraseDrag = (pointerId: number): void => {
@@ -899,12 +814,9 @@ export default function PhraseReview({
     setPhraseBuilderComplete(false);
     setDraggingPhraseTokenId("");
     setDraggingPhraseTokenPosition(null);
-    activeLatchSlotIndexRef.current = null;
-    setActiveLatchSlotIndex(null);
     draggingPhraseTokenIdRef.current = "";
     activePointerIdRef.current = null;
     pointerDragOffsetRef.current = { x: 0, y: 0 };
-    draggingPhraseTokenSizeRef.current = { width: 0, height: 0 };
     phraseBuilderCompletionAudioPlayedRef.current = false;
     placedTokenAudioActiveRef.current = false;
     placedPhraseAudioPlaybackActiveRef.current = false;
@@ -979,26 +891,6 @@ export default function PhraseReview({
             <span className="hint">{t("phrase.builderEnableAudioHint")}</span>
           </div>
         )}
-        <div className="phrase-builder-target-zone">
-          <div
-            ref={phraseSlotsRef}
-            className="phrase-builder-slots"
-            aria-label={t("phrase.builderAnswerLabel")}
-          >
-            {expectedPhraseTokens.map((token, index) => (
-              <span
-                key={token.id}
-                data-slot-index={index}
-                className={`phrase-builder-slot${placedPhraseTokens[index] ? " phrase-builder-slot-filled" : ""}${!placedPhraseTokens[index] && activeLatchSlotIndex === index ? " phrase-builder-slot-latching" : ""}`}
-              >
-                <span className="phrase-builder-slot-size">{token.text}</span>
-                <span className="phrase-builder-slot-value">
-                  {placedPhraseTokens[index]?.text || "\u00a0"}
-                </span>
-              </span>
-            ))}
-          </div>
-        </div>
         <div className="phrase-builder-bank-scroll">
           <div className="phrase-builder-bank" aria-label={t("phrase.builderBankLabel")}>
             {phraseBuilderTokens.map((token) => {
@@ -1028,7 +920,7 @@ export default function PhraseReview({
                       }
                       event.preventDefault();
                       event.currentTarget.setPointerCapture(event.pointerId);
-                      startPointerPhraseDrag(token.id, event.pointerId, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+                      startPointerPhraseDrag(token.id, event.pointerId, event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), event.pointerType);
                     }}
                     onPointerMove={(event) => {
                       if (activePointerIdRef.current !== event.pointerId) {
@@ -1039,12 +931,14 @@ export default function PhraseReview({
                     }}
                     onPointerUp={(event) => {
                       event.preventDefault();
+                      movePointerPhraseDrag(event.pointerId, event.clientX, event.clientY);
                       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                         event.currentTarget.releasePointerCapture(event.pointerId);
                       }
                       void flushPendingGesturePhraseAudio();
                       endPointerPhraseDrag(event.pointerId);
                     }}
+                    onLostPointerCapture={() => clearPhraseDrag()}
                     onPointerCancel={(event) => {
                       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -1059,6 +953,26 @@ export default function PhraseReview({
                 </span>
               );
             })}
+          </div>
+        </div>
+        <div className="phrase-builder-target-zone">
+          <div
+            ref={phraseSlotsRef}
+            className="phrase-builder-slots"
+            aria-label={t("phrase.builderAnswerLabel")}
+          >
+            {expectedPhraseTokens.map((token, index) => (
+              <span
+                key={token.id}
+                data-slot-index={index}
+                className={`phrase-builder-slot${placedPhraseTokens[index] ? " phrase-builder-slot-filled" : ""}${!placedPhraseTokens[index] && activeLatchSlotIndex === index ? " phrase-builder-slot-latching" : ""}`}
+              >
+                <span className="phrase-builder-slot-size">{token.text}</span>
+                <span className="phrase-builder-slot-value">
+                  {placedPhraseTokens[index]?.text || "\u00a0"}
+                </span>
+              </span>
+            ))}
           </div>
         </div>
         {phraseBuilderComplete && <p className="phrase-builder-success">{t("phrase.builderComplete")}</p>}

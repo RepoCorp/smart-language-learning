@@ -623,7 +623,7 @@ export default function NewItem({
       decode: t("newItem.decodeError"),
       encounter: t("newItem.encounterError"),
       compare: t("newItem.compareError"),
-      sing: "Failed to create song",
+      sing: t("sing.generationFailed"),
     },
   });
   const {

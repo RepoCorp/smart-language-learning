@@ -7,6 +7,7 @@ from ...prompts import (
     WORD_METADATA_CONTEXTUAL_PROMPT,
     WORD_METADATA_NORMALIZATION_PROMPT,
     WORD_METADATA_RULE_PROMPTS,
+    WORD_METADATA_TARGET_RULE_PROMPTS,
 )
 from ...text import normalize_text_for_matching
 from .core import call_openai_json, normalize_word_type
@@ -91,6 +92,7 @@ def normalize_word_metadata(
             word_type,
             source_name=source_name,
             target_name=target_name,
+            target_language=target_language,
         ),
         user_input=(
             f"Source language: {source_name}\n"
@@ -163,8 +165,9 @@ def _parse_contextual_word_metadata(parsed: dict | None) -> tuple[str, str, str]
     return contextual_source, contextual_target, word_type
 
 
-def _normalization_prompt_for_word_type(word_type: str, *, source_name: str, target_name: str) -> str:
-    rules_template = WORD_METADATA_RULE_PROMPTS.get(word_type)
+def _normalization_prompt_for_word_type(word_type: str, *, source_name: str, target_name: str, target_language: str) -> str:
+    target_rules = WORD_METADATA_TARGET_RULE_PROMPTS.get(target_language, {})
+    rules_template = target_rules.get(word_type, WORD_METADATA_RULE_PROMPTS.get(word_type))
     if not rules_template:
         raise RuntimeError("Word metadata generation returned invalid word type")
     rules = rules_template.replace("{source_name}", source_name).replace("{target_name}", target_name)

@@ -42,7 +42,7 @@ export default function ItemAdminActionsModal({
         <button type="button" className="modal-corner-close" aria-label={t("newItem.closeRelatedDialogs")} onClick={onClose}>
           ×
         </button>
-        <h3>Item actions</h3>
+        <h3>{t("newItem.actionsTitle")}</h3>
         <div className="item-admin-actions-list">
           <DangerousButton className="secondary-button dangerous-action-button" onConfirm={onRegenerateItem} disabled={busy}>
             {activeAction === "regenerate" ? t("newItem.itemRegenerating") : t("newItem.regenerateItem")}

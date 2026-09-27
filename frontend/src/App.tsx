@@ -174,7 +174,7 @@ export default function App(): JSX.Element {
                       </span>
                     </button>
                     {showPageMenu ? (
-                      <div className="top-nav-menu" role="menu" aria-label="Pages">
+                      <div className="top-nav-menu" role="menu" aria-label={t("menu.pages")}>
                         {pageOptions.map((option) => (
                           <button
                             key={option.path}

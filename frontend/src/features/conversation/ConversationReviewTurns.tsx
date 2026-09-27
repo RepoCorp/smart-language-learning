@@ -131,7 +131,7 @@ export default function ConversationReviewTurns({
                           onClick={() => void onAddErrorExercises?.(index)}
                           disabled={!onAddErrorExercises || errorInfo.addingExercises || errorInfo.exercisesAdded}
                         >
-                          {errorInfo.addingExercises ? "Adding..." : errorInfo.exercisesAdded ? "Added to exercises" : "Add to exercises"}
+                          {t(errorInfo.addingExercises ? "conversation.addingExercises" : errorInfo.exercisesAdded ? "conversation.exercisesAdded" : "conversation.addExercises")}
                         </button>
                       </>
                     )}

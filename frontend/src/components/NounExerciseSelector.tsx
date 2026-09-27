@@ -1,4 +1,5 @@
 import type { ExercisePhraseSection } from "../types";
+import { useI18n } from "../i18n";
 import WordExerciseGrid, {
   type WordExerciseGridPrimaryEntry,
   type WordExerciseSelectableEntry,
@@ -23,11 +24,11 @@ interface NounExerciseSelectorProps {
 }
 
 const DETERMINER_ROWS = [
-  { key: "definite", label: "Definite" },
-  { key: "indefinite", label: "Indefinite" },
-  { key: "negative", label: "Negative (kein)" },
-  { key: "possessive", label: "Possessive (mein)" },
-  { key: "demonstrative", label: "Demonstrative (dieser)" },
+  { key: "definite", label: "forms.definite" },
+  { key: "indefinite", label: "forms.indefinite" },
+  { key: "negative", label: "forms.negative" },
+  { key: "possessive", label: "forms.possessive" },
+  { key: "demonstrative", label: "forms.demonstrative" },
 ] as const;
 
 type GermanNounCase = "nominative" | "accusative" | "dative" | "genitive";
@@ -62,6 +63,7 @@ export default function NounExerciseSelector({
   targetText = "",
   pluralText = "",
 }: NounExerciseSelectorProps): JSX.Element {
+  const { t } = useI18n();
   const entriesBySectionAndFamily = new Map<string, WordExerciseSelectableEntry>();
   const selectedKeySet = new Set(selectedExerciseKeys);
 
@@ -116,7 +118,7 @@ export default function NounExerciseSelector({
 
   return (
     <WordExerciseGrid
-      ariaLabel="Noun exercise grid"
+      ariaLabel={t("forms.nounGrid")}
       className="noun-exercise-selector"
       targetClassName="noun-exercise-target-text"
       renderTargetText={(text) => (
@@ -145,7 +147,7 @@ export default function NounExerciseSelector({
           selected: isExactSelection(sectionKeys),
           onClick: () => selectColumn(sectionKey),
           disabled: exerciseRunning || generatingCaseKey === sectionKey,
-          secondaryActionLabel: canRegenerate ? "Regenerate case" : undefined,
+          secondaryActionLabel: canRegenerate ? t("forms.regenerateCase") : undefined,
           secondaryActionDisabled: generatingCaseKey === sectionKey || exerciseRunning,
           secondaryActionRequiresConfirm: canRegenerate,
           onSecondaryActionClick: canRegenerate ? () => onGenerateCase(sectionKey) : undefined,
@@ -153,7 +155,7 @@ export default function NounExerciseSelector({
       })}
       rows={DETERMINER_ROWS.map((row) => ({
         key: row.key,
-        label: row.label,
+        label: t(row.label),
         selected: isExactSelection(keysForRow(row.key)),
         onClick: () => selectRow(row.key),
         disabled: exerciseRunning || keysForRow(row.key).length === 0,

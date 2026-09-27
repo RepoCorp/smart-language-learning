@@ -53,6 +53,15 @@ WORD_METADATA_RULE_PROMPTS = {
     "other": _load("word_metadata/word_metadata_rules_other.txt"),
     "verb": _load("word_metadata/word_metadata_rules_verb.txt"),
 }
+WORD_METADATA_TARGET_RULE_PROMPTS = {
+    "english": {
+        "noun": _load("word_metadata/english/word_metadata_rules_noun.txt"),
+        "verb": _load("word_metadata/english/word_metadata_rules_verb.txt"),
+    },
+}
+PHRASE_KEYWORDS_TARGET_RULE_PROMPTS = {
+    "english": _load("items/english/phrase_keywords.txt"),
+}
 TOPIC_CONVERSATION_ANALYZE_USER_TURN_PROMPT = _load("topic_conversation/topic_conversation_analyze_user_turn.txt")
 TOPIC_CONVERSATION_ERROR_ANALYSIS_PROMPT = _load("topic_conversation/topic_conversation_error_analysis.txt")
 TOPIC_CONVERSATION_GOAL_EVALUATION_PROMPT = _load("topic_conversation/topic_conversation_goal_evaluation.txt")

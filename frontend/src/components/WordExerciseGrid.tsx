@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import DangerousButton from "./DangerousButton";
+import { useI18n } from "../i18n";
 
 export interface WordExerciseSelectableEntry {
   label?: string;
@@ -74,6 +75,7 @@ function HeaderCell({
   secondaryActionRequiresConfirm = false,
   onSecondaryActionClick,
   className,
+  ariaLabel,
 }: {
   label: string;
   sublabel?: string;
@@ -85,7 +87,9 @@ function HeaderCell({
   secondaryActionRequiresConfirm?: boolean;
   onSecondaryActionClick?: () => void;
   className?: string;
+  ariaLabel?: string;
 }): JSX.Element {
+  const { t } = useI18n();
   const classes = [
     "word-exercise-cell",
     "word-exercise-header",
@@ -108,8 +112,8 @@ function HeaderCell({
         className="word-exercise-header-secondary-action"
         disabled={secondaryActionDisabled}
         onConfirm={onSecondaryActionClick}
-        aria-label={secondaryActionLabel || "Regenerate"}
-        title={secondaryActionLabel || "Regenerate"}
+        aria-label={secondaryActionLabel || t("newItem.exercisesRegenerate")}
+        title={secondaryActionLabel || t("newItem.exercisesRegenerate")}
       >
         ↻
       </DangerousButton>
@@ -119,8 +123,8 @@ function HeaderCell({
         className="word-exercise-header-secondary-action"
         onClick={onSecondaryActionClick}
         disabled={secondaryActionDisabled}
-        aria-label={secondaryActionLabel || "Regenerate"}
-        title={secondaryActionLabel || "Regenerate"}
+        aria-label={secondaryActionLabel || t("newItem.exercisesRegenerate")}
+        title={secondaryActionLabel || t("newItem.exercisesRegenerate")}
       >
         ↻
       </button>
@@ -141,6 +145,7 @@ function HeaderCell({
       <button
         type="button"
         className="word-exercise-header-primary-action"
+        aria-label={ariaLabel}
         onClick={onClick}
         disabled={disabled}
       >
@@ -211,6 +216,7 @@ export default function WordExerciseGrid({
           [
             <HeaderCell
               key={`${row.key}-header`}
+              ariaLabel={row.label}
               label=""
               sublabel=""
               selected={row.selected}

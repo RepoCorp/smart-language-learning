@@ -42,26 +42,34 @@ export function useSingStrategy({ itemId, exercisePhrases, sourceLanguage, targe
   const [isCreatingLyrics, setIsCreatingLyrics] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [error, setError] = useState("");
+  const failureMessage = (value: unknown): string => {
+    if (!(value instanceof Error) || [
+      "Failed to create song",
+      "Failed to create song lyrics",
+      "Failed to create song image",
+    ].includes(value.message)) return errorMessage;
+    return value.message;
+  };
   const { song, history } = useMemo(() => songsFromPayload(exercisePhrases), [exercisePhrases]);
   const createLyrics = async (longerFunnyLyrics = false): Promise<void> => {
     if (itemId <= 0 || isCreatingLyrics) return;
     setIsCreatingLyrics(true); setError("");
     try { setExercisePhrases((await generateContentItemSongLyrics(itemId, sourceLanguage, targetLanguage, longerFunnyLyrics)).exercise_phrases || {}); }
-    catch (value) { setError(value instanceof Error ? value.message : errorMessage); }
+    catch (value) { setError(failureMessage(value)); }
     finally { setIsCreatingLyrics(false); }
   };
   const createSong = async (): Promise<void> => {
     if (itemId <= 0 || isCreatingSong) return;
     setIsCreatingSong(true); setError("");
     try { setExercisePhrases((await generateContentItemSong(itemId, sourceLanguage, targetLanguage)).exercise_phrases || {}); }
-    catch (value) { setError(value instanceof Error ? value.message : errorMessage); }
+    catch (value) { setError(failureMessage(value)); }
     finally { setIsCreatingSong(false); }
   };
   const generateImage = async (): Promise<void> => {
     if (itemId <= 0 || isGeneratingImage) return;
     setIsGeneratingImage(true); setError("");
     try { setExercisePhrases((await generateContentItemSongImage(itemId, sourceLanguage, targetLanguage)).exercise_phrases || {}); }
-    catch (value) { setError(value instanceof Error ? value.message : errorMessage); }
+    catch (value) { setError(failureMessage(value)); }
     finally { setIsGeneratingImage(false); }
   };
   useEffect(() => { setError(""); setIsCreatingSong(false); setIsCreatingLyrics(false); }, [itemId, song?.target]);

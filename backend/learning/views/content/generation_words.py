@@ -6,6 +6,7 @@ import re
 from ...languages import language_display_name
 from ...prompts import (
     PHRASE_KEYWORDS_PROMPT,
+    PHRASE_KEYWORDS_TARGET_RULE_PROMPTS,
     WORD_EXERCISES_ADJECTIVE_PROMPT,
     WORD_EXERCISES_ADVERB_PROMPT,
     WORD_EXERCISES_EXPRESSION_PROMPT,
@@ -423,6 +424,9 @@ def generate_keywords_for_phrase_with_chatgpt(
         if target_language == "german"
         else "Do not force articles in german_text unless natural for the selected target language."
     )
+    target_rules = PHRASE_KEYWORDS_TARGET_RULE_PROMPTS.get(target_language)
+    if target_rules:
+        article_requirement = target_rules
     parsed = call_openai_json_fn(
         PHRASE_KEYWORDS_PROMPT,
         (

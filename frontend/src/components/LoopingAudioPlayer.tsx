@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useI18n, type MessageKey } from "../i18n";
 
 const BAR_DURATION_SECONDS = 2;
 
 export default function LoopingAudioPlayer({ src }: { src: string }): JSX.Element {
+  const { t } = useI18n();
   const contextRef = useRef<AudioContext | null>(null);
   const bufferRef = useRef<AudioBuffer | null>(null);
   const sourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
@@ -10,7 +12,7 @@ export default function LoopingAudioPlayer({ src }: { src: string }): JSX.Elemen
   const playbackIdRef = useRef(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<MessageKey | "">("");
 
   const stop = () => {
     playbackIdRef.current += 1;
@@ -57,7 +59,10 @@ export default function LoopingAudioPlayer({ src }: { src: string }): JSX.Elemen
       await context.resume();
       if (!bufferRef.current) {
         const response = await fetch(src);
-        if (!response.ok) throw new Error("Could not load song audio");
+        if (!response.ok) {
+          setError("sing.loadAudioFailed");
+          return;
+        }
         bufferRef.current = await context.decodeAudioData(await response.arrayBuffer());
       }
       const buffer = bufferRef.current;
@@ -96,8 +101,8 @@ export default function LoopingAudioPlayer({ src }: { src: string }): JSX.Elemen
 
       scheduleCycle(context.currentTime + 0.05, false);
       setIsPlaying(true);
-    } catch (playbackError) {
-      setError(playbackError instanceof Error ? playbackError.message : "Could not play song audio");
+    } catch {
+      setError("sing.playAudioFailed");
       stop();
     } finally {
       setIsLoading(false);
@@ -106,8 +111,8 @@ export default function LoopingAudioPlayer({ src }: { src: string }): JSX.Elemen
 
   return <div className="looping-audio-player">
     <button className="secondary-button" type="button" disabled={isLoading} onClick={isPlaying ? stop : play}>
-      {isLoading ? "Loading song..." : isPlaying ? "Stop loop" : "Play loop"}
+      {t(isLoading ? "sing.loadingAudio" : isPlaying ? "sing.stopLoop" : "sing.playLoop")}
     </button>
-    {error ? <span className="error">{error}</span> : null}
+    {error ? <span className="error">{t(error)}</span> : null}
   </div>;
 }

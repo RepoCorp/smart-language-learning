@@ -182,13 +182,21 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
     "conversation-ready",
   ].includes(currentStep.id);
   const isMenuNavigationStep = ["open-menu", "open-session", "conversation-open-menu"].includes(currentStep.id);
+  let createDialogTop: number | undefined;
+  if (targetRect && currentStep.id === "create-dialog" && window.innerWidth > 640) {
+    const below = targetRect.bottom + 14;
+    const above = targetRect.top - popoverHeight - 14;
+    // Never push this actionable card over its button to fit the viewport.
+    createDialogTop = below + popoverHeight <= window.innerHeight - 16 || above < 16
+      ? below : above;
+  }
   const popoverStyle = targetRect
     ? {
-      top: keepPopoverClearOfTarget
+      top: createDialogTop ?? (keepPopoverClearOfTarget
         ? 16
         : isMenuNavigationStep && window.innerWidth > 640
           ? Math.max(16, targetRect.top - 4)
-        : Math.min(targetRect.bottom + 14, window.innerHeight - 228),
+        : Math.min(targetRect.bottom + 14, window.innerHeight - 228)),
       left: keepPopoverClearOfTarget
         ? 16
         : isMenuNavigationStep && window.innerWidth > 640

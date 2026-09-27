@@ -189,7 +189,7 @@ function VerbGrammarTable(): JSX.Element {
   const rows: StaticGrammarRow[] = [
     { topic: t("strategies.grammar.verbInfinitive"), example: <>spiel<strong>en</strong></>, note: t("strategies.grammar.verbInfinitiveNote") },
     { topic: t("strategies.grammar.verbStem"), example: <strong>spiel-</strong>, note: t("strategies.grammar.verbStemNote") },
-    { topic: t("strategies.grammar.verbPresent"), example: "spiel- + ending", note: t("strategies.grammar.verbPresentNote") },
+    { topic: t("strategies.grammar.verbPresent"), example: <>ich spiel<strong>e</strong> · du spiel<strong>st</strong></>, note: t("strategies.grammar.verbPresentNote") },
     { topic: t("strategies.grammar.verbPerfect"), example: <>haben + <strong>gespielt</strong></>, note: t("strategies.grammar.verbPerfectNote") },
     { topic: t("strategies.grammar.verbSimplePast"), example: <>spiel- + <strong>te</strong></>, note: t("strategies.grammar.verbSimplePastNote") },
     { topic: t("strategies.grammar.verbFuture"), example: <>werden + <strong>spielen</strong></>, note: t("strategies.grammar.verbFutureNote") },

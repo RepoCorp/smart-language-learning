@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../../i18n";
 import {
   addConversationErrorExercises,
   requestConversationTurnErrorInfo,
@@ -30,6 +31,7 @@ const EMPTY_INFO: ConversationReviewErrorInfo = {
 };
 
 export function useConversationReviewErrorInfo({ sourceLanguage, targetLanguage }: Args) {
+  const { t } = useI18n();
   const [byTurn, setByTurn] = useState<Record<number, ConversationReviewErrorInfo>>({});
 
   const requestErrorInfo = async (turnIndex: number, originalText: string, correctedText: string): Promise<void> => {
@@ -63,7 +65,8 @@ export function useConversationReviewErrorInfo({ sourceLanguage, targetLanguage 
           loading: false,
           ...EMPTY_INFO,
           text: current[turnIndex]?.text || "",
-          error: requestError instanceof Error ? requestError.message : "Failed to analyze the correction",
+          error: requestError instanceof Error && requestError.message !== "Failed to analyze the correction"
+            ? requestError.message : t("conversation.analysisFailed"),
         },
       }));
     }
@@ -81,7 +84,7 @@ export function useConversationReviewErrorInfo({ sourceLanguage, targetLanguage 
     try {
       const addedItemIds = await addConversationErrorExercises(analysis, sourceLanguage, targetLanguage);
       if (!addedItemIds.length) {
-        throw new Error("No matching practice item was found");
+        throw new Error(t("conversation.noPracticeMatch"));
       }
       setByTurn((current) => ({
         ...current,
@@ -93,7 +96,8 @@ export function useConversationReviewErrorInfo({ sourceLanguage, targetLanguage 
         [turnIndex]: {
           ...current[turnIndex],
           addingExercises: false,
-          error: requestError instanceof Error ? requestError.message : "Failed to add exercises",
+          error: requestError instanceof Error && requestError.message !== "Failed to add exercises"
+            ? requestError.message : t("conversation.addExercisesFailed"),
         },
       }));
     }

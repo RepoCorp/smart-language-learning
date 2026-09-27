@@ -1,10 +1,16 @@
 import type { PhraseGrammarFeaturePresentationMap } from "./phraseGrammarFeaturePresentationTypes";
+import { useI18n } from "../../i18n";
+
+function SubjectVerbObjectExample(): JSX.Element {
+  const { t } = useI18n();
+  return <><strong>I</strong> <strong>like</strong> <strong>coffee</strong>. <span>{t("strategies.grammar.subjectVerbObjectOrder")}</span></>;
+}
 
 export const ENGLISH_PHRASE_GRAMMAR_FEATURE_PRESENTATION = {
   english_subject_verb_object: {
     title: "strategies.grammar.subjectVerbObject",
     present: "strategies.grammar.subjectVerbObjectNote",
-    example: <><strong>I</strong> <strong>like</strong> <strong>coffee</strong>. <span>Subject → Verb → Object</span></>,
+    example: <SubjectVerbObjectExample />,
   },
   english_third_person_s: {
     title: "strategies.grammar.thirdPersonS",

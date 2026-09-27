@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { deterministicSort } from "../../deterministic";
 import { useI18n } from "../../i18n";
 import DialogActionIcon from "../DialogActionIcon";
+import { blockDragStart, isPointerOverBlockTarget } from "./blockDrag";
 import {
   grammarDistractorsForBlock,
   sameGrammarForm,
@@ -132,6 +133,7 @@ export default function ProgressivePhraseBlocksReview({
   const draggingTokenRef = useRef<PhraseToken | null>(null);
   const draggingElementRef = useRef<HTMLButtonElement | null>(null);
   const pointerOffsetRef = useRef({ x: 0, y: 0 });
+  const touchDragRef = useRef(false);
   const activeSlotRef = useRef<HTMLSpanElement | null>(null);
   const showNextLetterButtonRef = useRef<HTMLButtonElement | null>(null);
   const shouldKeepRevealControlVisibleRef = useRef(false);
@@ -206,14 +208,7 @@ export default function ProgressivePhraseBlocksReview({
     if (!slot) {
       return false;
     }
-    const rect = slot.getBoundingClientRect();
-    const touchTargetPadding = window.matchMedia("(pointer: coarse)").matches ? 32 : 0;
-    return (
-      clientX >= rect.left - touchTargetPadding
-      && clientX <= rect.right + touchTargetPadding
-      && clientY >= rect.top - touchTargetPadding
-      && clientY <= rect.bottom + touchTargetPadding
-    );
+    return isPointerOverBlockTarget(slot.getBoundingClientRect(), clientX, clientY, touchDragRef.current);
   };
 
   const revealNextLetter = (): void => {
@@ -291,20 +286,14 @@ export default function ProgressivePhraseBlocksReview({
                   }
                   event.currentTarget.setPointerCapture(event.pointerId);
                   const rect = event.currentTarget.getBoundingClientRect();
-                  const isTouchDrag = window.matchMedia("(pointer: coarse)").matches;
-                  const touchLift = isTouchDrag ? 28 : 0;
+                  const drag = blockDragStart(rect, event.clientX, event.clientY, event.pointerType);
+                  touchDragRef.current = drag.isTouch;
                   activePointerIdRef.current = event.pointerId;
                   draggingTokenRef.current = token;
                   draggingElementRef.current = event.currentTarget;
-                  // Keep the pointer at the lower edge so it does not hide the letters while dragging.
-                  pointerOffsetRef.current = { x: event.clientX - rect.left, y: rect.height - 5 + touchLift };
+                  pointerOffsetRef.current = drag.offset;
                   setDraggingTokenId(token.id);
-                  setDraggingPosition(isTouchDrag
-                    ? {
-                      left: event.clientX - pointerOffsetRef.current.x,
-                      top: event.clientY - pointerOffsetRef.current.y,
-                    }
-                    : { left: rect.left, top: rect.top });
+                  setDraggingPosition(drag.position);
                 }}
                 onPointerMove={(event) => {
                   if (activePointerIdRef.current !== event.pointerId) {

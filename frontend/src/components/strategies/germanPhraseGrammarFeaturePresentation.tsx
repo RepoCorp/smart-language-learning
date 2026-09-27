@@ -1,4 +1,15 @@
 import type { PhraseGrammarFeaturePresentationMap } from "./phraseGrammarFeaturePresentationTypes";
+import { useI18n } from "../../i18n";
+
+function AdjectiveGenderExample(): JSX.Element {
+  const { t } = useI18n();
+  return <><span>gut → {t("strategies.grammar.gender.masculine")}: gut<strong>er</strong> Hund</span> · <span>{t("strategies.grammar.gender.feminine")}: gut<strong>e</strong> Musik</span> · <span>{t("strategies.grammar.gender.neuter")}: gut<strong>es</strong> Essen</span></>;
+}
+
+function AdjectiveCaseExample(): JSX.Element {
+  const { t } = useI18n();
+  return <><span>gut + Hund → {t("strategies.grammar.nominative")}: gut<strong>er</strong> Hund</span> · <span>{t("strategies.grammar.accusative")}: gut<strong>en</strong> Hund</span> · <span>{t("strategies.grammar.dative")}: gut<strong>em</strong> Hund</span> · <span>{t("strategies.grammar.genitive")}: gut<strong>en</strong> Hundes</span></>;
+}
 
 export const GERMAN_PHRASE_GRAMMAR_FEATURE_PRESENTATION = {
   verb_position_main_clause: { title: "strategies.grammar.verbPositionStatement", present: "strategies.grammar.verbPositionStatementNote", example: <>Ich <strong>komme</strong> heute.</> },
@@ -20,6 +31,6 @@ export const GERMAN_PHRASE_GRAMMAR_FEATURE_PRESENTATION = {
   preposition_dative: { title: "strategies.grammar.prepositionDative", present: "strategies.grammar.prepositionDativeNote", example: <>mit → Ich komme <strong>mit dem Hund</strong>.</> },
   two_way_preposition_location: { title: "strategies.grammar.twoWayPrepositionLocation", present: "strategies.grammar.twoWayPrepositionLocationNote", example: <>in + Wo? → Ich bin <strong>in der Küche</strong>.</> },
   two_way_preposition_direction: { title: "strategies.grammar.twoWayPrepositionDirection", present: "strategies.grammar.twoWayPrepositionDirectionNote", example: <>in + Wohin? → Ich gehe <strong>in die Küche</strong>.</> },
-  adjective_ending_gender: { title: "strategies.grammar.adjectiveEndingGender", present: "strategies.grammar.adjectiveEndingGenderNote", example: <><span>gut → Masculine: gut<strong>er</strong> Hund</span> · <span>Feminine: gut<strong>e</strong> Musik</span> · <span>Neuter: gut<strong>es</strong> Essen</span></> },
-  adjective_ending_case: { title: "strategies.grammar.adjectiveEndingCase", present: "strategies.grammar.adjectiveEndingCaseNote", example: <><span>gut + Hund → Nominative: gut<strong>er</strong> Hund</span> · <span>Accusative: gut<strong>en</strong> Hund</span> · <span>Dative: gut<strong>em</strong> Hund</span> · <span>Genitive: gut<strong>en</strong> Hundes</span></> },
+  adjective_ending_gender: { title: "strategies.grammar.adjectiveEndingGender", present: "strategies.grammar.adjectiveEndingGenderNote", example: <AdjectiveGenderExample /> },
+  adjective_ending_case: { title: "strategies.grammar.adjectiveEndingCase", present: "strategies.grammar.adjectiveEndingCaseNote", example: <AdjectiveCaseExample /> },
 } satisfies PhraseGrammarFeaturePresentationMap;

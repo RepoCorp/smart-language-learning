@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useContext, useMemo, useState } from "react";
+import { useI18n } from "./i18n";
 
 const STORAGE_KEY = "debugToolsEnabled";
 
@@ -51,13 +52,14 @@ function initialEnabled(): boolean {
 }
 
 export function DebugToolsProvider({ children }: { children: ReactNode }): JSX.Element {
+  const { t } = useI18n();
   const [enabled, setEnabledState] = useState<boolean>(initialEnabled);
   const [entries, setEntries] = useState<DebugEntry[]>([]);
   const [status, setStatus] = useState<string>("");
 
   const setEnabled = (nextEnabled: boolean): void => {
     setEnabledState(nextEnabled);
-    setStatus(nextEnabled ? "Debug tools enabled" : "Debug tools disabled");
+    setStatus(t(nextEnabled ? "config.debugEnabled" : "config.debugDisabled"));
     try {
       window.localStorage.setItem(STORAGE_KEY, nextEnabled ? "1" : "0");
     } catch {
@@ -82,7 +84,7 @@ export function DebugToolsProvider({ children }: { children: ReactNode }): JSX.E
 
   const clear = (): void => {
     setEntries([]);
-    setStatus("Cleared debug log");
+    setStatus(t("config.debugCleared"));
   };
 
   const logText = entries
@@ -92,12 +94,12 @@ export function DebugToolsProvider({ children }: { children: ReactNode }): JSX.E
     .join("\n");
 
   const copyLog = async (): Promise<void> => {
-    const text = logText || "(debug log is empty)";
+    const text = logText || t("config.debugEmptyLog");
     try {
       await navigator.clipboard.writeText(text);
-      setStatus(`Copied ${entries.length} entries`);
+      setStatus(t("config.debugCopied", { count: entries.length }));
     } catch {
-      setStatus("Copy failed; select the log text manually");
+      setStatus(t("config.debugCopyFailed"));
     }
   };
 
@@ -112,7 +114,7 @@ export function DebugToolsProvider({ children }: { children: ReactNode }): JSX.E
       logText,
       copyLog,
     }),
-    [enabled, entries, status, logText],
+    [enabled, entries, status, logText, t],
   );
 
   return <DebugToolsContext.Provider value={value}>{children}</DebugToolsContext.Provider>;
@@ -186,6 +188,7 @@ function testSpeechSynthesis(log: (channel: string, event: string, details?: Deb
 }
 
 export function DebugToolsPanel(): JSX.Element | null {
+  const { t } = useI18n();
   const { enabled, entries, status, clear, log, logText, copyLog } = useDebugTools();
 
   if (!enabled) {
@@ -194,23 +197,23 @@ export function DebugToolsPanel(): JSX.Element | null {
 
   return (
     <details className="debug-tools-panel" open>
-      <summary>Debug tools ({entries.length})</summary>
-      {status ? <p className="hint">Last debug action: {status}</p> : null}
+      <summary>{t("config.debugTools")} ({entries.length})</summary>
+      {status ? <p className="hint">{t("config.debugLastAction", { status })}</p> : null}
       <div className="actions debug-tools-actions">
         <button type="button" className="secondary-button" onClick={clear}>
-          Clear log
+          {t("config.debugClear")}
         </button>
         <button type="button" className="secondary-button" onClick={() => log("manual", "snapshot", snapshotSpeechSynthesis())}>
-          Snapshot
+          {t("config.debugSnapshot")}
         </button>
         <button type="button" className="secondary-button" onClick={() => testSpeechSynthesis(log)}>
-          Test speech
+          {t("config.debugTestSpeech")}
         </button>
         <button type="button" className="secondary-button" onClick={() => void copyLog()}>
-          Copy log
+          {t("config.debugCopy")}
         </button>
       </div>
-      <pre className="debug-tools-log">{logText || "No debug entries yet. Tap Snapshot or reproduce the issue."}</pre>
+      <pre className="debug-tools-log">{logText || t("config.debugEmptyHint")}</pre>
     </details>
   );
 }

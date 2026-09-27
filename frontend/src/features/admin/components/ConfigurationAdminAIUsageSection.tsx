@@ -40,8 +40,8 @@ export default function ConfigurationAdminAIUsageSection({
       setUsers(response.users);
       setDefaults(response.defaults);
       setQuotaInputValues({});
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load AI usage");
+    } catch {
+      setError(t("config.aiUsageLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -80,8 +80,8 @@ export default function ConfigurationAdminAIUsageSection({
     try {
       await updateAdminAIUsageLimit(user);
       await load();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to update AI usage limit");
+    } catch {
+      setError(t("config.aiUsageSaveFailed"));
     } finally {
       setSavingUserId(null);
     }
@@ -104,7 +104,12 @@ export default function ConfigurationAdminAIUsageSection({
   };
 
   const usageSummary = (user: AdminAIUsageUser): string => (
-    `This week: ${user.week_generation_credits} OpenAI credits, ${user.week_elevenlabs_characters} ElevenLabs characters, ${user.week_elevenlabs_music_seconds} Eleven Music seconds, ${user.week_realtime_minutes} live minutes`
+    t("config.aiWeeklyUsage", {
+      credits: user.week_generation_credits,
+      characters: user.week_elevenlabs_characters,
+      seconds: user.week_elevenlabs_music_seconds,
+      minutes: user.week_realtime_minutes,
+    })
   );
 
   const renderLimitInput = (user: AdminAIUsageUser, field: LimitField, label: string): JSX.Element => (
@@ -125,7 +130,12 @@ export default function ConfigurationAdminAIUsageSection({
       <h2 className="settings-title">{t("config.registeredUsersTitle")}</h2>
       <p className="settings-subtitle">{t("config.registeredUsersSubtitle")}</p>
       <p className="hint">
-        Default weekly budget: {defaults.weekly_generation_credits} OpenAI credits, {defaults.weekly_elevenlabs_characters} ElevenLabs characters, {defaults.weekly_elevenlabs_music_seconds} Eleven Music seconds, and {defaults.weekly_realtime_minutes} live minutes. A limit of 0 uses these defaults.
+        {t("config.aiDefaultBudget", {
+          credits: defaults.weekly_generation_credits,
+          characters: defaults.weekly_elevenlabs_characters,
+          seconds: defaults.weekly_elevenlabs_music_seconds,
+          minutes: defaults.weekly_realtime_minutes,
+        })}
       </p>
       {loading ? <p className="hint">{t("config.registeredUsersLoading")}</p> : null}
       {error ? <p className="error">{error}</p> : null}
@@ -144,14 +154,14 @@ export default function ConfigurationAdminAIUsageSection({
               </summary>
               <div className="admin-user-usage-details">
                 <div className="ai-usage-limits-grid">
-                  <label><input type="checkbox" checked={user.is_blocked} onChange={(event) => updateUser(user.id, { is_blocked: event.target.checked })} /> Block AI</label>
-                  {renderLimitInput(user, "weekly_generation_credits", "Generation credits")}
-                  {renderLimitInput(user, "weekly_elevenlabs_characters", "ElevenLabs characters")}
-                  {renderLimitInput(user, "weekly_elevenlabs_music_seconds", "Eleven Music seconds")}
-                  {renderLimitInput(user, "weekly_realtime_minutes", "Live minutes")}
+                  <label><input type="checkbox" checked={user.is_blocked} onChange={(event) => updateUser(user.id, { is_blocked: event.target.checked })} /> {t("config.aiBlock")}</label>
+                  {renderLimitInput(user, "weekly_generation_credits", t("config.aiCredits"))}
+                  {renderLimitInput(user, "weekly_elevenlabs_characters", t("config.aiCharacters"))}
+                  {renderLimitInput(user, "weekly_elevenlabs_music_seconds", t("config.aiMusicSeconds"))}
+                  {renderLimitInput(user, "weekly_realtime_minutes", t("config.aiLiveMinutes"))}
                 </div>
                 <div className="actions">
-                  <button type="button" className="secondary-button" disabled={savingUserId === user.id} onClick={() => void save(user)}>Save limits</button>
+                  <button type="button" className="secondary-button" disabled={savingUserId === user.id} onClick={() => void save(user)}>{t("config.aiSaveLimits")}</button>
                   {!user.is_superuser ? (
                     <button type="button" className="dangerous-button" disabled={deletingUserId === user.id} onClick={() => void deleteUser(user)}>
                       {deletingUserId === user.id ? t("config.deletingUser") : t("config.deleteUser")}

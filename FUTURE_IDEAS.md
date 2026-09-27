@@ -3,6 +3,7 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
+Buscar como bajar costos en prompts y usar distintos modelos: hablé con Codex sobre esto pero voy a esperar a recoger datos de Juli y de mi mamá. Le dije a Codex que recordara el plan
 Patterns, wäre
 Refactor y tests.
 Letras de canciones con frases muy largas
@@ -10,6 +11,7 @@ Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que 
 Por que passen no tiene frase?
 Traduccion de la palabra en calentamiento
 ejemplo de expresion es la frase de donde salio
+Los be que forman verbos no se que, net, glitch, keit..
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 
@@ -25,6 +27,8 @@ Los audios de partes de frases, y no se si tambien cuando el modelo saca mas que
 Muchas veces saca error al guardar pero si parece que guardo 
 
 ### Tier 1 (trabajarle de a poquitos, timeboxed)
+Terminada de la conversacion como sugiere July
+Al final de la sesión una conversación escrita usando las palabras que más costaron
 Que no repita la regla gramatical en pregunta
 Mejorar prompt pregunta de gramatica
 Añadir mas guias

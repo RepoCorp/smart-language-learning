@@ -1,13 +1,14 @@
 import type { WordExerciseGridPrimaryEntry, WordExerciseSelectableEntry } from "./WordExerciseGrid";
 import WordExerciseGrid from "./WordExerciseGrid";
+import { useI18n } from "../i18n";
 
 export const VERB_BY_TENSE_GENERATION_MODE = "verb_by_tense_v1";
 
 export const VERB_TENSES = [
-  { key: "present", label: "Present" },
-  { key: "perfect", label: "Perfect" },
-  { key: "simple-past", label: "Simple past" },
-  { key: "future", label: "Future" },
+  { key: "present", label: "forms.present" },
+  { key: "perfect", label: "forms.perfect" },
+  { key: "simple-past", label: "forms.simplePast" },
+  { key: "future", label: "forms.future" },
 ] as const;
 
 export const VERB_PERSONS = [
@@ -112,6 +113,7 @@ export default function VerbExerciseSelector({
   onSelectPerson,
   onSelectTense,
 }: VerbExerciseSelectorProps): JSX.Element {
+  const { t } = useI18n();
   const entryBySlot = new Map(
     gridEntries.map(({ entry, parsed }) => [`${parsed.person}-${parsed.tense}`, entry]),
   );
@@ -127,7 +129,7 @@ export default function VerbExerciseSelector({
     const keys = getVerbExerciseKeysForTense(gridEntries, exerciseEntryKey, tense.key);
     return {
       key: tense.key,
-      label: tense.label,
+      label: t(tense.label),
       selected: isExactSelection(keys),
       onClick: () => (isExactSelection(keys) ? onSelectTense("__clear__" as VerbTenseKey) : onSelectTense(tense.key)),
       disabled: exerciseRunning || keys.length === 0,

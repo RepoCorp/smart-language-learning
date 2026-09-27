@@ -52,7 +52,7 @@ export default function AuthLanding({ onAuthenticated }: AuthLandingProps): JSX.
       setPin("");
       setShowRegister(false);
     } catch {
-      setAuthError("Invalid username/email or PIN.");
+      setAuthError(t("auth.loginFailed"));
     } finally {
       setAuthBusy(false);
     }
@@ -70,7 +70,8 @@ export default function AuthLanding({ onAuthenticated }: AuthLandingProps): JSX.
       setRegisterEmail("");
       setShowRegister(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to submit registration request.";
+      const message = error instanceof Error && error.message !== "Failed to submit registration request."
+        ? error.message : t("auth.registrationFailed");
       setRegisterError(message);
     } finally {
       setRegisterBusy(false);

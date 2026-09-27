@@ -60,7 +60,7 @@ export default function ConfigurationElevenLabsSection({
         if (!mounted) {
           return;
         }
-        setError(loadError instanceof Error ? loadError.message : "Failed to load ElevenLabs voices");
+        setError(t("config.elevenLabsLoadError"));
       })
       .finally(() => {
         if (mounted) {

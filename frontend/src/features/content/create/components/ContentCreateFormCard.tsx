@@ -112,6 +112,9 @@ export default function ContentCreateFormCard({
               onChange={(e) => {
                 setAttemptedGeneration(false);
                 onSelectedTopicChange(e.target.value);
+                if (previousTopics.includes(e.target.value)) {
+                  notifyGuidedTourAction("topic-chosen");
+                }
               }}
               disabled={loading || saving}
               aria-label={t("content.section.topicTitle")}
@@ -138,7 +141,7 @@ export default function ContentCreateFormCard({
                   if (event.key === "Enter" && customTopic.trim()) {
                     event.preventDefault();
                     setOpenSection(null);
-                    notifyGuidedTourAction("topic-created");
+                    notifyGuidedTourAction("topic-chosen");
                   }
                 }}
                 placeholder={t("content.topic.placeholder")}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../i18n";
 
 import {
   deleteContentItem,
@@ -35,6 +36,7 @@ export function useItemAdminActions({
   onAudioRegenerated,
   onDeleted,
 }: Args) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<AdminAction>(null);
   const [isLearned, setIsLearned] = useState(initialIsLearned);
@@ -52,7 +54,7 @@ export function useItemAdminActions({
     try {
       await callback();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Item action failed");
+      setError(requestError instanceof Error ? requestError.message : t("newItem.actionFailed"));
     } finally {
       setActiveAction(null);
     }

@@ -191,8 +191,7 @@ describe("item Forms entry preparation", () => {
         phrase("Ich habe gespielt.", "Yo he jugado.", "perfect-1s"),
       ] },
     }));
-    // Row selectors currently have no accessible names; the first row is first-person singular.
-    await userEvent.click(modal.getAllByRole("button", { name: "" })[0]);
+    await userEvent.click(modal.getByRole("button", { name: "1s" }));
     expect(loopLines()).toEqual(["Ich spiele.", "Ich habe gespielt."]);
     await userEvent.click(modal.getByRole("button", { name: "Present" }));
     expect(loopLines()).toEqual(["Ich spiele.", "Du spielst."]);

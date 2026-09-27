@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useI18n } from "../../i18n";
 
 import { fetchContentTopics, regenerateTopicConversationGoal } from "../../api";
 import type { StudyLanguageCode } from "../../studyLanguages";
@@ -16,6 +17,7 @@ type Args = {
 };
 
 export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
+  const { t } = useI18n();
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopicValue] = useState<string>(RANDOM_TOPIC_OPTION);
   const [customTopic, setCustomTopicValue] = useState<string>("");
@@ -111,7 +113,7 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
       const nextGoal = (response.goal_text || "").trim();
       const nextTopic = (response.topic || "").trim();
       if (!nextGoal || !nextTopic) {
-        throw new Error("Could not create a conversation goal. Please try again.");
+        throw new Error(t("conversation.goalFailed"));
       }
       setGoal({ text: nextGoal, topic: nextTopic });
       return true;

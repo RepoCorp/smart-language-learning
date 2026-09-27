@@ -1668,7 +1668,7 @@ button.overview-stats-metric-card:focus-visible {
 }
 
 @media (pointer: fine) {
-  .phrase-builder-progressive-review .phrase-builder-token:not(:disabled) {
+  .phrase-builder-token:not(:disabled) {
     cursor: url("/cursors/phrase-block-grab.svg") 15 1, grab;
   }
 }

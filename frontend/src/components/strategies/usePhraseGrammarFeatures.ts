@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useI18n } from "../../i18n";
 
 import {
   analyzeContentItemPhraseGrammarFeatures,
@@ -41,6 +42,7 @@ export function usePhraseGrammarFeatures({
   targetLanguage: StudyLanguageCode;
   enabled: boolean;
 }) {
+  const { t } = useI18n();
   const [features, setFeatures] = useState(initialFeatures);
   const [featureKeys, setFeatureKeys] = useState<PhraseGrammarFeatureKey[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,7 +80,8 @@ export function usePhraseGrammarFeatures({
         setFeatureKeys(detected);
       })
       .catch((requestError) => {
-        setError(requestError instanceof Error ? requestError.message : "Failed to analyze phrase grammar");
+        setError(requestError instanceof Error && !["Failed to analyze phrase grammar", "Failed to load phrase grammar features"].includes(requestError.message)
+          ? requestError.message : t("strategies.grammar.analysisFailed"));
       })
       .finally(() => {
         pendingAnalyses.delete(analysisKey);
@@ -111,7 +114,8 @@ export function usePhraseGrammarFeatures({
       })))
       .catch((requestError) => setFeatures((current) => ({
         ...current,
-        [featureKey]: { ...current[featureKey], error: requestError instanceof Error ? requestError.message : "Failed to load phrase grammar examples" },
+        [featureKey]: { ...current[featureKey], error: requestError instanceof Error && requestError.message !== "Failed to load phrase grammar examples"
+          ? requestError.message : t("strategies.grammar.examplesFailed") },
       })))
       .finally(() => setFeatures((current) => ({
         ...current,
