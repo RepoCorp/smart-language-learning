@@ -1,0 +1,5 @@
+English target-language study-entry rules:
+- For noun keywords in target_text, return "the" followed by the singular noun: "the dog". Include "the" exactly once; do not use "a" or "an".
+- For plural_target, return "the" followed by the plural noun: "the dogs".
+- For verb keywords in target_text, return "to" followed by the infinitive: "to work", "to be", "to look after". Include "to" exactly once, not a conjugated verb form.
+- These rules apply only to standalone target-language noun and verb entries. Do not change expressions, source-language conventions, or the original sentence.

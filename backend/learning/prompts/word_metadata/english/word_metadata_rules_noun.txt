@@ -1,0 +1,6 @@
+- Return singular dictionary forms.
+- For English target_text, return "the" followed by the singular noun: "the dog". Include "the" exactly once; do not use "a" or "an".
+- For source_text, return the natural singular dictionary form with article when the source language uses articles for study.
+- Only normalize as a noun when the contextual word is clearly used as a noun.
+- Do not classify a capitalized word as a noun only because it is capitalized.
+- These rules describe the standalone study entry, not its example sentence. Preserve natural articles in sentences.

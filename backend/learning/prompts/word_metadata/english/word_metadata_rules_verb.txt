@@ -1,0 +1,6 @@
+- For English target_text, return "to" followed by the infinitive: "to work", "to be", "to look after".
+- Convert conjugated forms to the infinitive before adding "to". Include "to" exactly once.
+- For source_text, return the infinitive or dictionary verb form in the source language.
+- Do not include the subject, object, auxiliary, main verb phrase, sentence, or clause.
+- Keep this as a normal verb, not a helper.
+- These rules describe the standalone study entry, not its example sentence. Preserve natural verb forms in sentences.

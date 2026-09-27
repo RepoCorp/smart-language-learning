@@ -77,8 +77,9 @@ export default function ContentCreateFormCard({
 
   useEffect(() => {
     const openRequestedSection = (event: Event): void => {
-      if ((event as CustomEvent<{ section?: string }>).detail?.section === "topic") {
-        setOpenSection("topic");
+      const section = (event as CustomEvent<{ section?: string }>).detail?.section;
+      if (section === "topic" || section === "options") {
+        setOpenSection(section);
       }
     };
     window.addEventListener(GUIDED_TOUR_OPEN_SECTION_EVENT, openRequestedSection);
@@ -202,7 +203,7 @@ export default function ContentCreateFormCard({
         onToggle={() => setOpenSection((current) => current === "options" ? null : "options")}
       >
         <>
-          <div className="content-form-section content-setting-block">
+          <div className="content-form-section content-setting-block" data-guide-target="dialog-level">
             <div className="content-setting-block-copy">
               <p className="content-form-section-title">{t("content.level.label")}</p>
             </div>
