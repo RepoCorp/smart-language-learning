@@ -4,7 +4,7 @@ import type { StudyLanguageCode } from "../../studyLanguages";
 export type ConversationTransport = "http" | "realtime";
 export type GoalDifficulty = "easy" | "medium" | "hard";
 export type ConversationSpeechSpeed = "normal" | "slow" | "super_slow";
-export type ConversationResponseLevel = "A1" | "A2" | "B1";
+export type ConversationResponseLevel = "A0" | "A1" | "A2" | "B1";
 export type ConversationPhase = "active" | "closing";
 
 export type ConversationHistoryEntry = {

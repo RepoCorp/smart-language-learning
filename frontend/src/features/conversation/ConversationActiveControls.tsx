@@ -175,6 +175,16 @@ export default function ConversationActiveControls({
             <div className="conversation-speed-controls">
               <label className="prompt conversation-speed-label">{t("conversation.levelLabel")}</label>
               <div className="exercise-audio-mode">
+                <label className={`exercise-radio-option ${status.responseLevel === "A0" ? "exercise-radio-option-selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="conversation-response-level"
+                    checked={status.responseLevel === "A0"}
+                    onChange={() => controls.onResponseLevelChange("A0")}
+                    disabled={status.conversationRealtimeConnecting}
+                  />
+                  <span>{t("study.absoluteBeginner")}</span>
+                </label>
                 <label className={`exercise-radio-option ${status.responseLevel === "A1" ? "exercise-radio-option-selected" : ""}`}>
                   <input
                     type="radio"

@@ -18,10 +18,13 @@ function speedInstruction(speed: ConversationSpeechSpeed): string {
   if (speed === "slow") {
     return "Speak slowly and clearly for the entire response. Keep the same slow pace from beginning to end and do not speed up at the end.";
   }
-  return "Speak at a normal pace for an A2 learner.";
+  return "Speak at a normal, clear pace appropriate for the selected learner level.";
 }
 
 function levelInstruction(level: ConversationResponseLevel): string {
+  if (level === "A0") {
+    return "Use an A0 absolute beginner level, before A1. This level takes priority over any earlier language-level guidance. Use very common, concrete everyday words and basic present-time phrases. Aim for 2 to 5 words per sentence, one idea at a time, and at most two short sentences per reply. Allow a few more words only for natural wording. Avoid idioms, abstract explanations, complex clauses, and unnecessary synonyms. Repeat familiar words and sentence patterns naturally. Use adult-appropriate language, not baby talk or broken grammar. While keeping the conversation going, prefer one simple yes/no or either/or question that can be answered with a few words instead of an open-ended question. Do not ask new questions during the closing phase. Rephrase simply if the learner is stuck, without giving away the goal or treating replies in their own language as goal completion.";
+  }
   if (level === "A1") {
     return "Use an A1 level. Use very simple words, very short sentences, and very basic grammar.";
   }

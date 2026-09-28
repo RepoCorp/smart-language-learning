@@ -104,6 +104,7 @@ def _generate_scenario_pool_with_chatgpt(
     source_language: str,
     target_language: str,
     call_openai_json_fn,
+    proficiency_level: str = "A2",
 ) -> list[str]:
     source_name = _language_label(source_language)
     target_name = _language_label(target_language)
@@ -137,6 +138,11 @@ Rules:
             f"Source language: {source_name}\n"
             f"Target language: {target_name}\n"
             "Generate varied but practical options with different concrete constraints."
+            + (
+                " For an absolute beginner, choose one tiny everyday interaction that can be expressed "
+                "with a few familiar words. Avoid problems requiring explanations, negotiations, or multiple steps."
+                if proficiency_level == "A0" else ""
+            )
         ),
         timeout_seconds=10,
         temperature=0.8,
@@ -200,6 +206,7 @@ def generate_conversation_with_chatgpt(
             source_language=source_language,
             target_language=target_language,
             call_openai_json_fn=call_openai_json_fn,
+            proficiency_level=proficiency_level,
         )
     except RuntimeError:
         return None

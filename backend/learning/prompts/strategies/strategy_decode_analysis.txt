@@ -22,6 +22,11 @@ Analyze the target word and explain how it can be broken into meaningful parts.
 
 Requirements:
 
+- Write all explanations and instructions in {source_name}, the language the learner speaks, not {target_name}.
+- In particular, write `linguistic.explanation`, `memory.explanation`, and `related[].why` in {source_name}. You may quote {target_name} words when explaining them, but keep the surrounding explanation in {source_name}.
+- Keep study words and example sentences in {target_name}: prefixes, roots, suffixes, lemmas, decomposed word parts, related words, and their sentences.
+- Write related-word meanings (`source`) and sentence translations (`translation`) in {source_name}.
+- Do not translate the JSON field names.
 - Identify prefixes, roots, suffixes, and the dictionary lemma whenever appropriate.
 - If the word belongs to a recognizable word family, identify the most useful related word.
 - If there is a useful memory decomposition that differs from the linguistic analysis, include it separately.

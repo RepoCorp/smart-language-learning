@@ -18,6 +18,7 @@ import type { ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
 import {
+  defaultConversationSpeechSpeed,
   getInitialConversationResponseLevel,
   getInitialConversationSpeechSpeed,
   setStoredConversationResponseLevel,
@@ -215,6 +216,7 @@ export default function ConversationPage(): JSX.Element {
   const updateResponseLevel = (level: ConversationResponseLevel): void => {
     setResponseLevel(level);
     setStoredConversationResponseLevel(level);
+    updateSpeechSpeed(defaultConversationSpeechSpeed(level));
   };
 
   const toggleAssistantTurnTranslation = (index: number): void => {

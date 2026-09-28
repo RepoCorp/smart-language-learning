@@ -16,7 +16,7 @@ const CREATE_NEW_OPTION = "__create_new__";
 const RANDOM_TOPIC_OPTION = "__random_topic__";
 type DialogLength = "standard" | "short_three";
 type RequiredWordsLanguage = "source" | "target";
-type ProficiencyLevel = "A1" | "A2" | "B1" | "B2";
+type ProficiencyLevel = "A0" | "A1" | "A2" | "B1" | "B2";
 export default function ContentCreatePage(): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();

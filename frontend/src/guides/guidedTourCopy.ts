@@ -95,7 +95,7 @@ const COPY: Record<GuideLanguage, GuidedTourCopy> = {
         target: "dialog-level",
         route: "/content/create",
         title: "Choose the dialog level",
-        body: "Choose a level that feels comfortable: A1 is the simplest, A2 uses more everyday language, and B1–B2 introduce longer, more complex conversations. If you are just starting, try A1. You can change the level or keep the current selection, then click Next.",
+        body: "Choose a level that feels comfortable: Absolute beginner is for your very first steps, A1 covers the basics, A2 uses more everyday language, and B1–B2 introduce longer, more complex conversations. You can change the level or keep the current selection, then click Next.",
         openSection: "options",
       },
       {
@@ -254,7 +254,7 @@ const COPY: Record<GuideLanguage, GuidedTourCopy> = {
         target: "dialog-level",
         route: "/content/create",
         title: "Elige el nivel del diálogo",
-        body: "Elige un nivel con el que te sientas cómoda: A1 es el más sencillo, A2 amplía el lenguaje cotidiano y B1–B2 ofrecen conversaciones más largas y complejas. Si estás empezando, prueba A1. Puedes cambiar el nivel o dejar el que está seleccionado y pulsar Siguiente.",
+        body: "Elige un nivel con el que te sientas cómoda: Principiante absoluto es para tus primeros pasos, A1 cubre lo básico, A2 amplía el lenguaje cotidiano y B1–B2 ofrecen conversaciones más largas y complejas. Puedes cambiar el nivel o dejar el que está seleccionado y pulsar Siguiente.",
         openSection: "options",
       },
       {

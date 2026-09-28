@@ -11,7 +11,7 @@ explanation of why personally useful topics help learning. Random topics remain
 available outside this guided step.
 
 After choosing a topic, the guide opens Options and highlights the dialog level
-selection (A1 through B2). It briefly explains the levels and lets the learner
+selection (Absolute beginner, then A1 through B2). It briefly explains the levels and lets the learner
 change the level or keep the current selection, then continue with Next. Choosing
 a radio option does not automatically advance the guide or generate a dialog.
 

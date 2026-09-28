@@ -11,7 +11,7 @@ type ConversationAudioRequest = {
   history: Array<{ user_text: string; assistant_text: string }>;
   voiceSeed: string;
   speechSpeed: "normal" | "slow" | "super_slow";
-  responseLevel: "A1" | "A2" | "B1";
+  responseLevel: "A0" | "A1" | "A2" | "B1";
   sourceLanguage: StudyLanguageCode;
   targetLanguage: StudyLanguageCode;
 };

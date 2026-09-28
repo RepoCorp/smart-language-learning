@@ -22,6 +22,11 @@ Create one very short acting exercise.
 
 Requirements:
 
+- Write all explanations and instructions in {source_name}, the language the learner speaks, not {target_name}.
+- In particular, write every entry in `actions` in {source_name}. If an action quotes the sentence to say aloud, keep only that quoted sentence in {target_name}.
+- Keep study words and example sentences in {target_name}: the spoken sentence in `target`.
+- Write its `source` translation in {source_name}.
+- Do not translate the JSON field names.
 - The exercise should naturally reinforce the meaning of {target_text}.
 - The student should perform one simple physical action or a short sequence of actions.
 - The actions should be easy to perform almost anywhere without special props.

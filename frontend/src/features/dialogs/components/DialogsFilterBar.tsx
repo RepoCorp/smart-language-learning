@@ -44,7 +44,7 @@ export default function DialogsFilterBar({
         <span>{t("content.level.label")}</span>
         <select value={level} onChange={(event) => onLevelChange(event.target.value)} disabled={loading}>
           <option value="">{t("dialogs.levelFilterPlaceholder")}</option>
-          {['A1', 'A2', 'B1', 'B2'].map((option) => <option key={option} value={option}>{option}</option>)}
+          {['A0', 'A1', 'A2', 'B1', 'B2'].map((option) => <option key={option} value={option}>{option === 'A0' ? t("study.absoluteBeginner") : option}</option>)}
         </select>
       </label>
       <label className="form-field">

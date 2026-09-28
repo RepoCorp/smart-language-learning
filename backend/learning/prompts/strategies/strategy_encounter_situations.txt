@@ -22,6 +22,11 @@ Identify the most common real-world situations where the student is likely to en
 
 Requirements:
 
+- Write all explanations and instructions in {source_name}, the language the learner speaks, not {target_name}.
+- In particular, write each situation's `title` and `description` in {source_name}. You may quote {target_name} words when explaining them, but keep the surrounding explanation in {source_name}.
+- Keep study words and example sentences in {target_name}: each situation's `target` sentence.
+- Write each `source` translation in {source_name}.
+- Do not translate the JSON field names.
 - Generate between 5 and 8 common situations.
 - Prioritize situations that an everyday language learner is likely to experience.
 - Include a variety of contexts (conversation, signs, websites, forms, transportation, shopping, work, travel, media, etc.) whenever appropriate.

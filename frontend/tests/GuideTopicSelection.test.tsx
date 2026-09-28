@@ -14,7 +14,7 @@ const RANDOM = "__random_topic__";
 function TopicForm() {
   const [selectedTopic, setSelectedTopic] = useState(RANDOM);
   const [customTopic, setCustomTopic] = useState("");
-  const [level, setLevel] = useState<"A1" | "A2" | "B1" | "B2">("A2");
+  const [level, setLevel] = useState<"A0" | "A1" | "A2" | "B1" | "B2">("A2");
   return <ContentCreateFormCard
     selectedTopic={selectedTopic} customTopic={customTopic}
     selectedContext="" customContext="" conversationDetails="" requiredWords=""
@@ -49,6 +49,7 @@ describe("starter guide dialog level step", () => {
     expect(steps[index].hideNext).not.toBe(true);
     expect(steps[index].body).toContain("A1");
     expect(steps[index].body).toContain("B2");
+    expect(steps[index].body).toContain(language === "en" ? "Absolute beginner" : "Principiante absoluto");
   });
 
   it.each([false, true])("opens and highlights levels, then allows continuing (change level: %s)", async changeLevel => {
@@ -75,6 +76,13 @@ describe("starter guide dialog level step", () => {
     fireEvent.click(next);
     expect(advance).toHaveBeenCalledWith(index + 1);
   });
+});
+
+it("allows selecting the absolute beginner dialog level", () => {
+  render(<TopicForm />);
+  act(() => requestGuidedTourSection("options"));
+  fireEvent.click(screen.getByRole("radio", { name: "Absolute beginner" }));
+  expect(screen.getByRole("radio", { name: "Absolute beginner" })).toBeChecked();
 });
 
 function setup(language: "en" | "es") {

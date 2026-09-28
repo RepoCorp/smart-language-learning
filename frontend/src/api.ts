@@ -254,7 +254,7 @@ export async function previewContent(
   requiredWords = "",
   requiredWordsLanguage: "source" | "target" = "target",
   dialogLength: "standard" | "short_three" = "standard",
-  proficiencyLevel: "A1" | "A2" | "B1" | "B2" = "A2",
+  proficiencyLevel: "A0" | "A1" | "A2" | "B1" | "B2" = "A2",
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
 ): Promise<ContentPreviewResponse> {
@@ -286,7 +286,7 @@ export async function confirmContent(
   sourceLanguage: StudyLanguageCode = "spanish",
   targetLanguage: StudyLanguageCode = "german",
   selectedTurnIndexes?: number[],
-  proficiencyLevel: "A1" | "A2" | "B1" | "B2" = "A2",
+  proficiencyLevel: "A0" | "A1" | "A2" | "B1" | "B2" = "A2",
 ): Promise<ContentConfirmResponse> {
   const response = await apiFetch(`${API_BASE}/content/confirm`, {
     method: "POST",

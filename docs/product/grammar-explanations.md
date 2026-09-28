@@ -20,3 +20,17 @@ the study phrase, without inventing extra examples.
 Feature IDs and precise model detection definitions are separate from learner
 copy and remain unchanged. Editing the wording must not invalidate cached
 grammar analysis or require new model calls.
+
+## Generated strategy explanations
+
+Model-generated explanations and instructions use the learner's source language
+(the language they speak), independently of interface language. This includes
+Compare's differences and mistakes, Decode's explanations and reasons, Encounter's
+titles and descriptions, and Act's physical-action instructions. Study words,
+word parts, and example sentences remain in the target language, with translations
+in the source language. Quoting study words inside explanations is allowed.
+Static UI grammar explanations remain localized to the interface language.
+
+Prompt improvements apply to future generations. Do not silently translate,
+invalidate, or regenerate already saved strategy results; the learner can
+explicitly regenerate them.

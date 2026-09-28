@@ -5,6 +5,17 @@ from .conversation_goal_phase import conversation_phase_instruction
 
 def response_level_instruction(level: str) -> str:
     normalized_level = str(level).strip().upper() or "A2"
+    if normalized_level == "A0":
+        return (
+            "Use an A0 absolute beginner level, before A1. This level takes priority over any earlier language-level guidance. "
+            "Use very common, concrete everyday words and basic present-time phrases. "
+            "Aim for 2 to 5 words per sentence, one idea at a time, and at most two short sentences per reply. "
+            "Allow a few more words only for natural wording. Avoid idioms, abstract explanations, complex clauses, and unnecessary synonyms. "
+            "Repeat familiar words and sentence patterns naturally. Use adult-appropriate language, not baby talk or broken grammar. "
+            "While keeping the conversation going, prefer one simple yes/no or either/or question that can be answered with a few words "
+            "instead of an open-ended question. Do not ask new questions during the closing phase. "
+            "Rephrase simply if the learner is stuck, without giving away the goal or treating replies in their own language as goal completion."
+        )
     if normalized_level == "A1":
         return "Use an A1 level. Use very simple words, very short sentences, and very basic grammar."
     if normalized_level == "B1":

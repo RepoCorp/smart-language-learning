@@ -32,7 +32,11 @@ def build_conversation_prompt(
         f"Variation seed: {creativity_seed}",
         "Conversation style: practical, common real-life wording first; add light variation without unusual twists.",
         "If extra user details are provided, they must be clearly reflected in at least two turns.",
-        "Variety constraints: avoid overused templates and avoid reusing the same key verb/noun in consecutive turns unless necessary.",
+        (
+            "Repeat useful words and simple sentence patterns naturally; familiarity matters more than variety at this level."
+            if proficiency_level == "A0" else
+            "Variety constraints: avoid overused templates and avoid reusing the same key verb/noun in consecutive turns unless necessary."
+        ),
     ]
     return "\n".join(parts)
 
@@ -40,12 +44,23 @@ def build_conversation_prompt(
 def _length_requirement(dialog_length: str, proficiency_level: str) -> str:
     if dialog_length == "short_three":
         return "Exactly 3 very short dialogue turns/phrases total."
+    if proficiency_level == "A0":
+        return "4 to 6 very short dialogue turns total, with one short sentence per turn."
     if proficiency_level in {"B1", "B2"}:
         return "6 to 12 dialogue turns total. Allow naturally longer turns when the situation benefits from detail or a follow-up."
     return "6 to 12 concise dialogue turns total."
 
 
 def _level_instruction(proficiency_level: str) -> str:
+    if proficiency_level == "A0":
+        return (
+            "Learner proficiency level: A0 (absolute beginner, before A1). Assume the learner has only just started. "
+            "Use very common, concrete everyday words and basic present-time phrases. "
+            "Aim for 2 to 5 words per sentence, with only one idea at a time; allow a few more words only for natural wording. "
+            "Use simple questions and brief answers. Avoid idioms, abstract explanations, complex clauses, and unnecessary synonyms. "
+            "Keep any requested vocabulary, even if it is harder, but make the surrounding language as simple as possible. "
+            "Use natural, adult-appropriate language, not baby talk or broken grammar."
+        )
     if proficiency_level == "B2":
         return (
             "Learner proficiency level: B2. Use natural, nuanced vocabulary and varied sentence structures. "

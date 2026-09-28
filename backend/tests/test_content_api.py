@@ -645,7 +645,8 @@ def test_content_preview_passes_short_three_dialog_length(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_content_preview_passes_proficiency_level(monkeypatch):
+@pytest.mark.parametrize("level", ["A0", "A1", "A2", "B1", "B2"])
+def test_content_preview_passes_proficiency_level(monkeypatch, level):
     from learning.views.content import api as api_views
 
     captured = {}
@@ -659,12 +660,13 @@ def test_content_preview_passes_proficiency_level(monkeypatch):
     client = APIClient()
     response = client.post(
         "/api/content/preview",
-        {"topic": "shopping", "proficiency_level": "B2"},
+        {"topic": "shopping", "proficiency_level": level},
         format="json",
     )
 
     assert response.status_code == 200
-    assert captured["proficiency_level"] == "B2"
+    assert captured["proficiency_level"] == level
+    assert response.json()["proficiency_level"] == level
 
 
 @pytest.mark.django_db

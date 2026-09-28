@@ -65,10 +65,11 @@ export default function StrategiesModal({
             </p>
             <p className="word-strategies-item-source">{sourceText}</p>
           </div>
-          <label className="word-strategies-select-group" htmlFor="word-strategy-select">
+          <label className="word-strategies-select-group strategy-picker" htmlFor="word-strategy-select">
             <select
               id="word-strategy-select"
               className="word-strategies-select"
+              aria-label={t("newItem.strategiesTitle")}
               value={selectedStrategy}
               onChange={(event) => onSelectedStrategyChange(event.target.value)}
             >

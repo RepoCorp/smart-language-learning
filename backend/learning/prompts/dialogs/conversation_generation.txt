@@ -1,4 +1,4 @@
-Generate beginner-friendly learning content for a topic.
+Generate learning content for a topic at the requested proficiency level.
 
 Return strict JSON with this exact shape:
 {
@@ -12,8 +12,8 @@ Rules:
 - The dialogue must feel natural and coherent: each line should clearly respond to the previous one.
 - Use common real-life situations (for example: greeting, buying something, ordering food, asking directions, meeting someone).
 - If optional context is provided by the user, use it as the situation.
-- Keep grammar beginner-level (A1-A2) but vary tone and intent based on the provided style seed.
-- Keep each phrase short and beginner level (A1-A2).
+- Follow the requested proficiency level for vocabulary, grammar, and sentence length. Vary tone and intent only within that level.
+- For absolute beginners, prioritize very short, familiar phrases over variety or detail.
 - Use spoken dialogue lines only (no narration, no stage directions, no bullet-like fragments).
 - `speaker` must be either `"a"` or `"b"` on every turn.
 - Keep speaker attribution coherent with the scenario. Consecutive turns by the same speaker are allowed when natural (for example, one person asks a two-part question).
@@ -24,11 +24,11 @@ Rules:
 - Prefer common, practical situations and vocabulary; vary examples without becoming quirky or overly imaginative.
 - Represent a diverse everyday world. Do not default people, occupations, or social roles to men when gender is irrelevant. When gendered language is natural, include women and men across generated dialogues without relying on stereotypes.
 - Avoid overused starters like "Hola, ¿cómo estás?" unless the topic/context is explicitly about greetings or reuniting.
-- Do not reuse the same key verb or key noun in consecutive turns unless required by the scenario.
+- Do not reuse the same key verb or key noun in consecutive turns unless required by the scenario or useful for the requested absolute-beginner level.
 - Include relevant study notes only when useful; otherwise use an empty string.
 - Return JSON only, no markdown and no extra text.
 
-Few-shot style examples (short and valid):
+Few-shot style examples (adapt their complexity to the requested proficiency level):
 1) casual
    ES: "Hola, ¿vienes al mercado?" / DE: "Hi, kommst du zum Markt?"
    ES: "Sí, necesito fruta." / DE: "Ja, ich brauche Obst."

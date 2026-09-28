@@ -10,7 +10,7 @@ const RANDOM_TOPIC_OPTION = "__random_topic__";
 
 type DialogLength = "standard" | "short_three";
 type RequiredWordsLanguage = "source" | "target";
-type ProficiencyLevel = "A1" | "A2" | "B1" | "B2";
+type ProficiencyLevel = "A0" | "A1" | "A2" | "B1" | "B2";
 
 export default function ContentCreateFormCard({
   selectedTopic,
@@ -208,7 +208,7 @@ export default function ContentCreateFormCard({
               <p className="content-form-section-title">{t("content.level.label")}</p>
             </div>
             <div className="content-radio-options" role="radiogroup" aria-label={t("content.level.label")}>
-              {(["A1", "A2", "B1", "B2"] as ProficiencyLevel[]).map((level) => (
+              {(["A0", "A1", "A2", "B1", "B2"] as ProficiencyLevel[]).map((level) => (
                 <label key={level} className={`content-radio-option${proficiencyLevel === level ? " content-radio-option-selected" : ""}`}>
                   <input
                     type="radio"
@@ -218,7 +218,7 @@ export default function ContentCreateFormCard({
                     onChange={() => onProficiencyLevelChange(level)}
                     disabled={loading || saving}
                   />
-                  {level}
+                  {level === "A0" ? t("study.absoluteBeginner") : level}
                 </label>
               ))}
             </div>
