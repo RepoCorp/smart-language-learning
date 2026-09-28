@@ -147,6 +147,7 @@ export default function ContentManagePage(): JSX.Element {
           return;
         }
         setOpenedItem({
+          pattern_key: detail.pattern_key, pattern_examples: detail.pattern_examples,
           id: detail.id,
           item_type: detail.item_type,
           spanish_text: detail.spanish_text,

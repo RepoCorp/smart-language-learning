@@ -32,6 +32,10 @@ export default function ManageSectionCard({
         >
           {t("manage.sectionPhrases")}
         </button>
+        <button type="button" className={currentSection === "patterns" ? "" : "secondary-button"}
+          onClick={() => onChangeSection("patterns")} disabled={busy}>
+          {t("wordFormation.patterns")}
+        </button>
         <button
           type="button"
           className={currentSection === "topics" ? "" : "secondary-button"}

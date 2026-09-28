@@ -20,6 +20,7 @@ from .dialog_phrase_match import build_dialog_phrase_match_payload
 from .content.item_compare_payloads import compare_words_payload
 from .session_review_pool import review_rows
 from ..review_schedule import local_day_bounds
+from ..word_formation import item_payload as pattern_item_payload
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,7 @@ class SessionEntry:
     due_at_sort: object | None = None
     repeated_after_failure: bool = False
     repeat_practice_step: str | None = None
+    review_version: int | None = None
 
 
 REVIEW_WORD_SECONDS = 15
@@ -222,6 +224,8 @@ def trim_entries_to_target_duration(entries: list[SessionEntry], target_seconds:
 
 
 def estimated_seconds_for_entry(entry: SessionEntry) -> int:
+    if entry.item.item_type == Item.ItemType.PATTERN:
+        return 30
     if entry.repeated_after_failure:
         if entry.repeat_practice_step == "word_intro":
             return DIFFICULT_WORD_INTRO_SECONDS
@@ -280,7 +284,7 @@ def build_new_entries(
     excluded_item_ids = excluded_item_ids or set()
     new_items = list(
         apply_user_scope(Item.objects, user).filter(
-            item_type__in=[Item.ItemType.WORD, Item.ItemType.PHRASE],
+            item_type__in=Item.ItemType.values,
             is_learned=False,
             source_language=source_language,
             target_language=target_language,
@@ -336,6 +340,7 @@ def build_difficult_practice_entries(
         apply_user_scope(Item.objects, user).filter(
             is_learned=False,
             is_difficult=True,
+            item_type__in=[Item.ItemType.WORD, Item.ItemType.PHRASE],
             source_language=source_language,
             target_language=target_language,
         ).order_by("-difficult_marked_at", "id")
@@ -423,6 +428,8 @@ def serialize_session_plan(entries: list[SessionEntry]) -> list[dict]:
             "direction": entry.direction,
             "repeatedAfterFailure": entry.repeated_after_failure,
             "repeatPracticeStep": entry.repeat_practice_step,
+            **({"review_version": getattr(entry.item, f"review_count_{entry.direction}")}
+               if entry.direction and entry.item.item_type == Item.ItemType.PATTERN else {}),
         }
         for entry in entries
     ]
@@ -472,6 +479,8 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "compare_words": compare_words_payload(entry.item),
                 "compare_words_insights": entry.item.compare_words_insights or "",
                 "session_restore_state": build_session_restore_state(entry.item),
+                **(pattern_item_payload(entry.item, entry.direction, entry.review_version)
+                   if entry.item.item_type == Item.ItemType.PATTERN else {}),
             }
         )
 

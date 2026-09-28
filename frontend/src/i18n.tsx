@@ -11,6 +11,8 @@ import { configurationMessages } from "./i18nConfig";
 import { authMessages } from "./i18nAuth";
 import { englishGrammarMessages } from "./i18nEnglishGrammar";
 import { singMessages } from "./i18nSing";
+import { wordFormationMessages } from "./i18nWordFormation";
+import { englishWordFormationMessages } from "./i18nEnglishWordFormation";
 
 export type AppLanguage = "en" | "es";
 
@@ -32,6 +34,8 @@ const messages = {
     ...authMessages.en,
     ...englishGrammarMessages.en,
     ...singMessages.en,
+    ...wordFormationMessages.en,
+    ...englishWordFormationMessages.en,
     "quota.blocked": "AI generation is disabled for this account.",
     "quota.live": "Your weekly live conversation minute limit has been reached. Please try again next week.",
     "quota.music": "Your weekly Eleven Music limit has been reached. Please try again next week.",
@@ -201,11 +205,11 @@ const messages = {
     "conversation.moreControls": "More controls",
     "conversation.helpTitle": "Conversation help",
     "conversation.helpDescription":
-      "Ask what you want to say, and get support in your source language.",
+      "Ask how to say something, and get help in the language you speak.",
     "conversation.helpInputPlaceholder": "Type what you want to say or ask...",
     "conversation.helpSend": "Get help",
     "conversation.helpSayInputPlaceholder":
-      "Type a word or phrase to say in the target language...",
+      "Type a word or phrase you want to say in the language you're learning...",
     "conversation.helpSaySend": "How to say it",
     "conversation.helpSayRequestRequired": "Write a word or phrase first.",
     "conversation.helpSayResponseLabel": "{language}:",
@@ -295,15 +299,15 @@ const messages = {
     "content.length.shortThree": "Short: 3 phrases",
     "content.level.label": "Dialog level",
     "content.level.description":
-      "Choose the target-language level for this dialog.",
+      "Choose the difficulty level for this dialog.",
     "content.requiredWords.label": "Words to include",
     "content.requiredWords.description":
       "Force specific words or expressions into the generated dialog.",
-    "content.requiredWords.languageTarget": "Words are in target language",
-    "content.requiredWords.languageSource": "Words are in source language",
+    "content.requiredWords.languageTarget": "In the language I'm learning",
+    "content.requiredWords.languageSource": "In the language I speak",
     "content.requiredWords.placeholder": "e.g. bezahlen, die Rechnung, schnell",
     "content.requiredWords.hint":
-      "Choose the language above, then separate multiple words with commas or new lines. Source-language words are translated first, then included in the target-language dialog.",
+      "Choose the language above, then separate multiple words with commas or new lines. Words in the language you speak are translated first, then included in the dialog in the language you're learning.",
     "content.details.label": "Extra guidance",
     "content.details.description":
       "Add optional instructions to shape the situation, tone, or constraints.",
@@ -585,7 +589,7 @@ const messages = {
     "dialogs.cancelPhraseSelection": "Cancel selection",
     "dialogs.addSelectedPhrase": "Add expression",
     "dialogs.selectedPhraseHint":
-      "Select two or more adjacent words from the target line.",
+      "Select two or more adjacent words in the language you're learning.",
     "dialogs.phraseSelectionConfirmPrompt":
       "Do you want to save this expression?",
     "dialogs.error.load": "Failed to load saved dialogs",
@@ -639,7 +643,7 @@ const messages = {
     "content.result.dialogAccepted": "Dialog accepted and saved.",
     "content.result.dialogTitle": "Saved dialog",
     "content.result.dialogWordHint":
-      "Click words in target lines to add them as items.",
+      "Click words in the language you're learning to save them.",
     "newItem.word": "New word",
     "newItem.phrase": "New phrase",
     "newItem.sourceLabel": "{language}:",
@@ -725,14 +729,14 @@ const messages = {
       "Recall the next word, then choose from a few phrase blocks.",
     "newItem.strategiesPlaceholder": "Placeholder for {strategy}.",
     "newItem.createDescription":
-      "Write a source-language sentence that feels personal, then turn it into a target-language phrase that keeps this word.",
+      "Write a sentence that feels personal in the language you speak, then turn it into a phrase in the language you're learning that includes this word.",
     "newItem.createPlaceholder": "Write your sentence here",
     "newItem.createAdd": "Add phrase",
     "newItem.createGenerating": "Generating...",
     "newItem.createEmpty": "No created phrases yet.",
     "newItem.createError": "Failed to create phrase",
     "newItem.examplesDescription":
-      "Practice with short target-language sentences that gradually grow a little more complex.",
+      "Practice with short sentences in the language you're learning that gradually grow a little more complex.",
     "newItem.examplesGenerating": "Generating examples...",
     "newItem.examplesEmpty": "No examples yet.",
     "newItem.examplesError": "Failed to generate examples",
@@ -792,7 +796,7 @@ const messages = {
     "newItem.openConversation": "Practice conversation",
     "newItem.conversationTitle": "Item conversation practice",
     "newItem.conversationDescription":
-      "Speak in the target language. The tutor replies with audio focused on this item.",
+      "Speak in the language you're learning. The tutor replies with audio focused on this item.",
     "newItem.conversationStartRecording": "Start speaking",
     "newItem.conversationStopRecording": "Send message",
     "newItem.conversationListening": "Listening... {seconds}s",
@@ -870,7 +874,7 @@ const messages = {
     "newItem.sentenceAddAdded": "sentence added",
     "newItem.sentenceAddExists": "sentence already exists",
     "newItem.sentenceAddError": "failed to add sentence",
-    "newItem.sentenceAddMissingSource": "missing source translation",
+    "newItem.sentenceAddMissingSource": "missing translation into the language you speak",
     "newItem.sentenceAddTitle": "Add Sentence",
     "newItem.sentenceAddTranslation": "Translation: {translation}",
     "newItem.sentenceAddPrompt": "Do you want to save this sentence?",
@@ -906,7 +910,7 @@ const messages = {
     "phrase.progressiveBlocksShowNextLetter": "Show next letter",
     "phrase.progressiveBlocksComplete": "Great, the phrase is in the right order.",
     "phrase.situationPrompt":
-      "Select the line that does not fit this target-language dialog.",
+      "Select the line that does not fit this dialog.",
     "phrase.situationChoice": "{text}",
     "phrase.situationPick": "Pick",
     "phrase.situationCorrect": "Correct. That was the odd line out.",
@@ -914,7 +918,7 @@ const messages = {
     "phrase.situationSceneLabel": "Scene:",
     "phrase.situationPlayScene": "Play scene",
     "phrase.situationUnavailable":
-      "This exercise needs enough other target-language dialog lines.",
+      "This exercise needs more lines from other dialogs in the language you're learning.",
     "review.revealAnswer": "Reveal answer",
     "review.answerLabel": "Answer:",
     "review.phraseLabel": "Phrase:",
@@ -965,7 +969,7 @@ const messages = {
     "words.title": "Words library",
     "words.description": "Search and open saved words for this study pair.",
     "words.searchLabel": "Search words",
-    "words.searchPlaceholder": "Type in source or target language",
+    "words.searchPlaceholder": "Search in either language",
     "words.loading": "Loading words...",
     "words.error": "Failed to load words",
     "words.empty": "No words found.",
@@ -984,6 +988,8 @@ const messages = {
     ...authMessages.es,
     ...englishGrammarMessages.es,
     ...singMessages.es,
+    ...wordFormationMessages.es,
+    ...englishWordFormationMessages.es,
     "quota.blocked": "La generación con IA está desactivada para esta cuenta.",
     "quota.live": "Has alcanzado tu límite semanal de minutos de conversación en vivo. Inténtalo de nuevo la próxima semana.",
     "quota.music": "Has alcanzado tu límite semanal de Eleven Music. Inténtalo de nuevo la próxima semana.",
@@ -1157,12 +1163,12 @@ const messages = {
     "conversation.moreControls": "Más controles",
     "conversation.helpTitle": "Ayuda para conversar",
     "conversation.helpDescription":
-      "Di lo que quieres comunicar y recibe ayuda en tu idioma de origen.",
+      "Pregunta cómo decir algo y recibe ayuda en el idioma que hablas.",
     "conversation.helpInputPlaceholder":
       "Escribe lo que quieres decir o preguntar...",
     "conversation.helpSend": "Recibir ayuda",
     "conversation.helpSayInputPlaceholder":
-      "Escribe una palabra o frase para decirla en el idioma objetivo...",
+      "Escribe una palabra o frase que quieras decir en el idioma que estás aprendiendo...",
     "conversation.helpSaySend": "Cómo decirlo",
     "conversation.helpSayRequestRequired":
       "Escribe primero una palabra o frase.",
@@ -1258,18 +1264,18 @@ const messages = {
     "content.length.shortThree": "Corto: 3 frases",
     "content.level.label": "Nivel del diálogo",
     "content.level.description":
-      "Elige el nivel del idioma objetivo para este diálogo.",
+      "Elige el nivel de dificultad de este diálogo.",
     "content.requiredWords.label": "Palabras a incluir",
     "content.requiredWords.description":
       "Fuerza palabras o expresiones específicas dentro del diálogo generado.",
     "content.requiredWords.languageTarget":
-      "Las palabras están en el idioma objetivo",
+      "En el idioma que estoy aprendiendo",
     "content.requiredWords.languageSource":
-      "Las palabras están en el idioma fuente",
+      "En el idioma que hablo",
     "content.requiredWords.placeholder":
       "p. ej. bezahlen, die Rechnung, schnell",
     "content.requiredWords.hint":
-      "Elige el idioma arriba y separa varias palabras con comas o saltos de línea. Las palabras del idioma fuente se traducen primero y luego se incluyen en el diálogo del idioma objetivo.",
+      "Elige el idioma arriba y separa varias palabras con comas o saltos de línea. Las palabras en el idioma que hablas se traducen primero y luego se incluyen en el diálogo en el idioma que estás aprendiendo.",
     "content.details.label": "Guía extra",
     "content.details.description":
       "Agrega instrucciones opcionales para orientar la situación, el tono o las restricciones.",
@@ -1552,7 +1558,7 @@ const messages = {
     "dialogs.cancelPhraseSelection": "Cancelar selección",
     "dialogs.addSelectedPhrase": "Agregar expresión",
     "dialogs.selectedPhraseHint":
-      "Selecciona dos o más palabras adyacentes de la línea del idioma objetivo.",
+      "Selecciona dos o más palabras adyacentes en el idioma que estás aprendiendo.",
     "dialogs.phraseSelectionConfirmPrompt": "¿Deseas guardar esta expresión?",
     "dialogs.error.load": "No se pudieron cargar los diálogos guardados",
     "dialogs.error.delete": "No se pudo eliminar el diálogo",
@@ -1606,7 +1612,7 @@ const messages = {
     "content.result.dialogAccepted": "Diálogo aceptado y guardado.",
     "content.result.dialogTitle": "Diálogo guardado",
     "content.result.dialogWordHint":
-      "Haz clic en palabras del idioma objetivo para agregarlas como elementos.",
+      "Haz clic en palabras del idioma que estás aprendiendo para guardarlas.",
     "newItem.word": "Palabra nueva",
     "newItem.phrase": "Frase nueva",
     "newItem.sourceLabel": "{language}:",
@@ -1696,14 +1702,14 @@ const messages = {
       "Piensa la siguiente palabra y luego elige entre algunos bloques de la frase.",
     "newItem.strategiesPlaceholder": "Placeholder para {strategy}.",
     "newItem.createDescription":
-      "Escribe una frase en el idioma de origen que te resuene y conviértela en una frase del idioma objetivo que conserve esta palabra.",
+      "Escribe una frase que sea personal para ti en el idioma que hablas y conviértela en una frase en el idioma que estás aprendiendo que incluya esta palabra.",
     "newItem.createPlaceholder": "Escribe tu frase aquí",
     "newItem.createAdd": "Agregar frase",
     "newItem.createGenerating": "Generando...",
     "newItem.createEmpty": "Todavía no hay frases creadas.",
     "newItem.createError": "No se pudo crear la frase",
     "newItem.examplesDescription":
-      "Practica con frases cortas en el idioma objetivo que poco a poco se vuelven un poco más complejas.",
+      "Practica con frases cortas en el idioma que estás aprendiendo que poco a poco se vuelven un poco más complejas.",
     "newItem.examplesGenerating": "Generando ejemplos...",
     "newItem.examplesEmpty": "Todavía no hay ejemplos.",
     "newItem.examplesError": "No se pudieron generar los ejemplos",
@@ -1766,7 +1772,7 @@ const messages = {
     "newItem.openConversation": "Practicar conversación",
     "newItem.conversationTitle": "Práctica de conversación del elemento",
     "newItem.conversationDescription":
-      "Habla en el idioma objetivo. El tutor responde con audio centrado en este elemento.",
+      "Habla en el idioma que estás aprendiendo. El tutor responde con audio centrado en este elemento.",
     "newItem.conversationStartRecording": "Empezar a hablar",
     "newItem.conversationStopRecording": "Enviar mensaje",
     "newItem.conversationListening": "Escuchando... {seconds}s",
@@ -1845,7 +1851,7 @@ const messages = {
     "newItem.sentenceAddAdded": "frase agregada",
     "newItem.sentenceAddExists": "la frase ya existe",
     "newItem.sentenceAddError": "error al agregar frase",
-    "newItem.sentenceAddMissingSource": "falta traducción en idioma de origen",
+    "newItem.sentenceAddMissingSource": "falta la traducción al idioma que hablas",
     "newItem.sentenceAddTitle": "Agregar frase",
     "newItem.sentenceAddTranslation": "Traducción: {translation}",
     "newItem.sentenceAddPrompt": "¿Deseas guardar esta frase?",
@@ -1882,7 +1888,7 @@ const messages = {
     "phrase.progressiveBlocksShowNextLetter": "Mostrar siguiente letra",
     "phrase.progressiveBlocksComplete": "Muy bien, la frase está en el orden correcto.",
     "phrase.situationPrompt":
-      "Selecciona la línea que no encaja en este diálogo del idioma objetivo.",
+      "Selecciona la línea que no encaja en este diálogo.",
     "phrase.situationChoice": "{text}",
     "phrase.situationPick": "Elegir",
     "phrase.situationCorrect": "Correcto. Esa era la línea fuera de lugar.",
@@ -1890,7 +1896,7 @@ const messages = {
     "phrase.situationSceneLabel": "Escena:",
     "phrase.situationPlayScene": "Reproducir escena",
     "phrase.situationUnavailable":
-      "Este ejercicio necesita suficientes líneas de otros diálogos en el idioma objetivo.",
+      "Este ejercicio necesita más líneas de otros diálogos en el idioma que estás aprendiendo.",
     "review.revealAnswer": "Mostrar respuesta",
     "review.answerLabel": "Respuesta:",
     "review.phraseLabel": "Frase:",
@@ -1942,7 +1948,7 @@ const messages = {
     "words.description":
       "Busca y abre palabras guardadas para este par de estudio.",
     "words.searchLabel": "Buscar palabras",
-    "words.searchPlaceholder": "Escribe en idioma origen o destino",
+    "words.searchPlaceholder": "Busca en cualquiera de tus dos idiomas",
     "words.loading": "Cargando palabras...",
     "words.error": "No se pudieron cargar las palabras",
     "words.empty": "No se encontraron palabras.",

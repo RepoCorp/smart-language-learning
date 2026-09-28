@@ -17,6 +17,7 @@ class Item(models.Model):
     class ItemType(models.TextChoices):
         WORD = "word", "Word"
         PHRASE = "phrase", "Phrase"
+        PATTERN = "pattern", "Pattern"
 
     class ReviewDirection(models.TextChoices):
         SPANISH_TO_GERMAN = "es_to_de", "Spanish to German"
@@ -30,6 +31,9 @@ class Item(models.Model):
         blank=True,
     )
     item_type = models.CharField(max_length=10, choices=ItemType.choices)
+    pattern_key = models.CharField(max_length=80, blank=True, default="")
+    review_count_es_to_de = models.PositiveIntegerField(default=0)
+    review_count_de_to_es = models.PositiveIntegerField(default=0)
     spanish_text = models.CharField(max_length=255)
     german_text = models.CharField(max_length=255)
     source_language = models.CharField(max_length=20, choices=STUDY_LANGUAGE_CHOICES, default="spanish")
@@ -65,6 +69,12 @@ class Item(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=("user", "source_language", "target_language", "pattern_key"),
+            condition=models.Q(item_type="pattern"), name="unique_user_pattern_item",
+        )]
 
     def __str__(self) -> str:
         return f"{self.item_type}: {self.spanish_text} -> {self.german_text}"

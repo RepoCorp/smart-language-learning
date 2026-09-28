@@ -18,7 +18,7 @@ def review_rows(
 ) -> list[tuple[object, int, str, Item]]:
     _, tomorrow = local_day_bounds(now)
     rows: list[tuple[object, int, str, Item]] = []
-    for item_type in (Item.ItemType.PHRASE, Item.ItemType.WORD):
+    for item_type in Item.ItemType.values:
         for suffix, direction in (
             ("es_to_de", Item.ReviewDirection.SPANISH_TO_GERMAN),
             ("de_to_es", Item.ReviewDirection.GERMAN_TO_SPANISH),

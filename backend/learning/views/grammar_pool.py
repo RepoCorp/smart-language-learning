@@ -18,7 +18,7 @@ class PhraseGrammarPoolView(APIView):
 
         target_language = str(request.data.get("target_language", "german")).strip().lower() or "german"
         if not phrase_grammar_features_for_language(target_language):
-            return Response({"detail": "Grammar metadata is not available for this target language."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Grammar metadata is not available for the language you're learning."}, status=status.HTTP_400_BAD_REQUEST)
 
         item = (
             Item.objects.filter(

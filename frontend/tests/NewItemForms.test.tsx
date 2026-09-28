@@ -7,6 +7,9 @@ import { fetchContentItemDetail } from "../src/api";
 import { generateContentItemExercises } from "../src/apiNounExercises";
 import { useRepeatExerciseLoop } from "../src/components/useRepeatExerciseLoop";
 import type { ExercisePhrase, SessionItem } from "../src/types";
+import { StudyLanguagesProvider } from "../src/studyLanguages";
+
+vi.mock("../src/components/strategies/PatternEnrollment", () => ({ default: () => null }));
 
 vi.mock("../src/api", async (importOriginal) => ({
   ...await importOriginal<typeof import("../src/api")>(),
@@ -16,6 +19,11 @@ vi.mock("../src/api", async (importOriginal) => ({
 vi.mock("../src/apiNounExercises", async (importOriginal) => ({
   ...await importOriginal<typeof import("../src/apiNounExercises")>(),
   generateContentItemExercises: vi.fn(),
+}));
+
+vi.mock("../src/apiStrategies", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../src/apiStrategies")>(),
+  fetchContentItemGrammarExamples: vi.fn().mockResolvedValue({ examples: {} }),
 }));
 
 vi.mock("../src/components/useRepeatExerciseLoop", () => ({
@@ -72,6 +80,34 @@ describe("item Forms entry preparation", () => {
       toggleMute: vi.fn(),
     });
     vi.mocked(generateContentItemExercises).mockRejectedValue(new Error("Unexpected generation"));
+  });
+
+  it("shows local word-building matches in Grammar without changing Forms", async () => {
+    const { modal } = await openForms(word({ german_text: "arbeitslos" }));
+    expect(modal.queryByRole("heading", { name: "Word building" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(modal.getByRole("combobox"), "Grammar");
+    expect(modal.getByRole("heading", { name: "Word building" })).toBeInTheDocument();
+    expect(modal.getByRole("article", { name: "-los" })).toBeInTheDocument();
+    expect(modal.getByText(/without.*lacking/)).toBeInTheDocument();
+    await userEvent.selectOptions(modal.getByRole("combobox"), "Forms");
+    expect(modal.queryByRole("heading", { name: "Word building" })).not.toBeInTheDocument();
+    expect(generateContentItemExercises).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["the teacher", "noun", "-er"],
+    ["to rewrite", "verb", "re-"],
+  ])("shows English word-building patterns for %s in the item Grammar view", async (text, type, affix) => {
+    localStorage.setItem("study_target_language", "english");
+    const item = word({ german_text: text, word_type: type });
+    vi.mocked(fetchContentItemDetail).mockResolvedValue({ ...item, created_at: "2026-09-27T00:00:00Z" });
+    render(<StudyLanguagesProvider><NewItem item={item} readOnly /></StudyLanguagesProvider>);
+    await userEvent.click(screen.getByRole("button", { name: "Open strategies" }));
+    const modal = within(await screen.findByRole("dialog"));
+    await userEvent.selectOptions(modal.getByRole("combobox"), "Grammar");
+    expect(modal.getByRole("heading", { name: "Word building" })).toBeInTheDocument();
+    expect(modal.getByRole("article", { name: affix })).toBeInTheDocument();
+    expect(generateContentItemExercises).not.toHaveBeenCalled();
   });
 
   it("prefers saved sentences, trims them, and sends only selected entries to the loop", async () => {

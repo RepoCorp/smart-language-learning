@@ -136,6 +136,8 @@ class ContentItemsView(APIView):
             queryset = queryset.filter(item_type=Item.ItemType.WORD)
         elif section == "phrases":
             queryset = queryset.filter(item_type=Item.ItemType.PHRASE)
+        elif section == "patterns":
+            queryset = queryset.filter(item_type=Item.ItemType.PATTERN)
         if review_state == "new":
             queryset = filter_new_items(queryset)
         if query:

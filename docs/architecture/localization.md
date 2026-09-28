@@ -8,6 +8,10 @@ Sing's catalog is separate in `i18nSing.ts`; configuration and debug controls
 use `i18nConfig.ts`.
 
 App language and study languages are independent. Localize instructions and
+use "the language you speak" / "the language you're learning" (Spanish:
+"el idioma que hablas" / "el idioma que estás aprendiendo") in user-facing text,
+rather than source/target or origen/objetivo. Internal API fields and prompt
+variables retain their technical names. Localize
 grammar labels, but leave the words, lyrics, and example sentences in the
 language being learned. Their saved translations remain in the learner's source
 language. Static grammar examples with interface labels render those labels

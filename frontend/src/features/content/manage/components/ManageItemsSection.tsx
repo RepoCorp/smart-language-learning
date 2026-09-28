@@ -34,8 +34,8 @@ export default function ManageItemsSection({
 
   return (
     <section className="card">
-      <h2>{currentSection === "words" ? t("manage.words") : t("manage.phrases")}</h2>
-      {!items.length && <p>{currentSection === "words" ? t("manage.emptyWords") : t("manage.emptyPhrases")}</p>}
+      <h2>{currentSection === "patterns" ? t("wordFormation.patterns") : currentSection === "words" ? t("manage.words") : t("manage.phrases")}</h2>
+      {!items.length && <p>{currentSection === "patterns" ? t("wordFormation.empty") : currentSection === "words" ? t("manage.emptyWords") : t("manage.emptyPhrases")}</p>}
       {!!items.length && (
         <ul className="manage-list">
           <li className="manage-actions-row">
@@ -76,13 +76,13 @@ export default function ManageItemsSection({
                   </span>
                 </div>
               </div>
-              <DangerousButton
+              {item.item_type !== "pattern" && <DangerousButton
                 className="secondary-button manage-item-action-button dangerous-action-button"
                 onConfirm={() => onRegenerateAudio(item)}
                 disabled={busy}
               >
                 {regeneratingAudioItemId === item.id ? t("manage.regeneratingAudio") : t("manage.regenerateAudio")}
-              </DangerousButton>
+              </DangerousButton>}
             </li>
           ))}
         </ul>

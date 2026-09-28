@@ -8,6 +8,7 @@ function entryKey(entry: SessionPlanItem): string {
     entry.id,
     entry.mode,
     entry.direction || "",
+    entry.review_version ?? "",
     entry.repeatedAfterFailure ? "retry" : "",
     entry.repeatPracticeStep || "",
   ].join(":");
@@ -133,7 +134,7 @@ export function useSessionItemPayloads({
   return {
     // Avoid briefly remounting a review with the previous item's payload while the next one loads.
     currentItem: currentItemKey === currentEntryKey ? currentItem : null,
-    currentItemLoading,
-    currentItemError,
+    currentItemLoading: Boolean(currentEntry) && currentItemLoading,
+    currentItemError: currentEntry ? currentItemError : "",
   };
 }

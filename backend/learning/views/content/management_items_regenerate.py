@@ -47,6 +47,7 @@ class ContentItemRegenerateView(APIView):
         source_language, target_language = _normalized_pair(request)
         item = apply_user_scope(Item.objects, user).filter(
             id=item_id,
+            item_type__in=[Item.ItemType.WORD, Item.ItemType.PHRASE],
             source_language=source_language,
             target_language=target_language,
         ).first()

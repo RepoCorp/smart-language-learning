@@ -13,14 +13,16 @@ import {
 
 type SessionOutcome = "time_up" | "completed" | null;
 
-function toSessionPlanItems(value: unknown): SessionPlanItem[] {
+export function toSessionPlanItems(value: unknown): SessionPlanItem[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
+  // Old pattern snapshots contain IDs from a different table. Never load them as Item IDs.
+  if (value.some(entry => entry?.item_type === "pattern" && "exercise" in entry)) return [];
+  return value.flatMap<SessionPlanItem>((entry) => {
     if (!entry || typeof entry !== "object") return [];
     const candidate = entry as Partial<SessionPlanItem>;
     if (
       typeof candidate.id !== "number"
-      || (candidate.item_type !== "word" && candidate.item_type !== "phrase")
+      || (candidate.item_type !== "word" && candidate.item_type !== "phrase" && candidate.item_type !== "pattern")
       || (candidate.mode !== "new" && candidate.mode !== "review")
     ) {
       return [];
@@ -32,6 +34,7 @@ function toSessionPlanItems(value: unknown): SessionPlanItem[] {
       direction: candidate.direction || null,
       repeatedAfterFailure: Boolean(candidate.repeatedAfterFailure),
       repeatPracticeStep: candidate.repeatPracticeStep,
+      review_version: candidate.review_version,
     }];
   });
 }

@@ -4,6 +4,7 @@ export function toItemViewSessionItem(detail: ContentItemDetailResponse): Sessio
   return {
     id: detail.id,
     item_type: detail.item_type,
+    pattern_key: detail.pattern_key, pattern_examples: detail.pattern_examples,
     spanish_text: detail.spanish_text,
     german_text: detail.german_text,
     example_sentence: detail.example_sentence || "",

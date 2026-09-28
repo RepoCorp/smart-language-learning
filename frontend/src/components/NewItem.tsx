@@ -78,6 +78,7 @@ import VerbExerciseSelector, {
   type VerbTenseKey,
 } from "./VerbExerciseSelector";
 import WordReview from "./WordReview";
+import PatternItem from "./session/PatternItem";
 
 interface NewItemProps {
   item: SessionItem;
@@ -156,14 +157,19 @@ function ItemActionIcon({
   );
 }
 
-export default function NewItem({
+export default function NewItem(props: NewItemProps): JSX.Element {
+  if (props.item.item_type === "pattern") return <PatternItem {...props} />;
+  return <WordOrPhraseItem {...props} item={{ ...props.item, item_type: props.item.item_type }} />;
+}
+
+function WordOrPhraseItem({
   item,
   onContinue,
   continueLabel,
   autoplayAudioOnMount = false,
   readOnly = false,
   onClose,
-}: NewItemProps): JSX.Element {
+}: Omit<NewItemProps, "item"> & { item: SessionItem & { item_type: "word" | "phrase" } }): JSX.Element {
   const { t } = useI18n();
   const {
     targetPromptMode,

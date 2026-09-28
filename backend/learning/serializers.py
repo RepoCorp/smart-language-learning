@@ -7,6 +7,8 @@ from .models import Item
 
 
 class SessionRestoreStateSerializer(serializers.Serializer):
+    review_count_es_to_de = serializers.IntegerField(min_value=0, required=False)
+    review_count_de_to_es = serializers.IntegerField(min_value=0, required=False)
     repetition_count_es_to_de = serializers.IntegerField(min_value=0)
     interval_days_es_to_de = serializers.IntegerField(min_value=0)
     last_reviewed_at_es_to_de = serializers.DateTimeField(allow_null=True)
@@ -21,6 +23,10 @@ class SessionRestoreStateSerializer(serializers.Serializer):
 
 
 class SessionItemSerializer(serializers.Serializer):
+    pattern_key = serializers.CharField(required=False)
+    pattern_exercise = serializers.DictField(required=False)
+    pattern_examples = serializers.ListField(child=serializers.DictField(), required=False)
+    review_version = serializers.IntegerField(required=False)
     id = serializers.IntegerField()
     item_type = serializers.ChoiceField(choices=Item.ItemType.choices)
     spanish_text = serializers.CharField()
@@ -59,6 +65,7 @@ class SessionItemSerializer(serializers.Serializer):
 
 
 class SessionPlanEntrySerializer(serializers.Serializer):
+    review_version = serializers.IntegerField(required=False)
     id = serializers.IntegerField()
     item_type = serializers.ChoiceField(choices=Item.ItemType.choices)
     mode = serializers.ChoiceField(choices=["new", "review"])
@@ -76,6 +83,7 @@ class SessionPlanEntrySerializer(serializers.Serializer):
 
 
 class SubmitReviewSerializer(serializers.Serializer):
+    review_version = serializers.IntegerField(min_value=0, required=False)
     item_id = serializers.IntegerField()
     correct = serializers.BooleanField()
     direction = serializers.ChoiceField(choices=Item.ReviewDirection.choices)

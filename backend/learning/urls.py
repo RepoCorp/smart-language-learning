@@ -1,4 +1,5 @@
 from django.urls import path
+from .views.word_formation import WordFormationView
 
 from .views import (
     AuthAdminCreateUserView,
@@ -85,6 +86,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("word-formation", WordFormationView.as_view(), name="word-formation"),
     path("health", HealthView.as_view(), name="health"),
     path("auth/login", AuthLoginView.as_view(), name="auth-login"),
     path("auth/bootstrap-status", AuthBootstrapStatusView.as_view(), name="auth-bootstrap-status"),

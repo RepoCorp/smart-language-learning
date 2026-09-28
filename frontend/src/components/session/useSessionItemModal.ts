@@ -19,6 +19,7 @@ export default function useSessionItemModal(
     try {
       const detail = await fetchContentItemDetail(itemId, sourceLanguage, targetLanguage);
       setOpenedItem({
+        pattern_key: detail.pattern_key, pattern_examples: detail.pattern_examples,
         id: detail.id, item_type: detail.item_type, spanish_text: detail.spanish_text, german_text: detail.german_text,
         example_sentence: detail.example_sentence || "", notes: detail.notes || "", word_type: detail.word_type || "",
         plural_german: detail.plural_german || "", audio_url: detail.audio_url || "", exercise_phrases: detail.exercise_phrases || {},

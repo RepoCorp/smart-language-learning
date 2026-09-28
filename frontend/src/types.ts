@@ -154,7 +154,11 @@ export interface SessionRestoreState {
 
 export interface SessionItem {
   id: number;
-  item_type: ItemType;
+  item_type: ItemType | "pattern";
+  pattern_key?: string;
+  pattern_exercise?: PatternExercise;
+  pattern_examples?: PatternExercise[];
+  review_version?: number;
   spanish_text: string;
   german_text: string;
   example_sentence?: string;
@@ -209,11 +213,21 @@ export interface SessionItem {
 
 export interface SessionPlanItem {
   id: number;
-  item_type: ItemType;
+  item_type: ItemType | "pattern";
+  review_version?: number;
   mode: SessionMode;
   direction?: ReviewDirection | null;
   repeatedAfterFailure?: boolean;
   repeatPracticeStep?: "word_intro" | "word_cloze" | "word_parts" | "phrase_builder" | "phrase_progressive_blocks";
+}
+
+export interface PatternExercise {
+    base: string;
+    base_translation: string;
+    meaning: string;
+    question: string;
+    answer: string;
+    highlight: [number, number];
 }
 
 export type ItemQuestionType =
@@ -311,7 +325,7 @@ export interface ContentDialogsResponse {
 
 export interface ContentItemRecord {
   id: number;
-  item_type: ItemType;
+  item_type: ItemType | "pattern";
   spanish_text: string;
   german_text: string;
   created_at: string;
@@ -336,7 +350,9 @@ export interface ContentItemsResponse {
 
 export interface ContentItemDetailResponse {
   id: number;
-  item_type: ItemType;
+  item_type: ItemType | "pattern";
+  pattern_key?: string;
+  pattern_examples?: PatternExercise[];
   spanish_text: string;
   german_text: string;
   example_sentence?: string;
@@ -506,6 +522,7 @@ export interface OverviewStatsResponse {
   saved_items: number;
   saved_word_items: number;
   saved_phrase_items: number;
+  saved_pattern_items?: number;
   not_started: number;
   difficult_items: number;
 }

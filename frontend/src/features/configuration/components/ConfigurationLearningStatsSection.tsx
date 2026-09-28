@@ -11,6 +11,7 @@ export default function ConfigurationLearningStatsSection({ stats }: { stats: Ov
         <div className="settings-stat-group">
           <strong>{t("config.savedMaterialTitle")}</strong>
           <span>{t("stats.savedItems", { words: stats?.saved_word_items ?? "-", phrases: stats?.saved_phrase_items ?? "-" })}</span>
+          {!!stats?.saved_pattern_items && <span>{t("wordFormation.stats", { count: stats.saved_pattern_items })}</span>}
           <span>{t("stats.notStarted", { count: stats?.not_started ?? "-" })}</span>
         </div>
         <div className="settings-stat-group">

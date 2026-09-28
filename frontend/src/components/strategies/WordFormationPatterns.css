@@ -1,0 +1,33 @@
+.word-formation-patterns {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.word-formation-patterns h3,
+.word-formation-patterns h4,
+.word-formation-patterns p {
+  margin: 0;
+}
+
+.word-formation-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+
+.word-formation-match {
+  font-size: 1.1rem;
+}
+
+.word-formation-translation {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}

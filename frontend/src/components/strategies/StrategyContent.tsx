@@ -7,6 +7,7 @@ import EncounterStrategyPanel from "./EncounterStrategyPanel";
 import ExamplesStrategyPanel from "./ExamplesStrategyPanel";
 import FormsStrategyPanel from "./FormsStrategyPanel";
 import GrammarStrategyPanel from "./GrammarStrategyPanel";
+import WordFormationPatterns from "./WordFormationPatterns";
 import RelatedStrategyPanel from "./RelatedStrategyPanel";
 import StrategyLoopContent from "./StrategyLoopContent";
 import VisualizeStrategyPanel from "./VisualizeStrategyPanel";
@@ -59,19 +60,24 @@ export default function StrategyContent(props: Props): JSX.Element {
 
   if (props.selectedStrategy === GRAMMAR_STRATEGY) {
     return (
-      <GrammarStrategyPanel
-        wordType={props.wordType}
-        targetLanguage={props.targetLanguage}
-        targetText={props.targetText}
-        pluralGerman={props.pluralGerman}
-        examples={props.grammarStrategy.examples}
-        isLoadingExamples={props.grammarStrategy.isLoading}
-        itemType={props.itemType}
-        phraseGrammar={props.phraseGrammarStrategy}
-        onAskAboutPhraseGrammarRule={props.onAskAboutPhraseGrammarRule}
-        onOpenPhraseGrammarExample={props.onOpenPhraseGrammarExample}
-        phraseGrammarLoop={props.phraseGrammarLoop}
-      />
+      <>
+        {props.itemType === "word" && (
+          <WordFormationPatterns targetText={props.targetText} wordType={props.wordType} targetLanguage={props.targetLanguage} />
+        )}
+        <GrammarStrategyPanel
+          wordType={props.wordType}
+          targetLanguage={props.targetLanguage}
+          targetText={props.targetText}
+          pluralGerman={props.pluralGerman}
+          examples={props.grammarStrategy.examples}
+          isLoadingExamples={props.grammarStrategy.isLoading}
+          itemType={props.itemType}
+          phraseGrammar={props.phraseGrammarStrategy}
+          onAskAboutPhraseGrammarRule={props.onAskAboutPhraseGrammarRule}
+          onOpenPhraseGrammarExample={props.onOpenPhraseGrammarExample}
+          phraseGrammarLoop={props.phraseGrammarLoop}
+        />
+      </>
     );
   }
   if (props.selectedStrategy === CREATE_STRATEGY && props.itemType === "word") {

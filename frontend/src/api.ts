@@ -131,6 +131,7 @@ export async function fetchSessionItem(
   if (entry.direction) {
     params.set("direction", entry.direction);
   }
+  if (entry.review_version !== undefined) params.set("review_version", String(entry.review_version));
   if (entry.repeatPracticeStep) {
     params.set("repeat_practice_step", entry.repeatPracticeStep);
   }
@@ -150,8 +151,9 @@ export async function fetchSessionItem(
   return (await response.json()) as SessionItem;
 }
 
-export async function submitReview(itemId: number, correct: boolean, direction?: ReviewDirection | null): Promise<void> {
-  const payload: { item_id: number; correct: boolean; direction?: ReviewDirection } = { item_id: itemId, correct };
+export async function submitReview(itemId: number, correct: boolean, direction?: ReviewDirection | null, reviewVersion?: number): Promise<void> {
+  const payload: { item_id: number; correct: boolean; direction?: ReviewDirection; review_version?: number } = { item_id: itemId, correct };
+  if (reviewVersion !== undefined) payload.review_version = reviewVersion;
   if (direction) {
     payload.direction = direction;
   }

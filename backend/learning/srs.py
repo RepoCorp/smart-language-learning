@@ -47,6 +47,8 @@ def mark_item_seen(item: Item) -> Item:
 
 def build_session_restore_state(item: Item) -> dict[str, object]:
     return {
+        "review_count_es_to_de": item.review_count_es_to_de,
+        "review_count_de_to_es": item.review_count_de_to_es,
         "repetition_count_es_to_de": item.repetition_count_es_to_de,
         "interval_days_es_to_de": item.interval_days_es_to_de,
         "last_reviewed_at_es_to_de": item.last_reviewed_at_es_to_de,
@@ -69,6 +71,8 @@ def restore_item_session_state(item: Item, state: dict[str, object]) -> Item:
 
 
 def _apply_directional_review_result(item: Item, correct: bool, now, suffix: str) -> Item:
+    review_count_field = f"review_count_{suffix}"
+    setattr(item, review_count_field, getattr(item, review_count_field) + 1)
     repetition_count_field = f"repetition_count_{suffix}"
     interval_days_field = f"interval_days_{suffix}"
     last_reviewed_at_field = f"last_reviewed_at_{suffix}"
@@ -99,6 +103,7 @@ def _apply_directional_review_result(item: Item, correct: bool, now, suffix: str
     item.save(
         update_fields=[
             repetition_count_field,
+            review_count_field,
             interval_days_field,
             last_reviewed_at_field,
             due_at_field,
@@ -109,6 +114,8 @@ def _apply_directional_review_result(item: Item, correct: bool, now, suffix: str
 
 
 def _linked_item_due_dates(item: Item) -> set:
+    if item.item_type == Item.ItemType.PATTERN:
+        return set()
     linked_item_type = Item.ItemType.PHRASE if item.item_type == Item.ItemType.WORD else Item.ItemType.WORD
     turn_ids = ItemDialogOccurrence.objects.filter(item=item).values("turn_id")
     linked_item_ids = (

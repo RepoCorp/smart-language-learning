@@ -46,6 +46,7 @@ export default function SessionPage(): JSX.Element {
   const removeUnavailableItem = useCallback((unavailableItem: typeof items[number]): void => {
     setItems((currentItems) => currentItems.filter((entry) => (
       entry.id !== unavailableItem.id
+      || entry.item_type !== unavailableItem.item_type
       || entry.mode !== unavailableItem.mode
       || entry.direction !== unavailableItem.direction
       || entry.repeatPracticeStep !== unavailableItem.repeatPracticeStep
@@ -138,7 +139,6 @@ export default function SessionPage(): JSX.Element {
     setItems([]);
     setIndex(0);
     setError("");
-    setResetCurrentResultError("");
     setShowPostReviewItem(false);
     setCurrentReviewCorrect(null);
     reviewFlow.resetFlow();
@@ -242,6 +242,7 @@ export default function SessionPage(): JSX.Element {
   }
 
   const currentRenderKey = [
+    current.item_type,
     current.id,
     current.mode,
     current.direction || "none",
@@ -270,6 +271,7 @@ export default function SessionPage(): JSX.Element {
             <section className="card">
           <SessionCurrentItem
             item={current}
+            disabled={showExtendPrompt || waitingNext}
             renderKey={currentRenderKey}
             reviewComplete={showPostReviewItem}
             onNewItemContinue={registerSeenItem}

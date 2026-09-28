@@ -45,12 +45,22 @@ class SessionItemPayloadView(APIView):
         if item is None:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        version = request.query_params.get("review_version")
+        if version is not None:
+            try:
+                version = int(version)
+            except (ValueError, TypeError):
+                return Response({"detail": "Invalid review version"}, status=400)
+            if direction is None or not 0 <= version <= getattr(item, f"review_count_{direction}"):
+                return Response({"detail": "Invalid review version"}, status=400)
+
         entry = SessionEntry(
             item=item,
             mode=mode,
             direction=direction,
             repeated_after_failure=_is_true(request.query_params.get("repeated_after_failure")),
             repeat_practice_step=repeat_step,
+            review_version=version,
         )
         payload = serialize_entries([entry], user=user)
         return Response(SessionItemSerializer(payload[0]).data)

@@ -7,6 +7,7 @@ from .item_questions import item_question_history
 from .management import APIView, Request, Response, _normalized_pair, apply_user_scope, get_request_user, status
 from ..dialog_phrase_match import build_dialog_phrase_match_payload
 from ...models import Item
+from ...word_formation import item_payload as pattern_item_payload
 
 
 class ContentItemDetailView(APIView):
@@ -20,6 +21,13 @@ class ContentItemDetailView(APIView):
         ).first()
         if not item:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if item.item_type == Item.ItemType.PATTERN:
+            return Response({
+                "id": item.id, "item_type": item.item_type,
+                "spanish_text": item.spanish_text, "german_text": item.german_text,
+                **pattern_item_payload(item),
+            })
 
         related_dialogs_map = related_dialogs_by_item_ids([item.id], per_item_limit=12, user=user)
         dialog_phrase_payload = build_dialog_phrase_match_payload(item, user=user)
@@ -60,6 +68,8 @@ class ContentItemDetailView(APIView):
         if not item:
             return Response({"detail": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        if item.item_type == Item.ItemType.PATTERN:
+            return Response({"detail": "Patterns do not have generated audio"}, status=400)
         if item.item_type == Item.ItemType.WORD:
             phrase_part = item.example_sentence.strip()
             audio_text = f"{item.german_text}. {phrase_part}".strip() if phrase_part else item.german_text

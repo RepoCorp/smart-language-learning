@@ -3,21 +3,21 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { suppressPromptAutoplayForAudio } from "../../audioAutoplayGuard";
 import { completeDifficultItem, restoreSessionItemState, submitReview } from "../../api";
 import { markSessionItemSeen } from "../../apiSessionProgress";
-import type { SessionItem } from "../../types";
+import type { SessionItem, SessionPlanItem } from "../../types";
 
 interface SessionReviewFlowOptions {
   current: SessionItem | null;
-  items: SessionItem[];
+  items: SessionPlanItem[];
   index: number;
   sessionOutcome: string | null;
   showExtendPrompt: boolean;
   showPostReviewItem: boolean;
-  setItems: Dispatch<SetStateAction<SessionItem[]>>;
+  setItems: Dispatch<SetStateAction<SessionPlanItem[]>>;
   setIndex: Dispatch<SetStateAction<number>>;
-  setSessionOutcome: Dispatch<SetStateAction<string | null>>;
+  setSessionOutcome: Dispatch<SetStateAction<"time_up" | "completed" | null>>;
   setShowPostReviewItem: Dispatch<SetStateAction<boolean>>;
   setCurrentReviewCorrect: Dispatch<SetStateAction<boolean | null>>;
-  onNewItemConfirmed: (result: unknown) => void;
+  onNewItemConfirmed: (result: Awaited<ReturnType<typeof markSessionItemSeen>>) => void;
   resetErrorMessage: string;
 }
 
@@ -92,7 +92,11 @@ export default function useSessionReviewFlow({
     if (!current || sessionOutcome !== null || showExtendPrompt || showPostReviewItem) return;
     if (!current.repeatedAfterFailure) {
       try {
-        await submitReview(current.id, correct, current.direction ?? undefined);
+        if (current.review_version === undefined) {
+          await submitReview(current.id, correct, current.direction ?? undefined);
+        } else {
+          await submitReview(current.id, correct, current.direction ?? undefined, current.review_version);
+        }
       } catch (error) {
         if (isMissingItemError(error)) {
           handleMissingCurrentItem();
