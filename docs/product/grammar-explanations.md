@@ -34,3 +34,20 @@ Static UI grammar explanations remain localized to the interface language.
 Prompt improvements apply to future generations. Do not silently translate,
 invalidate, or regenerate already saved strategy results; the learner can
 explicitly regenerate them.
+
+## Rules in session exercises
+
+When conversation analysis adds a phrase to difficult-item practice, keep the
+specific grammar feature keys that caused its selection. Show their existing
+localized titles and simple explanations above the session exercise, under
+"Pattern you're practising". Multiple reasons for the same phrase are combined
+without duplicates. Do not display every feature found in the phrase or invent
+a rule for word-level errors without a feature key.
+
+These reasons persist until difficult practice is completed, and participate in
+the session's reset-current-results snapshot. They do not change SRS scheduling
+or require another AI request. Previously queued items without a recorded reason
+remain unlabeled. Ordinary reviews do not display the practice explanation.
+
+Word-building pattern tests show their existing explanation after the answer is
+revealed, in either direction, so the explanation does not give away the answer.

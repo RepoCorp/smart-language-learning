@@ -17,6 +17,7 @@ import {
   isLetter,
   nextLetterSuggestions,
   normalizeWordAnswer as normalize,
+  normalizeWordTypingText,
   type PendingCaseMismatch,
   resolveWordInputChange,
   stripDiacritics,
@@ -309,7 +310,8 @@ export default function WordReview({
   const useClozeRetry = isSpanishToGerman && Boolean(item.repeatedAfterFailure) && item.repeatPracticeStep !== "word_intro";
   const allowPromptAudio = !isSpanishToGerman;
   const promptText = isSpanishToGerman ? item.spanish_text : item.german_text;
-  const expectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
+  const originalExpectedAnswer = isSpanishToGerman ? item.german_text : item.spanish_text;
+  const expectedAnswer = normalizeWordTypingText(originalExpectedAnswer);
   const targetWordText = item.german_text;
   const clozePhrase = useClozeRetry ? clozePhraseForItem(item) : "";
   const clozeNextLetter = useClozeRetry ? expectedAnswer.charAt(answer.length) : "";
@@ -327,11 +329,14 @@ export default function WordReview({
     : { target: "", source: "" };
   const warmupContextSentence = warmupContextPair.target;
   const warmupContextTranslation = warmupContextPair.source;
-  const warmupContextParts = useIntroRetry ? splitClozePhrase(blankTargetInPhrase(warmupContextSentence, expectedAnswer)) : null;
+  const warmupContextParts = useIntroRetry ? splitClozePhrase(blankTargetInPhrase(warmupContextSentence, originalExpectedAnswer)) : null;
   const warmupAllLettersRevealed = useIntroRetry && warmupRevealCount >= warmupRevealOrder.length;
   const warmupInputIsWrong = useIntroRetry && Boolean(answer) && !expectedAnswer.startsWith(answer);
   const warmupInputIsCorrect = useIntroRetry && normalize(answer) === normalize(expectedAnswer);
-  const showWarmupTranslation = useIntroRetry && Boolean(warmupContextTranslation) && (warmupInputIsCorrect || warmupAllLettersRevealed);
+  const warmupCompleted = useIntroRetry && (Boolean(completionPreview) || reviewComplete);
+  const showWarmupTranslation = useIntroRetry && Boolean(warmupContextTranslation)
+    && (warmupInputIsCorrect || warmupAllLettersRevealed || warmupCompleted)
+    && completionPreview?.phraseTranslation !== warmupContextTranslation;
   const completionPhrase = completionPhraseForItem(item);
   const languageLabel = isSpanishToGerman
     ? t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage])
@@ -515,6 +520,8 @@ export default function WordReview({
   };
 
   const handleAnswerChange = (value: string, acceptedAnswer = answer): void => {
+    value = normalizeWordTypingText(value);
+    acceptedAnswer = normalizeWordTypingText(acceptedAnswer);
     if (useSelfGradedAnswer) {
       return;
     }
@@ -728,6 +735,8 @@ export default function WordReview({
   };
 
   const handleWarmupAnswerChange = (value: string, acceptedAnswer = answer): void => {
+    value = normalizeWordTypingText(value);
+    acceptedAnswer = normalizeWordTypingText(acceptedAnswer);
     if (!useIntroRetry || isSubmitting) {
       return;
     }
@@ -945,6 +954,9 @@ export default function WordReview({
           <p className="word-warmup-progress" aria-label={t("word.letterBuildLabel")}>
             {warmupProgressText || expectedAnswer}
           </p>
+        )}
+        {warmupCompleted && (
+          <p className="revealed-answer-translation">{item.spanish_text}</p>
         )}
         {showWarmupTranslation && (
           <p className="revealed-answer">

@@ -31,6 +31,7 @@ export default function WordPartsReview({
   const [placedTokenIds, setPlacedTokenIds] = useState<string[]>([]);
   const [wrongTokenId, setWrongTokenId] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
+  const [feedbackTone, setFeedbackTone] = useState<"success" | "error">("error");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [draggingTokenId, setDraggingTokenId] = useState<string>("");
   const [draggingTokenPosition, setDraggingTokenPosition] = useState<DragPosition | null>(null);
@@ -74,6 +75,7 @@ export default function WordPartsReview({
   const completeReview = async (): Promise<void> => {
     setSubmitting(true);
     setFeedback(t("word.feedback.correct"));
+    setFeedbackTone("success");
     try {
       await new Promise((resolve) => window.setTimeout(resolve, FEEDBACK_DELAY_MS));
       await onAnswered(true);
@@ -90,6 +92,7 @@ export default function WordPartsReview({
     if (!expectedToken || expectedToken.id !== tokenId) {
       markWrongToken(tokenId);
       setFeedback(t("word.partsWrongChunk"));
+      setFeedbackTone("error");
       return;
     }
     const nextPlaced = [...placedTokenIds, tokenId];
@@ -107,6 +110,7 @@ export default function WordPartsReview({
     if (slotIndex !== currentPlacedCount) {
       markWrongToken(tokenId);
       setFeedback(t("word.partsWrongChunk"));
+      setFeedbackTone("error");
       return true;
     }
     handleTokenClick(tokenId);
@@ -275,7 +279,7 @@ export default function WordPartsReview({
         )}
         {reviewComplete && postReviewActions}
       </div>
-      {feedback && <p className={`word-input-feedback ${submitting ? "word-input-feedback-success" : "word-input-feedback-error"}`}>{feedback}</p>}
+      {feedback && <p className={`word-input-feedback word-input-feedback-${feedbackTone}`}>{feedback}</p>}
     </div>
   );
 }

@@ -60,6 +60,7 @@ def build_session_restore_state(item: Item) -> dict[str, object]:
         "is_learned": item.is_learned,
         "is_difficult": item.is_difficult,
         "difficult_marked_at": item.difficult_marked_at,
+        "difficult_grammar_feature_keys": item.difficult_grammar_feature_keys,
     }
 
 

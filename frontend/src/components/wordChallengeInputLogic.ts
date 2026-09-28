@@ -1,5 +1,10 @@
+export function normalizeWordTypingText(value: string): string {
+  // Smart punctuation must remain typeable with an ordinary period key.
+  return value.replace(/\u2026/g, "...");
+}
+
 export function normalizeWordAnswer(value: string): string {
-  return value.trim();
+  return normalizeWordTypingText(value).trim();
 }
 
 export function isLetter(value: string): boolean {
@@ -117,12 +122,11 @@ export function resolveWordInputChange(params: {
   expectedAnswer: string;
   provisionalBaseAnswer: string | null;
 }): WordInputDecision {
-  const {
-    value,
-    acceptedAnswer,
-    expectedAnswer,
-    provisionalBaseAnswer,
-  } = params;
+  const value = normalizeWordTypingText(params.value);
+  const acceptedAnswer = normalizeWordTypingText(params.acceptedAnswer);
+  const expectedAnswer = normalizeWordTypingText(params.expectedAnswer);
+  const provisionalBaseAnswer = params.provisionalBaseAnswer === null
+    ? null : normalizeWordTypingText(params.provisionalBaseAnswer);
 
   if (expectedAnswer.startsWith(value)) {
     return {

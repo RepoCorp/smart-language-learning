@@ -27,6 +27,7 @@ Los audios de partes de frases, y no se si tambien cuando el modelo saca mas que
 Muchas veces saca error al guardar pero si parece que guardo 
 
 ### Tier 1 (trabajarle de a poquitos, timeboxed)
+Que busque repetidas, o las señale al guardarlas
 Terminada de la conversacion como sugiere July
 Al final de la sesión una conversación escrita usando las palabras que más costaron
 Que no repita la regla gramatical en pregunta

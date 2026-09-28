@@ -150,9 +150,11 @@ export interface SessionRestoreState {
   is_learned: boolean;
   is_difficult: boolean;
   difficult_marked_at: string | null;
+  difficult_grammar_feature_keys?: string[];
 }
 
 export interface SessionItem {
+  practice_grammar_feature_keys?: string[];
   id: number;
   item_type: ItemType | "pattern";
   pattern_key?: string;

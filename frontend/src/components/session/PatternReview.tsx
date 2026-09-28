@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useI18n } from "../../i18n";
 import type { SessionItem } from "../../types";
+import PracticeRuleNote from "./PracticeRuleNote";
 
 export default function PatternReview({ item, completed, disabled, onAnswered, onNext, postReviewActions }: {
   item: SessionItem;
@@ -37,6 +38,7 @@ export default function PatternReview({ item, completed, disabled, onAnswered, o
     <p>{question}</p>
     {(revealed || completed) && <p className="word-formation-match">{recognition ? meaning
       : <>{answer.slice(0, start)}<strong>{answer.slice(start, end)}</strong>{answer.slice(end)}</>}</p>}
+    {(revealed || completed) && <PracticeRuleNote patternKey={item.pattern_key} />}
     {error && <p role="alert" className="error">{t("wordFormation.reviewFailed")}</p>}
     <div className="actions">
       {completed ? <button type="button" disabled={disabled} onClick={onNext}>{t("session.nextItem")}</button>

@@ -6,6 +6,7 @@ import PhraseReview from "../PhraseReview";
 import WordPartsReview from "../WordPartsReview";
 import WordReview from "../WordReview";
 import PatternReview from "./PatternReview";
+import PracticeRuleNote from "./PracticeRuleNote";
 
 type SessionCurrentItemProps = {
   item: SessionItem;
@@ -18,7 +19,17 @@ type SessionCurrentItemProps = {
   disabled?: boolean;
 };
 
-export default function SessionCurrentItem({
+export default function SessionCurrentItem(props: SessionCurrentItemProps): JSX.Element {
+  const { item } = props;
+  return <>
+    {item.mode === "review" && item.repeatedAfterFailure && item.repeatPracticeStep && (
+      <PracticeRuleNote grammarFeatureKeys={item.practice_grammar_feature_keys} />
+    )}
+    <CurrentItemExercise {...props} />
+  </>;
+}
+
+function CurrentItemExercise({
   item,
   renderKey,
   reviewComplete,

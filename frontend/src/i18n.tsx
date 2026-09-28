@@ -20,6 +20,7 @@ const STORAGE_KEY = "app_language";
 
 const messages = {
   en: {
+    "session.practicePattern": "Pattern you're practising",
     "loading.reassurance": "This can take a moment. Your practice is on its way.",
     "loading.preparingPractice": "Preparing your practice...",
     "loading.savingItem": "Saving item...",
@@ -979,6 +980,7 @@ const messages = {
     "words.close": "Close",
   },
   es: {
+    "session.practicePattern": "Patrón que practicas",
     "loading.reassurance": "Esto puede tomar un momento. Tu práctica está en camino.",
     "loading.preparingPractice": "Preparando tu práctica...",
     "loading.savingItem": "Guardando elemento...",

@@ -51,6 +51,7 @@ class Item(models.Model):
     is_learned = models.BooleanField(default=False)
     is_difficult = models.BooleanField(default=False)
     difficult_marked_at = models.DateTimeField(null=True, blank=True)
+    difficult_grammar_feature_keys = models.JSONField(default=list, blank=True)
 
     repetition_count = models.PositiveIntegerField(default=0)
     interval_days = models.PositiveIntegerField(default=1)

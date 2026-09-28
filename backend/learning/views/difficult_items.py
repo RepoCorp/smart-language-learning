@@ -23,5 +23,6 @@ class CompleteDifficultItemView(APIView):
 
         item.is_difficult = False
         item.difficult_marked_at = None
-        item.save(update_fields=["is_difficult", "difficult_marked_at", "updated_at"])
+        item.difficult_grammar_feature_keys = []
+        item.save(update_fields=["is_difficult", "difficult_marked_at", "difficult_grammar_feature_keys", "updated_at"])
         return Response({"ok": True})

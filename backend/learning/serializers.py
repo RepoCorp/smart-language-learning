@@ -20,9 +20,11 @@ class SessionRestoreStateSerializer(serializers.Serializer):
     is_learned = serializers.BooleanField()
     is_difficult = serializers.BooleanField()
     difficult_marked_at = serializers.DateTimeField(allow_null=True)
+    difficult_grammar_feature_keys = serializers.ListField(child=serializers.CharField(), required=False)
 
 
 class SessionItemSerializer(serializers.Serializer):
+    practice_grammar_feature_keys = serializers.ListField(child=serializers.CharField(), required=False)
     pattern_key = serializers.CharField(required=False)
     pattern_exercise = serializers.DictField(required=False)
     pattern_examples = serializers.ListField(child=serializers.DictField(), required=False)

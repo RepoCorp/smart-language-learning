@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from django.db import transaction
 from django.db.models.functions import Length
 from django.utils import timezone
 
@@ -15,6 +16,7 @@ _WORD_PREFIX_RE = re.compile(
 )
 
 
+@transaction.atomic
 def add_conversation_error_exercises(
     *,
     user,
@@ -24,6 +26,7 @@ def add_conversation_error_exercises(
     word_item_targets: list[str],
 ) -> list[int]:
     item_ids: set[int] = set()
+    feature_keys_by_item: dict[int, set[str]] = {}
     phrases = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.PHRASE,
         source_language=source_language,
@@ -38,6 +41,7 @@ def add_conversation_error_exercises(
         )
         if example:
             item_ids.add(example.id)
+            feature_keys_by_item.setdefault(example.id, set()).add(feature_key)
 
     words = apply_user_scope(Item.objects, user).filter(
         item_type=Item.ItemType.WORD,
@@ -53,8 +57,8 @@ def add_conversation_error_exercises(
         if _normalized_word_target(item.german_text) in normalized_targets:
             item_ids.add(item.id)
 
-    scheduled_items = list(Item.objects.filter(id__in=item_ids))
-    _mark_as_next_day_practice(scheduled_items)
+    scheduled_items = list(Item.objects.select_for_update().filter(id__in=item_ids))
+    _mark_as_next_day_practice(scheduled_items, feature_keys_by_item)
     return sorted(item.id for item in scheduled_items)
 
 
@@ -63,11 +67,15 @@ def _normalized_word_target(text: str) -> str:
     return _WORD_PREFIX_RE.sub("", normalized).strip()
 
 
-def _mark_as_next_day_practice(items: list[Item]) -> None:
+def _mark_as_next_day_practice(items: list[Item], feature_keys_by_item: dict[int, set[str]]) -> None:
     if not items:
         return
     now = timezone.now()
     for item in items:
+        existing_keys = item.difficult_grammar_feature_keys if item.is_difficult else []
+        item.difficult_grammar_feature_keys = sorted(
+            set(existing_keys) | feature_keys_by_item.get(item.id, set())
+        )
         item.is_difficult = True
         item.difficult_marked_at = now
         item.updated_at = now
@@ -76,6 +84,7 @@ def _mark_as_next_day_practice(items: list[Item]) -> None:
         [
             "is_difficult",
             "difficult_marked_at",
+            "difficult_grammar_feature_keys",
             "updated_at",
         ],
     )

@@ -467,6 +467,11 @@ def serialize_entries(entries: list[SessionEntry], *, user) -> list[dict]:
                 "direction": entry.direction,
                 "repeatedAfterFailure": entry.repeated_after_failure,
                 "repeatPracticeStep": entry.repeat_practice_step,
+                "practice_grammar_feature_keys": (
+                    entry.item.difficult_grammar_feature_keys
+                    if entry.item.is_difficult and entry.repeated_after_failure and entry.repeat_practice_step
+                    else []
+                ),
                 "options": [option["text"] for option in option_items],
                 "option_items": option_items,
                 "dialog_phrase_answer": dialog_phrase_answers_map.get(entry_key(entry), ""),
