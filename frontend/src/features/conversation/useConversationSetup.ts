@@ -21,8 +21,6 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
   const [previousTopics, setPreviousTopics] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopicValue] = useState<string>(RANDOM_TOPIC_OPTION);
   const [customTopic, setCustomTopicValue] = useState<string>("");
-  const [notes, setNotesValue] = useState<string>("");
-  const [role, setRoleValue] = useState<string>("");
   const [goalDifficulty, setGoalDifficultyValue] = useState<GoalDifficulty>("medium");
   const [selectedConversationMode, setSelectedConversationMode] = useState<ConversationTransport>("realtime");
   const [loadingTopics, setLoadingTopics] = useState<boolean>(false);
@@ -80,16 +78,6 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
     setCustomTopicValue(value);
   };
 
-  const setNotes = (value: string): void => {
-    clearGoal();
-    setNotesValue(value);
-  };
-
-  const setRole = (value: string): void => {
-    clearGoal();
-    setRoleValue(value);
-  };
-
   const setGoalDifficulty = (value: GoalDifficulty): void => {
     clearGoal();
     setGoalDifficultyValue(value);
@@ -104,8 +92,8 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
     try {
       const response = await regenerateTopicConversationGoal(
         selectedTopicText,
-        notes.trim(),
-        role.trim(),
+        "",
+        "",
         goalDifficulty,
         sourceLanguage,
         targetLanguage,
@@ -129,8 +117,6 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
     previousTopics,
     selectedTopic,
     customTopic,
-    notes,
-    role,
     goalDifficulty,
     selectedConversationMode,
     loadingTopics,
@@ -140,8 +126,6 @@ export function useConversationSetup({ sourceLanguage, targetLanguage }: Args) {
     resolvedTopic,
     setSelectedTopic,
     setCustomTopic,
-    setNotes,
-    setRole,
     setGoalDifficulty,
     setSelectedConversationMode,
     generateGoal,

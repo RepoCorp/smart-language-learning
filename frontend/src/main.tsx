@@ -8,55 +8,13 @@ import { I18nProvider } from "./i18n";
 import { PromptPreferencesProvider } from "./promptPreferences";
 import { StudyLanguagesProvider } from "./studyLanguages";
 import "./styles.css";
+import "./accessibility/modals.css";
+import "./accessibility/studyText.css";
+import { installVisualViewportSizing } from "./accessibility/visualViewport";
+import { StudyTextSizeProvider } from "./accessibility/StudyTextSizeProvider";
 
-type ZoomResetWindow = Window & { __sllInputZoomResetInstalled?: boolean };
-
-function isFormField(target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
-  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
-}
-
-function resetViewportToFitWidth(): void {
-  const viewport = document.querySelector('meta[name="viewport"]');
-  if (!viewport) {
-    return;
-  }
-  const baseContent = "width=device-width, initial-scale=1.0";
-  viewport.setAttribute("content", `${baseContent}, maximum-scale=1.0`);
-  window.setTimeout(() => {
-    viewport.setAttribute("content", baseContent);
-  }, 0);
-}
-
-function installMobileInputZoomReset(): void {
-  if (typeof window === "undefined" || typeof document === "undefined") {
-    return;
-  }
-  const state = window as ZoomResetWindow;
-  if (state.__sllInputZoomResetInstalled) {
-    return;
-  }
-  state.__sllInputZoomResetInstalled = true;
-
-  if (!window.matchMedia("(pointer: coarse)").matches) {
-    return;
-  }
-
-  document.addEventListener(
-    "focusout",
-    (event) => {
-      if (!isFormField(event.target)) {
-        return;
-      }
-      const scale = window.visualViewport?.scale ?? 1;
-      if (scale > 1.01) {
-        resetViewportToFitWidth();
-      }
-    },
-    true,
-  );
-}
-
-installMobileInputZoomReset();
+const disposeViewportSizing = installVisualViewportSizing();
+import.meta.hot?.dispose(disposeViewportSizing);
 
 const routerFutureFlags = {
   v7_relativeSplatPath: true,
@@ -70,7 +28,7 @@ createRoot(document.getElementById("root") as HTMLElement).render(
         <PromptPreferencesProvider>
           <DebugToolsProvider>
             <BrowserRouter future={routerFutureFlags}>
-              <App />
+              <StudyTextSizeProvider><App /></StudyTextSizeProvider>
             </BrowserRouter>
           </DebugToolsProvider>
         </PromptPreferencesProvider>

@@ -32,13 +32,13 @@ describe("absolute beginner conversation level", () => {
     const onLevelChange = vi.fn();
     const label = language === "en" ? "Absolute beginner" : "Principiante absoluto";
     render(<I18nProvider>
-      <ConversationActiveControls summary={{ role: "" }} status={{
+      <ConversationActiveControls status={{
         canSendResponse: false, conversationPaused: true, conversationRecording: false,
         conversationRecordingSeconds: 0, conversationLoading: false, conversationRealtimeConnecting: false,
-        responseLevel: "A2", showResponseLevelControl: true, showSpeechSpeedControl: true, speechSpeed: "normal",
+        responseLevel: "A2", speechSpeed: "normal",
       }} controls={{
-        helpLoading: false, onResponseLevelChange, onSpeechSpeedChange: vi.fn(), onEndConversation: vi.fn(),
-        onOpenHelp: vi.fn(), onPause: vi.fn(), onStartRecording: vi.fn(), onStopRecording: vi.fn(),
+        onResponseLevelChange, onSpeechSpeedChange: vi.fn(), onEndConversation: vi.fn(),
+        onPause: vi.fn(), onStartRecording: vi.fn(), onStopRecording: vi.fn(),
       }} />
       <DialogsFilterBar search="" topic="" context="" level="A0" topics={[]} contexts={[]} loading={false}
         onSearchChange={vi.fn()} onTopicChange={vi.fn()} onContextChange={vi.fn()} onLevelChange={onLevelChange} />

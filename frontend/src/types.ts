@@ -439,9 +439,6 @@ export interface ContentItemConversationResponse {
   assistant_text: string;
   assistant_translation_text?: string;
   assistant_audio_url?: string;
-  goal_achieved?: boolean;
-  goal_achievement_message?: string;
-  next_goal_suggestion?: string;
 }
 
 export interface ContentTopicContextsResponse {
@@ -500,15 +497,6 @@ export interface TopicConversationHelpResponse {
   request_text: string;
   help_text: string;
   target_text?: string;
-}
-
-export interface TopicConversationGoalEvaluationResponse {
-  goal_achieved: boolean;
-  goal_achievement_message?: string;
-  next_goal_suggestion?: string;
-  next_goal_index?: number;
-  all_goals_completed?: boolean;
-  current_goal_text?: string;
 }
 
 export interface TopicConversationGoalRegenerateResponse {

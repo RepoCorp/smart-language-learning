@@ -8,6 +8,8 @@ import { guidedTourCopy } from "./guidedTourCopy";
 import { conversationGuideCopy } from "./conversationGuideCopy";
 import { GUIDED_TOUR_ACTION_EVENT, requestGuidedTourSection, type GuidedTourId } from "./guidedTourEvents";
 import "./guidedTour.css";
+import { compactGuidePosition, guidePopoverPosition, type GuideTargetRect } from "./guidedTourPosition";
+import { useGuideViewport } from "./useGuideViewport";
 
 interface GuidedTourProps {
   open: boolean;
@@ -16,8 +18,6 @@ interface GuidedTourProps {
   onStepChange: (stepIndex: number) => void;
   guideId: GuidedTourId;
 }
-
-type TargetRect = Pick<DOMRect, "top" | "left" | "width" | "height" | "bottom">;
 
 function findTarget(target: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(`[data-guide-target="${target}"]`);
@@ -28,16 +28,23 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
   const location = useLocation();
   const navigate = useNavigate();
   const copy = guideId === "conversation" ? conversationGuideCopy(language) : guidedTourCopy(language);
-  const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
+  const [targetRect, setTargetRect] = useState<GuideTargetRect | null>(null);
   const [targetReady, setTargetReady] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [compactExpanded, setCompactExpanded] = useState(false);
   const [nextUnlocked, setNextUnlocked] = useState(false);
   const [popoverHeight, setPopoverHeight] = useState(0);
   const focusedAppLanguageRef = useRef(false);
   const scrolledTargetRef = useRef("");
   const popoverRef = useRef<HTMLElement | null>(null);
   const currentStep = copy.steps[stepIndex];
+  const viewport = useGuideViewport(open);
+  const compactLayout = viewport.width <= 640 || (viewport.width <= 900 && viewport.height <= 480);
+  const compactPosition = compactGuidePosition(targetRect, viewport);
+  const cardCollapsed = collapsed || (compactLayout && compactPosition.compact && !compactExpanded);
+  const minimizeLabel = language === "es" ? "Minimizar guía" : "Minimize guide";
+  const showLabel = language === "es" ? "Mostrar guía" : "Show guide";
 
   useEffect(() => {
     if (!open) {
@@ -80,8 +87,9 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
   useEffect(() => {
     setShowMoreInfo(false);
     setCollapsed(false);
+    setCompactExpanded(false);
     setNextUnlocked(false);
-  }, [stepIndex]);
+  }, [stepIndex, guideId]);
 
   useEffect(() => {
     if (!open) {
@@ -150,7 +158,7 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
 
   useEffect(() => {
     const popover = popoverRef.current;
-    if (!open || collapsed || !popover) {
+    if (!open || cardCollapsed || !popover) {
       setPopoverHeight(0);
       return;
     }
@@ -160,7 +168,7 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
     const observer = new ResizeObserver(measure);
     observer.observe(popover);
     return () => observer.disconnect();
-  }, [collapsed, currentStep.id, open, showMoreInfo]);
+  }, [cardCollapsed, currentStep.id, open, showMoreInfo]);
 
   if (!open) {
     return null;
@@ -173,37 +181,10 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
     }
     onStepChange(stepIndex + 1);
   };
-  const keepPopoverClearOfTarget = [
-    "save-dialog",
-    "save-word",
-    "save-phrase",
-    "conversation-goal",
-    "conversation-start",
-    "conversation-ready",
-  ].includes(currentStep.id);
-  const isMenuNavigationStep = ["open-menu", "open-session", "conversation-open-menu"].includes(currentStep.id);
-  let createDialogTop: number | undefined;
-  if (targetRect && currentStep.id === "create-dialog" && window.innerWidth > 640) {
-    const below = targetRect.bottom + 14;
-    const above = targetRect.top - popoverHeight - 14;
-    // Never push this actionable card over its button to fit the viewport.
-    createDialogTop = below + popoverHeight <= window.innerHeight - 16 || above < 16
-      ? below : above;
-  }
-  const popoverStyle = targetRect
-    ? {
-      top: createDialogTop ?? (keepPopoverClearOfTarget
-        ? 16
-        : isMenuNavigationStep && window.innerWidth > 640
-          ? Math.max(16, targetRect.top - 4)
-        : Math.min(targetRect.bottom + 14, window.innerHeight - 228)),
-      left: keepPopoverClearOfTarget
-        ? 16
-        : isMenuNavigationStep && window.innerWidth > 640
-          ? Math.max(16, targetRect.left - 334)
-        : Math.max(16, Math.min(targetRect.left, window.innerWidth - 336)),
-    }
-    : undefined;
+  const { style: popoverStyle, clearTarget: keepPopoverClearOfTarget, menu: isMenuNavigationStep } = guidePopoverPosition({
+    target: targetRect, stepId: currentStep.id, height: popoverHeight,
+    viewportWidth: window.innerWidth, viewportHeight: window.innerHeight,
+  });
   const highlightPadding = currentStep.highlightPadding || 6;
   const highlightWidth = targetRect ? Math.max(targetRect.width + highlightPadding * 2, currentStep.minHighlightWidth || 0) : 0;
   const highlightHeight = targetRect ? Math.max(targetRect.height + highlightPadding * 2, currentStep.minHighlightHeight || 0) : 0;
@@ -217,7 +198,7 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
   const guideScrollHeight = Math.max(window.innerHeight, popoverTop + popoverHeight + 16);
 
   return (
-    <div className="guided-tour-overlay" role="dialog" aria-modal="true" aria-label={copy.title}>
+    <div className={`guided-tour-overlay${compactLayout ? " guided-tour-compact-layout" : ""}`} role="dialog" aria-label={copy.title}>
       {targetRect ? (
         <div
           className="guided-tour-target"
@@ -231,12 +212,14 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
         />
       ) : null}
       <div className="guided-tour-scroll-content" style={{ minHeight: guideScrollHeight }}>
-        {collapsed ? (
+        {cardCollapsed ? (
           <button
             type="button"
             className="guided-tour-collapsed-card"
-            onClick={() => setCollapsed(false)}
-            aria-label={currentStep.title}
+            style={compactLayout ? compactPosition.toggleStyle : undefined}
+            onClick={() => { setCollapsed(false); setCompactExpanded(true); }}
+            aria-label={`${showLabel}: ${currentStep.title}`}
+            aria-expanded={false}
             title={currentStep.title}
           >
             <span aria-hidden="true">i</span>
@@ -244,9 +227,17 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
         ) : <section
           ref={popoverRef}
           className={`guided-tour-popover${targetRect ? "" : " guided-tour-popover-centered"}${keepPopoverClearOfTarget ? " guided-tour-popover-clear-target" : ""}${isMenuNavigationStep ? " guided-tour-popover-menu" : ""}`}
-          style={popoverStyle}
+          style={compactLayout ? compactPosition.style : popoverStyle}
         >
-          <h2>{currentStep.title}</h2>
+          <header className="guided-tour-card-header">
+            <h2>{currentStep.title}</h2>
+            <button type="button" className="guided-tour-minimize" aria-label={minimizeLabel}
+              title={minimizeLabel} aria-expanded={true}
+              onClick={() => { setCollapsed(true); setCompactExpanded(false); }}>
+              <span aria-hidden="true">−</span>
+            </button>
+          </header>
+          <div className="guided-tour-card-body" tabIndex={0} role="region" aria-label={currentStep.title}>
           <p>{body}</p>
           {currentStep.image === "conversation-panel" ? (
             <img
@@ -277,6 +268,7 @@ export default function GuidedTour({ open, onFinish, stepIndex, onStepChange, gu
               </button>
             </div>
           ) : null}
+          </div>
         </section>}
       </div>
     </div>

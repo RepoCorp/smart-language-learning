@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..auth import get_request_user
-from ..models import DailyAIUsage, RegistrationRequest, UserAIUsageLimit
+from ..models import DailyAIUsage, DailyLearningProgress, RegistrationRequest, UserAIUsageLimit
 from .auth_pin_setup import create_pin_setup_token
 
 
@@ -152,6 +152,12 @@ class AuthAIUsageView(APIView):
                 realtime_seconds=Sum("usage_units", filter=Q(feature="realtime-session")),
             )
         }
+        study_minutes_by_user = {
+            row["user_id"]: (row["seconds"] or 0) // 60
+            for row in DailyLearningProgress.objects.filter(date__gte=week_start, date__lte=today)
+            .values("user_id")
+            .annotate(seconds=Sum("active_seconds"))
+        }
         limits = {limit.user_id: limit for limit in UserAIUsageLimit.objects.filter(user__in=users)}
         all_time_request_counts = {
             row["user_id"]: row["request_count"] or 0
@@ -171,6 +177,7 @@ class AuthAIUsageView(APIView):
                 "week_realtime_minutes": (
                     ((usage_by_user.get(user.id, {}).get("realtime_seconds") or 0) + 59) // 60
                 ),
+                "week_study_minutes": study_minutes_by_user.get(user.id, 0),
             }
             for user in users
         ]

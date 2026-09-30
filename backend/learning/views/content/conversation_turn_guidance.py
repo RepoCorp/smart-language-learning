@@ -14,7 +14,7 @@ def response_level_instruction(level: str) -> str:
             "Repeat familiar words and sentence patterns naturally. Use adult-appropriate language, not baby talk or broken grammar. "
             "While keeping the conversation going, prefer one simple yes/no or either/or question that can be answered with a few words "
             "instead of an open-ended question. Do not ask new questions during the closing phase. "
-            "Rephrase simply if the learner is stuck, without giving away the goal or treating replies in their own language as goal completion."
+            "Rephrase simply if the learner is stuck and encourage them to use the language they are learning."
         )
     if normalized_level == "A1":
         return "Use an A1 level. Use very simple words, very short sentences, and very basic grammar."
@@ -47,6 +47,7 @@ def effective_notes(*, notes: str, goal_text: str, response_level: str, speech_s
             (
                 f"Learner's conversation goal (private guidance): {goal_text.strip()}\n"
                 "Use it only as subtle background guidance. Do not mention, quote, or explain it.\n"
+                "It is a general guide, not an assessment. Do not evaluate or announce goal achievement.\n"
                 "Do not give goal-specific information, hints, or leading questions intended to make the learner complete it.\n"
                 "Respond naturally to what the learner actually says and let them choose the direction within the topic."
                 if goal_text.strip() else ""

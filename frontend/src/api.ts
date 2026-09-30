@@ -16,7 +16,6 @@ import type {
   TopicConversationStartResponse,
   TopicConversationRealtimeSessionResponse,
   TopicConversationHelpResponse,
-  TopicConversationGoalEvaluationResponse,
   TopicConversationGoalRegenerateResponse,
   ContentTopicsResponse,
   OverviewStatsResponse,
@@ -816,49 +815,6 @@ export async function startTopicConversation(
     throw new Error(detail);
   }
   return (await response.json()) as TopicConversationStartResponse;
-}
-
-export async function evaluateTopicConversationGoal(
-  topic: string,
-  notes: string,
-  roleText: string,
-  goalTexts: string[],
-  currentGoalIndex: number,
-  latestUserText: string,
-  history: Array<{ user_text: string; assistant_text: string }>,
-  sourceLanguage: StudyLanguageCode = "spanish",
-  targetLanguage: StudyLanguageCode = "german",
-): Promise<TopicConversationGoalEvaluationResponse> {
-  const params = new URLSearchParams({
-    source_language: sourceLanguage,
-    target_language: targetLanguage,
-  });
-  const response = await apiFetch(`${API_BASE}/content/conversation/goal-evaluate?${params.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      topic,
-      notes,
-      role_text: roleText,
-      goal_texts: goalTexts,
-      current_goal_index: currentGoalIndex,
-      latest_user_text: latestUserText,
-      history,
-    }),
-  });
-  if (!response.ok) {
-    let detail = "Failed to evaluate conversation goal";
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
-        detail = payload.detail;
-      }
-    } catch {
-      // Keep generic detail when error body is not JSON.
-    }
-    throw new Error(detail);
-  }
-  return (await response.json()) as TopicConversationGoalEvaluationResponse;
 }
 
 export async function regenerateTopicConversationGoal(

@@ -20,6 +20,7 @@ export type BaseConversationTransportArgs = {
   onAssistantSpeakingChange: (speaking: boolean) => void;
   onPendingUserTurnChange: (pending: boolean) => void;
   onConversationTurn: (response: ContentItemConversationResponse) => void;
+  onConversationFinished: () => void;
   onPendingAssistantTextChange: (text: string) => void;
   playAudioUrl: (audioUrl?: string) => void;
   conversationHistory: ConversationHistoryEntry[];

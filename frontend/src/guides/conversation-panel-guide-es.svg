@@ -40,7 +40,7 @@
     <text x="646" y="315" font-size="12">Toma un descanso y continúa.</text>
     <circle cx="56" cy="405" r="15" fill="#dbead7"/><text x="51" y="411" font-size="15" font-weight="700">5</text>
     <text x="78" y="401" font-size="14" font-weight="700">Más controles</text>
-    <text x="78" y="420" font-size="12">Pide ayuda o ajusta la velocidad.</text>
+    <text x="78" y="420" font-size="12">Ajusta la velocidad y el nivel.</text>
     <circle cx="624" cy="365" r="15" fill="#dbead7"/><text x="619" y="371" font-size="15" font-weight="700">6</text>
     <text x="646" y="361" font-size="14" font-weight="700">Terminar conversación</text>
     <text x="646" y="380" font-size="12">Termina cuando acabes.</text>

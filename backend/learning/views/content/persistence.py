@@ -135,12 +135,11 @@ def create_word_if_missing(
         logger.info("content.create.word.skipped_exists topic=%s spanish=%s", topic, normalized_spanish)
         return None
     phrase_german = candidate.source_phrase_german.strip()
-    audio_text = f"{normalized_german}. {phrase_german}" if phrase_german else normalized_german
     try:
-        audio_url = create_openai_audio_file(audio_text, "word", target_language=target_language)
+        audio_url = create_openai_audio_file(normalized_german, "word", target_language=target_language)
     except TypeError:
         # Backward compatibility for tests/mocks that still accept only (text, prefix).
-        audio_url = create_openai_audio_file(audio_text, "word")
+        audio_url = create_openai_audio_file(normalized_german, "word")
     item = Item.objects.create(
         user=user,
         item_type=Item.ItemType.WORD,

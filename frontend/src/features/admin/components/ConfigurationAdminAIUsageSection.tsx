@@ -109,6 +109,7 @@ export default function ConfigurationAdminAIUsageSection({
       characters: user.week_elevenlabs_characters,
       seconds: user.week_elevenlabs_music_seconds,
       minutes: user.week_realtime_minutes,
+      studyMinutes: user.week_study_minutes,
     })
   );
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../../i18n";
 
 import {
   CONVERSATION_MAX_CONSECUTIVE_TIMEOUTS,
@@ -14,6 +15,7 @@ import type {
   ConversationSpeechSpeed,
 } from "./conversationTransportTypes";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
+import { closingFailureMessage } from "./ending/closingMessages";
 export function useRealtimeConversationTransport({
   sourceLanguage,
   targetLanguage,
@@ -22,12 +24,14 @@ export function useRealtimeConversationTransport({
   onAssistantSpeakingChange,
   onPendingUserTurnChange,
   onConversationTurn,
+  onConversationFinished,
   onPendingAssistantTextChange,
   conversationGoal,
   conversationPhase,
   speechSpeed,
   responseLevel,
 }: BaseConversationTransportArgs) {
+  const { language } = useI18n();
   const [conversationRecording, setConversationRecording] = useState<boolean>(false);
   const [conversationRecordingSeconds, setConversationRecordingSeconds] = useState<number>(0);
   const [conversationPaused, setConversationPaused] = useState<boolean>(false);
@@ -50,6 +54,9 @@ export function useRealtimeConversationTransport({
   const baseInstructionsRef = useRef<string>("");
   const timedOutSubmissionRef = useRef<boolean>(false);
   const consecutiveTimeoutCountRef = useRef<number>(0);
+  const closingRef = useRef(false);
+  const closingContextRef = useRef({ conversationGoal, conversationPhase, speechSpeed, responseLevel, onConversationFinished });
+  closingContextRef.current = { conversationGoal, conversationPhase, speechSpeed, responseLevel, onConversationFinished };
   const realtimeUsage = useRealtimeActiveAudioUsage({
     onLimitReached: () => {
       setConversationPaused(true);
@@ -104,6 +111,7 @@ export function useRealtimeConversationTransport({
   };
 
   const closeRealtimeSession = (): void => {
+    closingRef.current = false;
     realtimeUsage.stopSession();
     activeSessionTokenRef.current += 1;
     dataChannelRef.current?.close();
@@ -142,7 +150,7 @@ export function useRealtimeConversationTransport({
   }, [conversationGoal, conversationPhase, conversationRealtimeReady, responseLevel, speechSpeed]);
 
   const startRecording = async (conversationLoading: boolean): Promise<void> => {
-    if (conversationRecording || conversationLoading) {
+    if (conversationRecording || conversationLoading || closingRef.current) {
       return;
     }
     setConversationPaused(false);
@@ -254,6 +262,18 @@ export function useRealtimeConversationTransport({
       sendSessionUpdate: (transcriptionModel) => sendRealtimeSessionUpdate(speechSpeed, responseLevel, conversationPhase, transcriptionModel),
       onAssistantSpeakingChange, onPendingAssistantTextChange, onPendingUserTurnChange, onLoadingChange, onError,
       flushCompletedTurn, startRecording: () => void startRecording(false),
+      closing: {
+        getInstructions: () => {
+          const current = closingContextRef.current;
+          return buildRealtimeInstructions({
+            baseInstructions: baseInstructionsRef.current, goal: current.conversationGoal,
+            phase: current.conversationPhase, speed: current.speechSpeed, level: current.responseLevel,
+          });
+        },
+        onClosingChange: (closing) => { closingRef.current = closing; },
+        onFinished: () => closingContextRef.current.onConversationFinished(),
+        failureMessage: closingFailureMessage[language],
+      },
     });
   return {
     conversationPaused,

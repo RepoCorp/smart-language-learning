@@ -6,6 +6,8 @@ import { getSpeechSynthesisVoiceSelectionOptions } from "../../../browserSpeech"
 import { notifyGuidedTourAction } from "../../../guides/guidedTourEvents";
 import { useI18n } from "../../../i18n";
 import { usePromptPreferences } from "../../../promptPreferences";
+import StudyTextSizeSetting from "../../../accessibility/StudyTextSizeSetting";
+import { useStudyTextSize } from "../../../accessibility/StudyTextSizeProvider";
 import {
   BROWSER_VOICE_PREVIEW_TEXT_BY_CODE,
   STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE,
@@ -35,6 +37,7 @@ export default function ConfigurationPreferencesSection({
   onStatsChange,
 }: ConfigurationPreferencesSectionProps): JSX.Element {
   const { language, setLanguage, t } = useI18n();
+  const { setSize: setStudyTextSize } = useStudyTextSize();
   const {
     targetPromptMode,
     setTargetPromptMode,
@@ -123,6 +126,7 @@ export default function ConfigurationPreferencesSection({
     setSourceLanguage("spanish");
     setTargetLanguage("german");
     setTargetPromptMode("audio");
+    setStudyTextSize(1);
     setShowMobileActionLabels(true);
     setShowTutorialContinueButton(true);
     clearPreferredBrowserVoiceURIs();
@@ -188,6 +192,8 @@ export default function ConfigurationPreferencesSection({
             <button type="button" className={`settings-choice-button ${targetPromptMode === "audio" ? "settings-choice-button-selected" : ""}`} onClick={() => setTargetPromptMode("audio")} role="radio" aria-checked={targetPromptMode === "audio"}>{t("config.targetPromptModeAudio")}</button>
           </div>
         </div>
+
+        <StudyTextSizeSetting />
 
         <div className="settings-field">
           {t("config.mobileActionLabels")}

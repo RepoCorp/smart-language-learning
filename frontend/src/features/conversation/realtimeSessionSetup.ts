@@ -6,6 +6,7 @@ import { createRealtimeSessionEventHandler } from "./realtimeSessionEvents";
 import { connectRealtimeWebRtc } from "./realtimeWebRtcConnection";
 import type { BaseConversationTransportArgs, StartConversationTransportArgs } from "./conversationTransportTypes";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
+import type { RealtimeClosingOptions } from "./ending/realtimeConversationEnding";
 
 type RealtimeSessionSetupOptions = {
   args: StartConversationTransportArgs;
@@ -41,6 +42,7 @@ type RealtimeSessionSetupOptions = {
   onError: BaseConversationTransportArgs["onError"];
   flushCompletedTurn: () => void;
   startRecording: () => void;
+  closing: Omit<RealtimeClosingOptions, "sendEvent">;
 };
 
 export async function startRealtimeConversationSession(options: RealtimeSessionSetupOptions): Promise<boolean> {
@@ -110,6 +112,14 @@ export async function startRealtimeConversationSession(options: RealtimeSessionS
         onError: options.onError,
         flushCompletedTurn: options.flushCompletedTurn,
         startRecording: options.startRecording,
+        closing: {
+          ...options.closing,
+          sendEvent: (event) => {
+            const channel = options.dataChannelRef.current;
+            if (!isSessionActive() || channel?.readyState !== "open") throw new Error("Realtime connection is not ready");
+            channel.send(JSON.stringify(event));
+          },
+        },
       }),
       onNoAudioTrack: options.closeSession,
     });

@@ -2,32 +2,24 @@ import { useEffect, useRef } from "react";
 
 interface UseConversationScrollParams {
   started: boolean;
-  helpHistoryCount: number;
-  helpLoading: boolean;
-  helpOpen: boolean;
   conversationTurnsCount: number;
   conversationLoading: boolean;
   conversationRecording: boolean;
 }
 
 interface UseConversationScrollResult {
-  helpModalRef: React.MutableRefObject<HTMLDivElement | null>;
   historyRef: React.MutableRefObject<HTMLDivElement | null>;
   scrollConversationToBottom: () => void;
 }
 
 export function useConversationScroll({
   started,
-  helpHistoryCount,
-  helpLoading,
-  helpOpen,
   conversationTurnsCount,
   conversationLoading,
   conversationRecording,
 }: UseConversationScrollParams): UseConversationScrollResult {
   const STICKY_CONTROLS_CLEARANCE_PX = 132;
   const historyRef = useRef<HTMLDivElement | null>(null);
-  const helpModalRef = useRef<HTMLDivElement | null>(null);
   const previousStartedRef = useRef<boolean>(started);
 
   const scrollConversationToBottom = (): void => {
@@ -49,17 +41,6 @@ export function useConversationScroll({
   };
 
   useEffect(() => {
-    if (!helpOpen) {
-      return;
-    }
-    const helpElement = helpModalRef.current;
-    if (!helpElement) {
-      return;
-    }
-    helpElement.scrollTo({ top: helpElement.scrollHeight, behavior: "smooth" });
-  }, [helpOpen, helpHistoryCount, helpLoading]);
-
-  useEffect(() => {
     scrollConversationToBottom();
   }, [conversationTurnsCount, conversationLoading, conversationRecording]);
 
@@ -78,7 +59,6 @@ export function useConversationScroll({
   }, [started]);
 
   return {
-    helpModalRef,
     historyRef,
     scrollConversationToBottom,
   };

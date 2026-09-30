@@ -11,6 +11,7 @@ export type AdminAIUsageUser = AuthUser & {
   week_elevenlabs_characters: number;
   week_elevenlabs_music_seconds: number;
   week_realtime_minutes: number;
+  week_study_minutes: number;
 };
 
 type AdminAIUsageResponse = {

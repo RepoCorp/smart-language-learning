@@ -6,6 +6,9 @@ export type RealtimeResponseOutputPart = {
 
 export type RealtimeResponseOutputItem = {
   type?: string;
+  name?: string;
+  call_id?: string;
+  arguments?: string;
   content?: RealtimeResponseOutputPart[];
 };
 
@@ -14,7 +17,8 @@ export type RealtimeServerEvent = {
   delta?: string;
   text?: string;
   transcript?: string;
-  response?: { output?: RealtimeResponseOutputItem[] };
+  response_id?: string;
+  response?: { id?: string; status?: string; metadata?: Record<string, string>; output?: RealtimeResponseOutputItem[] };
   item?: { content?: RealtimeResponseOutputPart[] };
   error?: { message?: string };
   message?: string;

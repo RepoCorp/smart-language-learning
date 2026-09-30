@@ -1,0 +1,67 @@
+.blocking-modal-overlay {
+  position: fixed;
+  top: var(--visible-top, 0px);
+  left: var(--visible-left, 0px);
+  width: var(--visible-width, 100%);
+  height: var(--visible-height, 100dvh);
+  z-index: 1000;
+  background: rgba(17, 24, 39, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: auto;
+}
+
+.blocking-modal {
+  position: relative;
+  min-width: 220px;
+  max-width: 90vw;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.25);
+}
+
+/* More specific than full-screen variants: constrain to the visible area, not
+   the unzoomed layout viewport. Do not counter-scale the learner's text. */
+.blocking-modal-overlay > .blocking-modal {
+  min-width: 0;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow-wrap: anywhere;
+}
+
+.blocking-modal .item-view-shell > .modal-corner-close {
+  position: sticky;
+  top: 0;
+  right: auto;
+  align-self: flex-end;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  font-size: 1.375rem;
+  background: var(--color-surface);
+}
+
+/* These scroll surfaces must not suppress pinch zoom through an ancestor. */
+.blocking-modal .item-actions-toolbar {
+  touch-action: pan-x pinch-zoom;
+}
+
+.blocking-modal .exercise-modal-scroll,
+.blocking-modal .phrase-builder-bank-scroll {
+  touch-action: auto;
+}

@@ -1,0 +1,29 @@
+.conversation-page .exercise-audio-mode {
+  gap: 6px;
+}
+
+.conversation-page .exercise-radio-option {
+  min-height: 32px;
+  padding: 4px 9px;
+  gap: 6px;
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+.conversation-page .exercise-radio-option input[type="radio"] {
+  width: 0.875rem;
+  height: 0.875rem;
+  min-height: 0;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.conversation-page .conversation-speed-options .exercise-radio-option {
+  align-self: flex-start;
+}
+
+@media (pointer: coarse) {
+  .conversation-page .exercise-radio-option {
+    min-height: 36px;
+  }
+}

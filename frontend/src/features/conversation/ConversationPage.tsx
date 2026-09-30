@@ -1,71 +1,47 @@
 import { useEffect, useState } from "react";
+import "./conversationSettings.css";
 
 import {
   fetchContentItemDetail,
-  fetchTopicConversationUserLiteralTranslation,
   regenerateTopicConversationGoal,
   quickAddPhraseFromConversation,
   quickAddWordFromDialog,
-  sendTopicConversationHelpRequest,
   startTopicConversation,
 } from "../../api";
 import { useI18n } from "../../i18n";
-import { usePromptPreferences } from "../../promptPreferences";
 import { toItemViewSessionItem } from "../../itemViewItem";
-import { STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE } from "../../studyLanguageMetadata";
 import { useStudyLanguages } from "../../studyLanguages";
 import type { ContentItemConversationResponse, SessionItem } from "../../types";
 import NewItem from "../../components/NewItem";
 import ConversationActiveControls from "./ConversationActiveControls";
-import {
-  defaultConversationSpeechSpeed,
-  getInitialConversationResponseLevel,
-  getInitialConversationSpeechSpeed,
-  setStoredConversationResponseLevel,
-  setStoredConversationSpeechSpeed,
-} from "./conversationPreferences";
+import ConversationMoreControls from "./ConversationMoreControls";
+import { useConversationPreferences } from "./useConversationPreferences";
 import ConversationSetupCard from "./ConversationSetupCard";
 import ConversationReviewSection from "./ConversationReviewSection";
 import { CONVERSATION_SEND_ENABLE_DELAY_SECONDS } from "./conversationConstants";
 import { logRealtime, warnRealtime } from "./conversationRealtimeSupport";
 import { CREATE_NEW_OPTION, RANDOM_TOPIC_OPTION } from "./conversationSetupOptions";
 import ConversationTurns from "./ConversationTurns";
-import { useConversationGoalEvaluation } from "./useConversationGoalEvaluation";
 import { useConversationReview } from "./useConversationReview";
 import { useConversationScroll } from "./useConversationScroll";
 import { useConversationSetup } from "./useConversationSetup";
+import { createConversationEndActions } from "./ending/conversationEndActions";
 import {
-  type ConversationPhase,
-  type ConversationResponseLevel,
-  type ConversationSpeechSpeed,
   type ConversationTransport,
   type GoalDifficulty,
   useConversationTransport,
 } from "./useConversationTransport";
 
-const CONVERSATION_ASSISTANT_HINT_LIMIT = 3;
-
-type ConversationHelpEntry = {
-  request_kind?: "coach" | "say";
-  request_text: string;
-  help_text: string;
-  target_text?: string;
-};
-
 export default function ConversationPage(): JSX.Element {
   const { t } = useI18n();
-  const { targetPromptMode } = usePromptPreferences();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
 
-  const [speechSpeed, setSpeechSpeed] = useState<ConversationSpeechSpeed>(getInitialConversationSpeechSpeed);
-  const [responseLevel, setResponseLevel] = useState<ConversationResponseLevel>(getInitialConversationResponseLevel);
+  const { speechSpeed, responseLevel, updateSpeechSpeed, updateResponseLevel } = useConversationPreferences();
   const conversationSetup = useConversationSetup({ sourceLanguage, targetLanguage });
   const {
     previousTopics,
     selectedTopic,
     customTopic,
-    notes,
-    role,
     goalDifficulty,
     selectedConversationMode,
     loadingTopics,
@@ -75,8 +51,6 @@ export default function ConversationPage(): JSX.Element {
     resolvedTopic,
     setSelectedTopic,
     setCustomTopic,
-    setNotes,
-    setRole,
     setGoalDifficulty,
     setSelectedConversationMode,
     generateGoal,
@@ -88,17 +62,8 @@ export default function ConversationPage(): JSX.Element {
   const [activeNotes, setActiveNotes] = useState<string>("");
   const [activeRole, setActiveRole] = useState<string>("");
   const [activeGoalDifficulty, setActiveGoalDifficulty] = useState<GoalDifficulty>("medium");
-  const [conversationGoals, setConversationGoals] = useState<string[]>([]);
-  const [currentGoalIndex, setCurrentGoalIndex] = useState<number>(0);
   const [conversationGoal, setConversationGoal] = useState<string>("");
-  const [conversationPhase, setConversationPhase] = useState<ConversationPhase>("active");
   const [goalRegenerating, setGoalRegenerating] = useState<boolean>(false);
-  const [goalResetKey, setGoalResetKey] = useState<number>(0);
-  const [openingText, setOpeningText] = useState<string>("");
-  const [openingAudioUrl, setOpeningAudioUrl] = useState<string>("");
-  const [openingTranslation, setOpeningTranslation] = useState<string>("");
-  const [showOpeningTranslation, setShowOpeningTranslation] = useState<boolean>(false);
-  const [showTargetText, setShowTargetText] = useState<boolean>(targetPromptMode === "text");
 
   const [conversationTurns, setConversationTurns] = useState<ContentItemConversationResponse[]>([]);
   const [conversationLoading, setConversationLoading] = useState<boolean>(false);
@@ -109,15 +74,6 @@ export default function ConversationPage(): JSX.Element {
   const [conversationFinished, setConversationFinished] = useState<boolean>(false);
   const [conversationEnded, setConversationEnded] = useState<boolean>(false);
   const [assistantSpeaking, setAssistantSpeaking] = useState<boolean>(false);
-  const [assistantHintsUsed, setAssistantHintsUsed] = useState<number>(0);
-  const [assistantRevealUsedByTurn, setAssistantRevealUsedByTurn] = useState<Record<number, boolean>>({});
-  const [helpOpen, setHelpOpen] = useState<boolean>(false);
-  const [helpLoading, setHelpLoading] = useState<boolean>(false);
-  const [helpError, setHelpError] = useState<string>("");
-  const [helpInput, setHelpInput] = useState<string>("");
-  const [helpSayInput, setHelpSayInput] = useState<string>("");
-  const [helpHistory, setHelpHistory] = useState<ConversationHelpEntry[]>([]);
-  const [conversationTranslationVisible, setConversationTranslationVisible] = useState<Record<number, boolean>>({});
   const [sentenceActionStatus, setSentenceActionStatus] = useState<Record<string, "idle" | "saving" | "added" | "exists" | "error" | "missing_source">>({});
   const [pendingSentenceAdd, setPendingSentenceAdd] = useState<{
     key: string;
@@ -142,14 +98,11 @@ export default function ConversationPage(): JSX.Element {
   const [addingWord, setAddingWord] = useState<boolean>(false);
   const [openedLinkedWord, setOpenedLinkedWord] = useState<SessionItem | null>(null);
   const [loadingLinkedWord, setLoadingLinkedWord] = useState<boolean>(false);
-  const sourceLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
-  const targetLanguageLabel = t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage]);
   const goalDifficultyLabelByCode: Record<GoalDifficulty, Parameters<typeof t>[0]> = {
     easy: "conversation.goalDifficultyEasy",
     medium: "conversation.goalDifficultyMedium",
     hard: "conversation.goalDifficultyHard",
   };
-  const hideSourceText = targetPromptMode === "audio" && !showTargetText;
   const {
     reviewDialog: conversationReviewDialog,
     generateReview: generateConversationReview,
@@ -176,107 +129,11 @@ export default function ConversationPage(): JSX.Element {
     },
     onReviewGenerated: () => setConversationEnded(true),
   });
-  const {
-    clearGoalAchievementMessage,
-  } = useConversationGoalEvaluation({
-    enabled: started && !conversationFinished && conversationPhase === "active",
-    assistantSpeaking,
-    topic: activeTopic,
-    notes: activeNotes,
-    roleText: activeRole,
-    goalTexts: conversationGoals,
-    currentGoalIndex,
-    resetKey: goalResetKey,
-    turns: conversationTurns,
-    sourceLanguage,
-    targetLanguage,
-    onGoalAdvance: (nextGoalIndex, _nextGoalText) => {
-      setCurrentGoalIndex(nextGoalIndex);
-      setConversationPhase("closing");
-    },
-    onGoalsCompleted: () => {
-      setCurrentGoalIndex(conversationGoals.length);
-      setConversationPhase("closing");
-    },
-  });
-
-  const toggleOpeningTranslation = (): void => {
-    const nextVisible = !showOpeningTranslation;
-    setShowOpeningTranslation(nextVisible);
-    if (nextVisible) {
-      window.setTimeout(scrollConversationToBottom, 0);
-    }
-  };
-
-  const updateSpeechSpeed = (speed: ConversationSpeechSpeed): void => {
-    setSpeechSpeed(speed);
-    setStoredConversationSpeechSpeed(speed);
-  };
-
-  const updateResponseLevel = (level: ConversationResponseLevel): void => {
-    setResponseLevel(level);
-    setStoredConversationResponseLevel(level);
-    updateSpeechSpeed(defaultConversationSpeechSpeed(level));
-  };
-
-  const toggleAssistantTurnTranslation = (index: number): void => {
-    const nextVisible = true;
-    const showTranslation = async (): Promise<void> => {
-      if (nextVisible && !conversationTurns[index]?.assistant_translation_text && conversationTurns[index]?.assistant_text) {
-        try {
-          const payload = await fetchTopicConversationUserLiteralTranslation(
-            conversationTurns[index].assistant_text,
-            sourceLanguage,
-            targetLanguage,
-          );
-          setConversationTurns((current) => current.map((turn, turnIndex) => (
-            turnIndex === index
-              ? { ...turn, assistant_translation_text: payload.user_translation_text || "" }
-              : turn
-          )));
-        } catch (error) {
-          const detail = error instanceof Error ? error.message : "";
-          setConversationError(detail || t("newItem.questionsError"));
-          return;
-        }
-      }
-      setConversationTranslationVisible((current) => ({ ...current, [index]: nextVisible }));
-      if (nextVisible) {
-        window.setTimeout(scrollConversationToBottom, 0);
-      }
-    };
-
-    void showTranslation();
-  };
-
-  const hideAssistantTurnHelper = (): void => {
-    setConversationTranslationVisible({});
-  };
-
-  const showAssistantTurnHint = (index: number): void => {
-    const alreadyUsedForTurn = Boolean(assistantRevealUsedByTurn[index]);
-    if (
-      assistantSpeaking
-      || (!alreadyUsedForTurn && assistantHintsUsed >= CONVERSATION_ASSISTANT_HINT_LIMIT)
-      || conversationTranslationVisible[index]
-    ) {
-      return;
-    }
-    if (!alreadyUsedForTurn) {
-      setAssistantHintsUsed((current) => current + 1);
-      setAssistantRevealUsedByTurn((current) => ({ ...current, [index]: true }));
-    }
-    setPaused(true);
-    toggleAssistantTurnTranslation(index);
-  };
-
   const startConversationRecording = (): void => {
-    hideAssistantTurnHelper();
     void startRecording(conversationLoading);
   };
 
   const cleanToken = (value: string): string => value.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ]+|[^A-Za-zÀ-ÖØ-öø-ÿ]+$/g, "").trim();
-  const lineTokens = (line: string): string[] => line.split(/\s+/).filter((part) => part.trim().length > 0);
 
   const playAudioUrl = (audioUrl?: string): void => {
     if (!audioUrl) {
@@ -309,6 +166,7 @@ export default function ConversationPage(): JSX.Element {
     onConversationTurn: (response) => {
       setConversationTurns((current) => [...current, response]);
     },
+    onConversationFinished: () => finishConversation(),
     onPendingAssistantTextChange: setConversationPendingAssistantText,
     playAudioUrl,
     conversationHistory: conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
@@ -316,7 +174,7 @@ export default function ConversationPage(): JSX.Element {
     activeNotes,
     activeRole,
     conversationGoal,
-    conversationPhase,
+    conversationPhase: "active",
     speechSpeed,
     responseLevel,
   });
@@ -341,102 +199,13 @@ export default function ConversationPage(): JSX.Element {
     started,
   ]);
   const {
-    helpModalRef,
     historyRef,
-    scrollConversationToBottom,
   } = useConversationScroll({
     started,
-    helpHistoryCount: helpHistory.length,
-    helpLoading,
-    helpOpen,
     conversationTurnsCount: conversationTurns.length,
     conversationLoading,
     conversationRecording,
   });
-
-  useEffect(() => {
-    setShowTargetText(targetPromptMode === "text");
-  }, [targetPromptMode]);
-
-  const submitHelpRequest = async (): Promise<void> => {
-    const requestText = helpInput.trim();
-    if (!requestText) {
-      setHelpError(t("conversation.helpRequestRequired"));
-      return;
-    }
-    setHelpLoading(true);
-    setHelpError("");
-    try {
-      const response = await sendTopicConversationHelpRequest(
-        activeTopic,
-        activeNotes,
-        activeRole,
-        requestText,
-        conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
-        "coach",
-        sourceLanguage,
-        targetLanguage,
-      );
-      setHelpHistory((current) => [
-        ...current,
-        {
-          request_kind: response.request_kind || "coach",
-          request_text: response.request_text || "",
-          help_text: response.help_text || "",
-          target_text: response.target_text || "",
-        },
-      ]);
-      setHelpInput("");
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "";
-      setHelpError(detail || t("newItem.questionsError"));
-    } finally {
-      setHelpLoading(false);
-    }
-  };
-
-  const submitSayHelpRequest = async (): Promise<void> => {
-    const requestText = helpSayInput.trim();
-    if (!requestText) {
-      setHelpError(t("conversation.helpSayRequestRequired"));
-      return;
-    }
-    setHelpLoading(true);
-    setHelpError("");
-    try {
-      const response = await sendTopicConversationHelpRequest(
-        activeTopic,
-        activeNotes,
-        activeRole,
-        requestText,
-        conversationTurns.map((turn) => ({ user_text: turn.user_text, assistant_text: turn.assistant_text })),
-        "say",
-        sourceLanguage,
-        targetLanguage,
-      );
-      setHelpHistory((current) => [
-        ...current,
-        {
-          request_kind: response.request_kind || "say",
-          request_text: response.request_text || "",
-          help_text: response.help_text || "",
-          target_text: response.target_text || "",
-        },
-      ]);
-      setHelpSayInput("");
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "";
-      setHelpError(detail || t("newItem.questionsError"));
-    } finally {
-      setHelpLoading(false);
-    }
-  };
-
-  const openHelpModal = (): void => {
-    setHelpError("");
-    setPaused(true);
-    setHelpOpen(true);
-  };
 
   const regenerateConversationGoal = async (): Promise<void> => {
     if (!activeTopic || goalRegenerating || assistantSpeaking) {
@@ -459,11 +228,6 @@ export default function ConversationPage(): JSX.Element {
         throw new Error(t("conversation.goalFailed"));
       }
       setConversationGoal(nextGoal);
-      setConversationGoals([nextGoal]);
-      setCurrentGoalIndex(0);
-      setConversationPhase("active");
-      setGoalResetKey((current) => current + 1);
-      clearGoalAchievementMessage();
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
       setConversationError(detail || t("newItem.questionsError"));
@@ -472,24 +236,13 @@ export default function ConversationPage(): JSX.Element {
     }
   };
 
-  const closeHelpModal = (): void => {
-    setHelpError("");
-    setHelpOpen(false);
-  };
-
-  const finishConversation = (): void => {
-    stopRecording(false);
-    closeRealtimeSession();
-    setConversationError("");
-    setConversationPendingAssistantText("");
-    setConversationPendingUserTurn(false);
-    setAssistantSpeaking(false);
-    hideAssistantTurnHelper();
-    setConversationFinished(true);
-    setConversationEnded(false);
-    resetConversationReview();
-    clearGoalAchievementMessage();
-  };
+  const { finishConversation, endConversation } = createConversationEndActions({
+    stopRecording, closeRealtimeSession, setConversationError,
+    setConversationPendingAssistantText, setConversationPendingUserTurn,
+    setAssistantSpeaking, setConversationFinished,
+    setConversationEnded, resetConversationReview,
+    confirmEnd: () => typeof window === "undefined" || window.confirm(t("conversation.endConfirm")),
+  });
 
   const applyConversationStartState = (
     payload: Awaited<ReturnType<typeof startTopicConversation>>,
@@ -509,16 +262,8 @@ export default function ConversationPage(): JSX.Element {
       ? payload.goals.map((goal) => String(goal || "").trim()).filter(Boolean)
       : [];
     const normalizedGoals = nextGoals.length ? nextGoals : [payload.goal_text || ""].filter(Boolean);
-    setConversationGoals(normalizedGoals);
-    setCurrentGoalIndex(0);
     setConversationGoal(normalizedGoals[0] || "");
-    setConversationPhase("active");
-    setOpeningText(payload.opening_text || "");
-    setOpeningAudioUrl(payload.opening_audio_url || "");
-    setOpeningTranslation(payload.opening_translation_text || "");
-    setShowOpeningTranslation(false);
     setConversationTurns([]);
-    setConversationTranslationVisible({});
     setSentenceActionStatus({});
     setWordActionStatus({});
     setPendingWordAdd(null);
@@ -529,9 +274,6 @@ export default function ConversationPage(): JSX.Element {
     setConversationEnded(false);
     resetConversationReview();
     setAssistantSpeaking(false);
-    setAssistantHintsUsed(0);
-    setAssistantRevealUsedByTurn({});
-    clearGoalAchievementMessage();
   };
 
   const startConversation = async (): Promise<void> => {
@@ -547,8 +289,8 @@ export default function ConversationPage(): JSX.Element {
     }
     setConversationLoading(true);
     try {
-      const trimmedNotes = notes.trim();
-      const trimmedRole = role.trim();
+      const trimmedNotes = "";
+      const trimmedRole = "";
       logRealtime("start-request-started", {
         topic: resolvedTopic,
         sourceLanguage,
@@ -666,26 +408,14 @@ export default function ConversationPage(): JSX.Element {
     stopRecording(false);
     closeRealtimeSession();
     setConversationError("");
-    setHelpError("");
-    setHelpInput("");
-    setHelpOpen(false);
-    setHelpHistory([]);
     setStarted(false);
     setActiveTopicWasRandom(false);
-    setConversationGoals([]);
-    setCurrentGoalIndex(0);
     setConversationGoal("");
-    setConversationPhase("active");
     setConversationTurns([]);
-    setConversationTranslationVisible({});
     setSentenceActionStatus({});
     setWordActionStatus({});
     setPendingWordAdd(null);
     setPendingSentenceAdd(null);
-    setOpeningText("");
-    setOpeningAudioUrl("");
-    setOpeningTranslation("");
-    setShowOpeningTranslation(false);
     setConversationTransport("http");
     setConversationPendingUserTurn(false);
     setConversationFinished(false);
@@ -693,9 +423,6 @@ export default function ConversationPage(): JSX.Element {
     setConversationEnded(false);
     resetConversationReview();
     setAssistantSpeaking(false);
-    setAssistantHintsUsed(0);
-    setAssistantRevealUsedByTurn({});
-    clearGoalAchievementMessage();
 
     if (activeTopic) {
       if (previousTopics.includes(activeTopic)) {
@@ -706,16 +433,7 @@ export default function ConversationPage(): JSX.Element {
         setCustomTopic(activeTopic);
       }
     }
-    setNotes(activeNotes);
-    setRole(activeRole);
     setGoalDifficulty(activeGoalDifficulty);
-  };
-
-  const endConversation = (): void => {
-    if (typeof window !== "undefined" && !window.confirm(t("conversation.endConfirm"))) {
-      return;
-    }
-    finishConversation();
   };
 
   const openConversationItem = async (itemId: number): Promise<void> => {
@@ -824,70 +542,6 @@ export default function ConversationPage(): JSX.Element {
     }
   };
 
-  const renderTargetLineWithWordLinks = ({
-    baseKey,
-    sourceText,
-    targetText,
-    dialogId,
-    turnIndex,
-    disableWordClicks = false,
-  }: {
-    baseKey: string;
-    sourceText: string;
-    targetText: string;
-    dialogId?: number;
-    turnIndex?: number;
-    disableWordClicks?: boolean;
-  }): JSX.Element => {
-    if (!sourceText.trim()) {
-      return <>{targetText}</>;
-    }
-    const targetTokens = lineTokens(targetText);
-    if (!targetTokens.length) {
-      return <>{targetText}</>;
-    }
-
-    return (
-      <>
-        {targetTokens.map((token, tokenIndex) => {
-          const targetToken = cleanToken(token);
-          if (!targetToken) {
-            return (
-              <span key={`${baseKey}-punct-${tokenIndex}`} className="turn-token-wrap">
-                {token}
-                {tokenIndex < targetTokens.length - 1 ? " " : ""}
-              </span>
-            );
-          }
-          const statusKey = `${baseKey}-target-${tokenIndex}`;
-          const status = wordActionStatus[statusKey] || "idle";
-          return (
-            <span key={statusKey} className="turn-token-wrap">
-              <button
-                type="button"
-                className="turn-token-button"
-                onClick={() => {
-                  if (disableWordClicks) {
-                    return;
-                  }
-                  void requestAddWordFromTurnToken(statusKey, sourceText, targetText, token, dialogId, turnIndex);
-                }}
-                disabled={disableWordClicks || status === "saving"}
-              >
-                {token}
-              </button>
-              {tokenIndex < targetTokens.length - 1 ? " " : ""}
-              {status === "saving" && <span className="turn-token-status">({t("newItem.wordAddSaving")})</span>}
-              {status === "added" && <span className="turn-token-status">({t("newItem.wordAddAdded")})</span>}
-              {status === "exists" && <span className="turn-token-status">({t("newItem.wordAddExists")})</span>}
-              {status === "error" && <span className="turn-token-status">({t("newItem.wordAddError")})</span>}
-            </span>
-          );
-        })}
-      </>
-    );
-  };
-
   const requestAddSentenceFromConversation = async (
     key: string,
     sourceTextRaw: string,
@@ -948,17 +602,15 @@ export default function ConversationPage(): JSX.Element {
   };
 
   return (
-    <main className="container" data-testid="conversation-page">
+    <main className="container conversation-page" data-testid="conversation-page">
       <h1>{t("conversation.title")}</h1>
       <p>{t("conversation.description")}</p>
 
       <section className="card">
-        <ConversationSetupCard
+        {!started && <ConversationSetupCard
           previousTopics={previousTopics}
           selectedTopic={selectedTopic}
           customTopic={customTopic}
-          notes={notes}
-          role={role}
           goalDifficulty={goalDifficulty}
           selectedConversationMode={selectedConversationMode}
           loadingTopics={loadingTopics}
@@ -971,22 +623,25 @@ export default function ConversationPage(): JSX.Element {
           resolvedTopic={resolvedTopic}
           onSelectedTopicChange={setSelectedTopic}
           onCustomTopicChange={setCustomTopic}
-          onNotesChange={setNotes}
-          onRoleChange={setRole}
           onGoalDifficultyChange={setGoalDifficulty}
           onConversationModeChange={setSelectedConversationMode}
           onGenerateGoal={generateGoal}
           onStart={() => {
             void startConversation();
           }}
-        />
+        >
+          {(open, onOpenChange) => <ConversationMoreControls
+            open={open}
+            onOpenChange={onOpenChange}
+            status={{ conversationPaused: true, conversationLoading: conversationLoading || goalGenerating,
+              conversationRealtimeConnecting: false, responseLevel, speechSpeed }}
+            controls={{ onPause: () => {}, onResponseLevelChange: updateResponseLevel, onSpeechSpeedChange: updateSpeechSpeed }}
+          />}
+        </ConversationSetupCard>}
 
         {started && !conversationFinished && (
           <>
             <ConversationActiveControls
-              summary={{
-                role: activeRole,
-              }}
               status={{
                 canSendResponse: conversationRecordingSeconds >= CONVERSATION_SEND_ENABLE_DELAY_SECONDS,
                 conversationPaused,
@@ -995,14 +650,10 @@ export default function ConversationPage(): JSX.Element {
                 conversationLoading,
                 conversationRealtimeConnecting,
                 responseLevel,
-                showResponseLevelControl: true,
-                showSpeechSpeedControl: true,
                 speechSpeed,
               }}
               controls={{
-                helpLoading,
                 onEndConversation: endConversation,
-                onOpenHelp: openHelpModal,
                 onPause: () => setPaused(true),
                 onResponseLevelChange: updateResponseLevel,
                 onSpeechSpeedChange: updateSpeechSpeed,
@@ -1017,17 +668,11 @@ export default function ConversationPage(): JSX.Element {
                   topicWasRandom: activeTopicWasRandom,
                   goal: conversationGoal,
                   goalRegenerating,
-                  assistantHintsRemaining: Math.max(0, CONVERSATION_ASSISTANT_HINT_LIMIT - assistantHintsUsed),
-                  assistantRevealUsed: assistantRevealUsedByTurn,
                   assistantSpeaking,
-                  translationVisible: conversationTranslationVisible,
                 }}
                 actions={{
-                  renderTargetLineWithWordLinks,
-                  showAssistantTurnHint,
                   regenerateGoal: regenerateConversationGoal,
                 }}
-                conversationTurns={conversationTurns}
               />
               {conversationError && <p className="error">{conversationError}</p>}
             </ConversationActiveControls>
@@ -1152,69 +797,6 @@ export default function ConversationPage(): JSX.Element {
               </button>
               <button type="button" onClick={() => void confirmAddSentenceFromConversation()}>
                 {t("newItem.sentenceAddConfirmButton")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {helpOpen && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div ref={helpModalRef} className="blocking-modal conversation-help-modal">
-            <h3>{t("conversation.helpTitle")}</h3>
-            <p className="hint">{t("conversation.helpDescription")}</p>
-            <textarea
-              className="conversation-notes-input"
-              value={helpInput}
-              onChange={(event) => setHelpInput(event.target.value)}
-              placeholder={t("conversation.helpInputPlaceholder")}
-              rows={3}
-              disabled={helpLoading}
-            />
-            <input
-              value={helpSayInput}
-              onChange={(event) => setHelpSayInput(event.target.value)}
-              placeholder={t("conversation.helpSayInputPlaceholder")}
-              disabled={helpLoading}
-            />
-            {helpHistory.map((entry, index) => (
-              <div key={`help-entry-${index}`}>
-                {entry.request_text && (
-                  <p className="item-conversation-correction">
-                    <strong>{t("conversation.helpYouSaid")}</strong> {entry.request_text}
-                  </p>
-                )}
-                {entry.target_text && (
-                  <p className="item-conversation-correction">
-                    <strong>{t("conversation.helpSayResponseLabel", { language: targetLanguageLabel })}</strong> {entry.target_text}
-                  </p>
-                )}
-                {entry.help_text && (
-                  <p className="item-conversation-correction">
-                    <strong>{t("conversation.helpResponseLabel")}</strong> {entry.help_text}
-                  </p>
-                )}
-              </div>
-            ))}
-            {helpError && <p className="error">{helpError}</p>}
-            {helpLoading && <p className="hint">{t("conversation.helpProcessing")}</p>}
-            <div className="actions">
-              <button type="button" className="secondary-button" onClick={closeHelpModal} disabled={helpLoading}>
-                {t("content.cancel")}
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => void submitSayHelpRequest()}
-                disabled={helpLoading || conversationLoading || !helpSayInput.trim()}
-              >
-                {t("conversation.helpSaySend")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void submitHelpRequest()}
-                disabled={helpLoading || conversationLoading || !helpInput.trim()}
-              >
-                {t("conversation.helpSend")}
               </button>
             </div>
           </div>

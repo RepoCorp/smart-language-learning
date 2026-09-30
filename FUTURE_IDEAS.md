@@ -9,22 +9,13 @@ Refactor y tests.
 Letras de canciones con frases muy largas
 Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que si lo indique, cual es la regla al momento de practicarlo
 Por que passen no tiene frase?
-Traduccion de la palabra en calentamiento
 ejemplo de expresion es la frase de donde salio
-Los be que forman verbos no se que, net, glitch, keit..
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 
 ## New functionalities 
 
 ## PROBLEMAS/ERRORES/MEJORAS PARA IR HACIENDO:
-
-### Problemas
-En dialogos de palabras está cogiendo tambien palabras que significan lo mismo en español pero no son la misma en el idioma target
- Ja, wir haben Gouda im Kühlregal., im la esta guardando como in pero con la nota correcta y saca error pero si guarda
-Los audios de partes de frases, y no se si tambien cuando el modelo saca mas que solo la palabra, están chuecos
- Soll ich ihn einpacken? ihn la guardo er 
-Muchas veces saca error al guardar pero si parece que guardo 
 
 ### Tier 1 (trabajarle de a poquitos, timeboxed)
 Que busque repetidas, o las señale al guardarlas

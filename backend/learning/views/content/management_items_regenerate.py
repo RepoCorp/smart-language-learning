@@ -115,8 +115,7 @@ class ContentItemRegenerateView(APIView):
                 model=WORD_EXERCISE_MODEL,
             ) or plural_german
 
-        audio_text = f"{target_text}. {target_context}".strip() if target_context else target_text
-        audio_url = create_openai_audio_file(audio_text, "word", target_language=target_language)
+        audio_url = create_openai_audio_file(target_text, "word", target_language=target_language)
         if not audio_url:
             return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 

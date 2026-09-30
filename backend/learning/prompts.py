@@ -64,8 +64,6 @@ PHRASE_KEYWORDS_TARGET_RULE_PROMPTS = {
 }
 TOPIC_CONVERSATION_ANALYZE_USER_TURN_PROMPT = _load("topic_conversation/topic_conversation_analyze_user_turn.txt")
 TOPIC_CONVERSATION_ERROR_ANALYSIS_PROMPT = _load("topic_conversation/topic_conversation_error_analysis.txt")
-TOPIC_CONVERSATION_GOAL_EVALUATION_PROMPT = _load("topic_conversation/topic_conversation_goal_evaluation.txt")
-TOPIC_CONVERSATION_GOAL_TRANSLATION_PROMPT = _load("topic_conversation/topic_conversation_goal_translation.txt")
 TOPIC_CONVERSATION_HELP_PROMPT = _load("topic_conversation/topic_conversation_help.txt")
 TOPIC_CONVERSATION_LITERAL_TRANSLATION_PROMPT = _load("topic_conversation/topic_conversation_literal_translation.txt")
 TOPIC_CONVERSATION_REPLY_PROMPT = _load("topic_conversation/topic_conversation_reply.txt")

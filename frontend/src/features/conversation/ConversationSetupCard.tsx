@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useI18n, type MessageKey } from "../../i18n";
 import BlockingLoadingOverlay from "../../components/BlockingLoadingOverlay";
@@ -15,11 +15,10 @@ const GOAL_DIFFICULTY_MESSAGE_KEY: Record<GoalDifficulty, MessageKey> = {
 };
 
 export default function ConversationSetupCard({
+  children,
   previousTopics,
   selectedTopic,
   customTopic,
-  notes,
-  role,
   goalDifficulty,
   selectedConversationMode,
   loadingTopics,
@@ -32,18 +31,15 @@ export default function ConversationSetupCard({
   resolvedTopic,
   onSelectedTopicChange,
   onCustomTopicChange,
-  onNotesChange,
-  onRoleChange,
   onGoalDifficultyChange,
   onConversationModeChange,
   onGenerateGoal,
   onStart,
 }: {
+  children?: (open: boolean, onOpenChange: (open: boolean) => void) => ReactNode;
   previousTopics: string[];
   selectedTopic: string;
   customTopic: string;
-  notes: string;
-  role: string;
   goalDifficulty: GoalDifficulty;
   selectedConversationMode: ConversationTransport;
   loadingTopics: boolean;
@@ -56,22 +52,16 @@ export default function ConversationSetupCard({
   resolvedTopic: string;
   onSelectedTopicChange: (value: string) => void;
   onCustomTopicChange: (value: string) => void;
-  onNotesChange: (value: string) => void;
-  onRoleChange: (value: string) => void;
   onGoalDifficultyChange: (value: GoalDifficulty) => void;
   onConversationModeChange: (value: ConversationTransport) => void;
   onGenerateGoal: () => Promise<boolean>;
   onStart: () => void;
 }): JSX.Element {
   const { t } = useI18n();
-  const [openSection, setOpenSection] = useState<"topic" | "setup" | "difficulty" | "mode" | null>(null);
+  const [openSection, setOpenSection] = useState<"topic" | "difficulty" | "mode" | "controls" | null>(null);
   const shouldCreateNewTopic = selectedTopic === CREATE_NEW_OPTION;
   const usingRandomTopic = selectedTopic === RANDOM_TOPIC_OPTION;
   const topicSubtitle = usingRandomTopic ? t("content.topic.random") : (resolvedTopic || "");
-  const setupSubtitle = [
-    notes.trim() ? t("conversation.notesLabel") : "",
-    role.trim() ? t("conversation.roleLabel") : "",
-  ].filter(Boolean).join(" + ");
   const difficultySubtitle = t(GOAL_DIFFICULTY_MESSAGE_KEY[goalDifficulty]);
   const modeSubtitle = selectedConversationMode === "realtime" ? t("conversation.modeLive") : t("conversation.modeNaturalVoices");
 
@@ -125,38 +115,6 @@ export default function ConversationSetupCard({
             />
           )}
           {!resolvedTopic && <p className="content-required-hint">{t("content.topic.requiredHint")}</p>}
-        </div>
-      </ConversationCollapsibleSection>
-
-      <ConversationCollapsibleSection
-        title={t("conversation.setupTitle")}
-        subtitle={setupSubtitle}
-        open={openSection === "setup"}
-        onToggle={() => setOpenSection((current) => current === "setup" ? null : "setup")}
-        disabled={controlsLocked}
-      >
-        <div className="content-form-section content-setting-block">
-          <textarea
-            id="conversation-notes"
-            className="conversation-notes-input"
-            value={notes}
-            onChange={(event) => onNotesChange(event.target.value)}
-            placeholder={t("conversation.notesPlaceholder")}
-            rows={4}
-            disabled={conversationLoading || started}
-            aria-label={t("conversation.notesLabel")}
-          />
-          <input
-            id="conversation-role"
-            type="text"
-            className="conversation-role-input"
-            value={role}
-            onChange={(event) => onRoleChange(event.target.value)}
-            placeholder={t("conversation.rolePlaceholder")}
-            maxLength={240}
-            disabled={conversationLoading || started}
-            aria-label={t("conversation.roleLabel")}
-          />
         </div>
       </ConversationCollapsibleSection>
 
@@ -235,6 +193,8 @@ export default function ConversationSetupCard({
           </div>
         </div>
       </ConversationCollapsibleSection>
+
+      {children?.(openSection === "controls", (open) => setOpenSection(open ? "controls" : null))}
 
       {!started && (
         <div className="actions">

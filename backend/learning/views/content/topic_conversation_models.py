@@ -9,7 +9,7 @@ from ...prompts import (
     TOPIC_CONVERSATION_TARGET_PHRASE_HELP_PROMPT,
     TOPIC_CONVERSATION_USER_CORRECTION_PROMPT,
 )
-from .topic_conversation_goals import evaluate_goal_achievement, generate_topic_conversation_start
+from .topic_conversation_goals import generate_topic_conversation_start
 from .topic_conversation_model_support import (
     call_openai_json_logged as _call_openai_json_logged,
     recent_history_text as _recent_history_text,

@@ -2,6 +2,8 @@
 
 This repository keeps durable product and engineering context under `docs/`.
 
+At the start of a new conversation, read `docs/START_HERE.md`, including its core product and working-agreement links. Check the dated handoff against the current worktree; it is context, not a new task or authorization to deploy.
+
 Before designing or implementing a change:
 
 1. Read the relevant documents under `docs/product/`, `docs/architecture/`, and `docs/decisions/`.

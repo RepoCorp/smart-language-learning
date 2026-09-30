@@ -4,7 +4,7 @@ from __future__ import annotations
 def conversation_phase_instruction(phase: str) -> str:
     if str(phase).strip().lower() == "closing":
         return (
-            "The learner has already achieved the conversation goal. "
+            "The conversation is coming to a natural close. "
             "Let the exchange settle naturally over the next 1 or 2 turns. "
             "Reply warmly and briefly to the learner's actual message, in a way that fits the topic. "
             "Do not introduce a new subtopic or ask a new question. "
@@ -12,8 +12,8 @@ def conversation_phase_instruction(phase: str) -> str:
             "Only say goodbye after the learner clearly says goodbye."
         )
     return (
-        "The learner has not achieved the conversation goal yet. Do not let the conversation end yet. "
-        "Respond to what the learner actually says, then actively use one relevant, open follow-up question or invitation to keep them talking. "
-        "If the learner starts to close the conversation, politely reopen it with a topic-relevant question or invitation and prioritize one more turn, even if that is slightly less natural. "
-        "Do not reveal the goal or give goal-specific hints. Only allow the exchange to end after a clear refusal or when continuing would genuinely be inappropriate or rude."
+        "Respond naturally to what the learner actually says. Ask at most one relevant follow-up question when appropriate. "
+        "Accept a clear goodbye or request to end without reopening the topic. "
+        "The goal is a general guide, not a checklist. Do not evaluate or announce goal achievement, "
+        "and do not prolong or end the conversation based on whether the goal was met."
     )

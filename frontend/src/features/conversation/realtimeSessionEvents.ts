@@ -2,6 +2,7 @@ import type { MutableRefObject } from "react";
 
 import type { ContentItemConversationResponse } from "../../types";
 import { extractRealtimeText, logRealtime, type RealtimeServerEvent, warnRealtime } from "./conversationRealtimeSupport";
+import { createRealtimeConversationEnding, type RealtimeClosingOptions } from "./ending/realtimeConversationEnding";
 
 type RealtimeSessionEventOptions = {
   isSessionActive: () => boolean;
@@ -19,6 +20,7 @@ type RealtimeSessionEventOptions = {
   onError: (message: string) => void;
   flushCompletedTurn: () => void;
   startRecording: () => void;
+  closing?: RealtimeClosingOptions;
 };
 
 export function createRealtimeSessionEventHandler({
@@ -37,7 +39,33 @@ export function createRealtimeSessionEventHandler({
   onError,
   flushCompletedTurn,
   startRecording,
+  closing,
 }: RealtimeSessionEventOptions): (messageEvent: MessageEvent) => void {
+  const ending = closing && createRealtimeConversationEnding({
+    ...closing,
+    beforeGoodbye: () => {
+      pendingAssistantTextRef.current = "";
+      completedTurnRef.current = null;
+      audioStoppedRef.current = false;
+      onPendingAssistantTextChange("");
+      onAssistantSpeakingChange(true);
+      onLoadingChange(true);
+    },
+    onFailure: (message) => {
+      completedTurnRef.current = null;
+      responseActiveRef.current = false;
+      onAssistantSpeakingChange(false);
+      onPendingUserTurnChange(false);
+      onLoadingChange(false);
+      onError(message);
+    },
+  });
+  const completePlayback = (finish: boolean): void => {
+    if (!completedTurnRef.current || !audioStoppedRef.current) return;
+    flushCompletedTurn();
+    if (finish) closing?.onFinished();
+    else if (!ending?.isClosing() && autoRestartAfterAssistantRef.current) startRecording();
+  };
   return (messageEvent: MessageEvent): void => {
     if (!isSessionActive()) return;
     let event: RealtimeServerEvent;
@@ -49,6 +77,9 @@ export function createRealtimeSessionEventHandler({
     }
     const eventType = String(event.type || "");
     if (eventType) logRealtime("server-event", { type: eventType });
+    if (eventType === "output_audio_buffer.stopped" || eventType === "output_audio_buffer.cleared") onAudioActivityChange(false);
+    const closingAction = ending?.handle(event);
+    if (closingAction?.skip) return;
     if (eventType === "response.created" || eventType === "output_audio_buffer.started") {
       responseActiveRef.current = true;
       if (eventType === "output_audio_buffer.started") onAudioActivityChange(true);
@@ -60,10 +91,8 @@ export function createRealtimeSessionEventHandler({
     if (eventType === "output_audio_buffer.stopped") {
       responseActiveRef.current = false;
       audioStoppedRef.current = true;
-      onAudioActivityChange(false);
       onAssistantSpeakingChange(false);
-      flushCompletedTurn();
-      if (autoRestartAfterAssistantRef.current) startRecording();
+      completePlayback(Boolean(closingAction?.finish));
       return;
     }
     if (eventType === "conversation.item.input_audio_transcription.completed" || eventType === "conversation.item.input_audio_transcription.done") {
@@ -96,11 +125,8 @@ export function createRealtimeSessionEventHandler({
         assistant_text: extractRealtimeText(event) || pendingAssistantTextRef.current.trim(),
         assistant_translation_text: "",
         assistant_audio_url: "",
-        goal_achieved: false,
-        goal_achievement_message: "",
-        next_goal_suggestion: "",
       };
-      if (audioStoppedRef.current) flushCompletedTurn();
+      completePlayback(Boolean(closingAction?.finish));
       return;
     }
     if (eventType === "error" || eventType === "invalid_request_error") {

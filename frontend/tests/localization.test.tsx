@@ -103,7 +103,7 @@ describe("interface localization", () => {
 
   it("translates quota summaries and editable limits without changing submitted values", async () => {
     const limits = { weekly_generation_credits: 200, weekly_elevenlabs_characters: 10000, weekly_elevenlabs_music_seconds: 60, weekly_realtime_minutes: 45 };
-    vi.mocked(fetchAdminAIUsage).mockResolvedValue({ week_start: "2026-09-21", defaults: limits, users: [{ id: 1, username: "learner", email: "learner@example.com", is_superuser: false, is_blocked: false, ...limits, week_generation_credits: 12, week_elevenlabs_characters: 500, week_elevenlabs_music_seconds: 8, week_realtime_minutes: 2 }] });
+    vi.mocked(fetchAdminAIUsage).mockResolvedValue({ week_start: "2026-09-21", defaults: limits, users: [{ id: 1, username: "learner", email: "learner@example.com", is_superuser: false, is_blocked: false, ...limits, week_generation_credits: 12, week_elevenlabs_characters: 500, week_elevenlabs_music_seconds: 8, week_realtime_minutes: 2, week_study_minutes: 37 }] });
     render(<I18nProvider><ConfigurationAdminAIUsageSection canManage /></I18nProvider>);
     await screen.findByText("learner");
     expect(screen.getByText(/Presupuesto semanal predeterminado:/)).toHaveTextContent("200 créditos de OpenAI");

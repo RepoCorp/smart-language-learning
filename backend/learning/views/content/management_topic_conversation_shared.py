@@ -9,10 +9,6 @@ def analysis_enabled() -> bool:
     return bool(getattr(settings, "DEV_CONVERSATION_ENABLE_ANALYSIS", True))
 
 
-def goal_evaluation_enabled() -> bool:
-    return bool(getattr(settings, "DEV_CONVERSATION_ENABLE_GOAL_EVALUATION", True))
-
-
 def conversation_audio_enabled() -> bool:
     return bool(getattr(settings, "DEV_CONVERSATION_ENABLE_AUDIO", True))
 

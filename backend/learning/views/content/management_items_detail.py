@@ -70,16 +70,10 @@ class ContentItemDetailView(APIView):
 
         if item.item_type == Item.ItemType.PATTERN:
             return Response({"detail": "Patterns do not have generated audio"}, status=400)
-        if item.item_type == Item.ItemType.WORD:
-            phrase_part = item.example_sentence.strip()
-            audio_text = f"{item.german_text}. {phrase_part}".strip() if phrase_part else item.german_text
-            audio_prefix = "word"
-        else:
-            audio_text = item.german_text
-            audio_prefix = "phrase"
+        audio_prefix = "word" if item.item_type == Item.ItemType.WORD else "phrase"
 
         # Saved items always use the fixed OpenAI voice, independently from dialog audio.
-        audio_url = create_openai_audio_file(audio_text, audio_prefix, target_language=target_language)
+        audio_url = create_openai_audio_file(item.german_text, audio_prefix, target_language=target_language)
         if not audio_url:
             return Response({"detail": "Audio generation failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 

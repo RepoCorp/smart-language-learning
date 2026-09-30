@@ -2459,29 +2459,6 @@ textarea {
   color: var(--color-text-soft);
 }
 
-.conversation-line {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 14px;
-}
-
-.target-phrase-text-dialog,
-.conversation-line-translation {
-  color: var(--color-text);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.conversation-line-translation {
-  margin-top: 2px;
-}
-
-.dialog-target-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
 
 .dialog-inline-action-button {
   flex: 0 0 auto;
@@ -2500,21 +2477,6 @@ textarea {
   font: inherit;
 }
 
-.revealed-answer-phrase .target-phrase-text {
-  color: var(--color-text-muted);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.35;
-}
-
-.revealed-answer-phrase .turn-token-wrap,
-.revealed-answer-phrase .turn-token-button {
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.35;
-}
 
 .turn-audio-button {
   margin-left: 8px;
@@ -5964,37 +5926,6 @@ button.verb-exercise-entry:disabled {
   border-color: #f3c88f;
 }
 
-.blocking-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(17, 24, 39, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  touch-action: none;
-}
-
-.blocking-modal {
-  position: relative;
-  min-width: 220px;
-  max-width: 90vw;
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 18px 20px;
-  text-align: center;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.25);
-}
 
 .session-extend-overlay {
   z-index: 1400;

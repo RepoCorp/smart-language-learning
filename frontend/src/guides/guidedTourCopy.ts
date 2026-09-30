@@ -1,3 +1,5 @@
+import { studyTextSizeGuideStep } from "./studyTextSizeGuideStep";
+
 export type GuideLanguage = "en" | "es";
 
 export type GuidedTourStep = {
@@ -58,6 +60,7 @@ const COPY: Record<GuideLanguage, GuidedTourCopy> = {
         title: "Choose the language you are learning",
         body: "Dialogs, words, phrases, and exercises will be created in this language.",
       },
+      studyTextSizeGuideStep("en"),
       {
         id: "open-menu",
         target: "main-menu",
@@ -217,6 +220,7 @@ const COPY: Record<GuideLanguage, GuidedTourCopy> = {
         title: "Elige el idioma que quieres aprender",
         body: "Los diálogos, las palabras, las frases y los ejercicios se crearán en este idioma.",
       },
+      studyTextSizeGuideStep("es"),
       {
         id: "open-menu",
         target: "main-menu",

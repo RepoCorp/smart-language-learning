@@ -53,6 +53,7 @@ export async function sendTopicConversationAudio({
   formData.append("role_text", roleText);
   formData.append("goal_text", goalText);
   formData.append("conversation_phase", conversationPhase);
+  // Keep older backends from evaluating goals during a rolling deployment.
   formData.append("skip_goal_evaluation", "true");
   formData.append("speech_speed", speechSpeed);
   formData.append("response_level", responseLevel);
