@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useI18n } from "../../i18n";
 import type { SessionItem } from "../../types";
 import PracticeRuleNote from "./PracticeRuleNote";
+import ConstructionPatternRecall from "./ConstructionPatternRecall";
 
 export default function PatternReview({ item, completed, disabled, onAnswered, onNext, postReviewActions }: {
   item: SessionItem;
@@ -16,8 +17,8 @@ export default function PatternReview({ item, completed, disabled, onAnswered, o
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const inFlight = useRef(false);
-  if (!item.pattern_exercise) return <p role="alert">{t("wordFormation.reviewFailed")}</p>;
-  const { base, base_translation, question, answer, meaning, highlight: [start, end] } = item.pattern_exercise;
+  const construction = item.exercise_phrases?.generation_mode === "construction_pattern";
+  if (!construction && !item.pattern_exercise) return <p role="alert">{t("wordFormation.reviewFailed")}</p>;
   const recognition = item.direction === "de_to_es";
   const review = async (correct: boolean): Promise<void> => {
     if (inFlight.current || completed || disabled || !revealed) return;
@@ -34,11 +35,14 @@ export default function PatternReview({ item, completed, disabled, onAnswered, o
     }
   };
   return <div className="pattern-review">
-    <p><b>{base}</b> — <span>{base_translation}</span></p>
-    <p>{question}</p>
-    {(revealed || completed) && <p className="word-formation-match">{recognition ? meaning
-      : <>{answer.slice(0, start)}<strong>{answer.slice(start, end)}</strong>{answer.slice(end)}</>}</p>}
-    {(revealed || completed) && <PracticeRuleNote patternKey={item.pattern_key} />}
+    {construction ? <ConstructionPatternRecall item={item} revealed={revealed || completed} />
+      : item.pattern_exercise && <>
+        <p><b>{item.pattern_exercise.base}</b> — <span>{item.pattern_exercise.base_translation}</span></p>
+        <p>{item.pattern_exercise.question}</p>
+        {(revealed || completed) && <p className="word-formation-match">{recognition ? item.pattern_exercise.meaning
+          : <>{item.pattern_exercise.answer.slice(0, item.pattern_exercise.highlight[0])}<strong>{item.pattern_exercise.answer.slice(...item.pattern_exercise.highlight)}</strong>{item.pattern_exercise.answer.slice(item.pattern_exercise.highlight[1])}</>}</p>}
+        {(revealed || completed) && <PracticeRuleNote patternKey={item.pattern_key} />}
+      </>}
     {error && <p role="alert" className="error">{t("wordFormation.reviewFailed")}</p>}
     <div className="actions">
       {completed ? <button type="button" disabled={disabled} onClick={onNext}>{t("session.nextItem")}</button>

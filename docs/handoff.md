@@ -38,6 +38,44 @@ those failures. Unit and Playwright test discovery are now separated.
 
 ## Last verification
 
+Construction-session follow-up (2026-09-30) supersedes the earlier pending policy:
+saved constructions now enter sessions with a localized "Do you know this pattern?"
+self-check in both directions. Form versus saved explanation, reveal the other
+side/example, then normal Pass/Fail/Next and independent SRS. No migration or
+re-saving needed. Affix exercises unchanged. Passed 57 focused backend tests,
+35 frontend tests, and production build; typecheck still has baseline errors.
+
+Affix confirmation follow-up (2026-09-30): word confirmations now reuse the
+existing word-building matcher/cards and offer Save pattern independently of
+Add word. This applies to German and English catalogs, including -keit in
+Möglichkeit. Already-saved words still offer unsaved matching patterns; once all
+matches are enrolled they open details directly again. No model or schema change.
+Passed 140 focused frontend tests, 17 backend pattern tests, eight EN/ES
+desktop/mobile browser checks, and the build. Typecheck retains existing errors.
+
+Construction-saving follow-up (2026-09-30): Save pattern now works independently
+of Add word, including for an already-saved separable verb. Uses a signed preview
+and the existing pattern Item, no second model request or schema migration.
+Manage Content can reopen it; session practice remains deferred and blocked.
+The new-item query was extracted after a green baseline, verified again, then
+changed to exclude pending constructions. Focused checks passed 97 backend and
+33 frontend tests; four EN/ES desktop/mobile browser checks and the production
+build passed. Typechecking
+still reports 80 existing errors, none in the new modules. No deployment.
+
+On 2026-09-30, six German construction patterns were added to contextual word-click
+resolution: future/conditional/passive with werden, perfect with haben/sein,
+and separable verbs. This slice is detection and preview only, not pattern
+enrollment or new exercises. Separable verbs still save their lexical word.
+See product/construction-patterns.md. Relevant behavior was tested before/after
+extracting normalization, the API function, and the shared confirmation.
+Checks passed: 49 backend tests, 62 focused frontend tests, production build,
+and four EN/ES desktop/mobile browser checks. The full frontend run passed 412
+tests with the 17 documented SessionPage failures and an unmocked-request
+rejection. Typechecking reports 80 existing errors, none in the new modules.
+No deployment, migration, or paid model generation was performed. Real-model
+classification remains to be checked manually.
+
 Guide cards now adapt to small visible viewports: max 45% height, internal
 scrolling, placement away from the target, and minimize/reopen without skipping.
 Targets taking almost the entire screen cause an initially minimized card.

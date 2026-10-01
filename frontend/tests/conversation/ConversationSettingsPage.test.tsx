@@ -5,6 +5,8 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n";
 import ConversationPage from "../../src/features/conversation/ConversationPage";
 import type { BaseConversationTransportArgs } from "../../src/features/conversation/conversationTransportTypes";
+import type { ComponentProps } from "react";
+import type ConversationReviewSection from "../../src/features/conversation/ConversationReviewSection";
 
 const mocks = vi.hoisted(() => ({
   args: null as BaseConversationTransportArgs | null,
@@ -12,11 +14,14 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(), pause: vi.fn(), close: vi.fn(), stop: vi.fn(),
   goal: vi.fn(async () => ({ goal_text: "Buy bread", topic: "Shopping" })),
   begin: vi.fn(async () => ({ topic: "Shopping", goal_text: "Buy bread" })),
+  word: vi.fn(),
+  review: null as ComponentProps<typeof ConversationReviewSection> | null,
 }));
 vi.mock("../../src/api", () => ({
   evaluateTopicConversationGoal: mocks.evaluate,
   fetchContentTopics: vi.fn(async () => ({ topics: ["Shopping"] })),
   regenerateTopicConversationGoal: mocks.goal, startTopicConversation: mocks.begin,
+  quickAddWordFromDialog: mocks.word,
 }));
 vi.mock("../../src/components/NewItem", () => ({ default: () => null }));
 vi.mock("../../src/features/conversation/useConversationScroll", () => ({ useConversationScroll: () => ({}) }));
@@ -24,7 +29,10 @@ vi.mock("../../src/features/conversation/useConversationReview", () => ({ useCon
   resetReview: vi.fn(), preparationReady: true,
   finishedTranscript: { dialog: { turns: [] } }, generatedReviewAnnotations: {},
 }) }));
-vi.mock("../../src/features/conversation/ConversationReviewSection", () => ({ default: () => <p>Finished transcript</p> }));
+vi.mock("../../src/features/conversation/ConversationReviewSection", () => ({ default: (props: ComponentProps<typeof ConversationReviewSection>) => {
+  mocks.review = props;
+  return <p>Finished transcript</p>;
+} }));
 vi.mock("../../src/features/conversation/useConversationTransport", () => ({ useConversationTransport: (args: BaseConversationTransportArgs) => {
   mocks.args = args;
   const [paused, setPaused] = useState(false);
@@ -40,8 +48,32 @@ vi.mock("../../src/features/conversation/useConversationTransport", () => ({ use
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.review = null;
   vi.spyOn(console, "info").mockImplementation(() => {});
   vi.spyOn(window, "confirm").mockReturnValue(true);
+});
+
+it("shows a construction preview from a conversation without an Add action", async () => {
+  mocks.word.mockResolvedValue({
+    created: false, exists: false, item_type: "pattern",
+    construction_pattern: {
+      key: "future_with_werden", form: "werden + Infinitiv", meaning: "Futuro",
+      explanation: "Habla de una acción futura.", example: "Er wird kommen.",
+      matched_parts: ["wird", "kommen"], replaces_word: true,
+    },
+  });
+  render(<I18nProvider><ConversationPage /></I18nProvider>);
+  await userEvent.click(screen.getByRole("button", { name: "Generate goal" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Start conversation" })).toBeEnabled());
+  await userEvent.click(screen.getByRole("button", { name: "Start conversation" }));
+  await userEvent.click(await screen.findByRole("button", { name: "End conversation" }));
+  await act(() => mocks.review!.requestAddWordFromConversation("w", "Vendrá.", "Er wird kommen.", "wird", 4, 0));
+  expect(screen.getByText("Construction pattern")).toBeVisible();
+  expect(screen.getByText("Er wird kommen.")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Add" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(screen.queryByText("Construction pattern")).not.toBeInTheDocument();
+  expect(mocks.word).toHaveBeenCalledOnce();
 });
 afterEach(() => vi.restoreAllMocks());
 

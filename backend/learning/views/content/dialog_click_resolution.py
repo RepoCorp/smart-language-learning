@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 
+from ...construction_patterns import ConstructionMatch, parse_construction, prompt_catalog
 from ...auth import apply_user_scope
 from ...languages import language_display_name
 from ...models import DialogTurn, SavedDialog
@@ -26,7 +27,8 @@ def resolve_dialog_click_word_pair(
     clicked_target_token: str = "",
     model: str | None = None,
     reasoning_effort: str | None = None,
-) -> tuple[str, str, str, str]:
+    include_constructions: bool = False,
+) -> tuple[str, str, str, str] | ConstructionMatch:
     target_context = _target_context_for_click(
         user=user,
         source_language=source_language,
@@ -38,16 +40,23 @@ def resolve_dialog_click_word_pair(
     clicked_word = (clicked_target_token or target_text).strip()
     if not clicked_word or not target_context:
         raise RuntimeError("Dialog word resolution missing target context")
-    resolved_source, resolved_target, word_type, note = _parse_click_word_resolution(
-        _request_click_word_resolution(
-            source_language=source_language,
-            target_language=target_language,
-            clicked_word=clicked_word,
-            target_context=target_context,
-            model=model,
-            reasoning_effort=reasoning_effort,
-        )
+    parsed = _request_click_word_resolution(
+        source_language=source_language, target_language=target_language,
+        clicked_word=clicked_word, target_context=target_context,
+        model=model, reasoning_effort=reasoning_effort,
+        include_constructions=include_constructions,
     )
+    construction = parse_construction(
+        parsed, language=target_language, clicked_word=clicked_word,
+        context=target_context, enabled=include_constructions,
+    )
+    if construction and construction["replaces_word"]:
+        return ConstructionMatch(construction)
+    resolved_source, resolved_target, word_type, note = _parse_click_word_resolution(parsed)
+    if construction:
+        if word_type != "verb":
+            raise RuntimeError("Lexical construction must resolve to a verb")
+        return ConstructionMatch(construction, (resolved_source, resolved_target, word_type, note))
     resolved_source, resolved_target, note = _refine_click_resolution_if_needed(
         clicked_word=clicked_word,
         source_context=source_line.strip(),
@@ -72,6 +81,7 @@ def _request_click_word_resolution(
     target_context: str,
     model: str | None = None,
     reasoning_effort: str | None = None,
+    include_constructions: bool = False,
 ) -> dict | None:
     parsed = _call_openai_json_logged(
         label="resolve_dialog_click_word_metadata",
@@ -81,6 +91,7 @@ def _request_click_word_resolution(
             f"Target language: {language_display_name(target_language)}\n"
             f"Clicked target word: {clicked_word}\n"
             f"Target-language line context: {target_context}\n"
+            f"Available construction patterns: {prompt_catalog(target_language) if include_constructions else '{}'}\n"
         ),
         timeout_seconds=6,
         temperature=0.0,

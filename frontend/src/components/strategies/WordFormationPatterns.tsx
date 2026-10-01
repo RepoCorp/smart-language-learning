@@ -4,10 +4,13 @@ import PatternEnrollment from "./PatternEnrollment";
 import { matchWordFormationPatterns } from "../../languageFeatures/wordFormation";
 import "./WordFormationPatterns.css";
 
-export default function WordFormationPatterns({ targetText, wordType, targetLanguage }: {
+export default function WordFormationPatterns({ targetText, wordType, targetLanguage, actionLabel, disabled, onSavingChange }: {
   targetText: string;
   wordType: string;
   targetLanguage: string;
+  actionLabel?: string;
+  disabled?: boolean;
+  onSavingChange?: (saving: boolean) => void;
 }): JSX.Element | null {
   const { t } = useI18n();
   const { sourceLanguage } = useStudyLanguages();
@@ -30,7 +33,8 @@ export default function WordFormationPatterns({ targetText, wordType, targetLang
               {example.base} → {example.word.slice(0, exampleMatch.index)}<strong>{exampleMatch[0]}</strong>{example.word.slice(exampleMatch.index + exampleMatch[0].length)}
               <span className="word-formation-translation">{t(example.translation)}</span>
             </p>
-            <PatternEnrollment key={`${sourceLanguage}:${targetLanguage}:${pattern.id}`} pattern={pattern.id} source={sourceLanguage} target={targetLanguage} />
+            <PatternEnrollment key={`${sourceLanguage}:${targetLanguage}:${pattern.id}`} pattern={pattern.id} source={sourceLanguage} target={targetLanguage}
+              actionLabel={actionLabel} disabled={disabled} onSavingChange={onSavingChange} />
           </article>
         );
       })}

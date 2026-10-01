@@ -1,3 +1,4 @@
+import { shouldOpenSavedWord, wordAddPreview, type ConstructionPatternPreview } from "../../../dialogs/components/wordAddPreview";
 import { useState } from "react";
 
 import {
@@ -22,6 +23,7 @@ export type PendingWordAdd = {
   source: string;
   target: string;
   wordType: string;
+  construction?: ConstructionPatternPreview | null;
   sourceLine: string;
   targetLine: string;
   clickedTargetToken: string;
@@ -104,7 +106,7 @@ export default function useSavedDialogInteractions(
     setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
     try {
       const check = await quickAddWordFromDialog(targetToken, targetToken, sourceLanguage, targetLanguage, savedDialogId, turnIndex, true, sourceLine, targetLine, targetToken);
-      if (check.exists) {
+      if (await shouldOpenSavedWord(check, sourceLanguage, targetLanguage)) {
         if (!check.id) {
           setWordActionStatus((current) => ({ ...current, [key]: "error" }));
           return;
@@ -113,20 +115,16 @@ export default function useSavedDialogInteractions(
         setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
         return;
       }
-      const wordType = String(check.word_type || "").trim();
-      if (!wordType) {
-        setWordActionStatus((current) => ({ ...current, [key]: "error" }));
-        return;
-      }
+      const preview = wordAddPreview(check);
       setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
-      setPendingWordAdd({ key, source: check.source_text || targetToken, target: check.target_text || targetToken, wordType, sourceLine, targetLine, clickedTargetToken: targetToken, turnIndex, note: check.notes || "" });
+      setPendingWordAdd({ key, ...preview, sourceLine, targetLine, clickedTargetToken: targetToken, turnIndex, note: check.notes || "" });
     } catch {
       setWordActionStatus((current) => ({ ...current, [key]: "error" }));
     }
   };
 
   const confirmAddWord = async (): Promise<void> => {
-    if (!pendingWordAdd || !savedDialogId || addingWord) return;
+    if (!pendingWordAdd || pendingWordAdd.construction?.replaces_word || !savedDialogId || addingWord) return;
     const { key, source, target, sourceLine, targetLine, clickedTargetToken, turnIndex } = pendingWordAdd;
     setWordActionStatus((current) => ({ ...current, [key]: "saving" }));
     setAddingWord(true);

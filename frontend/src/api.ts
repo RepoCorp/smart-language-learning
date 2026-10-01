@@ -1036,51 +1036,7 @@ export async function fetchTopicConversationUserCorrection(
   };
 }
 
-export async function quickAddWordFromDialog(
-  sourceText: string,
-  targetText: string,
-  sourceLanguage: StudyLanguageCode = "spanish",
-  targetLanguage: StudyLanguageCode = "german",
-  dialogId?: number,
-  turnIndex?: number,
-  checkOnly = false,
-  sourceLine = "",
-  targetLine = "",
-  clickedTargetToken = "",
-): Promise<{ created: boolean; exists: boolean; id?: number | null; source_text?: string; target_text?: string; word_type?: string; notes?: string; audio_url?: string }> {
-  const params = new URLSearchParams({
-    source_language: sourceLanguage,
-    target_language: targetLanguage,
-  });
-  const response = await apiFetch(`${API_BASE}/content/words/add?${params.toString()}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      source_text: sourceText,
-      target_text: targetText,
-      notes: "",
-      dialog_id: dialogId,
-      turn_index: turnIndex,
-      check_only: checkOnly,
-      source_line: sourceLine,
-      target_line: targetLine,
-      clicked_target_token: clickedTargetToken,
-    }),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to add word from dialog");
-  }
-  notifyOverviewStatsUpdated();
-  return (await response.json()) as {
-    created: boolean;
-    exists: boolean;
-    id?: number | null;
-    source_text?: string;
-    target_text?: string;
-    word_type?: string;
-    audio_url?: string;
-  };
-}
+export { quickAddWordFromDialog } from "./apiDialogWord";
 
 export async function quickAddPhraseFromConversation(
   sourceText: string,

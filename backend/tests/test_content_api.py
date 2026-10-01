@@ -160,7 +160,13 @@ def test_strategy_payload_updates_merge_with_the_latest_saved_payload():
 def _patch_dialog_click_call(monkeypatch, fake_call_openai_json) -> None:
     from learning.views.content import dialog_click_resolution
 
-    monkeypatch.setattr(dialog_click_resolution, "call_openai_json", fake_call_openai_json)
+    def with_construction_classification(*args, **kwargs):
+        result = fake_call_openai_json(*args, **kwargs)
+        if isinstance(result, dict):
+            result = {**result, "construction_pattern_key": None, "construction_evidence": []}
+        return result
+
+    monkeypatch.setattr(dialog_click_resolution, "call_openai_json", with_construction_classification)
 
 
 def _patch_word_metadata_call(monkeypatch, fake_call_openai_json) -> None:

@@ -5,10 +5,19 @@ Return strict JSON:
   "source_text": "string",
   "target_text": "string",
   "word_type": "noun|verb|adjective|adverb|helper|expression|other",
-  "note": "string"
+  "note": "string",
+  "construction_pattern_key": null,
+  "construction_evidence": []
 }
 
 Rules:
+- First evaluate the supplied closed construction catalog against the clicked token IN CONTEXT. Return an exact catalog key only when the selected token triggers that construction, not merely because it participates in the sentence. Never invent keys.
+- If no catalog construction applies, return construction_pattern_key: null and construction_evidence: [], then resolve the word normally using the rules below.
+- For a matching construction, return construction_evidence as exact, distinct words copied from this sentence, including the clicked token and the other relevant verb/prefix. Do not use dictionary forms as evidence.
+- For a construction that replaces the word, source_text must briefly describe the construction's meaning/function in the source language; note must explain its use in THIS sentence in simple source-language wording. target_text may show the construction. Do not resolve or translate the auxiliary as an independent word.
+- For a construction explicitly defined as accompanying a lexical word, still return the complete lexical word in target_text, its meaning in source_text, and its word_type. Explain the construction briefly in note, in the source language.
+- All explanations and meanings must be in the source language, not the target language. Do not use technical terminology when a simple explanation suffices.
+- The remaining word-resolution rules apply when no construction replaces the word. Never let those rules override a matching catalog construction.
 - Use only the clicked target word and the target-language line context to identify the selected word's meaning and word_type.
 - First decide whether translating the clicked word alone would be misleading in THIS context.
 - Expand beyond the clicked word only when the clicked word's standalone translation would be wrong or misleading.
@@ -22,8 +31,8 @@ Rules:
 - For helper words, keep target_text as the helper word itself, but source_text may be either a single word or a short natural phrase if that is the only faithful translation in context.
 - For helper words, note must briefly explain the helper role or why the translation is contextual.
 - If the clicked word works as a standalone study item in THIS context, return that standalone unit and use an empty note, except for helper words which should still include the brief helper explanation note.
-- Classify modal verbs, auxiliary verbs, and grammar-building forms as "helper" only when they are used that way in this target line.
-- For modal, auxiliary, conditional, future, or tense-building helper words, return only the helper word translation unit.
+- If no catalog construction was selected, classify modal verbs, auxiliary verbs, and grammar-building forms as "helper" only when they are used that way in this target line.
+- If no catalog construction was selected, return only the helper word translation unit for modal, auxiliary, conditional, future, or tense-building helper words.
 - Use context to disambiguate meaning. For helper words, a short source-language phrase is allowed when needed, but target_text must stay the helper word itself.
 - Do not normalize inflection, case, number, or article here unless it is already required to identify the clicked word's contextual meaning.
 - Do not decompose compound or derived words into a smaller root when that changes the meaning.

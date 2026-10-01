@@ -7,7 +7,7 @@ from .item_questions import item_question_history
 from .management import APIView, Request, Response, _normalized_pair, apply_user_scope, get_request_user, status
 from ..dialog_phrase_match import build_dialog_phrase_match_payload
 from ...models import Item
-from ...word_formation import item_payload as pattern_item_payload
+from ...pattern_items import item_payload as pattern_item_payload
 
 
 class ContentItemDetailView(APIView):

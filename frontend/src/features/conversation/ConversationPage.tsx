@@ -1,3 +1,5 @@
+import { shouldOpenSavedWord, wordAddPreview, type ConstructionPatternPreview } from "../dialogs/components/wordAddPreview";
+import WordAddConfirmation from "../dialogs/components/WordAddConfirmation";
 import { useEffect, useState } from "react";
 import "./conversationSettings.css";
 
@@ -88,6 +90,7 @@ export default function ConversationPage(): JSX.Element {
     source: string;
     target: string;
     wordType: string;
+    construction?: ConstructionPatternPreview | null;
     dialogId?: number;
     turnIndex?: number;
     sourceLine: string;
@@ -473,7 +476,7 @@ export default function ConversationPage(): JSX.Element {
         targetText,
         targetToken,
       );
-      if (check.exists) {
+      if (await shouldOpenSavedWord(check, sourceLanguage, targetLanguage)) {
         if (!check.id) {
           setWordActionStatus((current) => ({ ...current, [key]: "error" }));
           return;
@@ -487,16 +490,10 @@ export default function ConversationPage(): JSX.Element {
         return;
       }
       setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
-      const resolvedWordType = String(check.word_type || "").trim();
-      if (!resolvedWordType) {
-        setWordActionStatus((current) => ({ ...current, [key]: "error" }));
-        return;
-      }
+      const preview = wordAddPreview(check);
       setPendingWordAdd({
         key,
-        source: check.source_text || targetToken,
-        target: check.target_text || targetToken,
-        wordType: resolvedWordType,
+        ...preview,
         dialogId,
         turnIndex,
         sourceLine: sourceText,
@@ -510,7 +507,7 @@ export default function ConversationPage(): JSX.Element {
   };
 
   const confirmAddWordFromDialog = async (): Promise<void> => {
-    if (!pendingWordAdd || addingWord) {
+    if (!pendingWordAdd || pendingWordAdd.construction?.replaces_word || addingWord) {
       return;
     }
 
@@ -750,36 +747,7 @@ export default function ConversationPage(): JSX.Element {
           />
         )}
       </section>
-      {pendingWordAdd && (
-        <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal add-word-modal">
-            <h3>{t("newItem.wordAddTitle")}</h3>
-            <p className="add-word-modal-word">{pendingWordAdd.target}</p>
-            <p className="add-word-modal-meaning">
-              {t("newItem.wordAddMeaning", { translation: pendingWordAdd.source })}
-            </p>
-            <p className="add-word-modal-type">
-              <strong>{t("newItem.wordAddType", { type: pendingWordAdd.wordType })}</strong>
-            </p>
-            <p className="hint">{t("newItem.wordAddPrompt")}</p>
-            <div className="actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  setPendingWordAdd(null);
-                }}
-                disabled={addingWord}
-              >
-                {t("newItem.wordAddCancel")}
-              </button>
-              <button type="button" onClick={() => void confirmAddWordFromDialog()} disabled={addingWord}>
-                {addingWord ? t("newItem.wordAddSaving") : t("newItem.wordAddConfirmButton")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {pendingWordAdd && <WordAddConfirmation item={pendingWordAdd} saving={addingWord} onCancel={() => setPendingWordAdd(null)} onConfirm={() => void confirmAddWordFromDialog()} />}
       {pendingSentenceAdd && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal add-word-modal">

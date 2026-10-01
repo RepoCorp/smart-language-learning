@@ -17,6 +17,7 @@ export default function PatternItem({ item, onContinue, continueLabel, readOnly 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const pattern = wordFormationPattern(targetLanguage, item.pattern_key || "");
+  const construction = item.exercise_phrases?.generation_mode === "construction_pattern";
   const confirm = async () => {
     setSaving(true);
     setError(false);
@@ -25,6 +26,7 @@ export default function PatternItem({ item, onContinue, continueLabel, readOnly 
   return <div className="word-formation-patterns">
     {onClose && <button type="button" className="modal-corner-close" aria-label={t("words.close")} onClick={onClose}>×</button>}
     <h2>{item.german_text}</h2>
+    {construction && <><p>{item.notes}</p><p>{item.example_sentence}</p></>}
     {pattern && <p>{t(pattern.note)}</p>}
     {(item.pattern_examples || []).map(example => {
       const [start, end] = example.highlight;

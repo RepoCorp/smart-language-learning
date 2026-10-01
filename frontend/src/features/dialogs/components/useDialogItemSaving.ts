@@ -1,3 +1,4 @@
+import { shouldOpenSavedWord, wordAddPreview, type ConstructionPatternPreview } from "./wordAddPreview";
 import { useState, type Dispatch, type SetStateAction } from "react";
 
 import {
@@ -16,6 +17,7 @@ export type PendingWordAdd = {
   source: string;
   target: string;
   wordType: string;
+  construction?: ConstructionPatternPreview | null;
   dialogId?: number;
   turnIndex?: number;
   sourceLine: string;
@@ -92,7 +94,7 @@ export function useDialogItemSaving({
       const check = await quickAddWordFromDialog(
         sourceToken, targetToken, sourceLanguage, targetLanguage, dialogId, turnIndex, true, sourceLine, targetLine, targetToken,
       );
-      if (check.exists) {
+      if (await shouldOpenSavedWord(check, sourceLanguage, targetLanguage)) {
         if (!check.id) {
           setWordActionStatus((current) => ({ ...current, [key]: "error" }));
           return;
@@ -101,17 +103,11 @@ export function useDialogItemSaving({
         setWordActionStatus((current) => ({ ...current, [key]: "exists" }));
         return;
       }
-      const wordType = String(check.word_type || "").trim();
-      if (!wordType) {
-        setWordActionStatus((current) => ({ ...current, [key]: "error" }));
-        return;
-      }
+      const preview = wordAddPreview(check);
       setWordActionStatus((current) => ({ ...current, [key]: "idle" }));
       setPendingWordAdd({
         key,
-        source: check.source_text || sourceToken,
-        target: check.target_text || targetToken,
-        wordType,
+        ...preview,
         dialogId,
         turnIndex,
         sourceLine,
@@ -125,7 +121,7 @@ export function useDialogItemSaving({
   };
 
   const confirmAddWordFromDialog = async (): Promise<void> => {
-    if (!pendingWordAdd || addingWord) {
+    if (!pendingWordAdd || pendingWordAdd.construction?.replaces_word || addingWord) {
       return;
     }
     const { key, source, target, dialogId, turnIndex, sourceLine, targetLine, clickedTargetToken } = pendingWordAdd;

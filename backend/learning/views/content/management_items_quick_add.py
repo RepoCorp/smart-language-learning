@@ -14,6 +14,9 @@ from .management import (
     status,
 )
 from .dialog_click_resolution import resolve_dialog_click_word_pair as _resolve_dialog_click_word_pair
+from .dialog_click_metadata import normalize_click_metadata
+from ...construction_patterns import ConstructionMatch
+from ...construction_patterns.storage import savable_preview
 from .dialog_item_context import (
     ensure_audio_for_dialog_turn,
     link_item_to_dialog_turn,
@@ -163,12 +166,6 @@ def _find_existing_word_item(
         update_fields.append("updated_at")
         existing.save(update_fields=update_fields)
     return existing
-
-
-def _unpack_word_resolution(value) -> tuple[str, str, str, str]:
-    source_text, target_text, word_type, *rest = value
-    note = str(rest[0] if rest else "").strip()
-    return source_text, target_text, word_type, note
 
 
 def _helper_note(*, source_text: str) -> str:
@@ -373,8 +370,9 @@ class ContentWordQuickAddView(APIView):
         if not source_text or not target_text:
             return Response({"detail": "source_text and target_text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        construction = None
         try:
-            source_text, target_text, word_type, model_note = _unpack_word_resolution(
+            metadata = normalize_click_metadata(
                 _resolve_dialog_click_word_pair(
                     user=user,
                     source_text=source_text,
@@ -386,17 +384,28 @@ class ContentWordQuickAddView(APIView):
                     source_line=source_line,
                     target_line=target_line,
                     clicked_target_token=clicked_target_token,
-                )
-            )
-            source_text, target_text, word_type = _normalize_word_metadata(
-                source_text=source_text,
-                target_text=target_text,
-                word_type=word_type,
+                    include_constructions=True,
+                ),
+                normalizer=_normalize_word_metadata,
                 source_language=source_language,
                 target_language=target_language,
                 source_line=source_line,
                 target_line=target_line,
             )
+            if isinstance(metadata, ConstructionMatch):
+                construction = savable_preview(
+                    metadata.preview, user=user,
+                    source_language=source_language, target_language=target_language,
+                )
+                if metadata.word is None:
+                    if not check_only:
+                        return Response({"detail": "Use Save pattern to save this construction, not Add word."}, status=409)
+                    return Response({
+                        "created": False, "exists": False, "id": None,
+                        "item_type": "pattern", "construction_pattern": construction,
+                    })
+                metadata = metadata.word
+            source_text, target_text, word_type, model_note = metadata
         except (RuntimeError, TypeError, ValueError) as exc:
             logger.exception(
                 "content.words.quick_add.metadata_generation_failed error=%s",
@@ -445,6 +454,7 @@ class ContentWordQuickAddView(APIView):
                         "source_text": source_text,
                         "target_text": target_text,
                         "word_type": response_word_type,
+                        "construction_pattern": construction,
                         "notes": existing.notes or final_notes,
                     }
                 )
@@ -461,6 +471,7 @@ class ContentWordQuickAddView(APIView):
                     "source_text": source_text,
                     "target_text": target_text,
                     "word_type": response_word_type,
+                    "construction_pattern": construction,
                     "notes": existing.notes or final_notes,
                 }
             )
@@ -474,6 +485,7 @@ class ContentWordQuickAddView(APIView):
                     "source_text": source_text,
                     "target_text": target_text,
                     "word_type": word_type,
+                    "construction_pattern": construction,
                     "notes": final_notes,
                 }
             )

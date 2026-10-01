@@ -4,10 +4,8 @@
 Ningun otro arreglito que no sea vital!!! 
 
 Buscar como bajar costos en prompts y usar distintos modelos: hablé con Codex sobre esto pero voy a esperar a recoger datos de Juli y de mi mamá. Le dije a Codex que recordara el plan
-Patterns, wäre
 Refactor y tests.
 Letras de canciones con frases muy largas
-Revisar en ejercicios de gramatica (los que uno saca de las conversaciones) que si lo indique, cual es la regla al momento de practicarlo
 Por que passen no tiene frase?
 ejemplo de expresion es la frase de donde salio
 

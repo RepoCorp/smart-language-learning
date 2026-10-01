@@ -19,8 +19,9 @@ from ..srs import build_session_restore_state
 from .dialog_phrase_match import build_dialog_phrase_match_payload
 from .content.item_compare_payloads import compare_words_payload
 from .session_review_pool import review_rows
+from .session_new_items import new_item_candidates
 from ..review_schedule import local_day_bounds
-from ..word_formation import item_payload as pattern_item_payload
+from ..pattern_items import item_payload as pattern_item_payload
 
 
 @dataclass(frozen=True)
@@ -282,15 +283,9 @@ def build_new_entries(
     excluded_item_ids: set[int] | None = None,
 ) -> list[SessionEntry]:
     excluded_item_ids = excluded_item_ids or set()
-    new_items = list(
-        apply_user_scope(Item.objects, user).filter(
-            item_type__in=Item.ItemType.values,
-            is_learned=False,
-            source_language=source_language,
-            target_language=target_language,
-            last_reviewed_at_es_to_de__isnull=True,
-            last_reviewed_at_de_to_es__isnull=True,
-        ).exclude(id__in=excluded_item_ids).order_by("created_at", "id")[:limit]
+    new_items = new_item_candidates(
+        user=user, source_language=source_language, target_language=target_language,
+        excluded_item_ids=excluded_item_ids, limit=limit,
     )
     return [new_entry(item) for item in new_items]
 

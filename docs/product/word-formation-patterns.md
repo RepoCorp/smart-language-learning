@@ -2,6 +2,10 @@
 
 ## Current scope
 
+Construction-pattern detection is documented separately in
+[Construction patterns](construction-patterns.md). That independently saved feature
+does not alter affix enrollment or the exercises described here.
+
 German and English word items can show word-building hints in the Grammar
 strategy. The initial German catalog contains exactly `un-`, `-los`, `-bar`, `-lich`, `-heit`, `-keit`,
 `-ung`, `-er`, `-in`, and `-chen`. The noun-forming endings `-heit` and
@@ -38,7 +42,13 @@ to the English/Spanish interface, like the existing static grammar content.
 ## Learning a pattern
 
 The learner explicitly chooses **Practise this pattern** on a matching Grammar
-card. Matching alone never enrolls a pattern. Enrollment is stored per user,
+card, or **Save pattern** in the word-saving confirmation. The confirmation
+reuses the same local matcher, cards, and enrollment endpoint in dialogs,
+saved generated dialogs, and conversation reviews. Saving the word does not
+implicitly save its patterns, nor does saving a pattern save the word. A saved
+word with an unsaved matching pattern also offers confirmation; once its patterns
+are saved, clicking the word opens its details as before. No extra AI request is
+needed for affixes. Matching alone never enrolls a pattern. Enrollment is stored per user,
 language pair, and pattern key, independently of the word that showed the card.
 The same pattern shown on another word is marked as already in the learning deck.
 
