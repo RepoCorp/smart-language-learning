@@ -34,7 +34,9 @@ it.each([
   fireEvent.click(screen.getByRole("button", { name: open }));
   const modal = within(screen.getByRole("dialog", { name: title }));
   expect(modal.getByRole("combobox", { name: title })).toHaveValue("affix_examples");
-  expect(modal.getAllByRole("option").map(option => option.textContent)).toEqual([examples]);
+  expect(modal.getAllByRole("option").map(option => option.textContent)).toEqual([
+    examples, language === "en" ? "Your words" : "Tus palabras",
+  ]);
   expect(modal.getAllByRole("listitem")).toHaveLength(6);
   const last = modal.getAllByRole("listitem")[5];
   expect(last).toHaveTextContent("einsam → die Einsamkeit");

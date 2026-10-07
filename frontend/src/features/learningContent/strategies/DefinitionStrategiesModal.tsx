@@ -41,7 +41,7 @@ export default function DefinitionStrategiesModal({ onClose, ...props }: AffixPa
             return <option key={id} value={id}>{registered ? text[registered.label] : text.unavailableStrategy}</option>;
           })}
         </select>
-        {strategy ? <strategy.View {...props} interfaceLanguage={interfaceLanguage} />
+        {strategy ? <strategy.View {...props} strategyId={selected} interfaceLanguage={interfaceLanguage} />
           : <p role="alert">{text.unavailableStrategy}</p>}
       </>}
     </ItemViewShell>

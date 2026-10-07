@@ -2,6 +2,7 @@ from django.urls import path
 from .views.word_formation import WordFormationView
 from .views.construction_patterns import ConstructionPatternSaveView
 from .views.learning_content import LearningContentCatalogView
+from .views.learning_content_bank_words import LearningContentBankWordsView
 
 from .views import (
     AuthAdminCreateUserView,
@@ -89,6 +90,8 @@ from .views import (
 
 urlpatterns = [
     path("admin/learning-content", LearningContentCatalogView.as_view(), name="learning-content-catalog"),
+    path("learning-content/<str:definition_key>/strategies/<str:strategy_id>/words",
+         LearningContentBankWordsView.as_view(), name="learning-content-bank-words"),
     path("word-formation", WordFormationView.as_view(), name="word-formation"),
     path("construction-patterns", ConstructionPatternSaveView.as_view(), name="construction-patterns"),
     path("health", HealthView.as_view(), name="health"),

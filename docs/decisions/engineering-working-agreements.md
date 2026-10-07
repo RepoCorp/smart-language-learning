@@ -22,6 +22,26 @@ Status: accepted user working preferences, consolidated 2026-09-29.
 The user wants to follow the changes and understand the code. Faster delivery is
 not permission to drop tests, hide risk, or perform a broad unrelated refactor.
 
+## Collaboration and code clarity
+
+- Treat requests for ideas, feasibility, explanations, or a proposed interface as
+  discussion, not permission to implement. Honor explicit checkpoints such as
+  "show me the text first" and "do not change code yet". Approval for one slice
+  does not authorize the rest of an architectural migration.
+- Explain new abstractions with one concrete example from this app, such as
+  `-keit`, rather than introducing a large speculative class hierarchy. Let the
+  user inspect each piece before moving on when working step by step.
+- Prefer descriptive names and small responsibilities over explanatory comments.
+  The user dislikes unnecessary comments; add them sparingly for non-obvious
+  constraints or reasoning, not narration. Keep architectural explanations in docs.
+- Group tests by feature/responsibility too. A new folder should make ownership
+  easier to follow, not merely move a large mixed file into another directory.
+- Check independent review claims against the diff and tests. Do not accept a
+  "no issues" conclusion as proof, or defend an earlier implementation instead
+  of investigating the user's observation.
+- Preserve the user's staging as well as file contents. Do not stage, unstage,
+  commit, or amend work as an incidental part of a feature or documentation task.
+
 ## Verification
 
 - Cover user-visible behavior and failure paths, not only extracted helpers. Audio,
@@ -38,6 +58,10 @@ not permission to drop tests, hide risk, or perform a broad unrelated refactor.
   exercise production data, or claim model/audio quality from mocked responses.
 - Include schema migrations when required and check the migration state. Never
   use direct production changes as a shortcut for a code or migration issue.
+- A regression test is protection for the behavior it actually asserts, not a
+  guarantee that the whole flow cannot drift. Test the phases, audio timing and
+  controls the user specified, not a simplified substitute; distinguish mocked
+  browser checks from real-device or real-provider verification.
 
 ## Simplicity and honesty
 
@@ -51,6 +75,23 @@ not permission to drop tests, hide risk, or perform a broad unrelated refactor.
   giant files, the full chat history, or unrelated parts of the repository.
 - Keep progress updates informative and final answers concise, with meaningful
   file references, test results, and any remaining uncertainty.
+- If a feature repeatedly seems unchanged, trace the exact entry point, shared
+  component, request, and active environment before another patch. Distinguish a
+  code defect from an outdated running container; do not prescribe a restart as
+  a substitute for diagnosis or change unrelated paths to force a visible effect.
+
+## Durable context
+
+Use repository documents as the cross-chat source of accepted decisions. External
+ChatGPT discussions and reviews are additional evidence only when actually read
+or supplied by the user; do not imply access to a conversation that was not retrieved.
+Preserve the resulting decisions and rationale here, not the entire transcript.
+
+Keep settled constraints, current implementation, and future ideas distinguishable.
+A dated handoff records a worktree snapshot and test results, not permanent facts
+about staging, ports, or passing tests. Recheck these in each new environment.
+Do not copy temporary tool permissions, credentials, or machine-specific runtime
+instructions into durable product or architecture rules.
 
 ## Infrastructure and pending ideas
 

@@ -25,7 +25,7 @@ KEIT = AffixPatternDefinition(
         },
     },
     item_view="affix_pattern",
-    strategies=("affix_examples",),
+    strategies=("affix_examples", "affix_bank_words"),
     exercises=(),
     evaluations={"source_to_target": "affix_production", "target_to_source": "affix_recognition"},
     examples=(

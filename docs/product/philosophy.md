@@ -16,6 +16,12 @@ optional, practical support: "Just a tiny bit. We don't like studying grammar ei
 Simple explanations must still be accurate and natural, not awkward substitutes
 for technical terms. See the dedicated grammar wording document.
 
+Prefer natural, accessible explanations to technical shorthand. A slightly longer
+explanation with a clear example is better than a cryptic rule or an awkward
+replacement for a grammar term. Do not imply that a word-building pattern can be
+attached freely to any word. Explain what relationship it contributes to existing
+words, including meaning, rather than merely naming the pattern.
+
 Personalization is fundamental, not decoration. The first guide introduces language
 settings, a personally useful topic, dialog creation, saving words and phrases,
 and sessions. Later tutorials expose more features gradually. The interface must

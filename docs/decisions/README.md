@@ -12,3 +12,7 @@ A useful lightweight structure is:
 - **Consequences** — important implications, tradeoffs, or follow-up work.
 
 Not every decision needs a formal ADR number. Prefer clarity over ceremony.
+
+The [definition-driven learning-content decision](definition-driven-learning-content.md)
+records the accepted structure, registration boundaries, and incremental migration
+approach for the new definitions and playground.

@@ -3,7 +3,38 @@
 Updated: 2026-10-07. This is a snapshot, not a permanent task list.
 Read `START_HERE.md` first. Verify current files and git state before acting.
 
-## Latest addition: definition-based evaluation
+## Current continuation point
+
+The active work is the new definition-driven learning structure, developed in
+small slices alongside the legacy app. Read the accepted
+[design and folder map](decisions/definition-driven-learning-content.md) and
+[playground guide](architecture/learning-content-playground.md) before continuing.
+The user is switching chats to continue this work, not authorizing a new migration
+or automatic next task. Let the user choose the next slice.
+
+The working agreements also preserve the user's sparse-comment preference,
+discussion/approval checkpoints, concrete-example explanations, grouped tests,
+and requirement to investigate regressions rather than trusting a green review
+or assuming a stale browser. These constraints still apply when optimizing for
+faster, more focused tasks.
+
+As of this handoff, `git status` shows the Your words strategy implementation,
+its tests, and documentation changes pending, including the staged glossary.
+The earlier definition/evaluation implementation is already present in HEAD.
+Preserve all work and recheck status; the old uncommitted-work claims below have
+been replaced with historical headings rather than treated as current state.
+
+## Latest implementation and verification
+
+The new `-keit` playground now also offers Strategies > Your words. It reads
+matching saved words from the signed-in learner's selected language pair, in
+shortest-first pages, without generation or progress writes. The bank-word
+renderer is generic; the registered affix matcher owns prefix/suffix rules.
+Legacy item strategies are unchanged. See the playground architecture document.
+Focused verification passed 60 backend tests, 164 frontend tests (including the
+73 learning-content tests plus pattern sessions, item views, and word reviews),
+12 browser tests, and the build. Typecheck retains 80 baseline errors, none in
+the changed learning-content area.
 
 The new `-keit` production and recognition evaluations are connected to ordinary sessions through
 the existing pattern enrollment, directional counters, versioned review API, and
@@ -16,13 +47,21 @@ in `itemView/legacy/LegacyItemViewHeader.tsx`. Earlier dated sections below rema
 historical context; inspect the worktree rather than assuming their paths or
 verification results are current.
 
-The new onboarding documents and `AGENTS.md` update are also uncommitted.
 For a focused change, consult `architecture/regression-map.md` rather than
 rediscovering the relevant test suites or assuming coverage from their names.
 
-## Latest work, present in the uncommitted worktree
+Browser checks used a temporary Playwright config on port 5186 because the default
+5174 belonged to another app. Check ports before running; do not reuse an unrelated
+server or stop another project. `/tmp/wls-phrase-saving.playwright.config.ts` was
+the local override, not a committed dependency or a guaranteed file on another machine.
+The full suite was not rerun for this slice. Earlier full-suite runs found 17
+`SessionPage.test.tsx` failures involving unmocked requests; do not enable real API
+calls to conceal them. The typecheck baseline is 80 errors, not a green check.
 
-Three completed implementation slices are still uncommitted at this handoff:
+## Historical context
+
+The following completed slices predate the current work. Their original status
+and verification notes are historical; use the current code and topic documents:
 
 1. **Word audio includes only the saved word/expression.** Initial save, audio
    regeneration, and item regeneration no longer append the example sentence.
@@ -49,7 +88,7 @@ The full frontend suite also exposed session-test failures with unmocked local
 API requests; do not assume the suite is green or enable real requests to hide
 those failures. Unit and Playwright test discovery are now separated.
 
-## Last verification
+## Earlier verification
 
 Construction-session follow-up (2026-09-30) supersedes the earlier pending policy:
 saved constructions now enter sessions with a localized "Do you know this pattern?"
@@ -166,5 +205,8 @@ Do not promise that prompting guarantees the model will always signal closure.
 
 > Continue working on WeLearnSmart in this repository. Read AGENTS.md and
 > docs/START_HERE.md, including the product philosophy, working agreements, and
-> dated handoff. Preserve the current uncommitted changes. Do not start deferred
-> work or make changes yet; briefly confirm the context, then wait for my next task.
+> dated handoff. We are developing the new definition-driven learning structure
+> and playground alongside legacy code. Read docs/decisions/definition-driven-learning-content.md
+> and docs/architecture/learning-content-playground.md. Preserve current changes.
+> Do not migrate or implement anything yet; confirm the context and wait for my
+> next task.

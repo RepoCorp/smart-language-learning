@@ -4,6 +4,10 @@ The new learning definitions are being developed alongside the existing app.
 The registered `-keit` production and recognition evaluations now run in ordinary
 sessions; item views and other patterns retain their legacy implementations.
 
+Read the accepted [architecture decision and folder map](../decisions/definition-driven-learning-content.md)
+before extending this structure. It explains the boundaries and migration rules;
+this document describes the working implementation.
+
 Sign in as an administrator and open Configuration > Administration > Learning
 content playground, or visit `/admin/learning-content` directly in the frontend.
 The page needs the backend running with the new catalog endpoint.
@@ -18,6 +22,10 @@ The page needs the backend running with the new catalog endpoint.
   the catalog or resetting preview languages.
 - Open Strategies > Examples to see the full hardcoded example set, with no
   generation or additional API requests.
+- Open Strategies > Your words to see matching words from your own bank for the
+  selected translation language and the definition's learning language. Saved
+  words are included regardless of review progress, shortest first, in pages of
+  20. An empty bank is shown explicitly, not replaced with generated examples.
 - Open Testing and choose Build a word or Understand a word. Production supplies
   the base word and its translation, then asks for the word with the requested
   meaning. Recognition supplies the complete word plus the base word's meaning,
@@ -29,7 +37,7 @@ The page needs the backend running with the new catalog endpoint.
   current environment does not reload Python files automatically.
 
 The playground is read-only. It does not enroll items, submit reviews, change
-SRS schedules, or call AI providers. The hardcoded Examples strategy and production
+SRS schedules, or call AI providers. Examples, Your words, and both directional
 evaluation previews are connected; exercises remain inactive. Only the new
 `-keit` definition is registered initially.
 
@@ -44,6 +52,13 @@ Views are registered under `frontend/src/features/learningContent/itemViews/`.
 The current payload/view type supports affixes; adding another kind also requires
 extending the typed payload and registering its view. Missing views and
 translations produce explicit notices rather than substitutions.
+
+The new definition data is independent of the legacy database field names.
+Existing Items still use `german_text` for the learning-language text and
+`spanish_text` for its translation, even for other language pairs. Do not infer
+the actual languages from those names; use `source_language` and `target_language`.
+Keep that translation at the persistence/API boundary rather than leaking the
+legacy names into new generic views, or renaming database fields incidentally.
 
 Outside this page, only registered session evaluations use the new implementation.
 The new affix view shares `components/ItemViewHeader.tsx` and the existing
@@ -92,6 +107,21 @@ substitute strategy. The strategy modal uses a native dialog for focus containme
 Escape dismissal, and focus restoration, plus the shared Close control. Changing
 definitions closes the modal; opening it never generates content.
 
+The `affix_bank_words` strategy uses the shared `strategies/bankWords/` renderer.
+It requests only IDs, words, and translations from the authenticated read-only
+`/api/learning-content/<key>/strategies/<strategy>/words` endpoint when selected.
+The endpoint scopes to the signed-in learner and language pair before matching;
+administrators do not get other learners' words. Filtering, shortest-first
+ordering, and pagination happen in the database. The affix matcher belongs to
+`patterns/affix/bank_words.py`: it uses the definition's word types and anchored,
+case-insensitive prefix/suffix matching, with at least two other characters.
+This is a spelling match, not a model-based semantic analysis. Articles are kept
+in the displayed text. Future word-pattern families can register their own matcher
+and reuse the same list without teaching it language or pattern-family rules.
+Only `-keit` currently registers this strategy. It is available in the playground;
+legacy item views remain unchanged. Language/definition changes cancel pending
+requests, and failed pages can be retried without discarding already loaded words.
+
 `evaluations/registry.ts` maps `affix_production` and `affix_recognition` to the
 specialized affix views. The definition registers them for `source_to_target`
 and `target_to_source` respectively; there is no
@@ -134,7 +164,7 @@ formatting only; the specialized views decide which information is shown or hidd
 
 - Backend: `docker compose run --rm --no-deps backend pytest tests/learning_content -q`
 - Frontend, from `frontend/`: `env NODE_OPTIONS=--no-experimental-webstorage npm test -- --run tests/learningContent`
-- Browser, from `frontend/`: `npm run test:e2e -- e2e/learning-content.spec.ts e2e/session-evaluation.spec.ts e2e/evaluation-layout.spec.ts`
+- Browser, from `frontend/`: `npm run test:e2e -- e2e/learning-content.spec.ts e2e/learning-content-bank-words.spec.ts e2e/session-evaluation.spec.ts e2e/evaluation-layout.spec.ts`
 
 Backend tests check real catalog serialization, access control, and read-only
 methods. Browser tests use a mocked catalog and cover desktop and small-screen

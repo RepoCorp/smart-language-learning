@@ -5,3 +5,7 @@ This directory contains durable descriptions of Smart Language Learning's archit
 Use it for information that helps an engineer or coding agent understand how the system is intended to fit together before changing it.
 
 Prefer describing current architectural intent and constraints here. Record a specific accepted choice and its rationale under `docs/decisions/` when that history matters.
+
+For the new learning-content work, start with the accepted
+[definition-driven design and folder map](../decisions/definition-driven-learning-content.md),
+then the [playground implementation guide](learning-content-playground.md).

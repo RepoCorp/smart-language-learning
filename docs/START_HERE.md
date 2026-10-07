@@ -13,13 +13,23 @@ decisions supersede these notes; verify implementation details against current c
 Then read only the documents relevant to the requested change. Do not reload the
 entire conversation history or audit the whole application for a small task.
 
+## Continuing the new learning structure
+
+For work on definitions, patterns, item views, strategies, evaluations, or the
+playground, read the accepted [definition-driven architecture decision](decisions/definition-driven-learning-content.md)
+and [playground implementation guide](architecture/learning-content-playground.md).
+They describe the small-file, registry-based design, the folder map, and what is
+still legacy. The playground is a real preview, not a replacement for the whole
+app; only explicitly connected evaluations currently run in ordinary sessions.
+
 ## Where to find context
 
 | Area | Starting point |
 | --- | --- |
+| Learning terminology | [Learning glossary](product/learning-glossary.md): items, pattern groups, strategies, exercises, and evaluations |
 | Session items and patterns | [Word-formation patterns](product/word-formation-patterns.md); `backend/learning/srs.py`, `review_schedule.py`, `review_availability.py`; `frontend/src/features/session/` |
 | Contextual construction patterns | [Construction patterns](product/construction-patterns.md) |
-| New learning definitions and playground | [Learning content playground](architecture/learning-content-playground.md) |
+| New learning definitions and playground | [Architecture decision and folder map](decisions/definition-driven-learning-content.md); [playground](architecture/learning-content-playground.md) |
 | Blocks and typing | [Block exercises](product/block-exercises.md), [Typing feedback](product/typing-feedback.md) |
 | Grammar and languages | [Grammar explanations](product/grammar-explanations.md), [Localization](architecture/localization.md), [English entries](product/english-word-entries.md), [Learning levels](product/learning-levels.md) |
 | Onboarding | [Starter guide](product/starter-guide.md) |

@@ -45,6 +45,6 @@ def test_display_has_both_interface_languages():
 
 def test_hardcoded_examples_and_both_evaluations_are_configured():
     assert KEIT.item_view == "affix_pattern"
-    assert KEIT.strategies == ("affix_examples",)
+    assert KEIT.strategies == ("affix_examples", "affix_bank_words")
     assert KEIT.exercises == ()
     assert KEIT.evaluations == {"source_to_target": "affix_production", "target_to_source": "affix_recognition"}

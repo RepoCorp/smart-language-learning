@@ -24,7 +24,8 @@ for (const language of ["en", "es"]) {
       const modal = page.getByRole("dialog", { name: language === "en" ? "Strategies" : "Estrategias" });
       await expect(modal).toBeVisible();
       await expect(modal.getByRole("combobox")).toHaveValue("affix_examples");
-      await expect(modal.getByRole("option")).toHaveText(language === "en" ? "Examples" : "Ejemplos");
+      await expect(modal.getByRole("option")).toHaveText(language === "en"
+        ? ["Examples", "Your words"] : ["Ejemplos", "Tus palabras"]);
       await expect(modal.getByRole("listitem")).toHaveCount(6);
       await modal.getByRole("listitem").last().scrollIntoViewIfNeeded();
       await expect(modal.getByRole("listitem").last()).toContainText("einsam → die Einsamkeit");
