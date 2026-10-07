@@ -17,8 +17,11 @@ Rules:
 - For adjectives and adverbs, return the uninflected base form.
 - word_type must be one of: noun, verb, adjective, adverb, expression, other.
 - Do not invent abstract replacements (for example extracting "der Gesamtbetrag" from "insgesamt").
-- If you intentionally return a base/canonical form that is not literal in the phrase, explain the mapping clearly in notes.
+- Normalizing an inflected word to its canonical form does not by itself justify a note. Only explain a meaning or usage distinction when it remains useful beyond the original phrase.
 - plural_target should contain the plural form with article when applicable; otherwise empty string.
-- Include relevant study notes only when useful; otherwise empty string.
+- Default notes to an empty string. Add a short note only when it gives important, non-obvious meaning or usage information that remains useful outside the original phrase.
+- Write notes in the source language. Useful notes may clarify an idiomatic meaning, a misleading literal translation, or an important usage/register distinction.
+- Do not repeat the translation, article, word type, or other information already present in the entry. Do not describe the original sentence, speaker, situation, or how the keyword was extracted.
+- If no note meets these criteria, return notes as ""; do not add filler to populate the field.
 - Keep keywords unique by source_text.
 - Return JSON only, no markdown and no extra text.

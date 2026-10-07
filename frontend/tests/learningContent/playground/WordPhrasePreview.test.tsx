@@ -23,6 +23,7 @@ it("switches between pattern, word and phrase previews without requests or progr
     expect(screen.getByRole("heading", { name: definition.text })).toBeInTheDocument();
     expect(screen.getByText(definition.translations.spanish!)).toBeInTheDocument();
     const preview = within(screen.getByRole("region", { name: "Item view preview" }));
+    if (definition === word) expect(preview.queryByText("Notes")).not.toBeInTheDocument();
     for (const button of preview.getAllByRole("button").slice(1)) expect(button).toBeDisabled();
     fireEvent.click(preview.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: "Open item view" }));

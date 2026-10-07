@@ -11,11 +11,11 @@ MOEGLICHKEIT = WordDefinition(
     display={
         "en": {
             "title": "die Möglichkeit",
-            "explanation": "A possibility or an available option. This noun uses die; its plural is die Möglichkeiten.",
+            "explanation": "",
         },
         "es": {
             "title": "die Möglichkeit",
-            "explanation": "Una posibilidad o una opción disponible. Este sustantivo lleva die; su plural es die Möglichkeiten.",
+            "explanation": "",
         },
     },
     item_view="word",

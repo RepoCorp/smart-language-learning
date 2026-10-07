@@ -15,7 +15,7 @@ Rules:
 - If no catalog construction applies, return construction_pattern_key: null and construction_evidence: [], then resolve the word normally using the rules below.
 - For a matching construction, return construction_evidence as exact, distinct words copied from this sentence, including the clicked token and the other relevant verb/prefix. Do not use dictionary forms as evidence.
 - For a construction that replaces the word, source_text must briefly describe the construction's meaning/function in the source language; note must explain its use in THIS sentence in simple source-language wording. target_text may show the construction. Do not resolve or translate the auxiliary as an independent word.
-- For a construction explicitly defined as accompanying a lexical word, still return the complete lexical word in target_text, its meaning in source_text, and its word_type. Explain the construction briefly in note, in the source language.
+- For a construction explicitly defined as accompanying a lexical word, still return the complete lexical word in target_text, its meaning in source_text, and its word_type. Explain the construction briefly in note, in the source language, as a reusable usage distinction rather than a description of the sentence's people or situation.
 - All explanations and meanings must be in the source language, not the target language. Do not use technical terminology when a simple explanation suffices.
 - The remaining word-resolution rules apply when no construction replaces the word. Never let those rules override a matching catalog construction.
 - Use only the clicked target word and the target-language line context to identify the selected word's meaning and word_type.
@@ -27,10 +27,13 @@ Rules:
 - Do not expand just to include articles, possessives, adjectives, objects, or nearby context when the clicked word has a clear standalone meaning.
 - For a clicked noun with a clear standalone meaning, return the noun itself here. Do not return a noun phrase like "sein Freund" unless the entire phrase has a non-literal expression meaning.
 - Never guess a standalone translation if it would be misleading. Prefer returning a larger expression only when necessary.
-- For expressions, target_text must be the target-language expression, source_text must be the translation of that expression, word_type must be "expression", and note must briefly explain why the clicked word alone is insufficient.
+- For expressions, target_text must be the target-language expression, source_text must be the translation of that expression, and word_type must be "expression".
 - For helper words, keep target_text as the helper word itself, but source_text may be either a single word or a short natural phrase if that is the only faithful translation in context.
-- For helper words, note must briefly explain the helper role or why the translation is contextual.
-- If the clicked word works as a standalone study item in THIS context, return that standalone unit and use an empty note, except for helper words which should still include the brief helper explanation note.
+- When no catalog construction was selected, default note to an empty string for every word type, including helpers and expressions. Add a short note only when it gives important, non-obvious meaning or usage information that remains useful outside the original sentence.
+- A useful word note may clarify an idiomatic meaning, a misleading literal translation, or an important usage/register distinction. Write it in the source language.
+- Do not repeat the translation, article, word type, or information already present in the study entry. Do not explain the original click, retell the speaker's situation, or add generic helper-word commentary.
+- Use the sentence to select the correct meaning; it does not make a context-specific explanation necessary. If no note meets these criteria, return note as ""; do not add filler to populate the field. The required construction explanations above remain separate from these optional word notes.
+- If the clicked word works as a standalone study item in THIS context, return that standalone unit.
 - If no catalog construction was selected, classify modal verbs, auxiliary verbs, and grammar-building forms as "helper" only when they are used that way in this target line.
 - If no catalog construction was selected, return only the helper word translation unit for modal, auxiliary, conditional, future, or tense-building helper words.
 - Use context to disambiguate meaning. For helper words, a short source-language phrase is allowed when needed, but target_text must stay the helper word itself.

@@ -38,3 +38,23 @@ def test_no_context_does_not_call_model(monkeypatch):
     with pytest.raises(RuntimeError):
         resolve(target_line="")
     model.assert_not_called()
+
+
+@pytest.mark.parametrize("word_type,target", [("helper", "können"), ("expression", "sich erinnern")])
+@pytest.mark.parametrize("refinement,expected_note", [
+    ({"note": ""}, ""),
+    ({"note": "  \n  "}, ""),
+    ({}, "Previous note."),
+    ({"note": "  Useful general usage note.  "}, "Useful general usage note."),
+])
+def test_special_refinement_distinguishes_empty_notes_from_omitted_notes(
+    monkeypatch, word_type, target, refinement, expected_note,
+):
+    model = Mock(side_effect=[
+        {"source_text": "significado", "target_text": target, "word_type": word_type, "note": "Previous note."},
+        refinement,
+    ])
+    monkeypatch.setattr(resolution, "call_openai_json", model)
+
+    assert resolve() == ("significado", target, word_type, expected_note)
+    assert model.call_count == 2

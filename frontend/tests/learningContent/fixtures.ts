@@ -7,8 +7,8 @@ export const word: WordDefinition = {
   text: "die Möglichkeit", word_type: "noun", gender: "feminine",
   translations: { english: "the possibility", spanish: "la posibilidad" },
   display: {
-    en: { title: "die Möglichkeit", explanation: "A possibility or an available option. This noun uses die; its plural is die Möglichkeiten." },
-    es: { title: "die Möglichkeit", explanation: "Una posibilidad o una opción disponible. Este sustantivo lleva die; su plural es die Möglichkeiten." },
+    en: { title: "die Möglichkeit", explanation: "" },
+    es: { title: "die Möglichkeit", explanation: "" },
   },
   strategies: [], exercises: [], evaluations: {},
 };
@@ -18,8 +18,8 @@ export const phrase: PhraseDefinition = {
   text: "Könnten Sie das bitte wiederholen?",
   translations: { english: "Could you please repeat that?", spanish: "¿Podría repetir eso, por favor?" },
   display: {
-    en: { title: "Könnten Sie das bitte wiederholen?", explanation: "A polite way to ask someone to repeat what they said. Sie is the formal way to address them." },
-    es: { title: "Könnten Sie das bitte wiederholen?", explanation: "Una forma cortés de pedir que alguien repita lo que dijo. Sie se usa para dirigirse a esa persona de usted." },
+    en: { title: "Könnten Sie das bitte wiederholen?", explanation: "Sie is the formal way to address someone." },
+    es: { title: "Könnten Sie das bitte wiederholen?", explanation: "Sie se usa para dirigirse a alguien de usted." },
   },
   strategies: [], exercises: [], evaluations: {},
 };

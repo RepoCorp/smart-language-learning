@@ -25,7 +25,11 @@ Rules:
 - Represent a diverse everyday world. Do not default people, occupations, or social roles to men when gender is irrelevant. When gendered language is natural, include women and men across generated dialogues without relying on stereotypes.
 - Avoid overused starters like "Hola, ¿cómo estás?" unless the topic/context is explicitly about greetings or reuniting.
 - Do not reuse the same key verb or key noun in consecutive turns unless required by the scenario or useful for the requested absolute-beginner level.
-- Include relevant study notes only when useful; otherwise use an empty string.
+- Default notes to an empty string. Add a short note only when it gives important, non-obvious meaning or usage information that remains useful outside this conversation.
+- Write notes in the source language. A useful note may clarify an idiomatic meaning, a misleading literal translation, or an important usage/register distinction.
+- Do not repeat the translation, restate the phrase's obvious purpose, or repeat information already present in the study entry.
+- Do not explain the dialogue's people, events, topic, or what this particular speaker means. Use context to choose the correct meaning, not as material to retell in notes.
+- If no note meets these criteria, return notes as ""; do not add filler to populate the field.
 - Return JSON only, no markdown and no extra text.
 
 Few-shot style examples (adapt their complexity to the requested proficiency level):

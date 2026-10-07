@@ -184,7 +184,7 @@ def refine_special_click_resolution(
         return source_text, target_text, note
     refined_source = str(parsed.get("source_text", "")).strip() or source_text
     refined_target = str(parsed.get("target_text", "")).strip() or target_text
-    refined_note = str(parsed.get("note", "")).strip() or note
+    refined_note = str(parsed["note"]).strip() if "note" in parsed else note
     if word_type == "expression" and len(refined_target.split()) == 1 and len(target_context.split()) > 1:
         return source_text, target_text, note
     return refined_source, refined_target, refined_note

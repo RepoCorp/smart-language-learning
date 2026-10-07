@@ -25,6 +25,21 @@ edit appeared during this work and was preserved. Recheck status before editing.
 
 ## Latest implementation and verification
 
+Word/phrase notes now follow a generation policy: empty by default, with brief
+notes only for important meaning/usage distinctions useful beyond the original
+context. Four note-producing prompt templates implement it; special word
+refinement preserves an explicit empty result, and word saving/regeneration no
+longer append helper boilerplate. Phrase quick-add sends no "Added from
+conversation" filler; its API function was extracted to `apiDialogPhrase.ts`
+behind the existing export. Current phrase saves do not generate model notes,
+and this work adds no new generation step. Existing saved notes are not rewritten.
+The playground word note is empty; its phrase keeps only the formal Sie distinction.
+Empty Notes cards are hidden in the new word/phrase views. The product philosophy
+and playground guide record the policy and the current generation boundaries.
+This follow-up passed 181 mocked backend tests, 17 focused frontend tests, build,
+and diff checks. Typecheck still reports the same 80 baseline errors. No live
+model generation was used to verify the wording.
+
 The playground's Definition selector now includes `die Möglichkeit` and
 `Könnten Sie das bitte wiederholen?` alongside `-keit`. The user explicitly chose
 fixed examples for layout inspection. Word/phrase family definitions live in

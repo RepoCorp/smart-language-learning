@@ -12,11 +12,11 @@ REPEAT_REQUEST = PhraseDefinition(
     display={
         "en": {
             "title": "Könnten Sie das bitte wiederholen?",
-            "explanation": "A polite way to ask someone to repeat what they said. Sie is the formal way to address them.",
+            "explanation": "Sie is the formal way to address someone.",
         },
         "es": {
             "title": "Könnten Sie das bitte wiederholen?",
-            "explanation": "Una forma cortés de pedir que alguien repita lo que dijo. Sie se usa para dirigirse a esa persona de usted.",
+            "explanation": "Sie se usa para dirigirse a alguien de usted.",
         },
     },
     item_view="phrase",

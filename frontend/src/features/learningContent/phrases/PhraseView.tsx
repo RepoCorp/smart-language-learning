@@ -25,7 +25,7 @@ export default function PhraseView({ definition, sourceLanguage, interfaceLangua
       </ItemHeading>
       <ItemMetadata>
         <ItemType label={labels.type}>{labels.phrase}</ItemType>
-        <ItemNotes label={labels.notes}>{display.explanation}</ItemNotes>
+        {display.explanation.trim() && <ItemNotes label={labels.notes}>{display.explanation}</ItemNotes>}
       </ItemMetadata>
     </ItemViewHeader>
   </section>;

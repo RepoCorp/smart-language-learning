@@ -33,7 +33,7 @@ export default function WordView({ definition, sourceLanguage, interfaceLanguage
         <ItemType label={labels.type} description={<ItemTypeDescription>{wordType}</ItemTypeDescription>}>
           {labels.word}
         </ItemType>
-        <ItemNotes label={labels.notes}>{display.explanation}</ItemNotes>
+        {display.explanation.trim() && <ItemNotes label={labels.notes}>{display.explanation}</ItemNotes>}
       </ItemMetadata>
     </ItemViewHeader>
   </section>;

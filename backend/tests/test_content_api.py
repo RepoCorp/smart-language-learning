@@ -2911,7 +2911,7 @@ def test_quick_add_helper_fails_when_source_translation_matches_target(monkeypat
 
 
 @pytest.mark.django_db
-def test_quick_add_helper_allows_short_phrase_translation_and_adds_note(monkeypatch):
+def test_quick_add_helper_allows_short_phrase_translation_and_preserves_model_note(monkeypatch):
     from learning.views import content as content_views
     from learning.views.content import management as management_views
 
@@ -2946,7 +2946,7 @@ def test_quick_add_helper_allows_short_phrase_translation_and_adds_note(monkeypa
             return {
                 "source_text": "poder ir",
                 "target_text": "kann",
-                "note": "Helper verb here expressing possibility.",
+                "note": "Se combina con otro verbo en infinitivo.",
             }
         if "Normalize a helper study entry" in system_prompt:
             return {"source_text": "poder ir", "target_text": "können"}
@@ -2977,8 +2977,7 @@ def test_quick_add_helper_allows_short_phrase_translation_and_adds_note(monkeypa
     payload = response.json()
     assert payload["source_text"] == "poder ir"
     assert payload["target_text"] == "können"
-    assert "Helper verb here expressing possibility." in payload["notes"]
-    assert "short phrase rather than a single standalone word" in payload["notes"]
+    assert payload["notes"] == "Se combina con otro verbo en infinitivo."
 
 
 @pytest.mark.django_db

@@ -62,11 +62,30 @@ contract; incomplete family content, missing views, and missing translations
 produce explicit notices rather than substitutions.
 
 `words/WordView.tsx` and `phrases/PhraseView.tsx` compose the shared header directly.
-They show study text, the selected translation, item type, and notes; the word
+They show study text, the selected translation, item type, and optional notes; the word
 also shows its localized word type. The German word definition supplies the
 article and feminine gender mark explicitly, without language rules in the
 shared shell. These are registered fixed definitions, not saved bank items;
 ordinary word/phrase details and sessions still use the legacy implementation.
+For word/phrase definitions, an empty explanation means no Notes card. Curated
+notes follow the product rule: add relevant, reusable meaning or usage information,
+without repeating the translation or describing only the source context. The
+fixed word has no note; the phrase keeps only its formal-address distinction.
+
+The generated-content paths follow the same note policy. Word saving and
+regeneration use `dialogs/dialog_click_word_resolution.txt` and
+`dialogs/dialog_click_special_refinement.txt`; contextual word metadata and
+normalization do not produce notes. The dialog-generation and phrase-keyword
+prompts also request optional, reusable notes. Current phrase quick-add does not
+generate a note; it sends an empty string rather than a source-of-save label.
+Its API call lives in `frontend/src/apiDialogPhrase.ts`, re-exported by `api.ts`.
+An explicit empty word-refinement note clears the earlier draft; an omitted
+note retains it. Saving and regeneration no longer append helper-word boilerplate.
+Quick-add still preserves explicitly supplied request notes and existing saved notes.
+The active dialog preview/confirmation path does not carry generated dialog
+notes into saved phrase items. These prompt updates do not add a generation step
+to the fixed playground or phrase saving, nor rewrite existing saved notes.
+Required construction-pattern explanations keep their separate contract.
 
 The new definition data is independent of the legacy database field names.
 Existing Items still use `german_text` for the learning-language text and

@@ -10,18 +10,6 @@ from .word_metadata import normalize_word_metadata as _normalize_word_metadata
 from ...models import Item, ItemDialogOccurrence
 
 
-def _helper_note(*, source_text: str) -> str:
-    translation = " ".join((source_text or "").split()).strip()
-    if translation:
-        return (
-            f'Helper word: this is a grammar/support word. In this context it is best understood as "{translation}", '
-            "which may be a short phrase rather than a single standalone word."
-        )[:255]
-    return (
-        "Helper word: this is a grammar/support word, so its meaning depends on the larger phrase and may not map to a single standalone word."
-    )[:255]
-
-
 def _original_item_occurrence(*, user, item: Item) -> ItemDialogOccurrence | None:
     target_occurrence = (
         apply_user_scope(ItemDialogOccurrence.objects, user, field="item__user")
@@ -103,9 +91,6 @@ class ContentItemRegenerateView(APIView):
             target_language=target_language,
         )
         final_notes = note.strip()
-        if word_type == "helper":
-            helper_note = _helper_note(source_text=source_text)
-            final_notes = f"{final_notes} {helper_note}".strip() if final_notes else helper_note
 
         plural_german = item.plural_german or ""
         if word_type == "noun" and target_language == "german":

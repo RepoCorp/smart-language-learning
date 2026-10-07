@@ -16,6 +16,16 @@ optional, practical support: "Just a tiny bit. We don't like studying grammar ei
 Simple explanations must still be accurate and natural, not awkward substitutes
 for technical terms. See the dedicated grammar wording document.
 
+Notes in word and phrase item views are optional. Include them only when they
+add useful information about meaning or usage that applies beyond the source
+dialog or situation. Do not fill the section with a paraphrase of the translation,
+obvious information already displayed, or commentary tied to that one context.
+When there is no relevant note, omit the Notes section entirely.
+Enforce this when generating content: model prompts must request an empty note
+by default and apply the relevance rule before supplying one. Context selects
+the intended meaning; it does not justify retelling the source situation in notes.
+Do not append generic boilerplate after the model has chosen an empty note.
+
 Prefer natural, accessible explanations to technical shorthand. A slightly longer
 explanation with a clear example is better than a cryptic rule or an awkward
 replacement for a grammar term. Do not imply that a word-building pattern can be
