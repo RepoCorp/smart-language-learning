@@ -11,15 +11,37 @@ export interface LearningDefinition {
 export function isLearningDefinition(value: unknown): value is LearningDefinition {
   if (!value || typeof value !== "object") return false;
   const definition = value as Partial<LearningDefinition>;
-  const strings = (entries: unknown): entries is string[] => Array.isArray(entries)
-    && entries.every(entry => typeof entry === "string");
-  return typeof definition.key === "string" && typeof definition.language === "string"
-    && typeof definition.item_view === "string"
-    && !!definition.display && typeof definition.display === "object" && !Array.isArray(definition.display)
-    && Object.values(definition.display).every(display => display === undefined || (
-      display && typeof display.title === "string" && typeof display.explanation === "string"
-    ))
-    && strings(definition.strategies) && strings(definition.exercises)
-    && !!definition.evaluations && typeof definition.evaluations === "object" && !Array.isArray(definition.evaluations)
-    && Object.values(definition.evaluations).every(id => typeof id === "string");
+
+  if (typeof definition.key !== "string") return false;
+  if (typeof definition.language !== "string") return false;
+  if (typeof definition.item_view !== "string") return false;
+  if (!hasValidDisplayText(definition.display)) return false;
+  if (!isStringList(definition.strategies)) return false;
+  if (!isStringList(definition.exercises)) return false;
+  if (!hasValidEvaluationIds(definition.evaluations)) return false;
+
+  return true;
+}
+
+function hasValidDisplayText(display: LearningDefinition["display"] | undefined): boolean {
+  if (!display || typeof display !== "object" || Array.isArray(display)) return false;
+
+  for (const translation of Object.values(display)) {
+    if (translation === undefined) continue;
+    if (!translation) return false;
+    if (typeof translation.title !== "string") return false;
+    if (typeof translation.explanation !== "string") return false;
+  }
+
+  return true;
+}
+
+function isStringList(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.every(entry => typeof entry === "string");
+}
+
+function hasValidEvaluationIds(evaluations: LearningDefinition["evaluations"] | undefined): boolean {
+  if (!evaluations || typeof evaluations !== "object" || Array.isArray(evaluations)) return false;
+  return Object.values(evaluations).every(id => typeof id === "string");
 }
