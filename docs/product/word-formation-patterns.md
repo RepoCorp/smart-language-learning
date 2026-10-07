@@ -103,10 +103,10 @@ Exercise pairs live in `backend/learning/word_formation/`, separated by target
 language. New catalog IDs must be added there as well as to the frontend matching
 catalog. Grammar detection feature IDs and model catalogs remain unchanged.
 
-The new definition-based `-keit` production evaluation is now connected to this
+The new definition-based `-keit` production and recognition evaluations are connected to this
 same session flow. Its examples come from the new `KEIT` definition and include
-the article in the revealed answer. It reuses existing enrollment, directional
+the article in German nouns and their English/Spanish translations. They reuse existing enrollment, directional
 review counters, snapshot versions, scoring, and SRS; no progress is reset.
-Recognition and all other patterns remain on the legacy implementation for now.
+All other patterns remain on the legacy implementation for now.
 See [Learning content playground](../architecture/learning-content-playground.md)
 for the registration boundary and the separate, non-persistent preview mode.

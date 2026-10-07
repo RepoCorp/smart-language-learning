@@ -49,15 +49,15 @@ export default function RevealedReviewSummary({
           >
             <DialogActionIcon name="play" />
           </button>
-            <InteractiveTargetPhrase
-              key={`${itemId}-${targetText}`}
-              className="conversation-line conversation-line-translation revealed-answer-phrase"
-              sourceText={phraseTranslation || ""}
-              targetText={targetText}
-              statusKeyPrefix={`review-${itemId}-phrase`}
-              hideTargetText={canHidePhraseText && !showPhraseText}
-              allowPhraseSaving={Boolean(phrase || fallbackPhrase)}
-            />
+          <InteractiveTargetPhrase
+            key={`${itemId}-${targetText}`}
+            className="conversation-line conversation-line-translation revealed-answer-phrase"
+            sourceText={phraseTranslation || ""}
+            targetText={targetText}
+            statusKeyPrefix={`review-${itemId}-phrase`}
+            hideTargetText={canHidePhraseText && !showPhraseText}
+            allowPhraseSaving={Boolean(phrase || fallbackPhrase)}
+          />
           {canHidePhraseText && (
             <button
               type="button"

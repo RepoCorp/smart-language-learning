@@ -39,7 +39,7 @@ it.each([
   const last = modal.getAllByRole("listitem")[5];
   expect(last).toHaveTextContent("einsam → die Einsamkeit");
   expect(within(last).getByText("keit", { selector: "strong" })).toBeInTheDocument();
-  expect(last).toHaveTextContent("solitario → soledad");
+  expect(last).toHaveTextContent("solitario → la soledad");
   expect(modal.getAllByRole("button")).toHaveLength(1);
   fireEvent.click(modal.getByRole("button", { name: close }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -56,8 +56,8 @@ it("updates translations while open and closes the strategy when the definition 
   fireEvent.click(screen.getByRole("button", { name: "Open strategies" }));
   rerender(<ItemView definition={keit} sourceLanguage="english" interfaceLanguage="es" />);
   const modal = within(screen.getByRole("dialog", { name: "Estrategias" }));
-  expect(modal.getByText("lonely → loneliness")).toBeInTheDocument();
-  expect(modal.queryByText("solitario → soledad")).not.toBeInTheDocument();
+  expect(modal.getByText("lonely → the loneliness")).toBeInTheDocument();
+  expect(modal.queryByText("solitario → la soledad")).not.toBeInTheDocument();
   rerender(<ItemView definition={{ ...keit, key: "another", strategies: [] }} sourceLanguage="english" />);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Open strategies" })).toBeDisabled();

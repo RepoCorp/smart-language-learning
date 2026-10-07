@@ -40,26 +40,36 @@ for (const language of ["en", "es"]) {
       await actions.nth(1).click();
       const evaluation = page.getByRole("dialog", { name: language === "en" ? "Testing" : "Pruebas" });
       await expect(evaluation).toBeVisible();
-      await expect(evaluation.getByRole("option")).toHaveText(language === "en" ? "Build a word" : "Forma una palabra");
+      await expect(evaluation.getByRole("option")).toHaveText(language === "en"
+        ? ["Build a word", "Understand a word"] : ["Forma una palabra", "Comprende una palabra"]);
       const picker = evaluation.getByRole("combobox");
       expect(await picker.evaluate(element => {
         const bounds = element.getBoundingClientRect();
         const parent = element.parentElement!.getBoundingClientRect();
         return bounds.left >= parent.left && bounds.right <= parent.right + 1;
       })).toBe(true);
-      await expect(evaluation).toContainText("«posibilidad»");
+      await expect(evaluation).toContainText("«la posibilidad»");
       await expect(evaluation).not.toContainText("Möglichkeit");
       await evaluation.getByRole("button", { name: language === "en" ? "Reveal answer" : "Mostrar respuesta" }).click();
       await expect(evaluation).toContainText("die Möglichkeit");
       await evaluation.getByRole("button", { name: language === "en" ? "Passed" : "Acertado" }).click();
       await evaluation.getByRole("button", { name: language === "en" ? "Next example" : "Siguiente ejemplo" }).click();
-      await expect(evaluation).toContainText("«limpieza»");
+      await expect(evaluation).toContainText("«la limpieza»");
       await expect(evaluation).not.toContainText("Sauberkeit");
+      await picker.selectOption("target_to_source");
+      await expect(evaluation).toContainText("die Möglichkeit");
+      await expect(evaluation).not.toContainText("la posibilidad");
+      await evaluation.getByRole("button", { name: language === "en" ? "Reveal answer" : "Mostrar respuesta" }).click();
+      await expect(evaluation).toContainText("la posibilidad");
+      await evaluation.getByRole("button", { name: language === "en" ? "Failed" : "Fallado" }).click();
+      await evaluation.getByRole("button", { name: language === "en" ? "Next example" : "Siguiente ejemplo" }).click();
+      await expect(evaluation).toContainText("die Sauberkeit");
+      await expect(evaluation).not.toContainText("la limpieza");
       expect(await evaluation.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
       await evaluation.getByRole("button", { name: language === "en" ? "Close" : "Cerrar" }).click();
       await expect(actions.nth(1)).toBeFocused();
       expect(requests).toEqual(["GET /api/admin/learning-content"]);
-      await expect(page.getByText("posible → posibilidad", { exact: true })).toBeVisible();
+      await expect(page.getByText("posible → la posibilidad", { exact: true })).toBeVisible();
       await page.getByLabel(language === "en" ? "Narrow preview" : "Vista estrecha").check();
       const metadata = page.locator(".item-view-meta-card");
       await expect.poll(async () => {
@@ -77,7 +87,7 @@ for (const language of ["en", "es"]) {
         await page.getByLabel(language === "en" ? "Narrow preview" : "Vista estrecha").check();
       }
       await page.getByLabel(language === "en" ? "Translation language" : "Idioma de las traducciones").selectOption("english");
-      await expect(page.getByText("possible → possibility", { exact: true })).toBeVisible();
+      await expect(page.getByText("possible → the possibility", { exact: true })).toBeVisible();
       await page.getByText(language === "en" ? "Definition data" : "Datos de la definición", { exact: true }).click();
       await expect(page.locator("pre")).toContainText("german_suffix_keit");
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

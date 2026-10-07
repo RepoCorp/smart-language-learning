@@ -20,3 +20,11 @@ audio replaces its clip; failed regeneration preserves the existing URL.
 
 Regression coverage: `backend/tests/test_word_audio_text.py`.
 Post-test selection and playback: `frontend/tests/wordReview/`.
+
+The post-test phrase uses the shared dialog saving controls: save the whole phrase
+or select an expression, then open its saved details without advancing or rescoring
+the test. Audio-only mode keeps the text hidden and offers whole-phrase saving;
+selecting an expression requires revealing the text. Saving is opt-in for the
+shared interactive text component, so other callers remain unchanged. Examples
+without dialog provenance omit dialog IDs, and missing translations are resolved
+by the existing phrase-saving API rather than invented locally.

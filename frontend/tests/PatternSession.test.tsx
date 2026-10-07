@@ -46,7 +46,7 @@ beforeEach(() => {
 const definitionPayload: SessionItem = {
   ...patternPayload, pattern_key: "german_suffix_keit", german_text: "-keit",
   learning_evaluation: { id: "affix_production", content: {
-    base: "möglich", base_translation: "posible", meaning: "posibilidad",
+    base: "möglich", base_translation: "posible", meaning: "la posibilidad",
     answer: "die Möglichkeit", highlight: [11, 15],
   } },
 };
@@ -110,6 +110,49 @@ async function start() {
   fireEvent.click(await screen.findByRole("button", { name: "Start session" }));
   await screen.findByText("hope");
 }
+
+describe("registered recognition in real sessions", () => {
+  const entry: SessionPlanItem = { ...pattern, direction: "de_to_es", review_version: 2 };
+  beforeEach(() => {
+    vi.mocked(fetchSession).mockResolvedValue({ items: [entry, word] });
+    vi.mocked(fetchSessionItem).mockImplementation(async item => item.id === entry.id ? {
+      ...definitionPayload, ...entry,
+      learning_evaluation: { id: "affix_recognition", content: {
+        base: "freundlich", base_translation: "amable", word: "die Freundlichkeit", answer: "la amabilidad",
+      } },
+    } : word);
+  });
+
+  it.each([true, false])("scores recognition as %s using its own pinned version and advances only on Next", async correct => {
+    render(<SessionPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Start session" }));
+    expect(await screen.findByText("die Freundlichkeit")).toBeVisible();
+    expect(screen.queryByText("la amabilidad")).not.toBeInTheDocument();
+    expect(screen.queryByText("hope")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    expect(screen.getByText("la amabilidad")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: correct ? "Passed" : "Failed" }));
+    const next = await screen.findByRole("button", { name: "Next" });
+    expect(submitReview).toHaveBeenCalledOnce();
+    expect(submitReview).toHaveBeenCalledWith(8, correct, "de_to_es", 2);
+    expect(screen.queryByText("Hund")).not.toBeInTheDocument();
+    fireEvent.click(next);
+    expect(await screen.findByText("Hund")).toBeVisible();
+  });
+
+  it.each([false, true])("restores recognition with completed=%s without changing examples or resubmitting", async completed => {
+    sessionStorage.setItem(storageKey, JSON.stringify({
+      items: [entry, word], index: 0, sessionDurationMinutes: 10,
+      sessionEndsAtMs: Date.now() + 600_000, showPostReviewItem: completed,
+    }));
+    render(<SessionPage />);
+    expect(await screen.findByText("die Freundlichkeit")).toBeVisible();
+    expect(fetchSessionItem).toHaveBeenCalledWith(expect.objectContaining(entry), "spanish", "german");
+    expect(screen.queryByText("la amabilidad") !== null).toBe(completed);
+    expect(screen.getByRole("button", { name: completed ? "Next" : "Reveal answer" })).toBeVisible();
+    expect(submitReview).not.toHaveBeenCalled();
+  });
+});
 
 describe("patterns in regular sessions", () => {
   it("introduces a new pattern with curated examples through the shared seen endpoint", async () => {

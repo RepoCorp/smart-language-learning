@@ -1,6 +1,21 @@
 from .definition import AffixPatternDefinition
 
 
+def prepare_recognition(definition: AffixPatternDefinition, source_language: str, version: int):
+    if not definition.examples:
+        return None
+    example = definition.examples[version % len(definition.examples)]
+    translation = example.translations.get(source_language)
+    if not translation:
+        return None
+    return {
+        "base": example.base,
+        "base_translation": translation["base"],
+        "word": example.result,
+        "answer": translation["result"],
+    }
+
+
 def prepare_production(definition: AffixPatternDefinition, source_language: str, version: int):
     if not definition.examples:
         return None

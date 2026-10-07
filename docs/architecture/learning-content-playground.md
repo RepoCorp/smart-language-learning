@@ -1,8 +1,8 @@
 # Learning content playground
 
 The new learning definitions are being developed alongside the existing app.
-The registered `-keit` production evaluation now runs in ordinary sessions;
-item views, recognition, and other patterns retain their legacy implementations.
+The registered `-keit` production and recognition evaluations now run in ordinary
+sessions; item views and other patterns retain their legacy implementations.
 
 Sign in as an administrator and open Configuration > Administration > Learning
 content playground, or visit `/admin/learning-content` directly in the frontend.
@@ -18,17 +18,20 @@ The page needs the backend running with the new catalog endpoint.
   the catalog or resetting preview languages.
 - Open Strategies > Examples to see the full hardcoded example set, with no
   generation or additional API requests.
-- Open Testing to preview the production evaluation: base word and translation,
-  requested meaning, Reveal answer, then Pass/Fail. Next example cycles through
-  all six curated pairs. Closing and reopening starts again from the first pair.
+- Open Testing and choose Build a word or Understand a word. Production supplies
+  the base word and its translation, then asks for the word with the requested
+  meaning. Recognition supplies the complete word plus the base word's meaning,
+  then asks what the complete word means. Reveal answer precedes Pass/Fail. Next
+  example cycles through all six curated pairs. Switching direction or closing
+  and reopening starts again from the first pair.
 - Expand Definition data to inspect the exact data returned by the backend.
 - Reload definitions after backend changes. Restart the backend first if its
   current environment does not reload Python files automatically.
 
 The playground is read-only. It does not enroll items, submit reviews, change
 SRS schedules, or call AI providers. The hardcoded Examples strategy and production
-evaluation preview are connected; exercises and recognition evaluations remain
-inactive. Only the new `-keit` definition is registered initially.
+evaluation previews are connected; exercises remain inactive. Only the new
+`-keit` definition is registered initially.
 
 ## Adding another definition
 
@@ -89,15 +92,16 @@ substitute strategy. The strategy modal uses a native dialog for focus containme
 Escape dismissal, and focus restoration, plus the shared Close control. Changing
 definitions closes the modal; opening it never generates content.
 
-`evaluations/registry.ts` maps `affix_production` to the specialized affix
-production view. The definition registers it for `source_to_target`; there is no
+`evaluations/registry.ts` maps `affix_production` and `affix_recognition` to the
+specialized affix views. The definition registers them for `source_to_target`
+and `target_to_source` respectively; there is no
 item-type or language switch in the common controls. `SelfAssessment` owns only
 the local Reveal/Pass/Fail/completed sequence, receiving question and answer
 content from its caller. The affix view selects the curated pair and advances
 the example index. Interface labels use the preview interface language; example
 meanings use the selected translation language. Missing translations, examples,
 or implementations produce explicit notices, not substitutions. Changing the
-translation language resets the attempt; changing the definition closes testing.
+translation language or selected evaluation resets the attempt; changing the definition closes testing.
 The evaluation modal supports Escape, focus restoration, and bounded scrolling.
 Playground results remain local preview state only, with no enrollment or SRS writes.
 
@@ -121,6 +125,10 @@ the revealed answer on failure for retry. Restored completed attempts show the
 answer and Next without submitting again. Next advances the session, not the
 example locally. Post-review actions and the rule note after reveal are retained.
 Existing enrollments work without a migration or re-saving the pattern.
+Both directions prepare their own payload and rotate using their own counter.
+Recognition reveals the complete translation, including the noun article, without
+affecting production progress. `EvaluationQuestion` shares localized sentence
+formatting only; the specialized views decide which information is shown or hidden.
 
 ## Verification
 

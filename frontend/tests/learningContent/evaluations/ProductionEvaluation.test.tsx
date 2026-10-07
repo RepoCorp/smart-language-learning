@@ -21,6 +21,17 @@ afterAll(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 it.each([
+  ["en", "english", "If möglich is possible, how would you say «the possibility»?"],
+  ["es", "spanish", "Si möglich significa posible, ¿cómo dirías «la posibilidad»?"],
+  ["en", "spanish", "If möglich is posible, how would you say «la posibilidad»?"],
+] as const)("uses a single localized question in %s with %s translations", (interfaceLanguage, sourceLanguage, prompt) => {
+  render(<AffixProductionEvaluation definition={keit} sourceLanguage={sourceLanguage} interfaceLanguage={interfaceLanguage} />);
+  expect(screen.getByText("möglich").parentElement).toHaveTextContent(prompt);
+  expect(screen.getByText("möglich").parentElement?.tagName).toBe("P");
+  expect(screen.queryByText(/Möglichkeit/)).not.toBeInTheDocument();
+});
+
+it.each([
   ["en", "Open testing", "Testing", "Reveal answer", "Passed", "Failed", "Next example", "Close"],
   ["es", "Abrir pruebas", "Pruebas", "Mostrar respuesta", "Acertado", "Fallado", "Siguiente ejemplo", "Cerrar"],
 ] as const)("previews production in %s without persisting scores or making requests", (language, open, title, reveal, pass, fail, next, dismiss) => {
@@ -30,12 +41,12 @@ it.each([
   fireEvent.click(screen.getByRole("button", { name: open }));
   const modal = within(screen.getByRole("dialog", { name: title }));
   expect(modal.getByRole("combobox")).toHaveValue("source_to_target");
-  expect(modal.getAllByRole("option")).toHaveLength(1);
-  expect(modal.getByRole("option")).toHaveTextContent(language === "en" ? "Build a word" : "Forma una palabra");
+  expect(modal.getAllByRole("option")).toHaveLength(2);
+  expect(modal.getAllByRole("option")[0]).toHaveTextContent(language === "en" ? "Build a word" : "Forma una palabra");
   expect(modal.getByRole("combobox")).toHaveClass("word-strategies-select");
   expect(modal.getByRole("combobox").parentElement).toHaveClass("strategy-picker");
   expect(modal.getByText("möglich")).toBeInTheDocument();
-  expect(modal.getByText(/«posibilidad»/)).toBeInTheDocument();
+  expect(modal.getByText(/«la posibilidad»/)).toBeInTheDocument();
   expect(modal.queryByText(/Möglichkeit/)).not.toBeInTheDocument();
   expect(modal.queryByRole("button", { name: pass })).not.toBeInTheDocument();
   expect(modal.queryByRole("button", { name: next })).not.toBeInTheDocument();
@@ -81,7 +92,7 @@ it("resets for translation changes and closes when switching definitions", () =>
   fireEvent.click(screen.getByRole("button", { name: "Passed" }));
   rerender(<ItemView definition={keit} sourceLanguage="english" interfaceLanguage="es" />);
   const modal = within(screen.getByRole("dialog", { name: "Pruebas" }));
-  expect(modal.getByText(/«possibility»/)).toBeInTheDocument();
+  expect(modal.getByText(/«the possibility»/)).toBeInTheDocument();
   expect(modal.queryByText(/Möglichkeit/)).not.toBeInTheDocument();
   expect(modal.getByRole("button", { name: "Mostrar respuesta" })).toBeInTheDocument();
   rerender(<ItemView definition={{ ...keit, key: "another", evaluations: {} }} sourceLanguage="english" />);

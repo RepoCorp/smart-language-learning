@@ -19,7 +19,7 @@ def test_all_six_examples_preserve_catalog_order_and_include_the_article():
         assert example.base == old.base
         assert example.result == f"die {old.answer}"
         assert example.translations == {
-            language: {"base": base, "result": result}
+            language: {"base": base, "result": {"spanish": "la ", "english": "the "}[language] + result}
             for language, (base, result) in old.translations.items()
         }
 
@@ -43,8 +43,8 @@ def test_display_has_both_interface_languages():
     }
 
 
-def test_hardcoded_examples_and_production_evaluation_are_configured():
+def test_hardcoded_examples_and_both_evaluations_are_configured():
     assert KEIT.item_view == "affix_pattern"
     assert KEIT.strategies == ("affix_examples",)
     assert KEIT.exercises == ()
-    assert KEIT.evaluations == {"source_to_target": "affix_production"}
+    assert KEIT.evaluations == {"source_to_target": "affix_production", "target_to_source": "affix_recognition"}

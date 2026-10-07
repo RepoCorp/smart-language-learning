@@ -27,54 +27,54 @@ KEIT = AffixPatternDefinition(
     item_view="affix_pattern",
     strategies=("affix_examples",),
     exercises=(),
-    evaluations={"source_to_target": "affix_production"},
+    evaluations={"source_to_target": "affix_production", "target_to_source": "affix_recognition"},
     examples=(
         AffixExample(
             base="möglich",
             result="die Möglichkeit",
             translations={
-                "english": {"base": "possible", "result": "possibility"},
-                "spanish": {"base": "posible", "result": "posibilidad"},
+                "english": {"base": "possible", "result": "the possibility"},
+                "spanish": {"base": "posible", "result": "la posibilidad"},
             },
         ),
         AffixExample(
             base="sauber",
             result="die Sauberkeit",
             translations={
-                "english": {"base": "clean", "result": "cleanliness"},
-                "spanish": {"base": "limpio", "result": "limpieza"},
+                "english": {"base": "clean", "result": "the cleanliness"},
+                "spanish": {"base": "limpio", "result": "la limpieza"},
             },
         ),
         AffixExample(
             base="freundlich",
             result="die Freundlichkeit",
             translations={
-                "english": {"base": "friendly", "result": "friendliness"},
-                "spanish": {"base": "amable", "result": "amabilidad"},
+                "english": {"base": "friendly", "result": "the friendliness"},
+                "spanish": {"base": "amable", "result": "la amabilidad"},
             },
         ),
         AffixExample(
             base="traurig",
             result="die Traurigkeit",
             translations={
-                "english": {"base": "sad", "result": "sadness"},
-                "spanish": {"base": "triste", "result": "tristeza"},
+                "english": {"base": "sad", "result": "the sadness"},
+                "spanish": {"base": "triste", "result": "la tristeza"},
             },
         ),
         AffixExample(
             base="höflich",
             result="die Höflichkeit",
             translations={
-                "english": {"base": "polite", "result": "politeness"},
-                "spanish": {"base": "cortés", "result": "cortesía"},
+                "english": {"base": "polite", "result": "the politeness"},
+                "spanish": {"base": "cortés", "result": "la cortesía"},
             },
         ),
         AffixExample(
             base="einsam",
             result="die Einsamkeit",
             translations={
-                "english": {"base": "lonely", "result": "loneliness"},
-                "spanish": {"base": "solitario", "result": "soledad"},
+                "english": {"base": "lonely", "result": "the loneliness"},
+                "spanish": {"base": "solitario", "result": "la soledad"},
             },
         ),
     ),

@@ -21,7 +21,7 @@ it("loads the catalog read-only, previews it and changes languages without chang
   localStorage.setItem("smart-language-learning-auth-token", "admin-token");
   open();
   expect(screen.getByRole("status")).toHaveTextContent("Loading definitions");
-  expect(await screen.findByText("posible → posibilidad")).toBeInTheDocument();
+  expect(await screen.findByText("posible → la posibilidad")).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledTimes(1);
   const [url, request] = fetch.mock.calls[0];
   expect(url).toMatch(/\/api\/admin\/learning-content$/);
@@ -31,7 +31,7 @@ it("loads the catalog read-only, previews it and changes languages without chang
   fireEvent.change(screen.getByLabelText("Preview interface language"), { target: { value: "es" } });
   expect(screen.getByText("Expresa una cualidad o un estado.")).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Translation language"), { target: { value: "english" } });
-  expect(screen.getByText("possible → possibility")).toBeInTheDocument();
+  expect(screen.getByText("possible → the possibility")).toBeInTheDocument();
   expect(localStorage.getItem("app_language")).toBe("en");
   expect(fetch).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByLabelText("Narrow preview"));

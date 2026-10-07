@@ -1,13 +1,13 @@
 # Working handoff
 
-Updated: 2026-10-05. This is a snapshot, not a permanent task list.
+Updated: 2026-10-07. This is a snapshot, not a permanent task list.
 Read `START_HERE.md` first. Verify current files and git state before acting.
 
 ## Latest addition: definition-based evaluation
 
-The new `-keit` production evaluation is connected to ordinary sessions through
+The new `-keit` production and recognition evaluations are connected to ordinary sessions through
 the existing pattern enrollment, directional counters, versioned review API, and
-SRS. No migration or production changes. Recognition and other patterns remain
+SRS. No migration or production changes. Other patterns remain
 legacy. The admin playground still does not persist scores. Architecture and
 verification commands: `architecture/learning-content-playground.md`.
 The old `NewItem.tsx` component is now `LegacyItemView.tsx`. Shared item headers
