@@ -9,7 +9,7 @@ import {
   fetchContentTopics,
   regenerateContentItemAudio,
 } from "../../api";
-import NewItem from "../../components/NewItem";
+import LegacyItemView from "../../components/LegacyItemView";
 import { useI18n } from "../../i18n";
 import { useStudyLanguages } from "../../studyLanguages";
 import type { ContentItemRecord, SessionItem } from "../../types";
@@ -362,7 +362,7 @@ export default function ContentManagePage(): JSX.Element {
           <div className="blocking-modal related-dialogs-modal">
             {loadingOpenedItem && <p>{t("session.loading")}</p>}
             {!loadingOpenedItem && openedItem && (
-              <NewItem item={openedItem} readOnly onClose={closeItemModal} />
+              <LegacyItemView item={openedItem} readOnly onClose={closeItemModal} />
             )}
           </div>
         </div>

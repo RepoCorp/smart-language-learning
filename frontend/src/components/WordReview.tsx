@@ -12,6 +12,7 @@ import RevealedReviewSummary from "./RevealedReviewSummary";
 import { useWordChallengeInputFocus } from "./useWordChallengeInputFocus";
 import { useTypingMistakeSound } from "./useTypingMistakeSound";
 import { warmupContextPairForItem } from "./wordWarmupContext";
+import { completionPhraseForItem, completionReplayAudio } from "./wordReview/completionPhrase";
 import {
   hintOptionLabel,
   isLetter,
@@ -20,7 +21,6 @@ import {
   normalizeWordTypingText,
   type PendingCaseMismatch,
   resolveWordInputChange,
-  stripDiacritics,
 } from "./wordChallengeInputLogic";
 
 function blankTargetInPhrase(phrase: string, targetText: string): string {
@@ -75,92 +75,6 @@ function fallbackClozePhraseForItem(item: SessionItem): string {
 function clozePhraseForItem(item: SessionItem): string {
   return dialogClozePhraseForItem(item) || fallbackClozePhraseForItem(item);
 }
-
-function normalizedSearchText(value: string): string {
-  return stripDiacritics(value).toLowerCase().trim();
-}
-
-function targetWordSearchTerms(value: string): string[] {
-  const ignoredTerms = new Set(["der", "die", "das", "ein", "eine", "einen", "einem", "einer"]);
-  const normalizedValue = normalizedSearchText(value);
-  const terms = normalizedValue
-    .split(/[^a-zA-ZÀ-ÖØ-öø-ÿ]+/)
-    .filter((part) => part.length > 1 && !ignoredTerms.has(part));
-  return Array.from(new Set([normalizedValue, ...terms].filter(Boolean)));
-}
-
-function completionPhraseForItem(item: SessionItem): { text: string; sourceText: string; audioUrl: string } {
-  const targetTerms = targetWordSearchTerms(item.german_text);
-  if (!targetTerms.length) {
-    return { text: "", sourceText: "", audioUrl: "" };
-  }
-
-  const containsTargetWord = (targetText: string): boolean => {
-    const normalizedTarget = normalizedSearchText(targetText);
-    return normalizedTarget.length > 0
-      && !targetTerms.includes(normalizedTarget)
-      && targetTerms.some((term) => normalizedTarget.includes(term));
-  };
-
-  const isPhraseForTargetWord = (targetText: string): boolean => {
-    return Boolean(blankTargetInPhrase(targetText, item.german_text)) || containsTargetWord(targetText);
-  };
-
-  const dialogTurnCandidates = (item.related_dialogs || []).flatMap((dialog) => dialog.turns.map((turn) => ({
-    target: turn.target_text,
-    source: turn.source_text,
-    audioUrl: turn.phrase_audio_url || "",
-  })));
-  const matchedTurnCandidates = (item.related_dialogs || []).flatMap((dialog) => dialog.matched_turns.map((turn) => {
-    const relatedTurn = dialog.turns.find((entry, index) => index === turn.turn_index);
-    return {
-      target: relatedTurn?.target_text || turn.target_text || "",
-      source: relatedTurn?.source_text || turn.source_text || "",
-      audioUrl: relatedTurn?.phrase_audio_url || "",
-    };
-  }));
-  const exercisePhraseCandidates = [
-    ...((item.exercise_phrases?.phrases || []).map((entry) => ({
-      target: entry.target_text,
-      source: entry.source_text,
-      audioUrl: entry.audio_url || "",
-    }))),
-    ...((item.exercise_phrases?.first_section || []).map((entry) => ({
-      target: entry.target_text,
-      source: entry.source_text,
-      audioUrl: entry.audio_url || "",
-    }))),
-    ...((item.exercise_phrases?.second_section || []).map((entry) => ({
-      target: entry.target_text,
-      source: entry.source_text,
-      audioUrl: entry.audio_url || "",
-    }))),
-    ...(item.exercise_phrases?.funny_image_phrase
-      ? [{
-        target: item.exercise_phrases.funny_image_phrase.target_text,
-        source: item.exercise_phrases.funny_image_phrase.source_text,
-        audioUrl: item.exercise_phrases.funny_image_phrase.audio_url || "",
-      }]
-      : []),
-  ];
-
-  const rankedCandidates = [
-    ...matchedTurnCandidates.filter((candidate) => candidate.audioUrl && isPhraseForTargetWord(candidate.target)),
-    ...matchedTurnCandidates.filter((candidate) => isPhraseForTargetWord(candidate.target)),
-    ...dialogTurnCandidates.filter((candidate) => candidate.audioUrl && isPhraseForTargetWord(candidate.target)),
-    ...dialogTurnCandidates.filter((candidate) => isPhraseForTargetWord(candidate.target)),
-    ...exercisePhraseCandidates.filter((candidate) => candidate.audioUrl && isPhraseForTargetWord(candidate.target)),
-    ...exercisePhraseCandidates.filter((candidate) => isPhraseForTargetWord(candidate.target)),
-  ];
-
-  const selectedCandidate = rankedCandidates.find((candidate) => candidate.target.trim() && candidate.source.trim());
-  if (selectedCandidate) {
-    return { text: selectedCandidate.target, sourceText: selectedCandidate.source, audioUrl: selectedCandidate.audioUrl };
-  }
-
-  return { text: "", sourceText: "", audioUrl: "" };
-}
-
 function splitClozePhrase(phrase: string): { before: string; after: string } | null {
   const marker = "____";
   const markerIndex = phrase.indexOf(marker);
@@ -338,6 +252,7 @@ export default function WordReview({
     && (warmupInputIsCorrect || warmupAllLettersRevealed || warmupCompleted)
     && completionPreview?.phraseTranslation !== warmupContextTranslation;
   const completionPhrase = completionPhraseForItem(item);
+  const completionReplayAudioUrl = completionReplayAudio(item.audio_url, completionPhrase);
   const languageLabel = isSpanishToGerman
     ? t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[targetLanguage])
     : t(STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE[sourceLanguage]);
@@ -416,7 +331,7 @@ export default function WordReview({
       word: targetWordText,
       phrase: completionPhrase.text,
       phraseTranslation: completionPhrase.sourceText,
-      phraseAudioUrl: completionPhrase.audioUrl || item.audio_url || "",
+      phraseAudioUrl: completionReplayAudioUrl,
     });
     return true;
   };
@@ -896,8 +811,8 @@ export default function WordReview({
             fallbackPhrase={targetWordText}
             audioOnly={false}
             showReplayAudio={reviewComplete}
-            onReplayAudio={(completionPreview?.phraseAudioUrl || completionPhrase.audioUrl || item.audio_url)
-              ? () => playAudioUrl(completionPreview?.phraseAudioUrl || completionPhrase.audioUrl || item.audio_url || "")
+            onReplayAudio={completionPreview.phraseAudioUrl
+              ? () => playAudioUrl(completionPreview.phraseAudioUrl)
               : undefined}
           />
         )}

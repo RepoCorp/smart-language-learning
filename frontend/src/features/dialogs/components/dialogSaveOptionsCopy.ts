@@ -15,7 +15,7 @@ const COPY: Record<"en" | "es", DialogSaveOptionsCopy> = {
     partialLineDescription: "Choose two or more words from the line.",
   },
   es: {
-    saveLabel: "Guardar una frase",
+    saveLabel: "Guardar frase",
     fullLineTitle: "Línea completa",
     fullLineDescription: "Estudia toda esta línea junta.",
     partialLineTitle: "Expresión corta",

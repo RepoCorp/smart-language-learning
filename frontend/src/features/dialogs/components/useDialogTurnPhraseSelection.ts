@@ -22,8 +22,8 @@ export function useDialogTurnPhraseSelection({
   sentenceAddError,
   onOpenItem,
 }: {
-  dialogId: number;
-  turnIndex: number;
+  dialogId?: number;
+  turnIndex?: number;
   sourceText: string;
   targetText: string;
   sourceLanguage: StudyLanguageCode;

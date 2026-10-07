@@ -22,7 +22,7 @@ vi.mock("../src/components/WordReview", () => ({
     ? <button onClick={onNextItem}>Next word</button>
     : <button onClick={() => onAnswered(true)}>Pass word</button>}</div>,
 }));
-vi.mock("../src/components/NewItem", async () => ({ default: (await import("../src/components/session/PatternItem")).default }));
+vi.mock("../src/components/LegacyItemView", async () => ({ default: (await import("../src/components/session/PatternItem")).default }));
 vi.mock("../src/components/PhraseReview", () => ({ default: () => null }));
 vi.mock("../src/components/WordPartsReview", () => ({ default: () => null }));
 
@@ -38,8 +38,71 @@ const storageKey = "active_session_spanish_german";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(submitReview).mockResolvedValue(undefined);
   vi.mocked(fetchSession).mockResolvedValue({ items: [pattern, word] });
   vi.mocked(fetchSessionItem).mockImplementation(async entry => entry.id === pattern.id ? patternPayload : word);
+});
+
+const definitionPayload: SessionItem = {
+  ...patternPayload, pattern_key: "german_suffix_keit", german_text: "-keit",
+  learning_evaluation: { id: "affix_production", content: {
+    base: "möglich", base_translation: "posible", meaning: "posibilidad",
+    answer: "die Möglichkeit", highlight: [11, 15],
+  } },
+};
+
+describe("registered evaluations in real sessions", () => {
+  beforeEach(() => {
+    vi.mocked(fetchSessionItem).mockImplementation(async entry => entry.id === pattern.id ? definitionPayload : word);
+  });
+
+  it.each([true, false])("submits the pinned production version for result %s then advances the session", async correct => {
+    render(<SessionPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Start session" }));
+    expect(await screen.findByText("möglich")).toBeInTheDocument();
+    expect(screen.queryByText("hope")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Möglichkeit/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reveal answer" }));
+    expect(screen.getByText("keit", { selector: "strong" }).parentElement).toHaveTextContent("die Möglichkeit");
+    expect(screen.getByRole("note")).toHaveTextContent("-keit");
+    fireEvent.click(screen.getByRole("button", { name: correct ? "Passed" : "Failed" }));
+    const next = await screen.findByRole("button", { name: "Next" });
+    expect(submitReview).toHaveBeenCalledTimes(1);
+    expect(submitReview).toHaveBeenCalledWith(8, correct, "es_to_de", 0);
+    expect(screen.getByRole("button", { name: "Open details" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Passed" })).not.toBeInTheDocument();
+    fireEvent.click(next);
+    expect(await screen.findByText("Hund")).toBeInTheDocument();
+  });
+
+  it("keeps the answer and allows retry after a save failure", async () => {
+    vi.mocked(submitReview).mockRejectedValueOnce(new Error("Offline"));
+    render(<SessionPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Start session" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reveal answer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Passed" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your result could not be saved.");
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    expect(screen.getByText("keit", { selector: "strong" }).parentElement).toHaveTextContent("die Möglichkeit");
+    fireEvent.click(screen.getByRole("button", { name: "Passed" }));
+    expect(await screen.findByRole("button", { name: "Next" })).toBeInTheDocument();
+    expect(submitReview).toHaveBeenCalledTimes(2);
+    expect(submitReview).toHaveBeenLastCalledWith(8, true, "es_to_de", 0);
+  });
+
+  it.each([false, true])("restores a pinned attempt with completed=%s without scoring again", async completed => {
+    sessionStorage.setItem(storageKey, JSON.stringify({
+      items: [pattern, word], index: 0, sessionDurationMinutes: 10,
+      sessionEndsAtMs: Date.now() + 600_000, showPostReviewItem: completed,
+    }));
+    render(<SessionPage />);
+    expect(await screen.findByText("möglich")).toBeInTheDocument();
+    expect(fetchSessionItem).toHaveBeenCalledWith(expect.objectContaining(pattern), "spanish", "german");
+    expect(screen.getByRole("button", { name: completed ? "Next" : "Reveal answer" })).toBeInTheDocument();
+    expect(submitReview).not.toHaveBeenCalled();
+    expect(fetchSession).not.toHaveBeenCalled();
+  });
 });
 
 async function start() {

@@ -37,7 +37,7 @@ do not globally disable zoom.
 
 Tests: `frontend/tests/visualViewport.test.ts` and
 `frontend/e2e/item-modal-accessibility.spec.ts`. The browser fixture renders the
-real DialogTurnText, item-saving modal, and NewItem components with mocked API
+real DialogTurnText, item-saving modal, and LegacyItemView components with mocked API
 responses, so it does not generate content or modify learning data. Chromium
 checks cover tappable-only scaling, 320px screens, 200% emulated pinch zoom, zoom changes,
 scrolling and dismissal. These do not replace a real-phone check of Safari/iOS

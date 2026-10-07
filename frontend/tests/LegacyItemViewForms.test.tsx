@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import NewItem from "../src/components/NewItem";
+import LegacyItemView from "../src/components/LegacyItemView";
 import { fetchContentItemDetail } from "../src/api";
 import { generateContentItemExercises } from "../src/apiNounExercises";
 import { useRepeatExerciseLoop } from "../src/components/useRepeatExerciseLoop";
@@ -57,7 +57,7 @@ async function openForms(item: SessionItem) {
     ...item,
     created_at: "2026-09-17T00:00:00Z",
   });
-  const view = render(<NewItem item={item} readOnly />);
+  const view = render(<LegacyItemView item={item} readOnly />);
   await userEvent.click(screen.getByRole("button", { name: "Open strategies" }));
   const modal = within(await screen.findByRole("dialog"));
   await userEvent.selectOptions(modal.getByRole("combobox"), "Forms");
@@ -101,7 +101,7 @@ describe("item Forms entry preparation", () => {
     localStorage.setItem("study_target_language", "english");
     const item = word({ german_text: text, word_type: type });
     vi.mocked(fetchContentItemDetail).mockResolvedValue({ ...item, created_at: "2026-09-27T00:00:00Z" });
-    render(<StudyLanguagesProvider><NewItem item={item} readOnly /></StudyLanguagesProvider>);
+    render(<StudyLanguagesProvider><LegacyItemView item={item} readOnly /></StudyLanguagesProvider>);
     await userEvent.click(screen.getByRole("button", { name: "Open strategies" }));
     const modal = within(await screen.findByRole("dialog"));
     await userEvent.selectOptions(modal.getByRole("combobox"), "Grammar");
@@ -276,7 +276,7 @@ describe("item Forms entry preparation", () => {
     expect(loopLines()).toEqual([]);
     await userEvent.click(reopened.getByRole("button", { name: "Select all" }));
 
-    rerender(<NewItem item={word({ id: 74, german_text: "neu", spanish_text: "nuevo", exercise_phrases: { phrases: [phrase("Das ist neu.")] } })} readOnly />);
+    rerender(<LegacyItemView item={word({ id: 74, german_text: "neu", spanish_text: "nuevo", exercise_phrases: { phrases: [phrase("Das ist neu.")] } })} readOnly />);
     await waitFor(() => expect(loopLines()).toEqual([]));
     await userEvent.selectOptions(reopened.getByRole("combobox"), "Forms");
     expect(reopened.queryByText("Das ist klein.")).not.toBeInTheDocument();

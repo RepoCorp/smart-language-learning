@@ -14,7 +14,7 @@ import { useI18n } from "../../i18n";
 import { toItemViewSessionItem } from "../../itemViewItem";
 import { useStudyLanguages } from "../../studyLanguages";
 import type { ContentItemConversationResponse, SessionItem } from "../../types";
-import NewItem from "../../components/NewItem";
+import LegacyItemView from "../../components/LegacyItemView";
 import ConversationActiveControls from "./ConversationActiveControls";
 import ConversationMoreControls from "./ConversationMoreControls";
 import { useConversationPreferences } from "./useConversationPreferences";
@@ -773,7 +773,7 @@ export default function ConversationPage(): JSX.Element {
       {openedLinkedWord && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
           <div className="blocking-modal words-item-modal">
-            <NewItem item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
+            <LegacyItemView item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
           </div>
         </div>
       )}

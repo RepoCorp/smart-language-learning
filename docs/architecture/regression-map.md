@@ -11,7 +11,7 @@ before changing the corresponding behavior.
 | Session lifecycle, directional tests, reveal/grade/audio, difficult practice | `frontend/tests/SessionPage.test.tsx`; `backend/tests/test_session_api.py`, `test_review_api.py`, `test_session_item_boundaries.py` |
 | Typing completion, Unicode, hints, feedback | `frontend/tests/wordExerciseCompletion.test.tsx`, `wordTypingEllipsis.test.tsx`, `wordChallengeInputLogic.test.ts`, `typingMistakeSound.test.tsx` |
 | Touch/desktop blocks | `frontend/tests/blockDrag.test.ts`, `blockExercises.test.tsx`, `ProgressivePhraseBlocksReview.test.ts` |
-| Forms preparation, selection, plural loop, item switching | `frontend/tests/NewItemForms.test.tsx` |
+| Forms preparation, selection, plural loop, item switching | `frontend/tests/LegacyItemViewForms.test.tsx` |
 | Dialog audio mode, speed, cancellation | `frontend/tests/DialogsPageAudio.test.tsx`, `dialogPlayback.test.tsx`; `backend/tests/test_dialog_clear_audio.py`, `test_word_audio_text.py` |
 | Conversation closing and goals | `frontend/tests/conversation/`; `backend/tests/test_realtime_closing_instructions.py`, `test_conversation_goal_phase.py` |
 | Saving content and grammar persistence | `backend/tests/test_content_api.py`, `test_item_question_grammar.py`, `test_conversation_error_analysis.py` |

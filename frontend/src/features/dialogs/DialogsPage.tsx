@@ -14,7 +14,7 @@ import DialogsFilterBar from "./components/DialogsFilterBar";
 import { useDialogItemSaving } from "./components/useDialogItemSaving";
 import useDialogsCatalog, { mergeDialogRecord } from "./components/useDialogsCatalog";
 import useDialogTurnPlayback, { type DialogTurnAudioMode } from "./components/useDialogTurnPlayback";
-import NewItem from "../../components/NewItem";
+import LegacyItemView from "../../components/LegacyItemView";
 import useDialogPlaybackFocus from "../../components/useDialogPlaybackFocus";
 import { useI18n } from "../../i18n";
 import { usePromptPreferences } from "../../promptPreferences";
@@ -317,7 +317,7 @@ export default function DialogsPage(): JSX.Element {
         <DialogItemSavingModals
           pendingWordAdd={pendingWordAdd}
           addingWord={addingWord}
-          openedItemContent={openedLinkedWord && <NewItem item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />}
+          openedItemContent={openedLinkedWord && <LegacyItemView item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />}
           onCancelWordAdd={() => setPendingWordAdd(null)}
           onConfirmWordAdd={() => void confirmAddWordFromDialog()}
         />

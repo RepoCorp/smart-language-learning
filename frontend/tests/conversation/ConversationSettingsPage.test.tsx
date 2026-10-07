@@ -23,7 +23,7 @@ vi.mock("../../src/api", () => ({
   regenerateTopicConversationGoal: mocks.goal, startTopicConversation: mocks.begin,
   quickAddWordFromDialog: mocks.word,
 }));
-vi.mock("../../src/components/NewItem", () => ({ default: () => null }));
+vi.mock("../../src/components/LegacyItemView", () => ({ default: () => null }));
 vi.mock("../../src/features/conversation/useConversationScroll", () => ({ useConversationScroll: () => ({}) }));
 vi.mock("../../src/features/conversation/useConversationReview", () => ({ useConversationReview: () => ({
   resetReview: vi.fn(), preparationReady: true,

@@ -7,7 +7,7 @@ import PatternReview from "../src/components/session/PatternReview";
 import SessionCurrentItem from "../src/components/session/SessionCurrentItem";
 import type { SessionItem } from "../src/types";
 
-vi.mock("../src/components/NewItem", () => ({ default: () => <div>New item</div> }));
+vi.mock("../src/components/LegacyItemView", () => ({ default: () => <div>New item</div> }));
 vi.mock("../src/components/PhraseReview", () => ({ default: () => <div>Phrase exercise</div> }));
 vi.mock("../src/components/WordReview", () => ({ default: () => <div>Word exercise</div> }));
 vi.mock("../src/components/WordPartsReview", () => ({ default: () => <div>Word blocks</div> }));

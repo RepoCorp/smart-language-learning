@@ -2,7 +2,7 @@ import { useI18n } from "../i18n";
 import { useStudyLanguages } from "../studyLanguages";
 import { FullScreenLoadingOverlay } from "./BlockingLoadingOverlay";
 import DialogTurnText from "./DialogTurnText";
-import NewItem from "./NewItem";
+import LegacyItemView from "./LegacyItemView";
 import DialogItemSavingModals from "../features/dialogs/components/DialogItemSavingModals";
 import { useDialogItemSaving } from "../features/dialogs/components/useDialogItemSaving";
 
@@ -14,6 +14,7 @@ interface InteractiveTargetPhraseProps {
   dialogId?: number;
   turnIndex?: number;
   statusKeyPrefix: string;
+  allowPhraseSaving?: boolean;
 }
 
 export default function InteractiveTargetPhrase({
@@ -24,11 +25,14 @@ export default function InteractiveTargetPhrase({
   dialogId,
   turnIndex,
   statusKeyPrefix,
+  allowPhraseSaving = false,
 }: InteractiveTargetPhraseProps): JSX.Element {
   const { t } = useI18n();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
   const {
     wordActionStatus,
+    phraseActionStatus,
+    phraseActionError,
     pendingWordAdd,
     addingWord,
     openedLinkedWord,
@@ -38,14 +42,17 @@ export default function InteractiveTargetPhrase({
     openLinkedWordItem,
     requestAddWordFromDialogToken,
     confirmAddWordFromDialog,
+    addWholeTurnPhraseFromDialog,
+    wholeTurnPhraseKey,
   } = useDialogItemSaving({ sourceLanguage, targetLanguage });
+  const phraseKey = wholeTurnPhraseKey(dialogId, turnIndex);
 
   return (
     <>
       <div className={className}>
         <DialogTurnText
-          dialogId={dialogId ?? -1}
-          turnIndex={turnIndex ?? -1}
+          dialogId={dialogId}
+          turnIndex={turnIndex}
           sourceText={sourceText}
           targetText={targetText}
           sourceLanguage={sourceLanguage}
@@ -53,8 +60,13 @@ export default function InteractiveTargetPhrase({
           tokenStatus={wordActionStatus}
           statusKeyPrefix={statusKeyPrefix}
           hideTargetText={hideTargetText}
-          showPhraseSelection={false}
-          showSavingOverlay={false}
+          showPhraseSelection={allowPhraseSaving}
+          showSavingOverlay={allowPhraseSaving && !isSaving}
+          wholePhraseSaveAction={allowPhraseSaving ? {
+            onSave: () => addWholeTurnPhraseFromDialog(dialogId, { source_text: sourceText, target_text: targetText }, turnIndex),
+            status: phraseActionStatus[phraseKey],
+            error: phraseActionError[phraseKey],
+          } : undefined}
           onOpenItem={openLinkedWordItem}
           onTokenClick={(key, token) => void requestAddWordFromDialogToken(
             key,
@@ -71,7 +83,7 @@ export default function InteractiveTargetPhrase({
         pendingWordAdd={pendingWordAdd}
         addingWord={addingWord}
         openedItemContent={openedLinkedWord && (
-          <NewItem item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
+          <LegacyItemView item={openedLinkedWord} readOnly onClose={() => setOpenedLinkedWord(null)} />
         )}
         onCancelWordAdd={() => setPendingWordAdd(null)}
         onConfirmWordAdd={() => void confirmAddWordFromDialog()}

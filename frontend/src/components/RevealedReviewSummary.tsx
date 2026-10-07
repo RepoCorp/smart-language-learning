@@ -49,16 +49,15 @@ export default function RevealedReviewSummary({
           >
             <DialogActionIcon name="play" />
           </button>
-          {canHidePhraseText && !showPhraseText ? (
-            <p className="prompt prompt-audio-placeholder revealed-answer-audio-placeholder">{t("prompt.audioOnly")}</p>
-          ) : (
             <InteractiveTargetPhrase
+              key={`${itemId}-${targetText}`}
               className="conversation-line conversation-line-translation revealed-answer-phrase"
               sourceText={phraseTranslation || ""}
               targetText={targetText}
               statusKeyPrefix={`review-${itemId}-phrase`}
+              hideTargetText={canHidePhraseText && !showPhraseText}
+              allowPhraseSaving={Boolean(phrase || fallbackPhrase)}
             />
-          )}
           {canHidePhraseText && (
             <button
               type="button"
@@ -74,10 +73,12 @@ export default function RevealedReviewSummary({
       )}
       {!showAudioControls && (
         <InteractiveTargetPhrase
+          key={`${itemId}-${targetText}`}
           className="conversation-line conversation-line-translation revealed-answer-phrase"
           sourceText={phraseTranslation || ""}
           targetText={targetText}
           statusKeyPrefix={`review-${itemId}-phrase`}
+          allowPhraseSaving={Boolean(phrase || fallbackPhrase)}
         />
       )}
     </div>

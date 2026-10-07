@@ -24,6 +24,7 @@ class SessionRestoreStateSerializer(serializers.Serializer):
 
 
 class SessionItemSerializer(serializers.Serializer):
+    learning_evaluation = serializers.DictField(required=False)
     practice_grammar_feature_keys = serializers.ListField(child=serializers.CharField(), required=False)
     pattern_key = serializers.CharField(required=False)
     pattern_exercise = serializers.DictField(required=False)

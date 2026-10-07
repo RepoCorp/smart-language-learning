@@ -154,6 +154,7 @@ export interface SessionRestoreState {
 }
 
 export interface SessionItem {
+  learning_evaluation?: import("./features/learningContent/evaluations/sessionTypes").LearningEvaluationPayload;
   practice_grammar_feature_keys?: string[];
   id: number;
   item_type: ItemType | "pattern";

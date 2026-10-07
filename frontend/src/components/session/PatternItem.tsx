@@ -4,6 +4,7 @@ import { useStudyLanguages } from "../../studyLanguages";
 import { wordFormationPattern } from "../../languageFeatures/wordFormation";
 import type { SessionItem } from "../../types";
 import "../strategies/WordFormationPatterns.css";
+import ItemViewShell from "../itemView/ItemViewShell";
 
 export default function PatternItem({ item, onContinue, continueLabel, readOnly = false, onClose }: {
   item: SessionItem;
@@ -23,8 +24,7 @@ export default function PatternItem({ item, onContinue, continueLabel, readOnly 
     setError(false);
     try { await onContinue?.(); } catch { setError(true); } finally { setSaving(false); }
   };
-  return <div className="word-formation-patterns">
-    {onClose && <button type="button" className="modal-corner-close" aria-label={t("words.close")} onClick={onClose}>×</button>}
+  return <ItemViewShell className="word-formation-patterns" onClose={onClose} closeLabel={t("words.close")}>
     <h2>{item.german_text}</h2>
     {construction && <><p>{item.notes}</p><p>{item.example_sentence}</p></>}
     {pattern && <p>{t(pattern.note)}</p>}
@@ -39,5 +39,5 @@ export default function PatternItem({ item, onContinue, continueLabel, readOnly 
     {!readOnly && onContinue && <button type="button" disabled={saving} onClick={() => void confirm()}>
       {saving ? t("newItem.saving") : continueLabel || t("newItem.gotIt")}
     </button>}
-  </div>;
+  </ItemViewShell>;
 }

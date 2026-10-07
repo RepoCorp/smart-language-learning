@@ -19,6 +19,7 @@ entire conversation history or audit the whole application for a small task.
 | --- | --- |
 | Session items and patterns | [Word-formation patterns](product/word-formation-patterns.md); `backend/learning/srs.py`, `review_schedule.py`, `review_availability.py`; `frontend/src/features/session/` |
 | Contextual construction patterns | [Construction patterns](product/construction-patterns.md) |
+| New learning definitions and playground | [Learning content playground](architecture/learning-content-playground.md) |
 | Blocks and typing | [Block exercises](product/block-exercises.md), [Typing feedback](product/typing-feedback.md) |
 | Grammar and languages | [Grammar explanations](product/grammar-explanations.md), [Localization](architecture/localization.md), [English entries](product/english-word-entries.md), [Learning levels](product/learning-levels.md) |
 | Onboarding | [Starter guide](product/starter-guide.md) |

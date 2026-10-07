@@ -10,6 +10,7 @@ import {
 } from "./authApi";
 import AuthLanding from "./components/AuthLanding";
 import AdminPage from "./features/admin/AdminPage";
+import LearningContentPlayground from "./features/learningContent/playground/LearningContentPlayground";
 import AIQuotaNotice from "./components/AIQuotaNotice";
 import ConfigurationsPage from "./features/configuration/ConfigurationsPage";
 import GettingStartedGuideModal from "./components/GettingStartedGuideModal";
@@ -222,6 +223,7 @@ export default function App(): JSX.Element {
               )}
             />
             <Route path="/admin" element={authUser.is_superuser ? <AdminPage authUser={authUser} /> : <Navigate to="/configurations" replace />} />
+            <Route path="/admin/learning-content" element={authUser.is_superuser ? <LearningContentPlayground /> : <Navigate to="/configurations" replace />} />
             <Route path="*" element={<Navigate to="/session" replace />} />
           </Routes>
           <GlobalSessionEndPrompt />

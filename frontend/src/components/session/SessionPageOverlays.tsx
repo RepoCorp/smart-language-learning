@@ -1,6 +1,6 @@
 import { useI18n } from "../../i18n";
 import type { SessionItem } from "../../types";
-import NewItem from "../NewItem";
+import LegacyItemView from "../LegacyItemView";
 
 interface SessionPageOverlaysProps {
   openedItem: SessionItem | null;
@@ -29,7 +29,7 @@ export default function SessionPageOverlays({
             {!openedItem && <button type="button" className="modal-corner-close" aria-label={t("words.close")} onClick={onCloseItem}>×</button>}
             {loadingOpenedItem && <p>{t("session.loading")}</p>}
             {!loadingOpenedItem && openedItemError && <p className="error">{openedItemError}</p>}
-            {!loadingOpenedItem && openedItem && <NewItem item={openedItem} readOnly onClose={onCloseItem} />}
+            {!loadingOpenedItem && openedItem && <LegacyItemView item={openedItem} readOnly onClose={onCloseItem} />}
           </div>
         </div>
       ) : null}

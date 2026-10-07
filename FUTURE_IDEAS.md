@@ -8,6 +8,7 @@ Refactor y tests.
 Letras de canciones con frases muy largas
 Por que passen no tiene frase?
 ejemplo de expresion es la frase de donde salio
+Añadir frase desde ejemplo test
 
 ## COSAS IMPORTANTES QUE VAMOS A EMPEZAR A HACER:
 

@@ -43,19 +43,6 @@
   overflow-wrap: anywhere;
 }
 
-.blocking-modal .item-view-shell > .modal-corner-close {
-  position: sticky;
-  top: 0;
-  right: auto;
-  align-self: flex-end;
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  font-size: 1.375rem;
-  background: var(--color-surface);
-}
-
 /* These scroll surfaces must not suppress pinch zoom through an ancestor. */
 .blocking-modal .item-actions-toolbar {
   touch-action: pan-x pinch-zoom;

@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 
 import type { SessionItem } from "../../types";
-import NewItem from "../NewItem";
+import LegacyItemView from "../LegacyItemView";
 import PhraseReview from "../PhraseReview";
 import WordPartsReview from "../WordPartsReview";
 import WordReview from "../WordReview";
 import PatternReview from "./PatternReview";
 import PracticeRuleNote from "./PracticeRuleNote";
+import SessionEvaluation from "../../features/learningContent/evaluations/SessionEvaluation";
 
 type SessionCurrentItemProps = {
   item: SessionItem;
@@ -40,7 +41,13 @@ function CurrentItemExercise({
   disabled = false,
 }: SessionCurrentItemProps): JSX.Element {
   if (item.mode === "new") {
-    return <NewItem key={renderKey} item={item} onContinue={onNewItemContinue} />;
+    return <LegacyItemView key={renderKey} item={item} onContinue={onNewItemContinue} />;
+  }
+
+  if (item.learning_evaluation) {
+    return <SessionEvaluation key={renderKey} payload={item.learning_evaluation} completed={reviewComplete} disabled={disabled}
+      onAnswered={onReviewAnswered} onNext={onNextItem} postReviewActions={postReviewActions}
+      answerDetails={<PracticeRuleNote patternKey={item.pattern_key} />} />;
   }
 
   if (item.item_type === "pattern") {

@@ -32,7 +32,7 @@ import DialogActionIcon from "./DialogActionIcon";
 import ItemActionToolbar from "./ItemActionToolbar";
 import ItemAdminActionsModal from "./ItemAdminActionsModal";
 import ItemQuestionsModal from "./ItemQuestionsModal";
-import ItemViewHeader from "./ItemViewHeader";
+import LegacyItemViewHeader from "./itemView/legacy/LegacyItemViewHeader";
 import PhraseReview from "./PhraseReview";
 import WordExerciseActions from "./WordExerciseActions";
 import FormsStrategyPanel from "./strategies/FormsStrategyPanel";
@@ -79,8 +79,9 @@ import VerbExerciseSelector, {
 } from "./VerbExerciseSelector";
 import WordReview from "./WordReview";
 import PatternItem from "./session/PatternItem";
+import ItemViewShell from "./itemView/ItemViewShell";
 
-interface NewItemProps {
+interface LegacyItemViewProps {
   item: SessionItem;
   onContinue?: () => Promise<void>;
   continueLabel?: string;
@@ -157,7 +158,7 @@ function ItemActionIcon({
   );
 }
 
-export default function NewItem(props: NewItemProps): JSX.Element {
+export default function LegacyItemView(props: LegacyItemViewProps): JSX.Element {
   if (props.item.item_type === "pattern") return <PatternItem {...props} />;
   return <WordOrPhraseItem {...props} item={{ ...props.item, item_type: props.item.item_type }} />;
 }
@@ -169,7 +170,7 @@ function WordOrPhraseItem({
   autoplayAudioOnMount = false,
   readOnly = false,
   onClose,
-}: Omit<NewItemProps, "item"> & { item: SessionItem & { item_type: "word" | "phrase" } }): JSX.Element {
+}: Omit<LegacyItemViewProps, "item"> & { item: SessionItem & { item_type: "word" | "phrase" } }): JSX.Element {
   const { t } = useI18n();
   const {
     targetPromptMode,
@@ -1206,18 +1207,8 @@ function WordOrPhraseItem({
   };
 
   return (
-    <div className="item-view-shell">
-      {readOnly && onClose && (
-        <button
-          type="button"
-          className="modal-corner-close"
-          aria-label={t("words.close")}
-          onClick={onClose}
-        >
-          ×
-        </button>
-      )}
-      <ItemViewHeader
+    <ItemViewShell onClose={readOnly ? onClose : undefined} closeLabel={t("words.close")}>
+      <LegacyItemViewHeader
         itemType={item.item_type}
         targetText={targetText}
         sourceText={sourceText}
@@ -2033,7 +2024,7 @@ function WordOrPhraseItem({
         pendingWordAdd={pendingWordAdd}
         addingWord={addingWord}
         openedItemContent={openedLinkedWord && (
-          <NewItem
+          <LegacyItemView
             item={openedLinkedWord}
             readOnly
             onClose={() => setOpenedLinkedWord(null)}
@@ -2046,6 +2037,6 @@ function WordOrPhraseItem({
         loading={savingDialogItem}
         message={t("loading.savingItem")}
       />
-    </div>
+    </ItemViewShell>
   );
 }

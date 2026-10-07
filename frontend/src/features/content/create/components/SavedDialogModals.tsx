@@ -1,7 +1,7 @@
 import WordAddConfirmation from "../../../dialogs/components/WordAddConfirmation";
 import { useI18n } from "../../../../i18n";
 import type { SessionItem } from "../../../../types";
-import NewItem from "../../../../components/NewItem";
+import LegacyItemView from "../../../../components/LegacyItemView";
 import type { PendingWordAdd } from "./useSavedDialogInteractions";
 
 type Props = {
@@ -30,7 +30,7 @@ export default function SavedDialogModals({
       {pendingWordAdd && <WordAddConfirmation item={pendingWordAdd} saving={addingWord} onCancel={onClosePendingWordAdd} onConfirm={() => void onConfirmWordAdd()} />}
       {openedLinkedWord && (
         <div className="blocking-modal-overlay" role="dialog" aria-modal="true">
-          <div className="blocking-modal words-item-modal"><NewItem item={openedLinkedWord} readOnly onClose={onCloseOpenedLinkedWord} /></div>
+          <div className="blocking-modal words-item-modal"><LegacyItemView item={openedLinkedWord} readOnly onClose={onCloseOpenedLinkedWord} /></div>
         </div>
       )}
       {loadingLinkedWord && <p className="hint">{t("session.loading")}</p>}

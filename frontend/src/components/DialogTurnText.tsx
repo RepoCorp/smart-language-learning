@@ -17,8 +17,8 @@ export type WholePhraseSaveAction = {
 };
 
 interface DialogTurnTextProps {
-  dialogId: number;
-  turnIndex: number;
+  dialogId?: number;
+  turnIndex?: number;
   sourceText: string;
   targetText: string;
   sourceLanguage: StudyLanguageCode;

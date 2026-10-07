@@ -1,0 +1,68 @@
+.learning-content-playground {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.learning-content-playground > .card {
+  margin: 0;
+  min-width: 0;
+}
+
+.learning-content-playground__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+}
+
+.learning-content-playground__controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.learning-content-playground__controls select {
+  width: 100%;
+  min-width: 0;
+}
+
+.learning-content-playground__controls .learning-content-playground__narrow {
+  display: flex;
+  align-items: center;
+}
+
+.learning-content-playground__narrow input {
+  width: auto;
+}
+
+.learning-content-playground__preview {
+  max-height: 75dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.learning-content-playground__preview--narrow {
+  width: 360px;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-self: center;
+}
+
+.learning-content-playground__data pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+  .learning-content-playground {
+    padding: 12px;
+  }
+
+  .learning-content-playground > .card {
+    padding: 12px;
+  }
+}

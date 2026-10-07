@@ -53,8 +53,8 @@ export function useDialogItemSaving({
   openLinkedWordItem: (itemId: number) => Promise<void>;
   requestAddWordFromDialogToken: (key: string, sourceTokenRaw: string, targetTokenRaw: string, dialogId?: number, turnIndex?: number, sourceLine?: string, targetLine?: string) => Promise<void>;
   confirmAddWordFromDialog: () => Promise<void>;
-  addWholeTurnPhraseFromDialog: (dialogId: number, turn: DialogTurn, turnIndex: number) => Promise<void>;
-  wholeTurnPhraseKey: (dialogId: number, turnIndex: number) => string;
+  addWholeTurnPhraseFromDialog: (dialogId: number | undefined, turn: DialogTurn, turnIndex: number | undefined) => Promise<void>;
+  wholeTurnPhraseKey: (dialogId: number | undefined, turnIndex: number | undefined) => string;
 } {
   const { t } = useI18n();
   const [wordActionStatus, setWordActionStatus] = useState<Record<string, DialogItemActionStatus>>({});
@@ -143,10 +143,10 @@ export function useDialogItemSaving({
     }
   };
 
-  const wholeTurnPhraseKey = (dialogId: number, turnIndex: number): string => `${phraseKeyPrefix}-${dialogId}-turn-${turnIndex}-whole-phrase`;
+  const wholeTurnPhraseKey = (dialogId: number | undefined, turnIndex: number | undefined): string => `${phraseKeyPrefix}-${dialogId}-turn-${turnIndex}-whole-phrase`;
 
-  const addWholeTurnPhraseFromDialog = async (dialogId: number, turn: DialogTurn, turnIndex: number): Promise<void> => {
-    if (!turn.source_text.trim() || !turn.target_text.trim()) {
+  const addWholeTurnPhraseFromDialog = async (dialogId: number | undefined, turn: DialogTurn, turnIndex: number | undefined): Promise<void> => {
+    if (!turn.target_text.trim()) {
       return;
     }
     const statusKey = wholeTurnPhraseKey(dialogId, turnIndex);

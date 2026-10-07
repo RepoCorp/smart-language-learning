@@ -9,13 +9,16 @@ import {
   STUDY_LANGUAGE_MESSAGE_KEY_BY_CODE,
 } from "../../studyLanguageMetadata";
 import { useStudyLanguages } from "../../studyLanguages";
+import { useNavigate } from "react-router-dom";
+import { locales } from "../learningContent/locales";
 
 interface AdminPageProps {
   authUser: AuthUser;
 }
 
 export default function AdminPage({ authUser }: AdminPageProps): JSX.Element {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const navigate = useNavigate();
   const { enabled: debugToolsEnabled, setEnabled: setDebugToolsEnabled } = useDebugTools();
   const { sourceLanguage, targetLanguage } = useStudyLanguages();
 
@@ -26,6 +29,9 @@ export default function AdminPage({ authUser }: AdminPageProps): JSX.Element {
         <p className="settings-subtitle">{t("config.adminSubtitle")}</p>
       </section>
       <ConfigurationAdminUsersSection canCreateUsers />
+      <section className="card settings-card">
+        <button type="button" onClick={() => navigate("/admin/learning-content")}>{locales[language].playgroundTitle}</button>
+      </section>
       <section className="card settings-card">
         <h2 className="settings-title">{t("config.debugTools")}</h2>
         <div className="settings-field">

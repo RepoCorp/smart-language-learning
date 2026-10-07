@@ -136,7 +136,7 @@ describe("SessionPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("supports Enter key for Got it on NewItem", async () => {
+  it("supports Enter key for Got it on LegacyItemView", async () => {
     vi.mocked(fetchSession).mockResolvedValue({
       items: [
         {

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import NewItem from "../../src/components/NewItem";
+import LegacyItemView from "../../src/components/LegacyItemView";
 import DialogTurnText from "../../src/components/DialogTurnText";
 import RevealedReviewSummary from "../../src/components/RevealedReviewSummary";
 import DialogItemSavingModals from "../../src/features/dialogs/components/DialogItemSavingModals";
@@ -44,7 +44,7 @@ function Fixture() {
     </section>
     <DialogItemSavingModals pendingWordAdd={null} addingWord={false}
       onCancelWordAdd={() => {}} onConfirmWordAdd={() => {}}
-      openedItemContent={open ? <NewItem item={item} readOnly onClose={() => setOpen(false)} /> : null} />
+      openedItemContent={open ? <LegacyItemView item={item} readOnly onClose={() => setOpen(false)} /> : null} />
   </I18nProvider>;
 }
 

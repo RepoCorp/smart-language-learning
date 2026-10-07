@@ -1,4 +1,5 @@
 from . import english, german, spanish
+from ..learning_content.session import evaluation_payload
 
 CATALOGS = {"english": english.PATTERNS, "german": german.PATTERNS}
 QUESTIONS = {"english": english.QUESTION, "spanish": spanish.QUESTION}
@@ -32,4 +33,5 @@ def item_payload(item, direction=None, version=None):
         "review_version": count,
         "pattern_exercise": exercise_for(item.target_language, item.pattern_key, item.source_language, count, direction),
         "pattern_examples": [e.exercise(item.source_language, QUESTIONS[item.source_language]) for e in examples],
+        **evaluation_payload(item, direction, count),
     }

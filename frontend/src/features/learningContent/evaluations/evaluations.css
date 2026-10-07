@@ -1,0 +1,50 @@
+.definition-evaluations-modal {
+  width: min(42rem, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  box-sizing: border-box;
+  padding: clamp(16px, 2vw, 24px);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+}
+
+.definition-evaluations-modal::backdrop {
+  background: rgba(17, 24, 39, 0.55);
+}
+
+.definition-evaluations-modal > .item-view-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 1.25rem 0;
+}
+
+.definition-evaluations-modal > .item-view-shell > * { grid-column: 1 / -1; min-width: 0; }
+
+.definition-evaluations-modal > .item-view-shell > .modal-corner-close {
+  grid-area: 1 / 2;
+  align-self: center;
+  margin: 0;
+  z-index: 1;
+}
+
+.definition-evaluations-modal h2 {
+  grid-row: 1;
+  align-self: center;
+  margin: 0;
+  padding-inline: 52px;
+  text-align: center;
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+
+.definition-evaluations-modal select { width: 100%; min-width: 0; box-sizing: border-box; }
+.definition-evaluation { display: grid; gap: 1rem; }
+.definition-evaluation-prompt { display: grid; gap: 0.5rem; }
+.definition-evaluation p { margin: 0; }
+.definition-evaluation .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0; }
+.definition-evaluation-answer { padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; }

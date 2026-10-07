@@ -1,6 +1,7 @@
 from django.urls import path
 from .views.word_formation import WordFormationView
 from .views.construction_patterns import ConstructionPatternSaveView
+from .views.learning_content import LearningContentCatalogView
 
 from .views import (
     AuthAdminCreateUserView,
@@ -87,6 +88,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("admin/learning-content", LearningContentCatalogView.as_view(), name="learning-content-catalog"),
     path("word-formation", WordFormationView.as_view(), name="word-formation"),
     path("construction-patterns", ConstructionPatternSaveView.as_view(), name="construction-patterns"),
     path("health", HealthView.as_view(), name="health"),

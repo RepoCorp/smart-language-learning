@@ -1,0 +1,40 @@
+.affix-pattern-view {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.affix-pattern-view h3,
+.affix-pattern-view p {
+  margin: 0;
+}
+
+.affix-pattern-view__examples-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.affix-pattern-view__examples {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.affix-pattern-view__examples li {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.affix-pattern-view__translation {
+  color: var(--color-text-muted);
+}

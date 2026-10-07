@@ -4,7 +4,7 @@ import { expect, it, vi } from "vitest";
 import DialogItemSavingModals from "../src/features/dialogs/components/DialogItemSavingModals";
 import SavedDialogModals from "../src/features/content/create/components/SavedDialogModals";
 
-vi.mock("../src/components/NewItem", () => ({ default: () => null }));
+vi.mock("../src/components/LegacyItemView", () => ({ default: () => null }));
 
 const pending = {
   key: "word", source: "venir", target: "kommen", wordType: "verb", turnIndex: 0,

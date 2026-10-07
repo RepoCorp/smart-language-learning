@@ -15,7 +15,7 @@ vi.mock("../../src/api", () => ({ startTopicConversation: vi.fn(async () => ({ t
 vi.mock("../../src/i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock("../../src/studyLanguages", () => ({ useStudyLanguages: () => ({ sourceLanguage: "spanish", targetLanguage: "german" }) }));
 vi.mock("../../src/promptPreferences", () => ({ usePromptPreferences: () => ({ targetPromptMode: "audio" }) }));
-vi.mock("../../src/components/NewItem", () => ({ default: () => null }));
+vi.mock("../../src/components/LegacyItemView", () => ({ default: () => null }));
 vi.mock("../../src/features/conversation/useConversationSetup", () => ({ useConversationSetup: () => ({
   previousTopics: [], selectedTopic: "Shopping", notes: "", role: "", goalDifficulty: "easy",
   selectedConversationMode: "http", resolvedTopic: "Shopping", goal: { text: "Buy bread" },
