@@ -57,10 +57,12 @@ the resulting word, and translations of both. Keep noun articles in examples and
 their meanings where appropriate. These examples are reusable content, not a
 separate playground-only copy.
 
-The current implementation is intentionally incomplete: the playground payload
-and some activity props are still affix-specific. Extend those contracts explicitly
-when adding a genuinely different family; do not claim that all item types already
-use the new system or introduce speculative classes for them in advance.
+The playground now uses a shared base definition/view contract, with family
+validation at registered implementation boundaries. Word and phrase definitions
+add study text and translations; words also supply word type and optional gender.
+Fixed German examples are registered for checking these new item layouts.
+Their activities are not implemented, and ordinary word/phrase items still use
+the legacy system. Extend family contracts only when the next concrete use needs it.
 
 The base contract is data, not a large behavior-owning superclass. Add capabilities
 through the relevant family and registered implementation; do not put fetching,
@@ -85,6 +87,8 @@ backend/learning/learning_content/
     evaluations.py              Family evaluation preparation
     bank_words.py               Family matching rules
     languages/german/keit.py     Concrete language-specific definition
+  words/                        Word contract and fixed language examples
+  phrases/                      Phrase contract and fixed language examples
 
 frontend/src/features/learningContent/
   definition.ts                 Frontend base contract
@@ -92,6 +96,8 @@ frontend/src/features/learningContent/
   strategies/                   Strategy modal, registry, shared bank-word list
   evaluations/                  Shared assessment controls and session dispatch
   patterns/affix/               Family views and evaluation content
+  words/                        Word definition, validation, and item view
+  phrases/                      Phrase definition, validation, and item view
   locales/                      Interface strings, not message components
   playground/                   Admin preview host
 ```
@@ -110,11 +116,12 @@ UI before wider adoption. It is admin-only and read-only: no review writes,
 enrollment, or paid generation. "Your words" reads the signed-in user's own bank,
 not all users' data, even for an administrator.
 
-Currently only `-keit` is registered. Its item view and strategies are available
-in the playground; its production and recognition evaluations are also connected
-to ordinary sessions through the existing review API. Other patterns and normal
-item-detail views remain legacy. The shell can be shared without migrating those
-behaviors. See [playground architecture](../architecture/learning-content-playground.md)
+The catalog contains `-keit` plus fixed word and phrase definitions. Only `-keit`
+has strategies and evaluations; its production and recognition evaluations are
+also connected to ordinary sessions through the existing review API. The fixed
+word and phrase entries support item-view inspection only. Other patterns and
+normal item-detail views remain legacy. The shell can be shared without migrating
+those behaviors. See [playground architecture](../architecture/learning-content-playground.md)
 for the exact UI, endpoints, session behavior, and verification commands.
 
 For each next slice: agree on the responsibility, characterize affected existing

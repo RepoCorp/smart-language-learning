@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import type { AffixPatternDefinition } from "../patterns/affix/definition";
+import type { LearningDefinition } from "../definition";
 import { CatalogRequestError, fetchDefinitions } from "./api";
 
 export function useDefinitionCatalog() {
-  const [definitions, setDefinitions] = useState<AffixPatternDefinition[]>([]);
+  const [definitions, setDefinitions] = useState<LearningDefinition[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<CatalogRequestError | null>(null);

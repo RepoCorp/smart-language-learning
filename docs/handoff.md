@@ -18,13 +18,29 @@ and requirement to investigate regressions rather than trusting a green review
 or assuming a stale browser. These constraints still apply when optimizing for
 faster, more focused tasks.
 
-As of this handoff, `git status` shows the Your words strategy implementation,
-its tests, and documentation changes pending, including the staged glossary.
-The earlier definition/evaluation implementation is already present in HEAD.
-Preserve all work and recheck status; the old uncommitted-work claims below have
-been replaced with historical headings rather than treated as current state.
+As of this handoff, the item/strategy header spacing changes and new fixed word
+and phrase playground previews are uncommitted, with their tests and documents.
+The earlier Your words implementation is in HEAD. An unrelated `FUTURE_IDEAS.md`
+edit appeared during this work and was preserved. Recheck status before editing.
 
 ## Latest implementation and verification
+
+The playground's Definition selector now includes `die Möglichkeit` and
+`Könnten Sie das bitte wiederholen?` alongside `-keit`. The user explicitly chose
+fixed examples for layout inspection. Word/phrase family definitions live in
+their own backend folders; their frontend views compose the shared header and
+show translated text, type, and notes. The noun retains its article and gender
+color. Their activities remain disabled, and ordinary word/phrase details and
+sessions remain legacy. The shared catalog/view contract is no longer affix-only;
+family validation sits at registered rendering boundaries.
+
+The item view and strategies modal now place Close beside their headings;
+the strategies modal no longer repeats the item title. Latest verification:
+69 backend tests, 198 focused frontend tests, 16 browser checks (the four new
+checks passed after correcting their test locator), production build, and diff
+check. Typecheck output exactly matches the 80-error baseline captured before
+this work. Screenshots were inspected for desktop and 320px/200% text layouts.
+No migration, deployment, paid generation, or progress writes.
 
 The new `-keit` playground now also offers Strategies > Your words. It reads
 matching saved words from the signed-in learner's selected language pair, in
@@ -52,7 +68,7 @@ rediscovering the relevant test suites or assuming coverage from their names.
 
 Browser checks used a temporary Playwright config on port 5186 because the default
 5174 belonged to another app. Check ports before running; do not reuse an unrelated
-server or stop another project. `/tmp/wls-phrase-saving.playwright.config.ts` was
+server or stop another project. `/tmp/wls-strategies.playwright.config.ts` was
 the local override, not a committed dependency or a guaranteed file on another machine.
 The full suite was not rerun for this slice. Earlier full-suite runs found 17
 `SessionPage.test.tsx` failures involving unmocked requests; do not enable real API

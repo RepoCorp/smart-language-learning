@@ -1,0 +1,26 @@
+.item-view-shell.definition-item-view--closable {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 12px 0;
+}
+
+.definition-item-view--closable > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.definition-item-view--closable > .modal-corner-close {
+  grid-area: 1 / 2;
+  align-self: start;
+  margin: 12px 12px 0 0;
+}
+
+.definition-item-view--closable > .modal-corner-close + * {
+  grid-area: 1 / 1 / 2 / -1;
+}
+
+.definition-item-view--closable > .modal-corner-close + * .item-view-title-row,
+.definition-item-view--closable > .modal-corner-close + p {
+  min-height: 44px;
+  padding-inline-end: 56px;
+}

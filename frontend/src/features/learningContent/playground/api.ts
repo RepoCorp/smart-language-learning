@@ -1,5 +1,5 @@
 import { API_BASE, apiFetch } from "../../../apiCore";
-import type { AffixPatternDefinition } from "../patterns/affix/definition";
+import { isLearningDefinition, type LearningDefinition } from "../definition";
 
 export class CatalogRequestError extends Error {
   constructor(public readonly kind: "connection" | "permission" | "endpoint" | "response" | "server", public readonly status?: number) {
@@ -7,7 +7,7 @@ export class CatalogRequestError extends Error {
   }
 }
 
-export async function fetchDefinitions(signal: AbortSignal): Promise<AffixPatternDefinition[]> {
+export async function fetchDefinitions(signal: AbortSignal): Promise<LearningDefinition[]> {
   let response: Response;
   try {
     response = await apiFetch(`${API_BASE}/admin/learning-content`, { signal, cache: "no-store" });
@@ -20,6 +20,8 @@ export async function fetchDefinitions(signal: AbortSignal): Promise<AffixPatter
     throw new CatalogRequestError(kind, response.status);
   }
   const payload = await response.json().catch(() => { throw new CatalogRequestError("response", response.status); });
-  if (!payload || !Array.isArray(payload.definitions)) throw new CatalogRequestError("response", response.status);
+  if (!payload || !Array.isArray(payload.definitions) || !payload.definitions.every(isLearningDefinition)) {
+    throw new CatalogRequestError("response", response.status);
+  }
   return payload.definitions;
 }

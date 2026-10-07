@@ -1,8 +1,10 @@
 import AffixExamples from "../patterns/affix/AffixExamples";
 import BankWords from "./bankWords/BankWords";
+import { isAffixPatternDefinition } from "../patterns/affix/definition";
+import { withDefinition } from "../itemViews/withDefinition";
 
 const strategies = {
-  affix_examples: { label: "examples" as const, View: AffixExamples },
+  affix_examples: { label: "examples" as const, View: withDefinition(isAffixPatternDefinition, AffixExamples) },
   affix_bank_words: { label: "yourWords" as const, View: BankWords },
 };
 

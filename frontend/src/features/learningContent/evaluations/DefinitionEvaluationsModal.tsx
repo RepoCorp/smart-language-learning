@@ -3,13 +3,13 @@ import ItemViewShell from "../../../components/itemView/ItemViewShell";
 import { useI18n } from "../../../i18n";
 import { locales } from "../locales";
 import type { LearningDefinition } from "../definition";
-import type { AffixPatternViewProps } from "../patterns/affix/AffixPatternView";
+import type { DefinitionViewProps } from "../itemViews/types";
 import { getEvaluation } from "./registry";
 import "./evaluations.css";
 
 type Direction = keyof LearningDefinition["evaluations"];
 
-export default function DefinitionEvaluationsModal({ onClose, ...props }: AffixPatternViewProps & {
+export default function DefinitionEvaluationsModal({ onClose, ...props }: DefinitionViewProps & {
   onClose: () => void;
 }): ReactElement {
   const { language } = useI18n();

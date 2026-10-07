@@ -3,6 +3,7 @@
 ## PRIORITARIO
 Ningun otro arreglito que no sea vital!!! 
 
+Que el asistente en la conversacion no ayude tanto tanto guiando la convesacion.
 Buscar como bajar costos en prompts y usar distintos modelos: hablé con Codex sobre esto pero voy a esperar a recoger datos de Juli y de mi mamá. Le dije a Codex que recordara el plan
 Refactor y tests.
 Letras de canciones con frases muy largas

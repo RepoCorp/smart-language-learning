@@ -25,7 +25,9 @@ export default function LearningContentPlayground(): ReactElement {
     <section className="card learning-content-playground__controls">
       <label>{text.definition}
         <select value={selected?.key ?? ""} onChange={event => setSelectedKey(event.target.value)} disabled={status !== "ready" || !definitions.length}>
-          {definitions.map(definition => <option key={definition.key} value={definition.key}>{definition.key}</option>)}
+          {definitions.map(definition => <option key={definition.key} value={definition.key}>
+            {definition.display[interfaceLanguage]?.title ?? definition.key}
+          </option>)}
         </select>
       </label>
       <label>{text.interfaceLanguage}

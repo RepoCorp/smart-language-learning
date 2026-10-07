@@ -1,11 +1,11 @@
 import { useState, type ReactElement } from "react";
 import DefinitionItemActions from "../itemViews/DefinitionItemActions";
-import type { AffixPatternViewProps } from "../patterns/affix/AffixPatternView";
+import type { DefinitionViewProps } from "../itemViews/types";
 import { useI18n } from "../../../i18n";
 import DefinitionStrategiesModal from "../strategies/DefinitionStrategiesModal";
 import DefinitionEvaluationsModal from "../evaluations/DefinitionEvaluationsModal";
 
-export default function DefinitionActivities(props: AffixPatternViewProps): ReactElement {
+export default function DefinitionActivities(props: DefinitionViewProps): ReactElement {
   const { language } = useI18n();
   const [open, setOpen] = useState<"strategies" | "evaluations" | null>(null);
   const hasStrategies = props.definition.strategies.length > 0;

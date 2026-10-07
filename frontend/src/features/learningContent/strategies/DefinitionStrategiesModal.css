@@ -3,7 +3,7 @@
   max-width: calc(100vw - 24px);
   max-height: calc(100dvh - 24px);
   box-sizing: border-box;
-  padding: 16px;
+  padding: 12px 16px 16px;
   border: 1px solid var(--color-border);
   border-radius: 16px;
   background: var(--color-surface);
@@ -17,6 +17,23 @@
   background: rgba(17, 24, 39, 0.55);
 }
 
+.definition-strategies-modal > .item-view-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 12px 0;
+}
+
+.definition-strategies-modal > .item-view-shell > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.definition-strategies-modal > .item-view-shell > .modal-corner-close {
+  grid-area: 1 / 2;
+  align-self: center;
+  margin: 0;
+}
+
 .definition-strategies-modal h2,
 .definition-strategies-modal h3,
 .definition-strategies-modal p {
@@ -24,5 +41,13 @@
 }
 
 .definition-strategies-modal h2 {
+  grid-row: 1;
+  align-self: center;
+  padding-inline: 52px;
   text-align: center;
+}
+
+.definition-strategies-modal select {
+  min-width: 0;
+  box-sizing: border-box;
 }

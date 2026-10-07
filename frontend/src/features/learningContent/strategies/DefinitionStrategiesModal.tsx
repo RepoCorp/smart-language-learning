@@ -2,11 +2,11 @@ import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 import ItemViewShell from "../../../components/itemView/ItemViewShell";
 import { useI18n } from "../../../i18n";
 import { locales } from "../locales";
-import type { AffixPatternViewProps } from "../patterns/affix/AffixPatternView";
+import type { DefinitionViewProps } from "../itemViews/types";
 import { getStrategy } from "./registry";
 import "./DefinitionStrategiesModal.css";
 
-export default function DefinitionStrategiesModal({ onClose, ...props }: AffixPatternViewProps & {
+export default function DefinitionStrategiesModal({ onClose, ...props }: DefinitionViewProps & {
   onClose: () => void;
 }): ReactElement {
   const { language } = useI18n();
@@ -33,14 +33,15 @@ export default function DefinitionStrategiesModal({ onClose, ...props }: AffixPa
     <ItemViewShell onClose={close} closeLabel={text.close}>
       <h2 id={headingId}>{text.strategiesTitle}</h2>
       {!display ? <p role="alert">{text.unavailableTranslation}</p> : <>
-        <p className="word-strategies-item-target">{display.title}</p>
-        <select className="word-strategies-select" aria-label={text.strategiesTitle} value={selected}
-          onChange={event => setSelected(event.target.value)}>
-          {props.definition.strategies.map(id => {
-            const registered = getStrategy(id);
-            return <option key={id} value={id}>{registered ? text[registered.label] : text.unavailableStrategy}</option>;
-          })}
-        </select>
+        <div className="strategy-picker">
+          <select className="word-strategies-select" aria-label={text.strategiesTitle} value={selected}
+            onChange={event => setSelected(event.target.value)}>
+            {props.definition.strategies.map(id => {
+              const registered = getStrategy(id);
+              return <option key={id} value={id}>{registered ? text[registered.label] : text.unavailableStrategy}</option>;
+            })}
+          </select>
+        </div>
         {strategy ? <strategy.View {...props} strategyId={selected} interfaceLanguage={interfaceLanguage} />
           : <p role="alert">{text.unavailableStrategy}</p>}
       </>}

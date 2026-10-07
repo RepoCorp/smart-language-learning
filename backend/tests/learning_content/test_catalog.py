@@ -7,6 +7,8 @@ from rest_framework.test import APIClient
 
 from learning.learning_content.catalog import DEFINITIONS
 from learning.learning_content.patterns.affix.languages.german.keit import KEIT
+from learning.learning_content.phrases.languages.german.repeat_request import REPEAT_REQUEST
+from learning.learning_content.words.languages.german.moeglichkeit import MOEGLICHKEIT
 from learning.models import Item, UserAuthToken
 
 
@@ -21,6 +23,19 @@ def client_for(*, admin=False):
 def test_catalog_has_unique_stable_keys():
     assert len({definition.key for definition in DEFINITIONS}) == len(DEFINITIONS)
     assert KEIT in DEFINITIONS
+
+
+@pytest.mark.parametrize(("definition", "key", "item_view"), [
+    (MOEGLICHKEIT, "german_word_moeglichkeit", "word"),
+    (REPEAT_REQUEST, "german_phrase_repeat_request", "phrase"),
+])
+def test_word_and_phrase_previews_register_only_their_item_views(definition, key, item_view):
+    assert definition in DEFINITIONS
+    assert definition.key == key
+    assert definition.language == "german"
+    assert definition.item_view == item_view
+    assert definition.strategies == definition.exercises == ()
+    assert definition.evaluations == {}
 
 
 @pytest.mark.django_db

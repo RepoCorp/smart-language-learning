@@ -21,9 +21,9 @@ afterAll(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 it.each([
-  ["en", "english", "If möglich is possible, how would you say «the possibility»?"],
-  ["es", "spanish", "Si möglich significa posible, ¿cómo dirías «la posibilidad»?"],
-  ["en", "spanish", "If möglich is posible, how would you say «la posibilidad»?"],
+  ["en", "english", "If möglich is «possible», how would you say «the possibility»?"],
+  ["es", "spanish", "Si möglich significa «posible», ¿cómo dirías «la posibilidad»?"],
+  ["en", "spanish", "If möglich is «posible», how would you say «la posibilidad»?"],
 ] as const)("uses a single localized question in %s with %s translations", (interfaceLanguage, sourceLanguage, prompt) => {
   render(<AffixProductionEvaluation definition={keit} sourceLanguage={sourceLanguage} interfaceLanguage={interfaceLanguage} />);
   expect(screen.getByText("möglich").parentElement).toHaveTextContent(prompt);

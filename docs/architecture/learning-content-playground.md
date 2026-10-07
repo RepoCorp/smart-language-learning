@@ -15,6 +15,10 @@ The page needs the backend running with the new catalog endpoint.
 ## What can be tested
 
 - Select a registered definition and inspect its actual item view.
+- Choose `-keit`, the fixed word `die Möglichkeit`, or the fixed phrase
+  `Könnten Sie das bitte wiederholen?`. The selector shows their titles; Definition
+  data still exposes stable keys. The word and phrase include English/Spanish
+  translations and notes for layout checks, without fetching personal items.
 - Change the preview interface and translation languages independently. These
   controls do not change the learner's saved application preferences.
 - Use the narrow preview, or open the page on a phone, to check layout.
@@ -38,8 +42,9 @@ The page needs the backend running with the new catalog endpoint.
 
 The playground is read-only. It does not enroll items, submit reviews, change
 SRS schedules, or call AI providers. Examples, Your words, and both directional
-evaluation previews are connected; exercises remain inactive. Only the new
-`-keit` definition is registered initially.
+evaluation previews are connected for `-keit`; exercises remain inactive. The
+fixed word and phrase currently register only their item views, so their activity
+buttons stay disabled.
 
 ## Adding another definition
 
@@ -49,9 +54,19 @@ The admin-only GET endpoint `/api/admin/learning-content` serializes these
 dataclasses directly; there is no separate production preview-data copy.
 
 Views are registered under `frontend/src/features/learningContent/itemViews/`.
-The current payload/view type supports affixes; adding another kind also requires
-extending the typed payload and registering its view. Missing views and
-translations produce explicit notices rather than substitutions.
+The catalog and shared `DefinitionViewProps` use the base learning definition.
+Affix, word, and phrase families extend it with their own typed payloads. The
+`withDefinition` registration adapter checks family data before rendering its
+specialized view, strategy, or evaluation. Catalog loading validates the base
+contract; incomplete family content, missing views, and missing translations
+produce explicit notices rather than substitutions.
+
+`words/WordView.tsx` and `phrases/PhraseView.tsx` compose the shared header directly.
+They show study text, the selected translation, item type, and notes; the word
+also shows its localized word type. The German word definition supplies the
+article and feminine gender mark explicitly, without language rules in the
+shared shell. These are registered fixed definitions, not saved bank items;
+ordinary word/phrase details and sessions still use the legacy implementation.
 
 The new definition data is independent of the legacy database field names.
 Existing Items still use `german_text` for the learning-language text and
@@ -89,6 +104,9 @@ for content and actions. Existing word/phrase and pattern views use it too.
 Close styling lives beside the shell and remains sticky in scrolling containers;
 the existing modal wrappers still own viewport sizing and modal scrolling.
 The inline playground preview has its own bounded scroll area.
+The definition item view reserves space beside its heading for Close instead
+of giving it a separate row. The strategies modal similarly places Close beside
+its title and omits the repeated item title.
 
 `ItemActions.tsx` renders supplied action groups without knowing the item type or
 language. It preserves tooltips, mobile labels, disabled/highlight states, the
@@ -164,7 +182,7 @@ formatting only; the specialized views decide which information is shown or hidd
 
 - Backend: `docker compose run --rm --no-deps backend pytest tests/learning_content -q`
 - Frontend, from `frontend/`: `env NODE_OPTIONS=--no-experimental-webstorage npm test -- --run tests/learningContent`
-- Browser, from `frontend/`: `npm run test:e2e -- e2e/learning-content.spec.ts e2e/learning-content-bank-words.spec.ts e2e/session-evaluation.spec.ts e2e/evaluation-layout.spec.ts`
+- Browser, from `frontend/`: `npm run test:e2e -- e2e/learning-content.spec.ts e2e/learning-content-bank-words.spec.ts e2e/learning-content-items.spec.ts e2e/session-evaluation.spec.ts e2e/evaluation-layout.spec.ts`
 
 Backend tests check real catalog serialization, access control, and read-only
 methods. Browser tests use a mocked catalog and cover desktop and small-screen
